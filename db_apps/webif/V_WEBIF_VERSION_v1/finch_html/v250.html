@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>V250</title>
+<script language="JavaScript" src="/cgi-bin/allpages.cgi?g=v250.html"></script>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript">
+
+ipm='Either you have not entered all of the numbers \n or some of the numbers you entered are invalid. \n The number in each entry box should be between 0 - 255.';
+
+function submitF()
+{       
+   var f=document.form;
+    
+   if (f.v250icto.value < 0 || f.v250icto.value > 65535)
+   {
+        alert("Error: 'Intercharacter timeout must have a value between 0 and 65535.")
+        f.v250icto.select();
+        return;
+   }
+   document.form.submit();
+} 
+
+</script>
+</head>
+<body onLoad="init();">
+<div id="contentWrapper">
+<% include menu.html %> 
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3>Modem Settings</h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+    <tr><th>Modem Settings</th></tr>
+</table>
+
+<table width="75%">
+<tr>
+<td width="38%">Baud rate</font></td>
+<td> 
+<select name=v250baud size=1 ID="Select3"><option value=300>300</option><option value=1200>1200</option>
+<option value=2400>2400</option><option value=4800>4800</option><option value=9600>9600</option>
+<option value=19200>19200</option><option value=38400>38400</option><option value=57600>57600</option>
+<option value=115200>115200</option>
+</select></td>
+</tr>
+
+<tr>
+<td>Inter Character Timeout</td>
+<td><input type=text name=v250icto size=8 maxLength=5 onkeyup=NumfieldEntry(this);> &nbsp;(0-65535) miliseconds</td>
+</tr>
+
+<tr> 
+<td>Id</td>
+<td><input type=text name=v250id size=32 maxlength=64>&nbsp;</td>
+</tr>
+
+<tr> 
+<td>Ignore String</td>
+<td><input type=text name=v250ignoreStr size=32 maxlength=128>&nbsp;</td>
+</tr>
+</table>
+
+<table width="75%">
+    <tr><th>Connection Settings</th></tr>
+</table>
+
+<table width="75%">
+<tr>
+<td width="38%">Connect to</font></td>
+<td> 
+<script language=Javascript>
+showSelectdialPort();
+</script>
+</td>
+</tr>
+
+<tr>
+<td>DTR Action</td>
+<td> 
+<script language=Javascript>
+showSelectv250dtr();
+</script>
+</td>
+</tr>
+
+<tr>
+<td>DCD Action</td>
+<td> 
+<script language=Javascript>
+showSelectv250dcd();
+</script>
+</td>
+</tr>
+
+<tr>
+<td>Flow Control</td>
+<td> 
+<script language=Javascript>
+showSelectv250fc();
+</script>
+</td>
+</tr>
+
+<tr>
+<td>RI Action</td>
+<td> 
+<script language=Javascript>
+showSelectv250ri();
+</script>
+</td>
+</tr>
+
+<tr>
+<td>Circuit AutoAnswer Rings</td>
+<td> 
+<script language=Javascript>
+showSelectmodemAutoAnswer();
+</script>
+</td>
+</tr>
+<tr> 
+<td>Auto Dial Number</td>
+<td><input type=text name=autoDialNumber size=32 maxlength=64>&nbsp;</td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="center" style="margin-right:25% ">
+<p></p>
+<INPUT TYPE="Button" VALUE="Save" id="bottomButton" onClick="javascript:submitF()">&nbsp;&nbsp;
+<!--INPUT TYPE="Button" VALUE="Help" id="Button1" onClick="window.open('help.htm#status')"-->
+</div>
+</form>
+</div>
+</body>
+<head><meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0"></head>
+</html>

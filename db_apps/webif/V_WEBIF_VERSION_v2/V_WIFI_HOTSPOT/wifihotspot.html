@@ -1,0 +1,1342 @@
+<!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Wireless Hotspot</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<%
+
+function validateInput() {
+#if 0
+	// TODO: validate "required" and range rules
+#endif
+	validateOnOffRadio(form['wirelesshotspotenable']);
+
+	tryConvertStringNumber(form['maxclients']);
+	tryConvertStringNumber(form['defbandwidthmaxdown']);
+	tryConvertStringNumber(form['defbandwidthmaxup']);
+	tryConvertStringNumber(form['defsessiontimeout']);
+	tryConvertStringNumber(form['defidletimeout']);
+#if 0
+	// WARNING: no validation for landingpage
+#endif
+	validateIpAddress(form['startipH'], "", "");
+	validateNetmask(form['netmaskH']);
+	if (form['terofuseH'] != undefined && form['terofuseH'] != "" && form['terofuseH'] != "inttou" && form['terofuseH'] != "notou" && form['terofuseH'] != "exttou" ) {
+		onBadRequest();
+	}
+
+	// WARNING: no validation for exttou
+	// WARNING: no validation for radiusserver1, radiusserver2
+
+	if (form['authsuccredirtoH'] != undefined && form['authsuccredirtoH'] != "" && form['authsuccredirtoH'] != "redirto" && form['authsuccredirtoH'] != "allowintacc") {
+		onBadRequest();
+	}
+
+	tryValidateOnOffRadio(form['authmethodselH']);
+	tryValidateOnOffRadio(form['customselH']);
+#if 0
+	// WARNING: no validation for authsuccredirtopage
+#endif
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+	tryValidateOnOffRadio(form['deprioritisationH']);
+#endif
+	tryValidateOnOffRadio(form['enablelocallanH']);
+	tryValidateOnOffRadio(form['enablemgmtinterfaceH']);
+	tryValidateOnOffRadio(form['enablehotspotclientsH']);
+
+	tryConvertStringNumber(form['locid']);
+#if 0
+	// form['locname'] is required and filtered by function isNameUnsafe
+#endif
+	if (string_regex_match(form['locname'], "^[!()*/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	tryValidateOnOffRadio(form['whiteListEnableH']);
+#if 0
+	// TODO: there should be server side input validation for white list
+#endif
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	if(form['uploadF'] == "upload") {
+		session['filename'] = files['uploadFile'].CLIENT_FILENAME;
+		for (f in files) {
+			var filename = files[f].FILENAME;
+			target = '/opt/cdcs/upload/' + session["filename"];
+			rename(files['uploadFile'].FILENAME, target);
+			retval=set_single( 'service.wirelesshotspot.upload_filename=' + session["filename"] );
+			retval=set_single( 'service.wirelesshotspot.upload_done=1' );
+		}
+		syslog(7, "File upload form posted");
+		redirect('/wifihotspot.html?fileuploadok');
+	}
+	else {
+		syslog(7, "Settings changed form posted");
+		tempval = form['wirelesshotspotenable'];
+		retval = set_single( 'service.wirelesshotspot.enable='+tempval, '-p' );
+		if(tempval == '0') {
+			retval = set_single( 'service.wirelesshotspot.status=Disabled' );
+			retval = set_single( 'wlan.hotspot.ssid=none', '-p' );
+		}
+		else {
+			validateInput();
+
+			set_single( 'service.wirelesshotspot.status=Enabled' );
+			tempval = form['wanI'];
+			retval = set_single( 'service.wirelesshotspot.waninterface='+tempval, '-p' );
+			tempval = form['lanI'];
+			retval = set_single( 'service.wirelesshotspot.laninterface='+tempval, '-p' );
+			retval = set_single( 'wlan.hotspot.ssid='+tempval, '-p' );
+			tempval = form['maxclients'];
+			retval = set_single( 'service.wirelesshotspot.maxclients='+tempval, '-p' );
+			tempval = form['defbandwidthmaxdown'];
+			retval = set_single( 'service.wirelesshotspot.bandwidthmaxdown='+tempval, '-p' );
+			tempval = form['defbandwidthmaxup'];
+			retval = set_single( 'service.wirelesshotspot.bandwidthmaxup='+tempval, '-p' );
+			tempval = form['defsessiontimeout'];
+			retval = set_single( 'service.wirelesshotspot.sessiontimeout='+tempval, '-p' );
+			tempval = form['defidletimeout'];
+			retval = set_single( 'service.wirelesshotspot.idletimeout='+tempval, '-p' );
+			tempval = form['ssid'];
+			retval = set_single( 'service.wirelesshotspot.ssid='+tempval, '-p' );
+			tempval = form['landingpage'];
+			retval = set_single( 'service.wirelesshotspot.landingpage='+tempval, '-p' );
+			tempval = form['startipH'];
+			retval = set_single( 'service.wirelesshotspot.startIP='+tempval, '-p' );
+			tempval = form['netmaskH'];
+			retval = set_single( 'service.wirelesshotspot.netmask='+tempval, '-p' );
+			tempval = form['terofuseH'];
+			retval = set_single( 'service.wirelesshotspot.termsofuse='+tempval, '-p' );
+			tempval = form['inttou'];
+			retval = set_single( 'service.wirelesshotspot.inttou='+tempval, '-p' );
+			tempval = form['exttou'];
+			retval = set_single( 'service.wirelesshotspot.exttou='+tempval, '-p' );
+			tempval = form['radiusserver1'];
+			retval = set_single( 'service.wirelesshotspot.radiusserver1='+tempval, '-p' );
+			tempval = form['radiusserver2'];
+			retval = set_single( 'service.wirelesshotspot.radiusserver2='+tempval, '-p' );
+			tempval = form['sharedsecret'];
+			retval = set_single( 'service.wirelesshotspot.sharedsecret='+tempval, '-p' );
+			tempval = form['authport'];
+			retval = set_single( 'service.wirelesshotspot.authport='+tempval, '-p' );
+			tempval = form['authsuccredirtoH'];
+			retval = set_single( 'service.wirelesshotspot.authsuccredirto='+tempval, '-p' );
+			tempval = form['authmethodselH'];
+			retval = set_single( 'service.wirelesshotspot.authmethodsel='+tempval, '-p' );
+			tempval = form['customselH'];
+			retval = set_single( 'service.wirelesshotspot.customsel='+tempval, '-p' );
+			tempval = form['authsuccredirtopage'];
+			retval = set_single( 'service.wirelesshotspot.authsuccredirtopage='+tempval, '-p' );
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+			tempval = form['deprioritisationH'];
+			retval = set_single( 'service.wirelesshotspot.deprioritisation='+tempval, '-p' );
+#endif
+			tempval = form['enablelocallanH'];
+			retval = set_single( 'service.wirelesshotspot.enablelocallan='+tempval, '-p' );
+			tempval = form['enablemgmtinterfaceH'];
+			retval = set_single( 'service.wirelesshotspot.enablemgmtinterface='+tempval, '-p' );
+			tempval = form['enablehotspotclientsH'];
+			retval = set_single( 'service.wirelesshotspot.enablehotspotclients='+tempval, '-p' );
+			tempval = form['ext_radius'];
+			retval = set_single( 'service.wirelesshotspot.ext_radius='+tempval, '-p' );
+			tempval = form['locid'];
+			retval = set_single( 'service.wirelesshotspot.ext_locid='+tempval, '-p' );
+			tempval = form['locname'];
+			retval = set_single( 'service.wirelesshotspot.ext_locname='+tempval, '-p' );
+			tempval = form['whiteListEnableH'];
+			retval = set_single( 'service.wirelesshotspot.whitelistenable='+tempval, '-p' );
+			tempval = form['whiteListTableH'];
+			retval = set_single( 'service.wirelesshotspot.whitelisttable='+tempval, '-p' );
+
+		}
+		redirect('/wifihotspot.html?success');
+	}
+}
+else { /*GET*/
+	tempval = get_single( 'service.wirelesshotspot.enable' );
+	form['wirelesshotspotenable'] = tempval;
+	if(tempval == '0') {
+		retval = set_single( 'service.wirelesshotspot.status=Disabled' );
+	}
+	else {
+		form['wanI'] = get_single( 'service.wirelesshotspot.waninterface' );
+	}
+	form['lanI'] = base64_encode(get_single( 'service.wirelesshotspot.laninterface' ));
+	form['maxclients'] = get_single( 'service.wirelesshotspot.maxclients' );
+	form['defbandwidthmaxdown'] = get_single( 'service.wirelesshotspot.bandwidthmaxdown' );
+	form['defbandwidthmaxup'] = get_single( 'service.wirelesshotspot.bandwidthmaxup' );
+	form['defsessiontimeout'] = get_single( 'service.wirelesshotspot.sessiontimeout' );
+	form['defidletimeout'] = get_single( 'service.wirelesshotspot.idletimeout' );
+	form['ssid'] = base64_encode(get_single( 'service.wirelesshotspot.ssid' ));
+	form['landingpage'] = base64_encode(get_single( 'service.wirelesshotspot.landingpage' ));
+	form['startipH'] = get_single( 'service.wirelesshotspot.startIP' );
+	form['netmaskH'] = get_single( 'service.wirelesshotspot.netmask' );
+	form['terofuseH'] = get_single( 'service.wirelesshotspot.termsofuse' );
+	form['inttou'] = base64_encode(get_single( 'service.wirelesshotspot.inttou' ));
+	form['exttou'] = base64_encode(get_single( 'service.wirelesshotspot.exttou' ));
+	form['radiusserver1'] = base64_encode(get_single( 'service.wirelesshotspot.radiusserver1' ));
+	form['radiusserver2'] = base64_encode(get_single( 'service.wirelesshotspot.radiusserver2' ));
+	form['sharedsecret'] = base64_encode(get_single( 'service.wirelesshotspot.sharedsecret' ));
+	form['reentersharedsecret'] = form['sharedsecret'];
+	form['authport'] = base64_encode(get_single( 'service.wirelesshotspot.authport' ));
+	form['authsuccredirtoH'] = get_single( 'service.wirelesshotspot.authsuccredirto' );
+	form['authmethodselH'] = get_single( 'service.wirelesshotspot.authmethodsel' );
+	form['customselH'] = get_single( 'service.wirelesshotspot.customsel' );
+	form['authsuccredirtopage'] = base64_encode(get_single( 'service.wirelesshotspot.authsuccredirtopage' ));
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+	form['deprioritisationH'] = get_single( 'service.wirelesshotspot.deprioritisation' );
+#endif
+	form['enablelocallanH'] = get_single( 'service.wirelesshotspot.enablelocallan' );
+	form['enablemgmtinterfaceH'] = get_single( 'service.wirelesshotspot.enablemgmtinterface' );
+	form['enablehotspotclientsH'] = get_single( 'service.wirelesshotspot.enablehotspotclients' );
+	form['ext_radius'] = base64_encode(get_single( 'service.wirelesshotspot.ext_radius' ));
+	form['locid'] = get_single( 'service.wirelesshotspot.ext_locid' );
+	form['locname'] = get_single( 'service.wirelesshotspot.ext_locname' );
+	form['whiteListEnableH'] = get_single( 'service.wirelesshotspot.whitelistenable' );
+	form['whiteListTableH'] = base64_encode(get_single( 'service.wirelesshotspot.whitelisttable' ));
+}
+%>
+
+<script language="JavaScript">
+#include "net_util.js"
+
+var secs
+var timerID = null
+var timerRunning = false
+var timeout = 5
+var delay = 1000
+
+function CreateWANOptions() {
+	var i=0;
+	document.form.wanI.options[i++] = new Option("Auto");
+	//  if(i == document.form.wanI.options.length)
+	//   document.form.wanI.options[i-1].selected = true;
+	$("#wanI").val("@@form['wanI']");
+}
+
+#ifdef V_WIFI_MBSSID
+function CreateLANOptions() {
+	var i=0;
+	var ssid1=<%val=base64_encode(get_single( 'wlan.0.ssid'));%>Base64.decode("@@val");
+	var ssid2=<%val=base64_encode(get_single( 'wlan.1.ssid'));%>Base64.decode("@@val");
+	var ssid3=<%val=base64_encode(get_single( 'wlan.2.ssid'));%>Base64.decode("@@val");
+	var ssid4=<%val=base64_encode(get_single( 'wlan.3.ssid'));%>Base64.decode("@@val");
+	var ssid5=<%val=base64_encode(get_single( 'wlan.4.ssid'));%>Base64.decode("@@val");
+	if(1 == <%val=get_single( 'wlan.0.enable');%>"@@val")
+	document.form.lanI.options[i++] = new Option(ssid1);
+	if(1 == <%val=get_single( 'wlan.1.enable');%>"@@val")
+	document.form.lanI.options[i++] = new Option(ssid2);
+	if(1 == <%val=get_single( 'wlan.2.enable');%>"@@val")
+	document.form.lanI.options[i++] = new Option(ssid3);
+	if(1 == <%val=get_single( 'wlan.3.enable');%>"@@val")
+	document.form.lanI.options[i++] = new Option(ssid4);
+	if(1 == <%val=get_single( 'wlan.4.enable');%>"@@val")
+	document.form.lanI.options[i++] = new Option(ssid5);
+
+	//  if(i == document.form.lanI.options.length)
+	//   document.form.lanI.options[i-1].selected = true;
+	$("#lanI").val(Base64.decode("@@form['lanI']"));
+}
+#else
+function CreateLANOptions() {
+	var ssid1=<%val=get_single( 'wlan.0.ssid');%>"@@val";
+	document.form.lanI.options[0] = new Option(ssid1);
+	$("#lanI").val(Base64.decode("@@form['lanI']"));
+}
+#endif
+
+function minmax(value, min, max) {
+	if(parseInt(value) < min)
+		return min;
+	else if(parseInt(value) > max)
+		return max;
+	else
+		return value;
+}
+function InitializeTimer() { // Set the length of the timer, in seconds
+	secs = timeout
+	StopTheClock()
+	StartTheTimer()
+}
+
+function StopTheClock() {
+	if(timerRunning)
+		clearTimeout(timerID)
+	timerRunning = false
+}
+
+var http_request = false;
+function StartTheTimer(){
+	if (secs==0) {
+		StopTheClock()
+		$.get("/cgi-bin/wifihotspot.cgi", alertContents);
+		secs = timeout
+		StartTheTimer()
+	}
+	else {
+		self.status = secs
+		secs = secs - 1
+		timerRunning = true
+		timerID = self.setTimeout("StartTheTimer()", delay)
+	}
+}
+
+function alertContents(responseText) {
+	eval(responseText);
+}
+
+
+function checkWirelessHotspotConf() {
+	if($("#wirelesshotspotEnable-0").is(":checked"))
+		greyOutMappingFields();
+	else
+		unGreyOutMappingFields();
+}
+InitializeTimer();
+
+function submitF1() {
+	var fileInput = $('.upload-file');
+	var fileSize = fileInput.get(0).files[0].size;
+	$.get('/cgi-bin/get_files.cgi?getfilelist');
+
+	if(fileSize > (size_remaining * 1024)) {
+		validate_alert("", _("fileSizeExceeded"));
+		return;
+        }
+	$("button").attr("disabled",true);
+	document.form1.submit();
+}
+
+function submitF() {
+	clear_alert();
+	if(document.form.authmethodselH.value=="0") {
+		if(document.form.sharedsecret.value != document.form.reentersharedsecret.value) {
+			validate_alert("", _("sharedSecrtsDontMatch"));//Shared Secrets do not match!
+			return;
+		}
+	}
+
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#maxclients").valid() || !$("#defbandwidthmaxdown").valid() || !$("#defbandwidthmaxup").valid() || !$("#defsessiontimeout").valid() || !$("#defidletimeout").valid()) {
+		validate_alert("","");
+		return;
+	}
+#else
+	if(validate_shared_secret(document.form.sharedsecret.value) == false ) {
+		alert(_("sharedSecretValidationFailed")); //'Shared Secret should be between 8 and 63 ASCII characters or 64 hexadecimal digits.'
+		return 0;
+	}
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	$("#startipH").val(load_value_from_element('startip'));
+	$("#netmaskH").val(load_value_from_element('netmask'));
+
+	var tbl={rdb_val:"", ip_ids:"", domain_ids:""};
+	var elementTbl= convert_elements_to_rdb();
+
+#ifdef V_WEBIF_SPEC_vdf
+	//Do not need to do validation check for IP address fields, it is done with generic functions.
+	if (typeof(elementTbl.domain_ids) != "undefined" && elementTbl.domain_ids != "") {
+		if(!$(elementTbl.domain_ids).valid()) {
+			validate_alert("","");
+			return;
+		}
+	}
+#endif
+
+	document.form.whiteListTableH.value = elementTbl.rdb_val;
+
+	document.form.submit();
+}
+
+function check_enable(value) {
+  if(value==1) {
+      <%APradio=get_single('wlan.0.radio');%>
+      if("@@APradio" != "1") {
+	  blockUI_alert(_("wirelesshotspotStartWarning"));
+	  el="input:radio.access[name=wirelesshotspotEnable]";
+	  load_value_to_element(el,false);
+	  $("#wirelesshotspot_configuration").css("display", "none");
+      }
+      else {
+	  $("#wirelesshotspot_configuration").css("display","");
+      }
+  }
+  else {
+      $("#wirelesshotspot_configuration").css("display","none");
+  }
+}
+
+var redirectProtocol = (location.href.search("^https") != -1)? "https":"http";
+function pView(page){
+	var own_addr=<%val=get_single( 'link.profile.0.address');%>"@@val";
+	window.open(redirectProtocol+"://"+own_addr+"/upload/"+page);
+	return true;
+}
+
+function sharedsecret_window() {
+  var sh_window = window.open("", "", "toolbar=no,width=500,height=100");
+  if(Butterlate.getLang()=="ar")
+        sh_window.document.write("<style>body { direction:rtl; }</style>");
+        sh_window.document.write(_("Shared secret is")+"<b>&nbsp;"+$("#sharedsecret").val()+"</b>");
+        sh_window.document.close();
+}
+
+function WinExpIP_0(field,event) {
+	if( field.value=="") {
+		if($(field).hasClass("required")) {
+			$(field).valid();
+		}
+	}
+	else {
+		if(isNValidIP(field.value))
+			validate_alert( "", _("ip warningMsg3"));
+		else
+			clear_alert();
+	}
+}
+
+function htmlGenIpBlocksWithoutRequired0(name_in, ipaddr) {
+	var res = ""
+	var ip_array;
+	ip_array=ipaddr.split(".");
+	if(ip_array.length != 4 ) {ip_array[0]=''; ip_array[1]='';ip_array[2]=''; ip_array[3]='';}
+	
+	res="<div class='field'><input type='text' class='ip-adress' maxLength='3' name='"+name_in+"1' id='"+name_in+"1' onkeyup='NumfieldEntry(this);WinExpIP_0(this,event)' value='"+htmlNumberEncode(ip_array[0])+"'></div>	<label for='"+name_in+"1' class='input-connect-dot'>.</label>\
+		<div class='field'><input type='text' class='ip-adress' maxLength='3' name='"+name_in+"2' id='"+name_in+"2' onkeyup='NumfieldEntry(this);WinExpIP_0(this,event)' value='"+htmlNumberEncode(ip_array[1])+"'></div>	<label for='"+name_in+"2' class='input-connect-dot'>.</label>\
+		<div class='field'><input type='text' class='ip-adress' maxLength='3' name='"+name_in+"3' id='"+name_in+"3' onkeyup='NumfieldEntry(this);WinExpIP_0(this,event)' value='"+htmlNumberEncode(ip_array[2])+"'></div>	<label for='"+name_in+"3' class='input-connect-dot'>.</label>\
+		<div class='field'><input type='text' class='ip-adress' maxLength='3' name='"+name_in+"4' id='"+name_in+"4' onkeyup='NumfieldEntry(this);WinExpIP_0(this,event)' value='"+htmlNumberEncode(ip_array[3])+"'></div>	<label for='"+name_in+"4' class='input-connect-dot'></label>";
+
+ return res;
+}
+
+function toggleWLType(obj, idx) {
+	var curr_val = $(obj).val();
+	if (curr_val == "ip") { // ip address mode
+		$('#td_ipAddr-'+idx).css('display', '');
+		$('#td_domain-'+idx).css('display', 'none');
+	}
+	else { // Domain mode
+		$('#td_ipAddr-'+idx).css('display', 'none');
+		$('#td_domain-'+idx).css('display', '');
+	}
+}
+
+var whitelist_table= new Array();
+var nextIndex=0;
+var maxNumOfEntries=10;
+
+function addEntry() {
+
+	if ($("#RulesList > tr").length >= maxNumOfEntries)
+		return;
+
+	if (addTableRow(nextIndex,"dom","","")) {
+		nextIndex++;
+	}
+}
+
+function delEntry(idx) {
+	nextIndex--;
+	for (var i = Number(idx); i < nextIndex; i ++) {
+		var ipAddr = load_value_from_element("inp_ip_addr-"+(i+1));
+		load_value_to_element("inp_ip_addr-"+i, ipAddr);
+
+		var domainN=$("#inp_domain-"+(i+1)).val();
+		$("#inp_domain-"+i).val(domainN);
+
+		var selType = $("#sel_type-"+ (i+1) +" option:selected").val();
+		$("#sel_type-"+i).val(selType);
+
+		toggleWLType($("#sel_type-"+i), i);
+	}
+	$("#RulesList").children("#tr_whitelist"+nextIndex).remove();
+}
+
+function convert_elements_to_rdb() {
+	var tbl={rdb_val:"", ip_ids:"", domain_ids:""};
+	var tbl_rdb=new Array();
+	var tbl_ip_ids=new Array();
+	var tbl_domain_ids=new Array();
+
+	for (var i = 0; i < nextIndex; i ++) {
+		var selType = $("#sel_type-"+ i +" option:selected").val();
+		var ipAddr = load_value_from_element("inp_ip_addr-"+i);
+		var domainN=$("#inp_domain-"+i).val();
+
+		if (selType == "ip")
+			tbl_ip_ids.push("#inp_ip_addr-"+i);
+		else
+			tbl_domain_ids.push("#inp_domain-"+i);
+
+		tbl_rdb.push(selType + "," + ipAddr + "," + domainN)
+	}
+	tbl.rdb_val = tbl_rdb.join(";");
+	tbl.ip_ids = tbl_ip_ids.join(",");
+	tbl.domain_ids = tbl_domain_ids.join(",");
+	return tbl;
+}
+
+function create_whitelist_table_from_rdb (rdb_val) {
+	// Formation of rdb_val => type0,ip_addr0,domain_name0;type1,ip_addr1,domain_name1; ... ;typeN,ip_addrN,domain_nameN
+	// example of rdb_val => ip,111.111.111.111,;ip,222.222.222.222,;dom,,google.com
+	var retTbl=new Array();
+
+	$.each(rdb_val.split(";"), function(i,val) {
+		if (val != "" && val != "N/A") {
+			// cols[0] --> type(ip: ip address, dom: domain name)
+			// cols[1] --> ip address
+			// cols[2] --> Domain name
+			var cols=val.split(",");
+			if (cols.length == 3) {
+				var entry = {entryType:cols[0], entryIpAddr:cols[1], entryDomain:cols[2]};
+				retTbl.push(entry);
+			}
+		}
+	});
+
+	return retTbl;
+}
+
+function addTableRow(idx ,entryType, entryIpAddr, entryDomain) {
+		var ipAddr="", ipDispNone="";
+		var domainName="", domainDispNone="";
+		var h="";
+
+		if ($("#RulesList").children("#tr_whitelist"+idx).length !=0) // The element already exists.
+			return false;
+		
+		if (typeof(entryType) == "undefined" || typeof(entryIpAddr) == "undefined"  || typeof(entryDomain) == "undefined")
+			return false;
+
+		if (entryType != "ip" && entryType != "dom")
+			return false;
+
+		if (entryType == "ip")  // ip address type
+			domainDispNone="style='display:none'";
+		else
+			ipDispNone="style='display:none'";
+
+		ipAddr=entryIpAddr;
+		domainName=entryDomain;
+
+		h+="<tr id='tr_whitelist" + idx + "'>";
+		h+="<td><select id='sel_type-"+idx+"' size='1' class='large' onChange='toggleWLType(this, "+idx+")'><option value='dom' "+(entryType != "ip" ? 'selected' : '')+">Domain name</option><option value='ip' "+(entryType == "ip" ? 'selected' : '')+">IP address</option></select></td>";
+		h+="<td id='td_ipAddr-"+idx+"' " + ipDispNone + "><div class='field'>" + htmlGenIpBlocksWithoutRequired0("inp_ip_addr-"+idx, ipAddr) + "</div></td>";
+		h+="<td id='td_domain-"+idx+"' " + domainDispNone + "><div class='field'><input id='inp_domain-"+idx+"' type='text' class='large validate[required, funcCall[validate_domainName] required domainName' value='"+ htmlNumberEncode(domainName) +"'></div></td>";
+
+		h+="<td class='last'><a href='javascript:delEntry("+idx+")' class=\"secondary sml\" style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close sml'></i></a></td>"
+
+		h+="</tr>"
+
+		$("#RulesList").append(h);
+		return true;
+}
+
+function init_RulesList(tbl) {
+	$.each(tbl, function(idx,val) {
+		if ( ($("#RulesList > tr").length < maxNumOfEntries) && (typeof(val) != "undefined")) {
+			if (addTableRow(nextIndex,val.entryType,val.entryIpAddr,val.entryDomain)) {
+				nextIndex++;
+			}
+		}
+	});
+}
+
+function init_whitelist() {
+	whitelist_table = create_whitelist_table_from_rdb(Base64.decode("@@form['whiteListTableH']"));
+	init_RulesList(whitelist_table);
+}
+</script>
+
+#ifdef V_WEBIF_SPEC_vdf
+<style>.bubble{float:left;margin:0 0 5px 10px;left:350px;}</style>
+#endif
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+		<%appendCsrfToken();%>
+		<div class="alpha hotspotEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+
+		<div class="right-column hide_for_hotspot_en white-box">
+		<div class="pad">
+			<h2><script language=Javascript>document.write(_("wirelessHotspotConfig"))</script></h2>
+			<div class="form-row no-bg-form">
+				<label for="field-0"><script language=Javascript>document.write(_("hotSpotFunc"))</script></label>
+				<div class="field">
+					<div class="location-settings">
+						<div class="radio-switch">
+							<input type="radio" id="wirelesshotspotEnable-0" name="wirelesshotspotEnable" class="access" value=1>
+							<label for="wirelesshotspotEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+							<input type="radio" id="wirelesshotspotEnable-1" name="wirelesshotspotEnable" class="access" value=0 onClick="$('#wirelesshotspot_configuration').css('display','none');document.form.wirelesshotspotenable.value='0';">
+							<label for="wirelesshotspotEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="grey-box" id="wirelesshotspot_configuration" >
+				<input type="hidden" name="wirelesshotspotenable" value="@@form['wirelesshotspotenable']"/>
+				<input type="hidden" name="enablelocallanH" id="enablelocallanH" value="@@form['enablelocallanH']"/>
+				<input type="hidden" name="enablemgmtinterfaceH" id="enablemgmtinterfaceH" value="@@form['enablemgmtinterfaceH']"/>
+				<input type="hidden" name="enablehotspotclientsH" id="enablehotspotclientsH" value="@@form['enablehotspotclientsH']"/>
+				<input type="hidden" name="authsuccredirtoH" id="authsuccredirtoH" value="@@form['authsuccredirtoH']"/>
+				<input type="hidden" name="authmethodselH" id="authmethodselH" value="@@form['authmethodselH']"/>
+				<input type="hidden" name="customselH" id="customselH" value="@@form['customselH']"/>
+				<input type="hidden" name="startipH" id="startipH" value="@@form['startipH']"/>
+				<input type="hidden" name="netmaskH" id="netmaskH" value="@@form['netmaskH']"/>
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+				<input type="hidden" name="deprioritisationH" id="deprioritisationH" value="@@form['deprioritisationH']"/>
+#endif
+				<input type="hidden" name="terofuseH" id="terofuseH" value="@@form['terofuseH']"/>
+				<input type="hidden" name="wirelesshotspotserver" value="@@form['wirelesshotspotserver']"/>
+				<input type="hidden" name="menuredironsuccauth" id="menuredironsuccauth"/>
+				<input type="hidden" name="ext_radius" id="ext_radius"/>
+				<input type="hidden" name="whiteListEnableH" id="whiteListEnableH" value="@@form['whiteListEnableH']"/>
+				<input type="hidden" name="whiteListTableH" id="whiteListTableH" value="@@form['whiteListTableH']"/>
+				<div class="form-row no-bg-form">
+					<label for="radiusUAM"><script language=Javascript>document.write(_("publicHotspotService"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="radiusUAM-0" name="radiusUAM" class="access" value="1">
+								<label for="radiusUAM-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="radiusUAM-1" name="radiusUAM" class="access" value="0">
+								<label for="radiusUAM-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div id="ext_radius_show">
+					<div class="form-row no-bg-form">
+						<fieldset>
+							<label for="laninterface_title"><script language=Javascript>document.write(_("server"))</script></label>
+							<div class="field">
+								<select name="UAMserver" id="UAMserver" size="1" >
+									<option value="hotspotsystem">hotspotsystem.com</option>
+								</select>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row">
+						<label for="locid"><script language=Javascript>document.write(_("locationID"))</script></label>
+						<div class="field">
+						<input type="text" class="validate[required, funcCall[validate_locid]] required locid large" name="locid" id="locid" maxlength=5 onKeyUp='NumfieldEntry(this)' value="@@form['locid']">
+						</div>
+						<div>
+						<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("oneTo99999"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="locname"><script language=Javascript>document.write(_("operatorName"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required] required large" name="locname" id="locname" onKeyUp="nameFilter(this);" value="@@form['locname']">
+						</div>
+					</div>
+				</div>
+				<div id="laninterface" class="form-row no-bg-form">
+					<fieldset>
+						<label for="laninterface_title"><script language=Javascript>document.write(_("ssid"))</script></label>
+						<div class="field">
+							<select name="lanI" id="lanI" size="1" value="" ></select>
+						</div>
+					</fieldset>
+				</div>
+				<div id="ext_radius_hide">
+					<div class="form-row">
+						<label for="maxclients"><script language=Javascript>document.write(_("maxCliConn"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required, funcCall[validate_maxclients] required validate_maxclients large" name="maxclients" id="maxclients" maxlength=3 onKeyUp="NumfieldEntry(this);" value="@@form['maxclients']">
+#ifndef V_WEBIF_SPEC_vdf
+							<span class="normal-text">&nbsp;&nbsp;(1-127)</span>
+							<div style="float:right">
+								<a id="info1" style="background-color:transparent;" title="Value must not be greater than the Maximum number of clients configured for the AP"><i id="net-info"></i></a>
+							</div>
+#else
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;&nbsp;(1-127)</span>
+#endif
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="defbandwidthmaxdown"><script language=Javascript>document.write(_("maxDownBand"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required, funcCall[validate_bandwidthmaxdown]] required bandwidthmaxdown large" name="defbandwidthmaxdown" id="defbandwidthmaxdown" maxlength=10 onKeyUp='NumfieldEntry(this)' value="@@form['defbandwidthmaxdown']">
+						</div>
+						<div>
+							<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("kbitsPerSec"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="defbandwidthmaxup"><script language=Javascript>document.write(_("maxUpBand"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required, funcCall[validate_bandwidthmaxup]] required bandwidthmaxup large" name="defbandwidthmaxup" id="defbandwidthmaxup" maxlength=10 onKeyUp='NumfieldEntry(this)' value="@@form['defbandwidthmaxup']">
+						</div>
+						<div>
+							<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("kbitsPerSec"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="defsessiontimeout"><script language=Javascript>document.write(_("sessTout"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required, funcCall[validate_sessTout]] required sessTout large" name="defsessiontimeout" id="defsessiontimeout" maxlength=10 onKeyUp='NumfieldEntry(this)' value="@@form['defsessiontimeout']">
+						</div>
+						<div>
+							<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("mins"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="defidletimeout"><script language=Javascript>document.write(_("idlTout"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required, funcCall[validate_idlTout]] required idlTout large" name="defidletimeout" id="defidletimeout" maxlength=10 onKeyUp='NumfieldEntry(this)' value="@@form['defidletimeout']">
+						</div>
+						<div>
+							<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("mins"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="startip"><script language=Javascript>document.write(_("startIp"))</script></label>
+						<script language=javascript>htmlGenIpBlocks("startip");</script>
+					</div>
+					<div class="form-row">
+						<label for="netmask"><script language=Javascript>document.write(_("netmask"))</script></label>
+						<script language=javascript>htmlGenMaskBlocks("netmask");</script>
+					</div>
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+					<div class="form-row no-bg-form">
+						<label for="deprioritisationL"><script language=Javascript>document.write(_("deprioritisation"))</script></label>
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="deprioritisation-0" name="deprioritisation" class="access" onClick="$('#deprioritisationH').val(this.value);" value=1>
+								<label for="deprioritisation-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="deprioritisation-1" name="deprioritisation" class="access" onClick="$('#deprioritisationH').val(this.value);" value=0>
+								<label for="deprioritisation-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+#endif
+#ifndef V_WEBIF_SPEC_vdf
+                                        <div>
+#else
+					<div style="display:none">
+#endif
+						<label for="authopt"><script language=Javascript>document.write(_("authOpt"))</script></label>
+						<div class="form-row">
+							<label for="authmethodsel-1"></label>
+							<div class="radio-box-group">
+								<div class="radio-box">
+									<input type="radio" name="amethsel" class="access" id="amethsel-1" onClick="$('#notouid').css('display', 'none');$('#radsettings').css('display', 'none');$('#authmethodselH').val(this.value);" value="1">
+									<label for="amethsel-1"><div class="radiotext"><script language=Javascript>document.write(_("locUsrSet"))</script></div></label>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label for="authmethodsel-0"></label>
+							<div class="radio-box-group">
+								<div class="radio-box">
+									<input type="radio" name="amethsel" class="access" id="amethsel-0" onClick="$('#radsettings').css('display', '');$('#locsettings').css('display', 'none');$('#notouid').css('display', '');$('#authmethodselH').val(this.value);" value="0">
+									<label for="amethsel-0"><div class="radiotext"><script language=Javascript>document.write(_("radSet"))</script></div></label>
+								</div>
+							</div>
+							<div id="radsettings">
+								<div class="form-row" style="margin-top:20px">
+									<label for="Server Address 1"><script language=Javascript>document.write(_("radSrvr1"))</script></label>
+									<input type="radiusserver1" class="validate[required] required large" name="radiusserver1" id="radiusserver1">
+								</div>
+								<div class="form-row">
+									<label for="Server Address 2"><script language=Javascript>document.write(_("radSrvr2"))</script></label>
+									<input type="radiusserver2" class="validate[required] required large" name="radiusserver2" id="radiusserver2">
+								</div>
+								<div class="form-row">
+									<label for="Authport"><script language=Javascript>document.write(_("authPort"))</script></label>
+									<input type="text" class="validate[required] required large" name="authport" id="authport">
+								</div>
+								<div class="form-row">
+									<label for="ssid"><script language=Javascript>document.write(_("ssid"))</script></label>
+									<input type="ssid" class="validate[required] required large" name="ssid" id="ssid">
+								</div>
+								<div class="form-row">
+									<label for="Shared Secret"><script language=Javascript>document.write(_("sharedSecrt"))</script></label>
+									<input type="password" class="validate[required] required large" maxlength='64' name="sharedsecret" id="sharedsecret">
+									<a style="color:BLUE" href="javascript:sharedsecret_window()"><script language="JavaScript">document.write(_("clickHereToDisplay"))</script></a>
+								</div>
+								<div class="form-row">
+									<label for="Re-Enter Shared Secret"><script language=Javascript>document.write(_("reEntSharedSecrt"))</script></label>
+									<input type="password" class="validate[required] required large" name="reentersharedsecret" id="reentersharedsecret">
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<b id="rouaccperm"><script language=Javascript>document.write(_("routrAccessPerm"))</script></b>
+						<div class="form-row no-bg-form">
+							<label for="enablelocallanL"><script language=Javascript>document.write(_("locLan"))</script></label>
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="enablelocallan-0" name="enablelocallan" class="access" onClick="$('#enablelocallanH').val(this.value);" value=1>
+									<label for="enablelocallan-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="enablelocallan-1" name="enablelocallan" class="access" onClick="$('#enablelocallanH').val(this.value);" value=0>
+									<label for="enablelocallan-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+						<div class="form-row no-bg-form">
+							<label for="enablemgmtinterface"><script language=Javascript>document.write(_("routrMgmt"))</script></label>
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="enablemgmtinterface-0" name="enablemgmtinterface" class="access" value=1 onClick="$('#enablemgmtinterfaceH').val(this.value);">
+									<label for="enablemgmtinterface-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="enablemgmtinterface-1" name="enablemgmtinterface" class="access" value=0 onClick="$('#enablemgmtinterfaceH').val(this.value);">
+									<label for="enablemgmtinterface-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<b id="pageRedir"><script language=Javascript>document.write(_("pageRedir"))</script></b>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="authsuccredirto"><script language=Javascript>document.write(_("pageRedir"))</script></label>
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="authsuccredirto-0" name="authsuccredirto" class="access" onClick="$('#redto').css('display', '');$('#authsuccredirtoH').val(this.value);" value="redirto">
+								<label for="authsuccredirto-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="authsuccredirto-1" name="authsuccredirto" class="access" onClick="$('#redto').css('display', 'none');$('#authsuccredirtoH').val(this.value);" value="allowintacc">
+								<label for="authsuccredirto-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+					<div class="form-row" id="redto">
+						<label for="authsuccredirtopage"><script language=Javascript>document.write(_("Redirect URL"))</script></label>
+						<div class="field">
+						<input type="authsuccredirtopage" class="validate[required] required large" name="authsuccredirtopage" id="authsuccredirtopage">
+						<span class="normal-text">&nbsp;(exclude http://)</span>
+						</div>
+					</div>
+					</form>
+
+					<div id="fileUpload">
+						<form id="form1" name="form1" class="content" method="POST" action="@@request['SCRIPT_NAME']?uploadF=upload" enctype="multipart/form-data">
+						<%appendCsrfToken();%>
+						<div class="form-row no-bg-form" style="padding-right:10px;">
+							<b id="landPageFileUpload"><script language=Javascript>document.write(_("Page customization"))</script></b>
+							<div class="form-row">
+								<label for="uploadFile"><script language=Javascript>document.write(_("Upload file"))</script></label>
+								<span class="file-wrapper">
+									<input class="upload-file" type="file" name="uploadFile">
+									<span class="secondary button" id="uploadFileText" ><script language=Javascript>document.write(_("chooseFile"))</script></span>
+									<span class="normal-text">(tar.gz,zip,bz2)</span>
+								</span>
+							</div>
+							<div class="form-row">
+								<label for="uploadF"></label>
+								<button type="button" class="secondary" name="uploadF" onClick="javascript:submitF1();" value="upload" style="margin-left:0"><script language=Javascript>document.write(_("upload"))</script></button>
+							</div>
+						</div>
+						</form>
+					</div>
+					<div class="form-row no-bg-form" style="padding-right:10px;">
+						<label for="customsel"><script language=Javascript>document.write(_("customOpt"))</script></label>
+						<div class="form-row">
+							<label for="customsel-0"></label>
+							<div class="radio-box-group">
+								<div class="radio-box">
+									<input type="radio" name="customsel" class="access" id="customsel-0" onClick="$('#customselH').val(this.value);$('#previewpane').css('display', 'none');" value="0">
+									<label for="customsel-0"><div class="radiotext"><script language=Javascript>document.write(_("defaultSet"))</script></div></label>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="customsel-1"></label>
+							<div class="radio-box-group">
+								<div class="radio-box">
+				 					<input type="radio" name="customsel" class="access" id="customsel-1" onClick="$('#customselH').val(this.value);$('#previewpane').css('display', '');" value="1">
+									<label for="customsel-1"><div class="radiotext"><script language=Javascript>document.write(_("customSet"))</script></div></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div id="previewpane">
+						<div class="form-row no-bg-form">
+							<label for="previewpage"><script language=Javascript>document.write(_("Landing page filename"))</script></label>
+							<div class="field">
+								<input type="text" name="previewpage" id="previewpage" class="large" value="@@form['previewpage']">
+								<button name="pview" id="pview" class="secondary" type="button" style="margin:0 0 0 5px;" onclick="pView($('#previewpage').val())"><script language=Javascript>document.write(_("Preview"))</script></button>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<b id="landpag"><script language=Javascript>document.write(_("landPage"))</script></b>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="landingpage"><script language=Javascript>document.write(_("landPage"))</script></label>
+						<div class="field">
+							<input type="landingpage" class="validate[required] required large" name="landingpage" id="landingpage">
+						</div>
+					</div>
+					<div class="form-row">
+						<b id="tou"><script language=Javascript>document.write(_("terUse"))</script></b>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="terofuse-0"><script language=Javascript>document.write(_("intTerUse"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" name="terofuse" class="access" id="terofuse-0" onClick="$('#into').css('display', '');$('#exto').css('display', 'none');$('#terofuseH').val(this.value);" maxlength=3600 value="inttou">
+								<label for="terofuse-0"><div class="radiotext"><script language=Javascript>document.write(_("Simple text message"))</script></div></label>
+							</div>
+							<div id="into" style="margin-top:40px">
+								<textarea rows='10' cols='50' name="inttou" id="inttou" wrap="hard" value="@@form['inttou']" ></textarea>
+							</div>
+						</div>
+					</div>
+					<div class="form-row" id="notouid">
+						<label for="terofuse-1"></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" name="terofuse" class="access" id="terofuse-1" onClick="$('#exto').css('display', 'none');$('#into').css('display', 'none');$('#terofuseH').val(this.value);" value="notou">
+								<label for="terofuse-1"><div class="radiotext"><script language=Javascript>document.write(_("noTerUse"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="terofuse-2"><script language=Javascript>document.write(_("extTerUse"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" name="terofuse" class="access" id="terofuse-2" onClick="$('#exto').css('display', '');$('#into').css('display', 'none');$('#terofuseH').val(this.value);" value="exttou">
+								<label for="terofuse-2"><div class="radiotext"><script language=Javascript>document.write(_("urlTermsUse"))</script></div></label>
+							</div>
+#ifdef V_WEBIF_SPEC_vdf
+							<a href="javascript:blockUI_alert(_('wifihotspotInfo2'))" id="info2" style="background-color:transparent;" title=""><i id="net-info"></i></a>
+#else
+							<a id="info2" style="background-color:transparent;" title="remote URL(e.g, www.netcommwireless.com)"><i id="net-info"></i></a>
+#endif
+						</div>
+					</div>
+					<div class="form-row" id="exto" >
+						<label></label>
+						<input type="text" class="validate[required] required large" name="exttou" id="exttou">
+						<span class="normal-text">&nbsp;(exclude http://)</span>
+					</div>
+					<div class="form-row">
+						<b id="whiteList"><script language=Javascript>document.write(_("white list"))</script></b>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="whiteListRadio"><script language=Javascript>document.write(_("white list"))</script></label>
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="whiteListRadio-0" name="whiteListRadio" class="access" onClick="$('#whiteListTableDiv').css('display', '');$('#whiteListEnableH').val(this.value);" value="1">
+								<label for="whiteListRadio-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="whiteListRadio-1" name="whiteListRadio" class="access" onClick="$('#whiteListTableDiv').css('display', 'none');$('#whiteListEnableH').val(this.value);" value="0">
+								<label for="whiteListRadio-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+					<div class="pad" id="whiteListTableDiv">
+						<div class="form-row">
+							<button type="button" class="secondary sml fr" onclick="addEntry()" style="margin-left:0"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+						<div class="form-row">
+							<table>
+								<colgroup>
+									<col width="200px">
+									<col width="300px">
+									<col width="auto">
+								</colgroup>
+								<thead id="title-head">
+								<tr>
+									<th class="align10"><script language=Javascript>document.write(_("type"))</script></th>
+									<th class="align10"><script language=Javascript>document.write(_("ip address or domain name"))</script></th>
+									<th>&nbsp;</th>
+								</tr>
+								<tbody id="RulesList"></tbody>
+								</thead>
+							</table>
+						</div>
+					</div>
+				</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" onclick="submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+<div class="container">
+	<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+</div>
+</footer>
+
+<script language='javascript'>
+var rdb=new rdb_tool("@@session[csrfTokenName]");
+<%if (request['QUERY_STRING']=="fileuploadok") {%>
+	$("#wirelesshotspotEnable-0").attr("checked", "checked");
+	$("#wirelesshotspot_configuration").css("display", "");
+<%} else {%>
+if(document.form.wirelesshotspotenable.value=='1') {
+	$("#wirelesshotspotEnable-0").attr("checked", "checked");
+	$("#wirelesshotspot_configuration").css("display", "");
+}
+else {
+	$("#wirelesshotspotEnable-1").attr("checked", "checked");
+	$("input[name='uploadFile']").prop('disabled', true);
+	$("#uploadFileText").css('color', "#888");
+	$("button[name='uploadF']").prop('disabled', true);
+	$("#wirelesshotspot_configuration").css("display", "none");
+}
+<%}%>
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+if(document.form.deprioritisationH.value=='1') {
+	$("#deprioritisation-0").attr("checked", "checked");
+}
+else {
+	$("#deprioritisation-1").attr("checked", "checked");
+}
+#endif
+if(document.form.enablelocallanH.value=='1') {
+	$("#enablelocallan-0").attr("checked", "checked");
+}
+else {
+	$("#enablelocallan-1").attr("checked", "checked");
+}
+if(document.form.enablemgmtinterfaceH.value=='1') {
+	$("#enablemgmtinterface-0").attr("checked", "checked");
+}
+else {
+	$("#enablemgmtinterface-1").attr("checked", "checked");
+}
+if(document.form.enablehotspotclientsH.value=='1') {
+	$("#enablehotspotclients-0").attr("checked", "checked");
+}
+else {
+	$("#enablehotspotclients-1").attr("checked", "checked");
+}
+if(document.form.authsuccredirtoH.value=="redirto") {
+	$("#authsuccredirto-0").attr("checked", "checked");
+	$('#redto').css('display', '');
+}
+else if(document.form.authsuccredirtoH.value=="allowintacc") {
+	$("#authsuccredirto-1").attr("checked", "checked");
+	$('#redto').css('display', 'none');
+}
+if(document.form.authmethodselH.value=="0") {
+	$("#amethsel-0").attr("checked", "checked");
+	$('#radsettings').css('display', '');
+	$('#locsettings').css('display', 'none');
+}
+else if(document.form.authmethodselH.value=="1") {
+	$("#amethsel-1").attr("checked", "checked");
+	$('#locsettings').css('display', '');
+	$('#radsettings').css('display', 'none');
+	$('#notouid').css('display', 'none');
+}
+
+if(document.form.customselH.value=="0") {
+	$("#customsel-0").attr("checked", "checked");
+	$('#previewpane').css('display', 'none');
+}
+else if(document.form.authmethodselH.value=="1") {
+	$("#customsel-1").attr("checked", "checked");
+}
+
+if(document.form.terofuseH.value=="inttou") {
+	$("#terofuse-0").attr("checked", "checked");
+	$('#into').css('display', '');
+	rdb.reset();
+	rdb.add("service.wirelesshotspot.inttou");
+	rdb.mget(function(res) {
+			$("#inttou").text(res["service.wirelesshotspot.inttou"]);
+	});
+	$('#exto').css('display', 'none');
+}
+else if(document.form.terofuseH.value=="notou") {
+	$("#terofuse-1").attr("checked", "checked");
+	$('#into').css('display', 'none');
+	$('#exto').css('display', 'none');
+}
+else if(document.form.terofuseH.value=="exttou") {
+	$("#terofuse-2").attr("checked", "checked");
+	$('#into').css('display', 'none');
+	$('#exto').css('display', '');
+}
+
+if(document.form.whiteListEnableH.value=="1") {
+	$("#whiteListRadio-0").attr("checked", "checked");
+	$('#whiteListTableDiv').css('display', '');
+}
+else {
+	$("#whiteListRadio-1").attr("checked", "checked");
+	$('#whiteListTableDiv').css('display', 'none');
+}
+
+set_menu("Internet", "Wireless Hotspot", <%_val = session["user"];%>"@@_val");
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("",_('wirelesshotspotSubmitSuccess'));
+<%} else if(request['QUERY_STRING']=="fileuploadok") {%>
+	success_alert("",_('wirelesshotspotFileUploadSuccess'));
+<%}%>
+$("#wirelesshotspotEnable-0").click(function() {
+	clear_alert();
+	document.form.wirelesshotspotenable.value='1';
+	check_enable(1);
+});
+$("#wirelesshotspotEnable-1").click(function() {
+	clear_alert();
+	check_enable(0);
+});
+$("#authsuccredirto-0").click(function() {
+	clear_alert();
+	$('#redto').css('display', '');
+});
+$("#authsuccredirto-1").click(function() {
+	clear_alert();
+$('#redto').css('display', 'none');
+});
+#if defined(V_WIFI_HOTSPOT_DEPRIORITISATION_qdisc) || defined(V_WIFI_HOTSPOT_DEPRIORITISATION_tos)
+$("#deprioritisation-0").click(function() {
+	clear_alert();
+	document.form.deprioritisation.value='1';
+});
+#endif
+$("#enablelocallan-0").click(function() {
+	clear_alert();
+	document.form.enablelocallan.value='1';
+});
+$("#enablelocallan-1").click(function() {
+	clear_alert();
+});
+
+var SITE = SITE || {};
+SITE.fileInputs = function() {
+var $this = $(this),
+$val = $this.val(),
+valArray = $val.split('\\'),
+newVal = valArray[valArray.length-1],
+$button = $this.siblings('.button'),
+$fakeFile = $this.siblings('.file-holder');
+if(newVal !== '') {
+	$button.text(_("fileChosen"));
+	if($fakeFile.length === 0) {
+		$button.after("<span class='file-holder'>"+newVal+"</span>");
+	}
+	else {
+		$fakeFile.text(newVal);
+	}
+}
+};
+var size_remaining;
+$(document).ready( function() {
+	var fileUploadStatus=<%val=get_single( 'service.wirelesshotspot.upload_file_status');%>"@@val";
+	if(fileUploadStatus == "failure") {
+	    validate_alert("", _("fileDecompressFailed"));
+	}
+	size_remaining=<%val=get_single('upload.free_size');%>"@@val";
+	$(".file-wrapper input[type=file]").bind("change focus click", SITE.fileInputs);
+
+	$("#ssid").val(Base64.decode("@@form['ssid']"));
+	$("#landingpage").val(Base64.decode("@@form['landingpage']"));
+	$("#inttou").val(Base64.decode("@@form['inttou']"));
+	$("#exttou").val(Base64.decode("@@form['exttou']"));
+	$("#radiusserver1").val(Base64.decode("@@form['radiusserver1']"));
+	$("#radiusserver2").val(Base64.decode("@@form['radiusserver2']"));
+	$("#authport").val(Base64.decode("@@form['authport']"));
+	$("#sharedsecret").val(Base64.decode("@@form['sharedsecret']"));
+	$("#reentersharedsecret").val(Base64.decode("@@form['reentersharedsecret']"));
+	$("#authsuccredirtopage").val(Base64.decode("@@form['authsuccredirtopage']"));
+	$("#ext_radius").val(Base64.decode("@@form['ext_radius']"));
+
+	load_value_to_element('startip',$("#startipH").val());
+	load_value_to_element('netmask',$("#netmaskH").val());
+	load_value_to_element("input:radio.access[name=radiusUAM]", $("#ext_radius").val()!=""?"1":"0");
+	CreateLANOptions();
+	$("#info1").prop("title", _("wifihotspotInfo1"));
+	$("#info2").prop("title", _("wifihotspotInfo2"));
+
+	$("input:radio.access[name=radiusUAM]").change(function() {
+		if($("#radiusUAM-0").is(':checked')) {
+			$('#ext_radius').val($("#UAMserver").val());
+			$("#ext_radius_hide").css("display","none");
+			$("#ext_radius_show").css("display","");
+		}
+		else {
+			$('#ext_radius').val("");
+			$("#ext_radius_hide").css("display","");
+			$("#ext_radius_show").css("display","none");
+		}
+	});
+	$("input:radio.access[name=radiusUAM]").change();
+	
+	init_whitelist();
+});
+
+
+/********* validation **********/
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("validate_maxclients",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 127) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg1"));
+
+
+	$.validator.addMethod("bandwidthmaxdown",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg2"));
+
+	$.validator.addMethod("bandwidthmaxup",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg3"));
+
+	$.validator.addMethod("sessTout",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 0 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg4"));
+
+	$.validator.addMethod("idlTout",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 0 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg5"));
+
+	$.validator.addMethod("locid",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 99999) {
+				return false;
+			}
+		}
+		return true;
+	},_("oneTo99999warningMeg"));
+
+	$.validator.addMethod("domainName",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(!is_valid_domain_name(c)) {
+				return false;
+			}
+		}
+		return true;
+	},_("hotspot warningMsg6"));
+
+#else
+function validate_maxclients(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 127) {
+		return _("hotspot warningMsg1"); //'Invalid MaxClients'
+	}
+}
+function validate_bandwidthmaxdown(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 4294967295) {
+		return _("hotspot warningMsg2");
+	}
+}
+function validate_bandwidthmaxup(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 4294967295) {
+		return _("hotspot warningMsg3");
+	}
+}
+function validate_sessTout(field) {
+	if(field.val() == "" || field.val() < 0 || field.val() > 4294967295) {
+		return _("hotspot warningMsg4");
+	}
+}
+function validate_idlTout(field) {
+	if(field.val() == "" || field.val() < 0 || field.val() > 4294967295) {
+		return _("hotspot warningMsg5");
+	}
+}
+function validate_shared_secret(field) {
+ var ret = false;
+ var len = field.length;
+ var maxSize = 64;
+ var minSize = 8;
+ if ( len >= minSize && len < maxSize )
+   ret = true;
+ else if ( len == maxSize ) {
+  for ( i = 0; i < maxSize; i++ )
+   if ( isHexaDigit(field.charAt(i)) == false )
+     break;
+   if ( i == maxSize )
+     ret = true;
+  } else
+    ret = false;
+  return ret;
+}
+function validate_locid(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 99999) {
+		return _("oneTo99999warningMeg");
+	}
+}
+
+function validate_domainName(field) {
+	if(!is_valid_domain_name(field.val())) {
+		return _("hotspot warningMsg6");
+	}
+}
+#endif
+/****************************/
+
+</script>
+</body>
+</html>

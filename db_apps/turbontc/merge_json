@@ -1,0 +1,66 @@
+#!/usr/bin/node
+/**
+ * Merges multiple JSON files into one file, which is output to stdout.
+ *
+ * This implementation uses nodejs to do this rather than lua (with turbo) simply because node
+ * is part of the default dependencies for Serpent already, while lua is not - i.e., turbo may
+ * not be available to the machine doing the build
+ *
+ * Copyright (C) 2018 NetComm Wireless limited.
+ */
+var merge = function(path, x, y) {
+    // adapted from https://stackoverflow.com/questions/36008326/combine-2-json-objects-into-a-single-one-in-node-js
+    var r = {};
+    if (path != "") {
+        console.warn("Merging " + JSON.stringify(path))
+        path = path + ".";
+    }
+    function set(k) {
+        if (k in r) {
+            if (typeof this[k] === 'object' && typeof r[k] === 'object') {
+                r[k] = merge(path + k, r[k], this[k]);
+            }
+            else {
+                if (r[k] != this[k]) {
+                    console.warn("NOTICE: " + JSON.stringify(path + k) + " changed from " + JSON.stringify(r[k]) + " to " + JSON.stringify(this[k]))
+                }
+                r[k] = this[k];
+            }
+        }
+        else {
+            r[k] = this[k];
+        }
+    }
+    function aset(k, i) {
+        r[i] = k;
+    }
+    if (Array.isArray(x)) {
+        r = []
+        x.forEach(aset, x);
+    }
+    else {
+        Object.keys(x).forEach(set, x);
+    }
+    if (Array.isArray(y)) {
+        y.forEach(aset, y);
+    }
+    else {
+        Object.keys(y).forEach(set, y);
+    }
+    return r;
+};
+
+var fs = require('fs');
+var path = require('path');
+var result = {};
+
+var add_file = function(filename) {
+    console.warn("Reading " + filename);
+    var data = JSON.parse(fs.readFileSync(path.join(__dirname, filename), 'utf8'));
+    result = merge("", result, data);
+}
+
+var argv = process.argv.slice(2);
+argv.forEach(add_file);
+console.log(JSON.stringify(result, null, 2));
+

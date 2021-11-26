@@ -1,0 +1,93 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=uft8">
+<title>Wireless Station List</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi?wlInfo'></script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("wlstationlist");
+
+function initTranslation() {
+	document.getElementById("stalistTitle").innerHTML = _("treeapp station list");
+<% system_skin=get_single('system.product.skin'); if( system_skin=='ts' ) { %>
+	document.getElementById("stalistIntroduction").innerHTML = _("stalist TSintroduction");
+<%}else{%>
+	document.getElementById("stalistIntroduction").innerHTML = _("stalist introduction");
+<%}%>
+	document.getElementById("stalistMacAddr").innerHTML = _("port filter macaddr");
+	//document.getElementById("stalistRefresh").value=_("refresh");
+}
+
+function appendTD(tr, data) {
+	var td = document.createElement("td");
+	td.innerHTML=data;
+	tr.appendChild(td);
+}
+
+function setStaHandler(responseText) {
+	if (responseText.length<10 ) return;
+	eval( responseText );
+	var e = document.getElementById("wlInfo").getElementsByTagName("TBODY")[0];
+
+	while(e.rows.length>1) {
+		e.deleteRow(e.rows.length-1)
+	}
+
+	for(i=0; i<wlst.length; i++) {
+		var tr = document.createElement("tr");
+		appendTD(tr, wlst[i].ssid);
+		appendTD(tr, wlst[i].mac);
+		appendTD(tr, wlst[i].host);
+		appendTD(tr, wlst[i].ipaddr);
+		appendTD(tr, wlst[i].rssi);
+		appendTD(tr, wlst[i].psm);
+		appendTD(tr, wlst[i].bw);
+		appendTD(tr, wlst[i].uptime);
+		e.appendChild(tr);
+	}
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi?wlInfo', setStaHandler);
+	initTranslation();
+	var startPoll = function() { $.get('/cgi-bin/ajax.cgi?wlInfo', setStaHandler);};
+	setInterval(startPoll, 3000);
+});
+</script>
+
+<form name="form" class="content">
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("stationInfo"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+	<tr><th id="stalistTitle"></th></tr>
+	<tr><td id="stalistIntroduction"></td></tr>
+</table>
+
+<table width="80%" id="wlInfo">
+	<tr>
+		<td><b>SSID</b></td>
+		<td><b id="stalistMacAddr"></b></td>
+		<td><b><script language="JavaScript">document.write( _("mesh hostname"))</script></b></td>
+		<td><b><script language="JavaScript">document.write( _("ip address"))</script></b></td>
+		<td><b>RSSI</b></td>
+		<td><b>PSM</b></td>
+		<td><b>BW</b></td>
+		<td><b><script language="JavaScript">document.write( _("stalist connectedTime"))</script></b></td>
+	</tr>
+</table>
+
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight()</script>
+</body>
+</html>

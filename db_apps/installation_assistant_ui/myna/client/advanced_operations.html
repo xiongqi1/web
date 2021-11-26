@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Advanced Operations</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <style>
+        .fw_list_table {
+            width: 400px;
+        }
+        .fw_button_td {
+            width: 100px;
+        }
+        .battery_warning {
+            color: #fc5900;
+        }
+        .request_fail_status {
+            color: red;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script src="js/battery_handler.js"></script>
+    <script>
+        // this page includes scanning function
+        ajaxPostRequest("/installation_state", "state=scan_connect");
+
+        /*
+         * Derived class from BatteryHandler to handle battery data in Advanced Operation page
+         */
+        function AdvancedOpsBatteryHandler() {
+            BatteryHandler.call(this);
+        }
+
+        AdvancedOpsBatteryHandler.prototype = Object.create(BatteryHandler.prototype)
+
+        /*
+         * @copydoc BatteryHandler::handleData
+         */
+        AdvancedOpsBatteryHandler.prototype.handleData = function(data) {
+            BatteryHandler.prototype.handleData.call(this, data);
+            if (this.percentage < 10) {
+                this.enableFwUpdate(false);
+                this.enableFactoryReset(false);
+            } else if (this.percentage < 20) {
+                this.enableFwUpdate(false);
+                this.enableFactoryReset(true);
+            } else {
+                this.enableFwUpdate(true);
+                this.enableFactoryReset(true);
+            }
+        }
+
+        /*
+         * Enable or disable firmware update
+         * @param enable true: enable; false: disable
+         */
+        AdvancedOpsBatteryHandler.prototype.enableFwUpdate = function(enable) {
+            var updateEl = document.getElementById("to_update_owa_firmware");
+            var insufficientEl = document.getElementById("insufficient_power_update");
+            if (enable) {
+                if (updateEl.style["display"] == "none") {
+                    updateEl.style["display"] = "block";
+                }
+                if (insufficientEl.style["display"] != "none") {
+                    insufficientEl.style["display"] = "none";
+                }
+            } else {
+                if (updateEl.style["display"] != "none") {
+                    updateEl.style["display"] = "none";
+                }
+                if (insufficientEl.style["display"] == "none") {
+                    insufficientEl.style["display"] = "block";
+                }
+            }
+        }
+
+        /*
+         * Enable or disable factory reset
+         * @param enable true: enable; false: disable
+         */
+        AdvancedOpsBatteryHandler.prototype.enableFactoryReset = function(enable) {
+            var resetEl = document.getElementById("to_factory_reset");
+            var insufficientEl = document.getElementById("insufficient_power_factory_reset");
+            if (enable) {
+                if (resetEl.style["display"] == "none") {
+                    resetEl.style["display"] = "block";
+                }
+                if (insufficientEl.style["display"] != "none") {
+                    insufficientEl.style["display"] = "none";
+                }
+            } else {
+                if (resetEl.style["display"] != "none") {
+                    resetEl.style["display"] = "none";
+                }
+                if (insufficientEl.style["display"] == "none") {
+                    insufficientEl.style["display"] = "block";
+                }
+            }
+        }
+
+        var batteryHandler = new AdvancedOpsBatteryHandler();
+    </script>
+    <script>
+        var currentFwVersion;
+
+        function copyOneFieldValue(orig, dest, idx, unit_str) {
+            var orig_td = document.getElementById(orig+idx);
+            var orig_font_color = null;
+            // rssinr field does not exist for non-serving cells
+            if (orig_td  != null) {
+                document.getElementById(dest).innerHTML = orig_td.innerHTML + unit_str;
+                // use font color same as in Avaiable Cells table that is defined in
+                // className and classList with the form "color-font"
+                orig_font_color = orig_td.style["color"];
+            } else {
+                document.getElementById(dest).innerHTML = "N/A";
+            }
+            if (orig_font_color != null) {
+                document.getElementById(dest).style["color"] = orig_font_color;
+            } else {
+                document.getElementById(dest).style["color"] = "black";
+            }
+
+        }
+
+        // Save current antenna orientation and cell information to local local storage
+        // for later comparison purpose
+        function lockCellInfo(buttonElement) {
+            copyOneFieldValue("bearing_data", "locked_bearing", "", "");
+            copyOneFieldValue("down_tilt_data", "locked_downtilt", "", "");
+
+            var cellInfo = rfScanProcessor.saveButtonHandler(buttonElement);
+            document.getElementById("locked_cid").textContent = cellInfo.cellId;
+            document.getElementById("locked_rsrp").textContent = cellInfo.rsrp + " dBm";
+            document.getElementById("locked_rsrp").setAttribute("class", cellInfo.goodRsrp ? "green-font" : "red-font");
+            if (cellInfo.rssinr) {
+                document.getElementById("locked_rssinr").textContent = cellInfo.rssinr + " dB";
+            } else {
+                document.getElementById("locked_rssinr").textContent = "";
+            }
+            document.getElementById("locked_rsrq").textContent = cellInfo.rsrq + " dB";
+        }
+
+        function read_values_local_storage() {
+            for (var i = 0 ; i < 3 ; i++) {
+                g_cid[i] = localStorage.getItem("cid" + (i+1));
+                g_pass[i] = localStorage.getItem("pass" + (i+1));
+            }
+        }
+
+        // Validate field value is within required range then change field value color
+        // to black or red
+        // fname : field name to validate
+        // min_val : minimum limit
+        // max_val : maximum limit
+        // input_val : a flag to indicate read-only field or input field
+        // unit_str : unit string displayed in read-only field, degree or meter
+        // return : 1 if validation succeeded or 0 if failed
+        function validateAntennaParam(fname, min_val, max_val, input_val, unit_str) {
+            var fval;
+            if (input_val == null) {
+                fval = document.getElementById(fname).value;
+            } else {
+                document.getElementById(fname).innerHTML = input_val;
+                fval = input_val;
+            }
+            if ((fval === 0 || (isNaN(fval) == false && fval != "")) && fval >= min_val && fval <= max_val) {
+                document.getElementById(fname).style["color"] = "black";
+                if (input_val != null && unit_str != null) {
+                    document.getElementById(fname).innerHTML += unit_str;
+                }
+                return 1;
+            }
+            document.getElementById(fname).style["color"] = "red";
+            return 0;
+        }
+
+        // Validate antenna parameters for read-only field and input field
+        // data : antenna parameter data from server to be displayed in read-only field
+        //        Null when called for input field validation
+        function validateAntennaParams(data) {
+            validateAntennaParam("tool_bearing", 0, 359, data.bearing, '&deg;');
+            validateAntennaParam("tool_downtilt", -90, 90, data.downtilt, '&deg;');
+        }
+
+        // get firmware list
+        function getFirmwareList() {
+            ajaxGetRequest("/owa_firmware_upgrade/list_firmware", true,
+                processFirmwareList,
+                function(code) {
+                    // error means unavailable, retry
+                    setTimeout(getFirmwareList, 3000);
+                });
+        }
+
+        // Don't need to refresh FW version with Websocket
+        function getFwVersion() {
+            ajaxGetRequest("/versions/", true, function(data) {
+                document.getElementById("fw_ver").textContent = data.sw_ver;
+                currentFwVersion = data.sw_ver;
+                getFirmwareList();
+            });
+        }
+
+        function getSasResponseInfo() {
+            ajaxGetRequest("/sas_response_info/", true, function(data) {
+                showSasResponseInfo(data);
+            });
+        }
+
+        function showInfo(id, info, default_value) {
+            var element = document.getElementById(id);
+            if(element) {
+                element.textContent = (info && info!="")?info:default_value;
+            }
+        }
+
+        function showSasResponseInfo(info) {
+            showInfo("registration-request-code", info.registration.request_code, "N/A");
+            showInfo("registration-response-code", info.registration.response_code, "N/A");
+            showInfo("registration-message", info.registration.message, "N/A");
+            showInfo("registration-data", info.registration.data, "N/A");
+
+            showInfo("grant-request-code", info.grant.request_code, "N/A");
+            showInfo("grant-response-code", info.grant.response_code, "N/A");
+            showInfo("grant-message", info.grant.message, "N/A");
+            showInfo("grant-data", info.grant.data, "N/A");
+
+            showInfo("modem-ctrl", (info.modem.tx=="1")?"on":"off", "N/A");
+            showInfo("comm-error", info.registration.request_error?info.registration.request_error:info.grant.request_error, "None");
+        }
+
+        // compare 2 version number strings
+        // @retval -1: versionA > versionB; 0: versionA == versionB; 1: versionA < versionB
+        function compareVersion(versionA, versionB) {
+            if (versionA === versionB) {
+                return 0;
+            }
+
+            var componentsA = versionA.split('.');
+            var componentsB = versionB.split('.');
+
+            var minComponentsLength = Math.min(componentsA.length, componentsB.length);
+
+            for (var i = 0; i < minComponentsLength; i++) {
+                var intA = parseInt(componentsA[i]);
+                var intB = parseInt(componentsB[i]);
+                if (intA > intB) {
+                    return -1;
+                } else if (intA < intB) {
+                    return 1;
+                }
+            }
+
+            if (componentsA.length > componentsB.length) {
+                return -1;
+            }
+            if (componentsA.length < componentsB.length) {
+                return 1;
+            }
+            return 0;
+        }
+
+        // compare version number strings of 2 firmware meta information entries
+        // @retval -1: entryA > entryB; 0: entryA == entryB; 1: entryA < entryB
+        function compareFwEntries(entryA, entryB) {
+            return compareVersion(entryA.version, entryB.version);
+        }
+
+        // extract version number string from give data string
+        // @param versionData given data string to extract
+        // @retval version number string or null if failed
+        function extractVersionNumber(versionData) {
+            var version = /(([0-9]+\.)*[0-9]+)$/.exec(versionData)
+            if (version) {
+                return version[0];
+            } else {
+                return null;
+            }
+        }
+
+        // render firmware list
+        // @param firmwareList list of firmware meta information to render
+        function renderFirmwareList(firmwareList) {
+            document.getElementById("firmware_list_status").setAttribute("style", "display:none");
+            var table = document.createElement("table");
+            table.setAttribute("class", "fw_list_table");
+            for (var i = 0; i < firmwareList.length; i++) {
+                var row = document.createElement("tr");
+                var verTd = document.createElement("td");
+                verTd.textContent = firmwareList[i].version;
+                var buttonTd = document.createElement("td");
+                buttonTd.setAttribute("class", "fw_button_td");
+                buttonTd.innerHTML = "<button class=\"tinyfont\" onclick=\"upgradeFirmware(" + firmwareList[i].index + ")\">Upgrade</button>";
+                row.appendChild(verTd);
+                row.appendChild(buttonTd);
+                table.appendChild(row);
+            }
+            document.getElementById("firmware_list").appendChild(table);
+        }
+
+        // send request to upgrade firmware
+        // @param index index of target firmware in server's firmware list
+        function upgradeFirmware(index) {
+            ajaxPostRequest("/owa_firmware_upgrade/do_upgrade", "firmwareIndex=" + index, function() {
+                window.location = "/firmware_update.html";
+            }, function(code, response) {
+                var el = document.getElementById("update_trigger_status");
+                el.textContent = response;
+                el.style["display"] = "block";
+            });
+        }
+
+        // process list of firmware meta information
+        // @param firmwareList list of firmware meta information
+        function processFirmwareList(firmwareList) {
+            if (firmwareList.length < 1) {
+                document.getElementById("firmware_list_status").textContent = "None";
+                return;
+            }
+
+            // try to extract current version number string
+            // only consider version number string
+            // this is to prepare if only higher version firmwares are displayed
+            var currentVersion = extractVersionNumber(currentFwVersion)
+
+            var toDisplayFirmwareList = [];
+            var nonVersionedFirmwareList = [];
+
+            for (var firmwareEntry = firmwareList.shift();
+                    typeof firmwareEntry != "undefined"; firmwareEntry = firmwareList.shift()) {
+                var version = extractVersionNumber(firmwareEntry.version);
+                // allowing downgrading
+                // if only upgrading is allowed (hence display only higher versions), the condition is:
+                // (version != null
+                // && (currentVersion == null || compareVersion(currentVersion, firmwareEntry.version) == 1)) {
+                if (version != null) {
+                    toDisplayFirmwareList.push(firmwareEntry);
+                } else {
+                    nonVersionedFirmwareList.push(firmwareEntry);
+                }
+            }
+            // higher version is displayed first; non-versioned entries are still displayed at the end
+            toDisplayFirmwareList.sort(compareFwEntries);
+            toDisplayFirmwareList = toDisplayFirmwareList.concat(nonVersionedFirmwareList);
+            renderFirmwareList(toDisplayFirmwareList);
+        }
+
+        // send request to factory reset
+        function factoryReset() {
+            if(!confirm("Proceed for a factory reset?")) {
+                return;
+            }
+
+            ajaxPostRequest("/owa_factory_reset", null, function() {
+                window.location = "/factory_reset.html";
+            }, function(code, response) {
+                var el = document.getElementById("reset_trigger_status");
+                el.textContent = response;
+                el.style["display"] = "block";
+            });
+        }
+
+        function getRuntimeConfigInfo() {
+            ajaxGetRequest("/runtime_config_info", true, (data)=>{
+                document.getElementById("runtime_config_version").innerText = data.version;
+                document.getElementById("runtime_config_message").innerText = data.message;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupPeriodicKeepAlive();
+
+            read_values_local_storage();
+            console.log("Reading locally stored variables " + g_cid[0] + ' ' + g_cid[1] + ' ' + g_cid[2] +
+            ' ' + g_pass[0] + ' ' + g_pass[1] + ' ' + g_pass[2]);
+            g_is_html5_supported = is_html5_supported();
+
+            // Get current F/W version via Ajax GET once
+            getFwVersion();
+
+            // searching for new FW available will be conducted after current version is available
+
+            getSasResponseInfo();
+
+            // disable "show FWI cell mode" and "show all cells" mode. It may have been set in advanced page
+            // The negative side effect of this arrangement is that next time on entry into advanced page the
+            // tick boxes are cleared even if they were set before. So some extra code is added to the 
+            // advanced page to save and restore tick boxes states.
+            ajaxPostRequest("/control/toggleShowMode?showFWICells=true", "");
+            ajaxPostRequest("/control/toggleShowMode?showAllCells=true", "");
+
+            // Set websocket report filter
+            setWebsocketReportFilter(BITMASK_RF_STATISTICS|BITMASK_RF_CURR_READING|BITMASK_ORIENTATION|BITMASK_BATTERY);
+
+            rfScanProcessor.checkPlayingSound();
+
+            document.getElementById("push_settings").onclick = function() {
+                var formData = new FormData();
+                ajaxFormDataPostRequest("/repush_runtime_config", formData, ()=>{
+                    document.getElementById("runtime_config_message").innerText = "Processing...";
+                    setTimeout(getRuntimeConfigInfo, 10 * 1000);
+                }, ()=>{
+                    document.getElementById("runtime_config_message").innerText = "Waiting data to be synchronised, please try again.";
+                });
+            }
+
+            getRuntimeConfigInfo();
+        });
+    </script>
+
+</head>
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box">
+        <div class="box-header">
+            <h2>OWA Firmware Version</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="data_field_set_row fixed_field_height">
+                        <div class="data_field_label wide_label">OWA Firmware Version</div>
+                        <div class="data_field_text"><span id="fw_ver" name="fw_ver"></span></div>
+                    </div>
+                    <div id="to_update_owa_firmware" style="display:none">
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label wide_label" style="vertical-align:top;">Available OWA Firmware</div>
+                            <div class="data_field_text">
+                                <span id="firmware_list_status">Loading</span>
+                            </div>
+                        </div>
+                        <div id="update_trigger_status" class="request_fail_status" style="display:none"></div>
+                        <div id="firmware_list"></div>
+                    </div>
+                    <div id="insufficient_power_update" style="display:none">
+                        <div class="data_field_set_row fixed_field_height">
+                            <span class="battery_warning">Battery power is insufficient to update OWA firmware</span>
+                        </div>
+                    </div>
+                    <div class="data_field_set_row fixed_field_height">
+                        <div class="data_field_label wide_label">Configuration Version</div>
+                        <div class="data_field_text">
+                            <span id="runtime_config_version"></span>
+                        </div>
+                        <div class="data_field_text">
+                            <button id="push_settings" style="width: 120px;" class="tinyfont">Push Settings </button>
+                        </div>
+                        <div class="data_field_text">
+                            <span id="runtime_config_message"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="box" id="app-network-orientation">
+        <div class="box-header">
+            <h2>Antenna Orientation</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Bearing:</div>
+                    <div class="data_field_text"><span id="bearing_data" name="tool_bearing"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Downtilt:</div>
+                    <div class="data_field_text"><span id="down_tilt_data" name="tool_downtilt"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="box" id="app-network-scan">
+        <div class="box-header">
+            <h2>All Available Cells</h2>
+        </div>
+        <div class="box-content">
+            <div id="allowing_audio_indicator" class="data_field_set_line" style="display:none">
+                <button class="tinyfont no_float button_auto_width" onclick="rfScanProcessor.allowPlaySound()">Push this button to allow playing audio indicator</button>
+            </div>
+            <audio id="audio_indicator">
+                <source src="res/signal_ready.mp3"></source>
+            </audio>
+            <div class="box-content" id="wait_scannable_state_ind" style="display:none">
+                <div class="data_field_set_line">
+                    <div class="data_field_set_row fixed_field_height">
+                        <div class="data_field_text fixed_field_height valign_middle"><img src="/loading.gif"></div>
+                        <div class="data_field_text fixed_field_height" style="color:#ee7d11;">Waiting for scannable state...</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <table id="advScanResult">
+                    <tr>
+                        <th class='align12-2'>Cell sector ID</th>
+                        <th class='align12-2'>Serving Cell</th>
+                        <th class='align12-2'>Minimum RSRP</th>
+                        <th class='align12-2'>Measure</th>
+                        <th class='align12-2'>Save to compare</th>
+                    </tr>
+                </table>
+                <div class="data_field_label">
+                    <input type="checkbox" name="show_all" id="show_all" onchange="rfScanProcessor.showAllCells(this.checked);"> Show All Cells
+#ifndef NO_DETACH_NETWORK
+                    <button class="med button_auto_width no_float" onclick="ajaxPostRequest('/modem_detach');">Detach from network</button>
+#endif
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="box">
+        <div class="box-header">
+            <h2>Saved Cell To Compare</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Bearing</div>
+                    <div class="data_field_text"><span id="locked_bearing" name="locked_bearing"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Downtilt</div>
+                    <div class="data_field_text"><span id="locked_downtilt" name="locked_downtilt"></span></div>
+                </div>
+            </div>
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Cell sector ID</div>
+                    <div class="data_field_text"><span id="locked_cid" name="locked_cid"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">RSRP</div>
+                    <div class="data_field_text"><span id="locked_rsrp" name="locked_rsrp"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">RSSINR</div>
+                    <div class="data_field_text"><span id="locked_rssinr" name="locked_rssinr"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">RSRQ</div>
+                    <div class="data_field_text"><span id="locked_rsrq" name="locked_rsrq"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="box" id="response-information-box">
+        <div class="box-header">
+            <h2>SAS Response</h2>
+        </div>
+        <div class="box-content">
+            <div class="box-content">
+                Modem transmission: <span id="modem-ctrl">&nbsp;</span></p>
+                Communication error: <span id="comm-error">&nbsp;</span>
+            </div>
+            <div>
+                <table id="response-information">
+                    <tr>
+                        <th class='align12-2' width="10%">Type</th>
+                        <th class='align12-2' width="15%">Request code</th>
+                        <th class='align12-2' width="15%">Response code</th>
+                        <th class='align12-2' width="40%">Message</th>
+                        <th class='align12-2' width="20%">Data</th>
+                    </tr>
+                    <tr>
+                        <td >Registration</td>
+                        <td id="registration-request-code"></td>
+                        <td id="registration-response-code"></td>
+                        <td id="registration-message"></td>
+                        <td id="registration-data"></td>
+                    </tr>
+                    <tr>
+                        <td >Grant</td>
+                        <td id="grant-request-code"></td>
+                        <td id="grant-response-code"></td>
+                        <td id="grant-message"></td>
+                        <td id="grant-data"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="box">
+        <div class="box-header">
+            <h2>Factory Reset</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line" id="to_factory_reset">
+                <button class='med button_auto_width no_float' onclick="factoryReset()">Factory Reset OWA</button>
+                <div id="reset_trigger_status" class="request_fail_status" style="display:none"></div>
+            </div>
+            <div class="data_field_set_line" id="insufficient_power_factory_reset" style="display:none">
+                <span class="battery_warning">Battery power is insufficient to start factory reset OWA</span>
+            </div>
+        </div>
+    </div>
+    <!-- <div id="systemStatusContent"></div> -->
+    <div class="box" id="app-network-buttons">
+        <div class="box-content">
+            <div class="data_field_set_button_line">
+                <button class='med no_float button_auto_width no_float' onclick="window.location='/data_entry.html'">Data Entry</button>
+                <button class='med no_float button_auto_width no_float' onclick="window.location='/scan.html'">Network Scan</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script src="js/rf_scan_result_processor.js"></script>
+<script src="js/orientation_data_handler.js"></script>
+<script>
+var orientationDataHandler = new OrientationDataHandler();
+var rfScanProcessor = new AdvRfScanProcessor();
+rfScanProcessor.setSaveButtonHandler("lockCellInfo");
+</script>
+</html>

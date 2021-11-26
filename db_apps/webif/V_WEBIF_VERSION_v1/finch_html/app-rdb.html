@@ -1,0 +1,55 @@
+<% 
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		// Post-back. Process user data.
+		myname = form['name'];
+		if (form['ok'] == "Set")
+		{
+            myvalue = form['valueSet'];
+            if( myvalue == "" )
+            	retval=set_single( myname ); //delete
+            else
+				retval=set_single( myname+'='+myvalue, form['flags']);
+			form['name'] = myname;
+			form['valueSet'] = myvalue;
+		}
+		else if (form['ok'] == "Get")
+		{
+            form['valueGet'] = get_single( myname );
+		}
+	} 
+	else 
+	{
+		// Normal GET request on the page
+		form['name'] = "menu.nodeURL0";
+        form['valueSet'] = "/esp/app-rdb.esp";
+		form['valueGet'] = get_single( "menu.nodeURL0" );
+        
+	}
+   /* form['test'] = server['SERVER_ADDR'];*/
+%>
+
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']">
+<table class="inputForm" border=0>
+<tr>
+	<td><b>Name: </b></td>
+	<td><input name="name" type="text" value="@@form['name']"></td>
+</tr>
+<tr>
+	<td><b>Falgs: </b></td>
+	<td><input name="flags" type="text" value="@@form['flags']"></td>
+</tr>
+<tr>
+    <td><b>Set Value: </b></td>
+	<td><input name="valueSet" type="text" value="@@form['valueSet']"></td>
+    <td>&nbsp;<input type="submit" name="ok" value="Set" /></td>
+</tr>
+<tr>
+	<td><b>Get Value: </b></td>
+	<td><input name="valueGet" type="text" value="@@form['valueGet']"></td>
+    <td>&nbsp;<input type="submit" name="ok" value="Get" /></td>
+</tr>
+
+<!--<td><input type="text" name="test" value="@@form['test']/></td>-->
+</table>
+</form> 

@@ -1,0 +1,12 @@
+--- appweb-src-2.4.2/configure	
++++ appweb-src-2.4.2/configure
+@@ -939,7 +939,8 @@
+ 	#
+ 	if [ "${cmd}" != "${cmd#*/*}" ] 
+ 	then
+-		if [ -f "$cmd" ] ; then
++		cmdd=`type -p $cmd 2>/dev/null`
++		if [ -f "$cmdd" ] ; then
+ 			[ "$verbose" != 0 ] && echo "$item $tool found with absolute path at $cmd"
+ 			eval ${varName}=\"$cmd\"
+ 			return 1

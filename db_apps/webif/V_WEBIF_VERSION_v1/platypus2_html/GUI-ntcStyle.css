@@ -1,0 +1,394 @@
+body {
+	font-size:12px;
+	font-family: Arial;
+	background-color:#000000
+}
+a {
+	color:#FFFFFF;
+}
+
+.a1 {
+	color:#FFFFFF;
+}
+
+.a2 {
+	font-size:18px;
+	text-decoration:none;
+}
+
+.a3 {
+	font-size:11px;
+	font-weight:bold;
+}
+
+.strip {
+	position:absolute;
+	left:60px
+}
+
+.t1 {
+	position:absolute;
+	color:#FFF;
+	font-weight:bold;
+	top:13px;
+	left:44px;
+	width:370px;
+	font-size: 12px;
+	padding-right:10px;
+}
+
+#apn_pass {
+	position:absolute;
+	top:42px;
+	left:420px;
+}
+.t2 {
+	position:absolute;
+	top:20px;
+	left:20px;
+	font-weight:bold;
+	color:#fff;
+	width:214px;
+}
+
+.t3 {
+	position:absolute;
+	color:#FFF;
+	font-weight:bold;
+	left:50px;
+	width:370px;
+	font-size: 12px;
+}
+
+#basicGUI {
+	position:absolute;
+	left:66px;
+	top:150px;
+}
+#GUI-offset {
+	position:absolute;
+	top:0px;
+}
+#GUI-battery {
+	left:132px;
+	top:59px;
+	position:absolute;
+}
+#GUI-CSQ {
+	left:158px;
+	top:235px;
+	position:absolute;
+}
+#GUI-confirmKey {
+	left:30px;
+	top:154px;
+	position:absolute;
+}
+#langTab {
+	position:absolute;
+	font-size:12px;
+	left:360px;
+	top:-30px;
+	display:none;
+}
+
+.div_input {
+	color:#FFF;
+	left:191px;
+	position:absolute;
+	width: 200px;
+}
+.div_input2 {
+	color:#FFF;
+	left:65px;
+	position:absolute;
+	width: 200px;
+}
+
+.div_input3 {
+	color:#FFF;
+	left:196px;
+	position:absolute;
+	width: 200px;
+}
+
+.div_text {
+	color:#FFF;
+	font-weight:bold;
+	left:47px;
+	position:absolute;
+	font-size: 12px;
+	padding-right:10px;
+	width:160px;
+}
+.div_small_text {
+	color:#FFF;
+	/*font-weight:bold;*/
+	left: 47px;
+	position:absolute;
+	width:370px;
+	font-size: 11px;
+}
+.div_button {
+	left:150px;
+	position:absolute;
+	top:470px;
+}
+.div_button1 {
+	left:198px;
+	position:absolute;
+	top:470px;
+}
+.div_button input {
+	background:#ffffff;
+}
+
+.finchAjax {
+	border-style:none;
+	background-color:transparent;
+}
+
+.div_step{
+	font-size:18px;
+	font-weight:lighter;
+	color:#fff;
+	position:absolute;
+	left:65px;
+	top:45px;
+}
+.div_introduction {
+	color:#fff;
+	position:absolute;
+	width:345px;
+	font-size: 12px;
+	left: 65px;
+	top: 75px;
+	height: 100px;
+}
+.div_text_n12 {
+	position:absolute;
+	color:#fff;
+	font-weight:bold;
+	font-size: 12px;
+	left: 65px;
+}
+.warning {
+	position:absolute;
+	left:1px;
+	top:-77px;
+	width:382px;
+	height: 53px;
+	border-top:3px solid #dddddd;
+	border-bottom:3px solid #dddddd;
+	border-left:3px solid #dddddd;
+	border-right:3px solid #dddddd;
+	background-color: #f0f0f0;
+}
+.warningText {
+	position:absolute;
+	left:25px;
+	top:17px;
+	color:#fff;
+	font-weight:bold;
+}
+
+.box {
+	position:absolute;
+	top:210px;
+	width:380px;
+	height:200px;
+}
+
+.Rotate-90-IE10 {
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+	font-size:14px;
+	font-weight:bold;
+	-ms-transform: rotate(-90deg);
+}
+.Rotate-90 {
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+	font-size:14px;
+	font-weight:bold;
+
+	filter: progid:DXImageTransform.Microsoft.BasicImage(rotation=3);
+	-moz-transform:rotate(-90deg);
+	/*-moz-transform-origin: bottom left;*/
+	-webkit-transform: rotate(-90deg);
+	/*-webkit-transform-origin: bottom left;*/
+	-o-transform: rotate(-90deg);
+	/*-o-transform-origin:  bottom left;*/
+}
+
+#tab-status {
+	left:10px;
+	top:-5px;
+}
+#tab-status2 {
+	left:10px;
+	top:-5px;
+}
+#tab-login {
+	left:10px;
+	top:135px; 
+}
+#tab-login2 {
+	left:5px;
+	top:135px; 
+}
+#tab-wlan {
+	left:10px;
+	top:135px;
+}
+#tab-wlan2 {
+	left:5px;
+	top:135px;
+}
+#tab-3gwwan {
+	left:10px;
+	top:270px;
+}
+#tab-3gwwan2 {
+	left:5px;
+	top:270px;
+}
+#tab-3gwwan2 a{
+	color:#FFFFFF;
+}
+#chooseAPN {
+	background-color:#000000;
+	text-decoration:underline;
+	color:#ffffff;
+}
+#firstTimeSetup {
+	position:absolute;
+	left:8px;
+	top:66px;
+	font-weight:normal;
+	height:150px;
+	width:150px;
+}
+#firstTimeSetup a{ color:#ffffff;}
+
+#waitingBox {
+	background-color:#aaaaaa;
+	width:470px;
+	height:74px;
+	left:250px;
+	top:-108px;
+}
+
+/* ================================================================ 
+This copyright notice must be kept untouched in the stylesheet at 
+all times.
+
+The original version of this stylesheet and the associated (x)html
+is available at http://www.stunicholls.com/menu/pro_drop_2.html
+Copyright (c) 2005-2007 Stu Nicholls. All rights reserved.
+This stylesheet and the associated (x)html may be modified in any 
+way to fit your requirements.
+=================================================================== */
+
+/*=================================================================== */
+#nav2
+{
+	padding:0;
+	margin:0;
+	list-style:none;
+	height:32px;
+	position:relative;
+	z-index:50;
+	font-family:arial, verdana, sans-serif;
+	font-size:11px;
+	width:200px;
+	background-color:transparent;
+}
+
+#nav2 li.top
+{
+	display:block;
+	float:left;
+	height:22px;
+	background-color:#000;
+}
+
+#nav2 li:hover {position:relative; z-index:200;}
+
+#nav2 li:hover ul.sub
+{
+	left:1px; /*position-x*/
+	top:20px; /*position-y*/
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #aaaaaa;*/
+	white-space:nowrap;
+	width:132px;/*Country*/
+	height:auto;
+	z-index:300;
+	background-color: #cccccc;
+}
+#nav2 li:hover ul.sub li
+{display:block; height:20px; position:relative; float:left; width:80px; font-weight:normal;}
+
+
+/*#nav2 li:hover ul.sub li a,*/
+#nav2 li:hover ul.sub li span
+{
+	display:block;
+	height:18px;
+	width:130px;/*Country & Carrier*/
+	line-height:18px;
+	text-indent:5px;
+	color:#000;
+	text-decoration:none;
+	border:1px solid #FFFFFF;
+}
+
+/*#nav2 li:hover ul.sub li a:hover,*/ 
+#nav2 li:hover ul.sub li span:hover
+{
+	/*color:#005799;*/
+	border-color:#ffffff;
+	background-color: #aaaaaa;
+}
+
+#nav2 li:hover li:hover ul
+{
+	left:88px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /* Carrier */
+	z-index:400;
+	height:auto;
+}
+
+#nav2 li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover li:hover ul
+{
+	left:120px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /*APN*/
+	z-index:400;
+	height:auto;
+}
+
+#nav2 ul, 
+#nav2 li:hover ul ul,
+#nav2 li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover li:hover ul ul
+{position:absolute; left:-9999px; top:-9999px; list-style:none;}
+
+

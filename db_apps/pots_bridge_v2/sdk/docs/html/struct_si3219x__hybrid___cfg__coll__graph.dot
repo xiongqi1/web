@@ -1,0 +1,6 @@
+digraph "Si3219x_hybrid_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3219x_hybrid_Cfg\n|+ ecfir_c2\l+ ecfir_c3\l+ ecfir_c4\l+ ecfir_c5\l+ ecfir_c6\l+ ecfir_c7\l+ ecfir_c8\l+ ecfir_c9\l+ ecfir_b0\l+ ecfir_b1\l+ ecfir_a1\l+ ecfir_a2\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

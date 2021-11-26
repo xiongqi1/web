@@ -1,0 +1,34 @@
+== javardb ==
+There's two parts to this: a set of java classes (which are architecture-agnostic) and a C JNI wrapper
+for librdb that needs to be built.
+To avoid having java as a dependancy for the build the class files are in subversion (as .jar) - they
+will have to be recommitted if the .java code changes. Rebuild them using the standard 'javac' command.
+The regular build process is roughly:
+* Copy correct JRE to tempinstall dir
+* Copy javardb.jar to the JRE's ext dir
+* Build C JNI wrapper to .so and put it with JRE's own libraries
+
+== jdk_headers ==
+These came from the /include dir of the full Oracle JDK. They shouldn't need to change.
+
+== Building the Oracle JRE ==
+The JRE comes as a pre-built tarball which contains a script to cherry-pick bits to suit the chosen profile.
+There wasn't anything to gain by rebuilding it, so the final VMs are checked in and the build process simply
+selects the correct one for the variant to put into the package.
+
+The following section gives the description from the website, the name of the tarball and
+the command that was used to build it Find the tarballs in ftp://svn/other_packages or
+download http://www.oracle.com/technetwork/java/embedded/embedded-se/downloads/index.html (Oracle account required)
+
+== Building the Java wrapper ==
+Simplest way is with Eclipse - it automatically recompiles as changes are made.
+When done right-click package com.netcommwireless.javardb then Export->Java->Jar
+The doc was created with AurigaDoclet:
+javadoc -doclet com.aurigalogic.doclet.core.Doclet -docletpath aurigadoclet/bin/AurigaDoclet.jar
+      -sourcepath src/ com.netcommwireless.javardb -format pdf -out JavaRDB-javadoc.pdf
+
+== current JREs ==
+JRE-armv5:
+Description= ARMv5 Linux - SoftFP ABI, Little Endian
+From= ejdk-8u6-fcs-b23-linux-arm-sflt-12_jun_2014.tar.gz
+Command= bin/jrecreate.sh -p compact2 --vm client 

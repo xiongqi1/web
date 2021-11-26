@@ -1,0 +1,340 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%
+var getdata;
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['setdata'];
+	retval=set_single( 'wwan.0.cdmamip.cmd.setdata='+tempval );
+	retval=set_single( 'wwan.0.cdmamip.cmd.command=set' );
+	esp_sleep(2000);
+	form['status'] = get_single( 'wwan.0.cdmamip.cmd.status' );
+
+	set_single( 'wwan.0.cdmamip.cmd.command=get' );
+	esp_sleep(2000);
+	getdata = get_single( 'wwan.0.cdmamip.cmd.getdata' );
+}
+else //GET
+{
+	set_single( 'wwan.0.cdmamip.cmd.command=get' );
+	esp_sleep(2000);
+	getdata = get_single( 'wwan.0.cdmamip.cmd.getdata' );
+}
+%>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Mobile IP Configuration</title>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi"></script>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<script language="JavaScript">
+
+var mobileIP_getdata ='@@getdata';
+
+function init()
+{
+	var getdata_items = mobileIP_getdata.split(";");
+	var tempbuf;
+	var getIParray = new Array();
+
+	if(getdata_items.length == 9)
+	{
+	//    document.getElementById("mod_NAI_ID").value = getdata_items[0];
+
+		document.form.mod_NAI.value = getdata_items[0].replace(/"/g, "");
+
+		tempbuf = getdata_items[1].replace(/"/g, "");
+		getIParray = tempbuf.split(".");
+
+		document.form.mod_Pri_HA_Addr1.value = getIParray[0];
+		document.form.mod_Pri_HA_Addr2.value = getIParray[1];
+		document.form.mod_Pri_HA_Addr3.value = getIParray[2];
+		document.form.mod_Pri_HA_Addr4.value = getIParray[3];
+
+		tempbuf = getdata_items[2].replace(/"/g, "");
+		getIParray = tempbuf.split(".");
+
+		document.form.mod_Sec_HA_Addr1.value = getIParray[0];
+		document.form.mod_Sec_HA_Addr2.value = getIParray[1];
+		document.form.mod_Sec_HA_Addr3.value = getIParray[2];
+		document.form.mod_Sec_HA_Addr4.value = getIParray[3];
+
+		tempbuf = getdata_items[3].replace(/"/g, "");
+		getIParray = tempbuf.split(".");
+
+		document.form.mod_Home_Addr1.value = getIParray[0];
+		document.form.mod_Home_Addr2.value = getIParray[1];
+		document.form.mod_Home_Addr3.value = getIParray[2];
+		document.form.mod_Home_Addr4.value = getIParray[3];
+
+		document.getElementById("mod_Home_SS_ID").value = getdata_items[4];
+		document.getElementById("mod_AAA_SS_ID").value = getdata_items[5];
+		document.getElementById("mod_HA_SPI_ID").value = getdata_items[6];
+		document.getElementById("mod_AAA_SPI_ID").value = getdata_items[7];
+
+		if(getdata_items[8] == "1")
+		document.form.reverseTP[0].checked=true;
+		else
+		document.form.reverseTP[1].checked=true;
+
+	}
+	else
+	{
+		document.getElementById("mod_NAI_ID").value = "";
+
+		document.form.mod_Pri_HA_Addr1.value = "";
+		document.form.mod_Pri_HA_Addr2.value = "";
+		document.form.mod_Pri_HA_Addr3.value = "";
+		document.form.mod_Pri_HA_Addr4.value = "";
+
+		document.form.mod_Sec_HA_Addr1.value = "";
+		document.form.mod_Sec_HA_Addr2.value = "";
+		document.form.mod_Sec_HA_Addr3.value = "";
+		document.form.mod_Sec_HA_Addr4.value = "";
+
+		document.form.mod_Home_Addr1.value = "";
+		document.form.mod_Home_Addr2.value = "";
+		document.form.mod_Home_Addr3.value = "";
+		document.form.mod_Home_Addr4.value = "";
+
+		document.getElementById("mod_Home_SS_ID").value = "";
+		document.getElementById("mod_AAA_SS_ID").value = "";
+		document.getElementById("mod_HA_SPI_ID").value = "";
+		document.getElementById("mod_AAA_SPI_ID").value = "";
+
+		document.form.reverseTP[1].checked=true;
+	}
+
+}
+
+function submitF()
+{
+	var setdata_items = new Array(9);
+
+	setdata_items[0] = '"'+document.form.mod_NAI.value+'"';
+
+	if ( (document.form.mod_Pri_HA_Addr1.value == "") || (document.form.mod_Pri_HA_Addr2.value == "")
+	|| (document.form.mod_Pri_HA_Addr3.value == "") || (document.form.mod_Pri_HA_Addr4.value == "")  )
+	{
+	alert("Error: Primary HA Address not entered correctly.")
+	return;
+	}
+	setdata_items[1] = '"'+document.form.mod_Pri_HA_Addr1.value+'.'+document.form.mod_Pri_HA_Addr2.value+'.'
+			+document.form.mod_Pri_HA_Addr3.value+'.'+document.form.mod_Pri_HA_Addr4.value+'"';
+
+	if ( (document.form.mod_Sec_HA_Addr1.value == "") || (document.form.mod_Sec_HA_Addr2.value == "")
+	|| (document.form.mod_Sec_HA_Addr3.value == "") || (document.form.mod_Sec_HA_Addr4.value == "")  )
+	{
+	alert("Error: Secondary HA Address not entered correctly.")
+	return;
+	}
+	setdata_items[2] = '"'+document.form.mod_Sec_HA_Addr1.value+'.'+document.form.mod_Sec_HA_Addr2.value+'.'
+			+document.form.mod_Sec_HA_Addr3.value+'.'+document.form.mod_Sec_HA_Addr4.value+'"';
+
+	if ( (document.form.mod_Home_Addr1.value == "") || (document.form.mod_Home_Addr2.value == "")
+	|| (document.form.mod_Home_Addr3.value == "") || (document.form.mod_Home_Addr4.value == "")  )
+	{
+	alert("Error: Home Address not entered correctly.")
+	return;
+	}
+	setdata_items[3] = '"'+document.form.mod_Home_Addr1.value+'.'+document.form.mod_Home_Addr2.value+'.'
+			+document.form.mod_Home_Addr3.value+'.'+document.form.mod_Home_Addr4.value+'"';
+
+	setdata_items[4] = document.getElementById("mod_Home_SS_ID").value;
+	setdata_items[5] = document.getElementById("mod_AAA_SS_ID").value;
+	setdata_items[6] = document.getElementById("mod_HA_SPI_ID").value;
+	setdata_items[7] = document.getElementById("mod_AAA_SPI_ID").value;
+
+	if(document.form.reverseTP[0].checked == true)
+		setdata_items[8] = "1";
+	else
+		setdata_items[8] = "0";
+
+	document.form.setdata.value = setdata_items.join(";");
+
+	try
+	{
+		//document.form.paramBand.value = paramList[paraIndex];
+		document.form.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+}
+
+function load()
+{
+  setTimeout("check_result()", 50);
+}
+
+function check_result()
+{
+	if( document.form.status.value.indexOf("[error]")!= -1)
+	{
+		alert('ERROR! The phone module does not support the parameter');
+	}
+
+	document.form.status.value ="";
+}
+
+function show_prompt()
+{
+	var input_msl_code=prompt("Please enter MSL(Master Subsidy Lock)");
+	var msl_code = <%val=get_single('wwan.0.cdmamip.mslcode');%>"@@val";
+
+	if(input_msl_code != null) {
+		if(input_msl_code !="" && input_msl_code == msl_code) {
+		submitF();
+		}
+		else {
+		alert("MSL Error!");
+		}
+	}
+}
+</script>
+
+<!-- [start] -->
+<style type="text/css">
+<!--
+
+div#navcontainer {
+	padding: 3px 0;
+	margin-left: 0;
+	border-bottom: 1px solid #778;
+	font-size: 12px;
+}
+
+div#navcontainer span {
+	list-style: none;
+	margin: 0;
+	display: inline;
+}
+
+div#navcontainer span a {
+	padding: 3px 0.5em;
+	margin-left: 3px;
+	border: 1px solid #778;
+	border-bottom: 1px solid #778;
+	background: #DDE;
+	text-decoration: none;
+}
+
+div#navcontainer span a:link { color: #448; }
+
+div#navcontainer span a:hover {
+	color: #000;
+	background: #AAE;
+	border-color: #227;
+	font-weight: bold;
+}
+
+div#navcontainer span a#active {
+	background: white;
+	border-bottom: 1px solid white;
+}
+-->
+</style>
+<!-- [end] -->
+</head>
+
+<body onload="load()">
+<div id="contentWrapper">
+<% include menu.html %>
+<div class="content" >
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" >
+<input type="hidden" name="setdata" value="@@form['setdata']"/>
+<input type="hidden" name="status" value="@@form['status']">
+
+<!--
+<h3>Sprint Test > Mobile IP Config<a href="moduleAdvPara.html">&nbsp;/&nbsp;Advanced Parameters</a></h3>
+-->
+
+<!-- [start] -->
+<div id="navcontainer">
+	<h3><span><a href="moduleMobileIP.html" id="active">Mobile IP Config</a></span>
+	<span><a href="moduleAdvPara.html">Advanced&nbsp;Parameters</a></span></h3>
+</div>
+<!-- [end] -->
+
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Mobile&nbsp;IP&nbsp;Configuration</th></tr>
+</table>
+
+<table width="92%">
+
+<tr>
+	<td width="22%">Network Access Identifier</td>
+	<td><input type="text" name="mod_NAI"  size="40" maxLength="72"/></td>
+</tr>
+
+<tr>
+	<td>Primary HA Address</td>
+	<td><script language=javascript>htmlGenIpBlocks("mod_Pri_HA_Addr");</script></td>
+</tr>
+
+<tr>
+	<td>Secondary HA Address</td>
+	<td><script language=javascript>htmlGenIpBlocks("mod_Sec_HA_Addr");</script></td>
+</tr>
+
+<tr>
+	<td>Home Address</td>
+	<td><script language=javascript>htmlGenIpBlocks("mod_Home_Addr");</script></td>
+</tr>
+
+<tr>
+	<td>Home Agent Shared Secret</td>
+	<td><input type="text" id="mod_Home_SS_ID"  size="40" /></td>
+</tr>
+
+<tr>
+	<td>AAA Server Shared Secret</td>
+	<td><input type="text" id="mod_AAA_SS_ID"  size="40" /></td>
+</tr>
+
+<tr>
+	<td>HA SPI</td>
+	<td><input type="text" id="mod_HA_SPI_ID"  size="40" /></td>
+</tr>
+
+<tr>
+	<td>AAA SPI</td>
+	<td><input type="text" id="mod_AAA_SPI_ID"  size="40" /></td>
+</tr>
+
+<tr>
+	<td>Reverse Tunneling Preference</td>
+	<td>
+		<input type="radio" name="reverseTP"  value="1" />&nbsp;TRUE&nbsp;&nbsp;</input>
+		<input type="radio" name="reverseTP"  value="0" />&nbsp;FALSE</input>
+	</td>
+</tr>
+
+</table>
+</div>
+
+<div class="line" style="margin: 20px 20% 16px 0;"></div>
+<div align="center" style="margin-right:15% ">
+<p></p>
+<!--<INPUT TYPE="Button" VALUE="Save" id="bottomButton" name="saveMobileIP" onClick="javascript:submitF()">-->
+<INPUT TYPE="Button" VALUE="Save" id="bottomButton" name="saveMobileIP" onClick="show_prompt()">
+</div>
+<script language="JavaScript">init();</script>
+
+</form>
+</div>
+</div>
+<div id="footer"><div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

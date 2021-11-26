@@ -1,0 +1,453 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%
+var getdata;
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['setdata'];
+	retval=set_single( 'wwan.0.advancedpara.cmd.errorcode='+"" );
+	retval=set_single( 'wwan.0.advancedpara.cmd.buffer='+tempval );
+	retval=set_single( 'wwan.0.advancedpara.cmd.command=set' );
+	esp_sleep(2000);
+	form['status'] = get_single( 'wwan.0.advancedpara.cmd.status' );
+	form['errorcode'] = get_single( 'wwan.0.advancedpara.cmd.errorcode' );
+
+	set_single( 'wwan.0.advancedpara.cmd.command=get' );
+	esp_sleep(2000);
+	getdata = get_single( 'wwan.0.advancedpara.cmd.buffer' );
+}
+else { //GET
+	set_single( 'wwan.0.advancedpara.cmd.command=get' );
+	esp_sleep(2000);
+	getdata = get_single( 'wwan.0.advancedpara.cmd.buffer' );
+}
+%>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Advanced Parameters</title>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi"></script>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<script language="JavaScript">
+
+var advparam_getdata ='@@getdata';
+var slotmode_enabled;
+var homeSysReg_enabled;
+var setdata_items = new Array(9);
+
+
+function init() {
+	var getdata_items = advparam_getdata.split(";");
+	var tempbuf;
+	var temp_value;
+
+	document.getElementById("mod_imei_ID").value = imei;
+
+	document.getElementById("mod_SCM_ID").value = "";
+	document.getElementById("mod_SlotMode_ID").checked = false;
+	slotmodeclick();
+	document.getElementById("mod_SCI_ID").value = "";
+	document.getElementById("mod_HomeSID_ID").value = "";
+	document.getElementById("mod_HomeNID_ID").value = "";
+	document.getElementById("mod_MCC_ID").value = "";
+	document.getElementById("mod_MNC_ID").value = "";
+	document.getElementById("mod_ACCOLC_ID").value = "";
+	document.getElementById("mod_HomeSysReg_ID").checked = false;
+	homeSysRegclick();
+
+	if(getdata_items.length == 9) {
+		//[1]Station Class Mark
+		if(getdata_items[0].length != 0) {
+			temp_value = parseInt(getdata_items[0]);
+			if(temp_value>=0 && temp_value <=255) {
+				document.getElementById("mod_SCM_ID").value = temp_value.toString(2);
+			}
+		}
+
+		//[2]Slot Mode
+		if(getdata_items[1] == '1')
+			document.getElementById("mod_SlotMode_ID").checked = true;
+		else
+			document.getElementById("mod_SlotMode_ID").checked = false;
+
+		slotmodeclick();
+
+		//[3]Slot Cycle Index
+		if(getdata_items[2].length != 0) {
+			temp_value = parseInt(getdata_items[2]);
+			if(temp_value>=0 && temp_value <=9) {
+				document.getElementById("mod_SCI_ID").value = temp_value;
+			}
+		}
+
+		//[4]Home System ID
+		if(getdata_items[3].length != 0) {
+			temp_value = parseInt(getdata_items[3]);
+			if(temp_value>=0 && temp_value <=32767) {
+				document.getElementById("mod_HomeSID_ID").value = temp_value;
+			}
+		}
+
+		//[5]Home Network ID
+		if(getdata_items[4].length != 0) {
+			temp_value = parseInt(getdata_items[4]);
+			if(temp_value>=0 && temp_value <=65535) {
+				document.getElementById("mod_HomeNID_ID").value = temp_value;
+			}
+		}
+
+		//[6]Mobile Country Code
+		if(getdata_items[5].length != 0) {
+			temp_value = parseInt(getdata_items[5]);
+			if(temp_value>=0 && temp_value <=999) {
+				document.getElementById("mod_MCC_ID").value = temp_value;
+			}
+		}
+
+		//[7]Mobile Network Code
+		if(getdata_items[6].length != 0) {
+			temp_value = parseInt(getdata_items[6]);
+			if(temp_value>=0 && temp_value <=99) {
+				document.getElementById("mod_MNC_ID").value = temp_value;
+			}
+		}
+
+		//[8]Access Overload Class
+		if(getdata_items[7].length != 0) {
+			temp_value = parseInt(getdata_items[7]);
+			if(temp_value>=0 && temp_value <=9) {
+				document.getElementById("mod_ACCOLC_ID").value = temp_value;
+			}
+		}
+
+		//[9]Home System Registration
+		if(getdata_items[8] == 1)
+			document.getElementById("mod_HomeSysReg_ID").checked = true;
+		else
+			document.getElementById("mod_HomeSysReg_ID").checked = false;
+		homeSysRegclick();
+	}
+}
+
+function submitF() {
+	var x;
+
+	for(x in setdata_items) { ;}
+
+	if(x == undefined)
+	return;
+
+	document.form.setdata.value = setdata_items.join(";");
+	setdata_items = "";
+
+	try {
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function load() {
+	setTimeout("check_result()", 50);
+}
+
+function check_result() {
+	var x;
+	var item_name = [" Station Class Mark", " Slot Mode", " Slot Cycle Index",
+			" Home System ID", " Home Network ID", " Mobile Country Code",
+			" Mobile Network Code", " Access Overload Class", " Home System Registration"];
+
+	var errormsg = "";
+
+	var errorcode_array = document.form.errorcode.value.split(";");
+
+	if( document.form.status.value.indexOf("[error]")!= -1) {
+		alert('ERROR! The phone module does not support the parameter');
+		return;
+	}
+
+	for(x in errorcode_array) {
+		if( errorcode_array[x].indexOf("[error]")!= -1) {
+			errormsg=errormsg.concat(item_name[x] +'\n');
+		}
+	}
+
+	if(errormsg.length != 0)
+		alert('ERROR Occurred:\n\n'+errormsg);
+
+	document.form.errorcode.value ="";
+}
+
+function NumfieldMinMaxCheck(field, min, max) {
+	if(field.value.length == 0)
+		return;
+
+	if(parseInt(field.value,10) < min)
+		alert('Parameter ERROR!');
+
+	if(parseInt(field.value,10) > max)
+		alert('Parameter ERROR!');
+}
+
+function IntfieldEntry(field) {
+	var loop_cnt;
+
+	if(field.value.length == 0)
+		return;
+
+	for(loop_cnt=field.value.length-1; loop_cnt >= 0; loop_cnt--) {
+		if(isNaN(field.value.charAt(loop_cnt)))
+			field.value=field.value.slice(0,loop_cnt);
+	}
+}
+
+function BinfieldEntry(field) {
+	var loop_cnt;
+
+	if(field.value.length == 0)
+		return;
+
+	for(loop_cnt=field.value.length-1; loop_cnt >= 0; loop_cnt--) {
+		if(isNaN(field.value.charAt(loop_cnt))) {
+			field.value=field.value.slice(0,loop_cnt);
+			continue;
+		}
+
+		if((field.value.charAt(loop_cnt) != 1) && (field.value.charAt(loop_cnt) != 0)) {
+			field.value=field.value.slice(0,loop_cnt);
+			continue;
+		}
+	}
+}
+
+function slotmodeclick() {
+	if(document.getElementById("mod_SlotMode_ID").checked == true)
+		slotmode_enabled = " ENABLE"
+	else if(document.getElementById("mod_SlotMode_ID").checked == false)
+		slotmode_enabled = " DISABLE"
+	else
+		slotmode_enabled = " N/A"
+	document.getElementById("slotmodetext").value = slotmode_enabled;
+}
+
+function homeSysRegclick() {
+	if(document.getElementById("mod_HomeSysReg_ID").checked == true)
+		homeSysReg_enabled = " ENABLE"
+	else if(document.getElementById("mod_HomeSysReg_ID").checked == false)
+		homeSysReg_enabled = " DISABLE"
+	else
+		homeSysReg_enabled = " N/A"
+	document.getElementById("homeSysRegtext").value = homeSysReg_enabled;
+}
+
+function valuechanged(element) {
+	switch (element.id) {
+		case "mod_SCM_ID":
+		setdata_items[0] = element.value;
+		break;
+
+		case "mod_SlotMode_ID":
+		if(element.checked == true)
+		setdata_items[1] = '1';
+		else
+		setdata_items[1] = '0';
+		break;
+
+		case "mod_SCI_ID":
+		setdata_items[2] = element.value;
+		break;
+
+		case "mod_HomeSID_ID":
+		setdata_items[3] = element.value;
+		break;
+
+		case "mod_HomeNID_ID":
+		setdata_items[4] = element.value;
+		break;
+
+		case "mod_MCC_ID":
+		setdata_items[5] = element.value;
+		break;
+
+		case "mod_MNC_ID":
+		setdata_items[6] = element.value;
+		break;
+
+		case "mod_ACCOLC_ID":
+		setdata_items[7] = element.value;
+		break;
+
+		case "mod_HomeSysReg_ID":
+		if(element.checked == true)
+		setdata_items[8] = '1';
+		else
+		setdata_items[8] = '0';
+		break;
+
+		default:
+		break;
+	}
+}
+
+function show_prompt() {
+	var input_msl_code=prompt("Please enter MSL(Master Subsidy Lock)");
+	var msl_code = <%val=get_single('wwan.0.advancedpara.mslcode');%>"@@val";
+
+	if(input_msl_code != null) {
+		if(input_msl_code !="" && input_msl_code == msl_code) {
+			submitF();
+		}
+		else {
+			alert("MSL Error!");
+		}
+	}
+}
+</script>
+
+<!-- [start] -->
+<style type="text/css">
+<!--
+
+div#navcontainer {
+	padding: 3px 0;
+	margin-left: 0;
+	border-bottom: 1px solid #778;
+	font-size: 12px;
+}
+
+div#navcontainer span {
+	list-style: none;
+	margin: 0;
+	display: inline;
+}
+
+div#navcontainer span a {
+	padding: 3px 0.5em;
+	margin-left: 3px;
+	border: 1px solid #778;
+	border-bottom: 1px solid #778;
+	background: #DDE;
+	text-decoration: none;
+}
+
+div#navcontainer span a:link { color: #448; }
+
+div#navcontainer span a:hover {
+	color: #000;
+	background: #AAE;
+	border-color: #227;
+	font-weight: bold;
+}
+
+div#navcontainer span a#active {
+	background: white;
+	border-bottom: 2px solid white;
+}
+-->
+</style>
+<!-- [end] -->
+
+</head>
+
+<body onload="load()">
+<div id="contentWrapper">
+<% include menu.html %>
+<div class="content" >
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" >
+<input type="hidden" name="setdata" value="@@form['setdata']"/>
+<input type="hidden" name="status" value="@@form['status']">
+<input type="hidden" name="errorcode" value="@@form['errorcode']">
+
+<!--
+<h3>Sprint Test > Advanced Parameters</h3>
+-->
+<!-- [start] -->
+<div id="navcontainer">
+	<h3><span><a href="moduleMobileIP.html">Mobile IP Config</a></span>
+	<span><a href="moduleAdvPara.html" id="active">Advanced&nbsp;Parameters</a></span></h3>
+</div>
+<!-- [end] -->
+
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Advanced&nbsp;Parameters</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td width="22%">Electronic Serial Number (ESN)</td>
+	<td><input type="text" id="mod_imei_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td>Station Class Mark</td>
+	<td><input type=text id='mod_SCM_ID' size=10 maxLength=8 onkeyup=BinfieldEntry(this); onchange=valuechanged(this);> &nbsp;( 8bit binary format )</td>
+</tr>
+<tr>
+	<td>Slot Mode</td>
+	<td><input type="checkbox" id="mod_SlotMode_ID" onclick=slotmodeclick(); onchange=valuechanged(this);></input>
+	<input type="text" id='slotmodetext' class='cdcsAjax' readonly></input>
+	</td>
+</tr>
+
+<tr>
+	<td>Slot Cycle Index</td>
+	<td><input type=text id='mod_SCI_ID' size=10 maxLength=1 onkeyup=IntfieldEntry(this); onchange=valuechanged(this);> &nbsp;( 0-9 )</td>
+</tr>
+
+<tr>
+	<td>Home System Identification Number</td>
+	<td><input type=text id='mod_HomeSID_ID' size=10 maxLength=5 onkeyup=IntfieldEntry(this); onblur=NumfieldMinMaxCheck(this,0,32767); onchange=valuechanged(this);> &nbsp;( 0-32767 )</td>
+</tr>
+
+<tr>
+	<td>Home Network Identification Number</td>
+	<td><input type=text id='mod_HomeNID_ID' size=10 maxLength=5 onkeyup=IntfieldEntry(this); onblur=NumfieldMinMaxCheck(this,0,65535); onchange=valuechanged(this);> &nbsp;( 0-65535 )</td>
+</tr>
+
+<tr>
+	<td>Mobile Country Code</td>
+	<td><input type=text id='mod_MCC_ID' size=10 maxLength=3 onkeyup=IntfieldEntry(this); onchange=valuechanged(this);> &nbsp;( 000-999 )</td>
+</tr>
+
+<tr>
+	<td>Mobile Network Code</td>
+	<td><input type=text id='mod_MNC_ID' size=10 maxLength=2 onkeyup=IntfieldEntry(this); onchange=valuechanged(this);> &nbsp;( 00-99 )</td>
+</tr>
+
+<tr>
+	<td>Access Overload Class</td>
+	<td><input type=text id='mod_ACCOLC_ID' size=10 maxLength=1 onkeyup=IntfieldEntry(this); onchange=valuechanged(this);> &nbsp;( 0-9 )</td>
+</tr>
+
+<tr>
+	<td>Home System Registration</td>
+	<td><input type="checkbox" id="mod_HomeSysReg_ID" onclick=homeSysRegclick(); onchange=valuechanged(this);></input>
+	<input type="text" id='homeSysRegtext' class='cdcsAjax' readonly></input>
+	</td>
+</tr>
+
+</table>
+</div>
+
+<div class="line" style="margin: 20px 20% 16px 0;"></div>
+<div align="center" style="margin-right:15% ">
+<p></p>
+<!--<INPUT TYPE="Button" VALUE="Save" id="bottomButton" name="saveMobileIP" onClick="javascript:submitF()">-->
+<INPUT TYPE="Button" VALUE="Save" id="bottomButton" name="saveMobileIP" onClick="show_prompt()">
+</div>
+<script language="JavaScript">init();</script>
+</form>
+</div>
+</div>
+<div id="footer"><div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

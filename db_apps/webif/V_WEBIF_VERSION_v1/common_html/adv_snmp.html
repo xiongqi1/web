@@ -1,0 +1,181 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>SNMP</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['snmpenable'];
+	retval = set_single( 'service.snmp.enable='+tempval );
+	tempval = form['snmpROCommunityName'];
+	retval = set_single( 'service.snmp.name.readonly='+tempval );
+	tempval = form['snmpRWCommunityName'];
+	retval = set_single( 'service.snmp.name.readwrite='+tempval );
+	tempval = form['snmpTrapDestination'];
+	retval = set_single('service.snmp.snmp_trap_dest='+tempval);
+	tempval = form['snmpHeartbeatInterval'];
+	retval = set_single('service.snmp.heartbeat_interval='+tempval);
+	tempval = form['snmpTrapPersistence'];
+	retval = set_single('service.snmp.trap_persist='+tempval);
+	tempval = form['snmpTrapRetransmission'];
+	retval = set_single('service.snmp.trap_resend='+tempval);
+}
+else { /*GET*/
+	temp = get_single( 'service.snmp.enable' );
+	form['snmpenable'] = temp;
+	temp = get_single( 'service.snmp.name.readonly' );
+	form['snmpROCommunityName'] = temp;
+	temp = get_single( 'service.snmp.name.readwrite' );
+	form['snmpRWCommunityName'] = temp;
+	temp = get_single('service.snmp.snmp_trap_dest');
+	form['snmpTrapDestination'] = temp;
+	temp = get_single('service.snmp.heartbeat_interval');
+	form['snmpHeartbeatInterval'] = temp;
+	temp = get_single('service.snmp.trap_persist');
+	form['snmpTrapPersistence'] = temp;
+	temp = get_single('service.snmp.trap_resend');
+	form['snmpTrapRetransmission'] = temp;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("adv_snmp");
+function greyOutSNMPFields() { // if SNMP is disabled then grey out the fields
+	document.form.snmpROCommunityName.disabled = true;
+	document.form.snmpRWCommunityName.disabled = true;
+	document.form.snmpHeartbeatInterval.disabled = true;
+	document.form.snmpTrapPersistence.disabled = true;
+	document.form.snmpTrapRetransmission.disabled = true;
+	document.form.snmpTrapDestination.disabled = true;
+	document.getElementById("send_heartbeat").disabled=true;
+}
+
+function ungreyOutSNMPFields() { // if SNMP is disabled then grey out the fields
+	document.form.snmpROCommunityName.disabled = false;
+	document.form.snmpRWCommunityName.disabled = false;
+	document.form.snmpHeartbeatInterval.disabled = false;
+	document.form.snmpTrapPersistence.disabled = false;
+	document.form.snmpTrapRetransmission.disabled = false;
+	document.form.snmpTrapDestination.disabled = false;
+	document.getElementById("send_heartbeat").disabled=false;
+}
+
+function checkSNMPConf() {
+	if (document.form.snmpEnable[1].checked == true)
+		greyOutSNMPFields();
+	else if (document.form.snmpEnable[0].checked == true)
+		ungreyOutSNMPFields();
+}
+
+function sendHeartbeat() {
+var http = false;
+
+if(!isValidIpAddress(document.form.snmpTrapDestination.value)) {
+	if(document.form.snmpTrapDestination.value=="")
+		alert(_("warningMsg01"));
+	else
+		alert(_("warningMsg03"));//'IP adress format error.'
+	return;
+}
+if( isNaN(document.form.snmpHeartbeatInterval.value) || (document.form.snmpHeartbeatInterval.value)==0 ) {
+	alert(_("invalid heartbeat interval"));
+	return;
+}
+
+if(navigator.appName == "Microsoft Internet Explorer") {
+	http = new ActiveXObject("Microsoft.XMLHTTP");
+} else {
+	http = new XMLHttpRequest();
+}
+
+http.open("GET", "/cgi-bin/heartbeat.cgi");
+http.onreadystatechange=function() {
+		if(http.readyState == 4) {alert('HEARTBEAT SENT OK');}
+	}
+	http.send(null);
+}
+</script>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > SNMP")</script></h3>
+
+<input type="hidden" name="snmpenable" value="@@form['snmpenable']"/>
+
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("snmp configuration"))</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("enable snmp"))</script></td>
+	<td><input type=radio name='snmpEnable' value=1 onClick="javascript:document.form.snmpenable.value='1';ungreyOutSNMPFields()" >&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+	<input type=radio name='snmpEnable' value=0 onClick="javascript:document.form.snmpenable.value='0';greyOutSNMPFields()" >&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("readonly community name"))</script></td>
+	<td><input type=text name='snmpROCommunityName' size=32 maxlength=64 value="@@form['snmpROCommunityName']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("rw community name"))</script></td>
+	<td><input type=text name='snmpRWCommunityName' size=32 maxlength=64 value="@@form['snmpRWCommunityName']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("download mib"))</script></td>
+	<td style="height:45px"><!--input type="Button" value="Download" onClick="window.open('cdcs.mib', '_self')"-->
+		<a href="/cgi-bin/logfile.cgi?action=downloadMib"><script language="JavaScript">document.write(_("download"))</script></a>
+		<br/><script language="JavaScript">document.write("( "+_("snmp mib info")+" )")</script>
+	</td>
+</tr>
+</table>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("snmp traps"))</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td  width="38%"><script language="JavaScript">document.write(_("trap destination"))</script></td>
+	<td><input type=text name='snmpTrapDestination' size=32 maxlength=64 value="@@form['snmpTrapDestination']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("heartbeat interval"))</script></td>
+	<td><input type=text name='snmpHeartbeatInterval' size=32 maxlength=64 value="@@form['snmpHeartbeatInterval']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("trap persistence time"))</script></td>
+	<td><input type=text name='snmpTrapPersistence' size=32 maxlength=64 value="@@form['snmpTrapPersistence']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("trap retransmission time"))</script></td>
+	<td><input type=text name='snmpTrapRetransmission' size=32 maxlength=64 value="@@form['snmpTrapRetransmission']"></td>
+</tr>
+<tr>
+	<td>&nbsp;</td>
+	<td><input type="Button" value="Send Heartbeat Now" id="send_heartbeat" onClick="sendHeartbeat()"></td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+<div align="center"><p></p><input type="submit" value="Save" id="save_button" onClick="javascript:ungreyOutSNMPFields()" style="width:120px;"></div>
+
+<script type="text/javascript">
+	if(document.form.snmpenable.value=='1') {
+		ungreyOutSNMPFields();
+		document.form.snmpEnable[0].checked=true;
+	}
+	else {
+		greyOutSNMPFields();
+		document.form.snmpEnable[1].checked=true;
+	}
+	document.getElementById("save_button").value = _("CSsave");
+	document.getElementById("send_heartbeat").value = _("send heartbeat now");
+</script>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+digraph "VDAA API"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node4 [label="Diagnostics",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___d_i_a_g.html"];
+  Node3 [label="Line state",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___l_i_n_e___s_t_a_t_e.html"];
+  Node0 [label="VDAA API",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node2 [label="Ring detection",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___r_i_n_g.html"];
+  Node5 [label="Interrupts",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___i_n_t_e_r_r_u_p_t_s.html"];
+  Node1 [label="Audio",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___a_u_d_i_o.html"];
+  Node6 [label="Initialization",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___i_n_i_t.html"];
+  Node0->Node1 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node6 [shape=plaintext, dir="back", style="solid"];
+}

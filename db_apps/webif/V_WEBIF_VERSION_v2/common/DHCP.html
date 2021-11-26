@@ -1,0 +1,822 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>DHCP</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+<%
+var querystring =base64_encode(request['QUERY_STRING']);
+var profilenum = querystring;
+%>
+
+<script language="JavaScript">
+var profilenum = Base64.decode("@@profilenum");
+</script>
+
+<script language="JavaScript" src="/cgi-bin/dhcp.cgi?@@profilenum"></script>
+#else
+<script language="JavaScript" src="/cgi-bin/dhcp.cgi"></script>
+#endif
+<script language="JavaScript">
+#include "net_util.js"
+
+var f = document.form;
+
+function submitF1() {
+var f=document.form;
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		validate_group("DHCPServerAddr");
+		validate_group("DHCPStart");
+		validate_group("DHCPEnd");
+		validate_group("DNSAddress1");
+		validate_group("DNSAddress2");
+		validate_group("WINSIP1");
+		validate_group("WINSIP2");
+		validate_group("NTPserver");
+		return;
+	}
+#endif
+
+	// if the dhcp is enabled then validate all the DHCP values...
+	startAddr=parse_ip_from_fields("DHCPStart");
+	endAddr=parse_ip_from_fields("DHCPEnd");
+	if (f.DHCPConf[0].checked == true) {
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		var myip="<%get_single_direct('vlan.'+profilenum+'.address');%>";
+		var mymask="<%get_single_direct('vlan.'+profilenum+'.netmask');%>";
+#else
+		var myip="<%get_single_direct('link.profile.0.address');%>";
+		var mymask="<%get_single_direct('link.profile.0.netmask');%>";
+#endif
+
+		if (!checkIPrange(startAddr, endAddr, endAddr)) {
+			validate_alert("", _("invalidDHCPange"));
+			return;
+		}
+		if (!isWithinHostIpRange(myip, mymask, startAddr)) {
+			validate_alert("", _("dhcp warningMsg14"));
+			return;
+		}
+		if (!isWithinHostIpRange(myip, mymask, endAddr)) {
+			validate_alert("", _("dhcp warningMsg15"));
+			return;
+		}
+	}
+
+	f.DHCPrange.value = startAddr + "," + endAddr;
+	f.DNS1.value=parse_ip_from_fields("DNSAddress1");
+	f.DNS2.value=parse_ip_from_fields("DNSAddress2");
+	f.WINSIP1.value=parse_ip_from_fields("WINSIP1");
+	f.WINSIP2.value=parse_ip_from_fields("WINSIP2");
+	f.NTPserver.value=parse_ip_from_fields("NTPserver");
+	ungreyOutAllDHCPFields();
+	f.DHCPServerAddr.value=parse_ip_from_fields("DHCPServerAddr");
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	submitF3();
+#else
+	$("button").attr("disabled",true);
+	f.submit();
+#endif
+}
+
+function submitF3() {
+	var doc = document;
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	var f=document.form;
+	var f3=f;
+#else
+	var f3=doc.form3;
+#endif
+	for(var i=0; i<=f3.maxReservation.value; i++) {
+		if(!( doc.getElementById('macid'+i) )) {
+			continue;
+		}
+		else {
+			if(!isValidMacAddress(doc.getElementById('macid'+i).value))//&&(doc.getElementById('name'+i).value)=="")
+			{
+				validate_alert("", _("invalid MAC address")+" "+_("Please specify a HEX value")+" "+_("mac example"));
+				return;
+			}
+		}
+	}
+	for( i=0; i<f3.maxReservation.value; i++) {
+		if(!( doc.getElementById('ipid'+i) )) {
+			continue;
+		}
+		else {
+			doc.getElementById('ipid'+i).value
+				= doc.getElementById('ip1'+i).value+"."+doc.getElementById('ip2'+i).value+"."+doc.getElementById('ip3'+i).value+"."+doc.getElementById('ip4'+i).value;
+			for(var j="1"; j<i; j++ ) {
+				// alert(document.getElementById('ipid'+j).value);
+				if(!( doc.getElementById('ipid'+j) )) {
+					continue;
+				}
+				if(   ( (doc.getElementById('ipid'+j).value) == (doc.getElementById('ipid'+i).value) ) ) {
+					validate_alert("", _("dhcp warningMsg09")+doc.getElementById('ipid'+j).value+", "+_("dhcp warningMsg10"));
+					return;
+				}
+			}
+		}
+	}
+	$("button").attr("disabled",true);
+	f3.submit();
+}
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+function cancelForm() {
+	window.location="VLAN_Settings.html?"+profilenum;
+}
+#endif
+
+// for when submit form
+function ungreyOutAllDHCPFields() {
+var f=document.form;
+
+	f.DHCPStart1.disabled = false;
+	f.DHCPStart2.disabled = false;
+	f.DHCPStart3.disabled = false;
+	f.DHCPStart4.disabled = false;
+
+	f.DHCPEnd1.disabled = false;
+	f.DHCPEnd2.disabled = false;
+	f.DHCPEnd3.disabled = false;
+	f.DHCPEnd4.disabled = false;
+
+	f.DHCPLease.disabled = false;
+	f.DDNsuffix.disabled = false;
+
+	f.DNSAddress11.disabled = false;
+	f.DNSAddress12.disabled = false;
+	f.DNSAddress13.disabled = false;
+	f.DNSAddress14.disabled = false;
+
+	f.DNSAddress21.disabled = false;
+	f.DNSAddress22.disabled = false;
+	f.DNSAddress23.disabled = false;
+	f.DNSAddress24.disabled = false;
+
+	f.WINSIP11.disabled = false;
+	f.WINSIP12.disabled = false;
+	f.WINSIP13.disabled = false;
+	f.WINSIP14.disabled = false;
+
+	f.WINSIP21.disabled = false;
+	f.WINSIP22.disabled = false;
+	f.WINSIP23.disabled = false;
+	f.WINSIP24.disabled = false;
+
+	f.DHCPServerAddr1.disabled = false;
+	f.DHCPServerAddr2.disabled = false;
+	f.DHCPServerAddr3.disabled = false;
+	f.DHCPServerAddr4.disabled = false;
+}
+
+function greyOutDHCPFields() {
+	document.form.DHCPenable.value='0';
+	$("#box_dhcp").css("display", "none");
+	$(".box_reservation").css("display", "none");
+	return;
+}
+
+// this is when disabling DHCP
+function ungreyOutDHCPFields() {
+	document.form.DHCPenable.value='1';
+	$("#box_dhcp").css("display", "");
+	$(".box_reservation").css("display", "");
+	return;
+}
+
+// this is when enabling DHCP Relay
+function greyOutRelayFields() {
+	document.form.DHCPrelay.value='0'
+	$("#box_dhcp_relay").css("display", "none");
+	$(".box_dhcp_conf").css("display", "");
+	if (document.form.DHCPenable.value=='0') {
+		greyOutDHCPFields();
+	}
+	else {
+		ungreyOutDHCPFields();
+	}
+	return;
+}
+
+function ungreyOutRelayFields() {
+	document.form.DHCPrelay.value='1';
+	$("#box_dhcp_relay").css("display", "");
+	$(".box_dhcp_conf").css("display", "none");
+
+	return;
+}
+
+function checkDHCPConf() { //onload
+	if (document.form.DHCPrelay.value == '0') {
+		greyOutRelayFields();
+	}
+	else {
+		ungreyOutRelayFields();
+	}
+}
+
+function cloneLeasesData( hostname, mac, ip ) {
+	if( document.getElementById( "reservationdiv1" ).style['display']=='none') {
+		hideItem('reservationdiv', 1);
+	}
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	for( i=0; i<document.form.maxReservation.value; i++) {
+#else
+	for( i=0; i<document.form3.maxReservation.value; i++) {
+#endif
+		if(!( document.getElementById('ipid'+i) )) {
+			continue;
+		}
+		else {
+			var myip=$("#ip1"+i).val()+"."+$("#ip2"+i).val()+"."+$("#ip3"+i).val()+"."+$("#ip4"+i).val();
+			if(hostname==$("#name"+i).val() || mac==$("#mac"+i).val() || ip==reservationdata[i].ip) {
+				blockUI_alert(_("cloneWarning"));
+				return;
+			}
+		}
+	}
+	addElement( Base64.encode(hostname), mac, ip, 1);
+}
+
+function displayReservationData() {
+	if(reservationdata.length==0) {
+		$("#ReservationDiv-title").css("display","none");
+	}
+	else {
+		for(i=0; i<reservationdata.length; i++) {
+			addElement( reservationdata[i].computerName, reservationdata[i].mac, reservationdata[i].ip, reservationdata[i].enable=='enabled'? 1:0 );
+		}
+	}
+}
+
+function addElement(name, mac, ip, enabled) {
+	var num = $("#maxReservation").val();
+	var divIdName = 'myDiv'+num;
+	var radio0Enabled = (enabled=='1')?"checked=\"checked\"":"";
+	var radio1Enabled = (enabled!='1')?"checked=\"checked\"":"";
+	var ray = new Array();
+
+	ray = ip.split(".");
+	if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+	$("#ReservationDiv-title").css("display","");
+	h='<tr id="'+divIdName+'">\
+		<td>\
+			<input type="text" class="table-input" id="name'+num+'" name="listname'+num+'" size=12 onkeyup="hostNameFilter(this);" value="'+htmlNumberEncode(Base64.decode(name))+'" style="width:116px">\
+		</td>\
+		<td>\
+			<input type="text" class="table-input" maxlength="17" id="macid'+num+'" name="mac'+num+'" onkeyup="urlFilter(this);" value="'+mac+'" style="width:116px">\
+		</td>\
+		<td>\
+			<input class="ip-adress" maxLength=3 name=p1'+num+' id="ip1'+num+'" value='+ray[0]+' onkeyup="javascript:WinExpIP_1(this,event)">\
+			<span class="input-connect-dot">.</span>\
+			<input class="ip-adress" maxLength=3 name=p2'+num+' id="ip2'+num+'" value='+ray[1]+' onkeyup="javascript:WinExpIP(this,event)">\
+			<span class="input-connect-dot">.</span>\
+			<input class="ip-adress" maxLength=3 name=p3'+num+' id="ip3'+num+'" value='+ray[2]+' onkeyup="javascript:WinExpIP(this,event)">\
+			<span class="input-connect-dot">.</span>\
+			<input class="ip-adress" maxLength=3 name=p4'+num+' id="ip4'+num+'" value='+ray[3]+' onkeyup="javascript:WinExpIP(this,event)">\
+			<input type=hidden name=ip'+num+' id="ipid'+num+'">\
+		</td>\
+		<td>\
+			<div class="location-settings">\
+				<div class="radio-switch">\
+					<input type="radio" class="access" id="enabled'+num+'-0" name="enable'+num+'" '+radio0Enabled+' value="enabled">\
+					<label for="enabled'+num+'-0" class="on">'+_("on")+'</label>\
+					<input type="radio" class="access" id="enabled'+num+'-1" name="enable'+num+'" '+radio1Enabled+' value="disabled">\
+					<label for="enabled'+num+'-1" class="off">'+_("off")+'</label>\
+				</div>\
+			</div>\
+		</td>\
+		<td class="last">\
+			<button type=button onClick="removeThis('+"'"+divIdName+"'"+')" class="secondary sml" style="padding:0;border:0;margin-left:0">\
+			<i class="icon close"></i></button>\
+		</td>\
+	</tr>';
+	$("#ReservationDiv").append(h);
+#ifdef V_WEBIF_SPEC_vdf
+	$.get("vdf-lib/js/lib/selectivizr.min.js");
+#else
+	$.get("js/selectivizr.js");
+#endif
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	document.form.maxReservation.value++;
+#else
+	document.form3.maxReservation.value++;
+#endif
+}
+
+function removeThis(dId) {
+	$("#ReservationDiv").children("#"+dId).remove();
+}
+
+function setall() {
+	var f = document.form;
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	var f3 = document.form3;
+#endif
+
+	if(f.DHCPenable.value=='1') {
+		$("#DHCPConf-0").attr("checked", "checked");
+	}
+	else {
+		$("#DHCPConf-1").attr("checked", "checked");
+		$("#box_dhcp").css("display", "none");
+	}
+	if(f.DHCPrange.value=="0.0.0.0"){f.DHCPrange.value="";}
+
+	parse_ip_into_fields(f.DHCPrange.value.split(",")[0], "DHCPStart");
+	parse_ip_into_fields(f.DHCPrange.value.split(",")[1], "DHCPEnd");
+	parse_ip_into_fields(f.DNS1.value, "DNSAddress1");
+	parse_ip_into_fields(f.DNS2.value, "DNSAddress2");
+	parse_ip_into_fields(f.WINSIP1.value, "WINSIP1");
+	parse_ip_into_fields(f.WINSIP2.value, "WINSIP2");
+	parse_ip_into_fields(f.DHCPServerAddr.value, "DHCPServerAddr");
+	parse_ip_into_fields(f.NTPserver.value, "NTPserver");
+
+#ifndef V_DHCP_RELAY_WEBUI_none
+	if(f.DHCPrelay.value=='1') {
+		$("#DHCPRelayConf-0").attr("checked", "checked");
+	}
+	else {
+		$("#DHCPRelayConf-1").attr("checked", "checked");
+		$("#box_dhcp_relay").css("display", "none");
+	}
+#endif
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	f.maxReservation.value = reservationdata.length;
+#else
+	f3.maxReservation.value = reservationdata.length;
+#endif
+}
+
+var ajaxerror=0;
+function displayLeasesData(ld) {
+	ajaxerror=0;
+	eval(ld);
+	var ht="";
+	var show_clone_button=true;
+	for(var i=0; i<leasesdata.length; i++ ) {
+		show_clone_button=true;
+		leasesdata[i].hostname = Base64.decode(leasesdata[i].hostname);
+		ht+="<tr align=left><td>"+htmlNumberEncode(leasesdata[i].hostname)+"</td><td>"+leasesdata[i].mac+"</td><td>"+leasesdata[i].ip+"</td><td>"+new Date((leasesdata[i].ends)*1000).toLocaleString()+"</td><td class='last'>";
+#if defined(V_COPROCESSOR_hannibal_onboard)
+		if (leasesdata[i].hostname == "Builtin_QCA") {
+			show_clone_button=false;
+		}
+#endif
+		if (show_clone_button) {
+			ht+="<button type='button' class='secondary sml' onClick=\"cloneLeasesData('"+leasesdata[i].hostname+"','"+leasesdata[i].mac+"','"+leasesdata[i].ip+"')\"><i class='icon clone'></i>"+_("clone")+"</button></td></tr>";
+		}
+		else {
+			ht+="&nbsp;</td></tr>";
+		}
+	}
+	$("#lease_data").html(ht);
+}
+
+$(document).ready(function() {
+	displayReservationData();
+	setall();
+	checkDHCPConf();
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+			$.get('/cgi-bin/dhcp.cgi?'+@@profilenum, displayLeasesData);
+#else
+			$.get('/cgi-bin/dhcp.cgi', displayLeasesData);
+#endif
+		else
+			location.reload();
+	}
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	$.get('/cgi-bin/dhcp.cgi?'+@@profilenum, displayLeasesData);
+#else
+	$.get('/cgi-bin/dhcp.cgi', displayLeasesData);
+#endif
+	setInterval(startPoll, 3000);
+});
+</script>
+
+<%
+function validateInput() {
+	validateOnOffRadio(form['DHCPrelay']);
+	validateOnOffRadio(form['DHCPenable']);
+	if (form['DHCPrange'] != "") {
+		validateIpAddress(form['DHCPrange'], ",", "{1}");
+	}
+	if (form['DHCPLease'] != "") {
+		var dhcpLease=string_to_number(form['DHCPLease']);
+		if (dhcpLease < 120) {
+			onBadRequest();
+		}
+	}
+#if 0
+	// WARNING: Currently except max length there is no input validation for form['DDNsuffix'] at client side.
+	// Hence not sure whether introducing server side validation may break current usage.
+	//
+	// form['DDNsuffix'] is to set domain for a subnet or a IP address range
+	// Examples in gnu_apps/dnsmasq/src/dnsmasq.conf.example
+	// thekelleys.org.uk
+	// wireless.thekelleys.org.uk,192.168.2.0/24
+	// reserved.thekelleys.org.uk,192.68.3.100,192.168.3.200
+	// Hence at least it should check valid characters:
+	// if (form['DDNsuffix'] != "") {
+	// 	if (string_regex_match(form['DDNsuffix'], "^[.0-9A-Z_a-z/,-]+$") == false) {
+	// 		onBadRequest();
+	// 	}
+	// }
+#endif
+	if (string_length(form['DDNsuffix']) > 128) {
+		onBadRequest();
+	}
+	if (form['DNS1'] != "") {
+		validateIpAddress(form['DNS1'], "", "");
+	}
+	if (form['DNS2'] != "") {
+		validateIpAddress(form['DNS2'], "", "");
+	}
+	if (form['WINSIP1'] != "") {
+		validateIpAddress(form['WINSIP1'], "", "");
+	}
+	if (form['WINSIP2'] != "") {
+		validateIpAddress(form['WINSIP2'], "", "");
+	}
+	if (form['NTPserver'] != "") {
+		validateIpAddress(form['NTPserver'], "", "");
+	}
+#if 0
+	// WARNING: Currently except max length there is no input validation for form['TFTPserver'], form['option150'], form['option160']
+	// form['TFTPserver'] should be IP address, a list of IP addresses separated by commas, host name, or list of host name.
+	// Hence at least it should check valid characters
+#endif
+	if (string_length(form['TFTPserver']) > 128) {
+		onBadRequest();
+	}
+	if (string_length(form['option150']) > 128) {
+		onBadRequest();
+	}
+	if (string_length(form['option160']) > 128) {
+		onBadRequest();
+	}
+	if (form['DHCPServerAddr'] != "") {
+		validateIpAddress(form['DHCPServerAddr'], "", "");
+	}
+}
+
+rdbBase = "service.dhcp.";
+if (request['REQUEST_METHOD'] == "POST") {
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	profilenum = form['profilenum'];
+	rdbBase = 'vlan.'+profilenum+".dhcp.";
+#else
+	if(request['QUERY_STRING']=='form1') {
+#endif
+		validateInput();
+
+		set_single_direct("-p",rdbBase+'range.0',form['DHCPrange']);
+		set_single_direct("-p",rdbBase+'enable',form['DHCPenable']);
+		set_single_direct("-p",rdbBase+'lease.0',form['DHCPLease']);
+		set_single_direct("-p",rdbBase+'suffix.0',form['DDNsuffix']);
+		set_single_direct("-p",rdbBase+'dns1.0',form['DNS1']);
+		set_single_direct("-p",rdbBase+'dns2.0',form['DNS2']);
+		set_single_direct("-p",rdbBase+'win1.0',form['WINSIP1']);
+		set_single_direct("-p",rdbBase+'win2.0',form['WINSIP2']);
+		set_single_direct("-p",rdbBase+'ntp_server.0',form['NTPserver']);
+		set_single_direct("-p",rdbBase+'tftp_server.0',form['TFTPserver']);
+		set_single_direct("-p",rdbBase+'option150.0',form['option150']);
+		set_single_direct("-p",rdbBase+'option160.0',form['option160']);
+		set_single_direct("-p",rdbBase+'relay.0',form['DHCPrelay']);
+		set_single_direct("-p",rdbBase+'relay.server.0',form['DHCPServerAddr']);
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		redirect('/DHCP.html?success-1');
+	}
+	else if(request['QUERY_STRING']=='form3') {
+#endif
+		max=string_to_number(form['maxReservation']);
+		n=0;
+		for( i=0; i < max; i++ ) {
+			ipaddress= form['ip'+i];
+			if ( ipaddress ) {
+				// validate input
+#if 0
+				// WARNING: there is no input validation for listname at client side!
+				// It should follow host name rules.
+#endif
+				validateIpAddress(ipaddress, "", "");
+				var resMacAddress = form['mac'+i];
+				validateMacAddress(resMacAddress);
+				var resEnable = form['enable'+i];
+				if (resEnable != "enabled" && resEnable != "disabled") {
+					onBadRequest();
+				}
+
+				set_single_direct("-p",rdbBase+"static."+n,form['listname'+i]+","+resMacAddress+","+ipaddress+","+resEnable);
+				n++;
+			}
+		}
+		set_single_direct("-p",rdbBase+"static."+n,"");
+		set_single_direct("-p", rdbBase+"static.trigger","1");
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		redirect('VLAN_Settings.html?'+profilenum);
+#else
+		redirect('/DHCP.html?success-3');
+	}
+#endif
+}
+else { /*GET*/
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	rdbBase = 'vlan.'+profilenum+".dhcp.";
+#endif
+	form['DHCPrange'] = get_single( rdbBase+'range.0');
+	form['DHCPenable'] = get_single( rdbBase+'enable');
+	form['DHCPLease'] = get_single( rdbBase+'lease.0');
+	form['DDNsuffix'] = base64_encode(get_single( rdbBase+'suffix.0'));
+	form['DNS1'] = get_single( rdbBase+'dns1.0');
+	form['DNS2'] = get_single( rdbBase+'dns2.0');
+	form['WINSIP1'] = get_single( rdbBase+'win1.0');
+	form['WINSIP2'] = get_single( rdbBase+'win2.0');
+	form['NTPserver'] = get_single( rdbBase+'ntp_server.0');
+	form['TFTPserver'] = base64_encode(get_single( rdbBase+'tftp_server.0'));
+	form['option150'] = base64_encode(get_single( rdbBase+'option150.0'));
+	form['option160'] = base64_encode(get_single( rdbBase+'option160.0'));
+	form['DHCPrelay'] = get_single( rdbBase+'relay.0');
+	form['DHCPServerAddr'] = get_single( rdbBase+'relay.server.0');
+}
+%>
+<script language="javascript">
+$(document).ready(function() {
+	$("input[name=DDNsuffix]").val(Base64.decode("@@form['DDNsuffix']"));
+	$("input[name=TFTPserver]").val(Base64.decode("@@form['TFTPserver']"));
+	$("input[name=option150]").val(Base64.decode("@@form['option150']"));
+	$("input[name=option160]").val(Base64.decode("@@form['option160']"));
+});
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?form1">
+			<%appendCsrfToken();%>
+			<div class="pad">
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+				<input type="hidden" name="profilenum" value="@@profilenum"/>
+				<input type="hidden" value="0" id="maxReservation" name="maxReservation"/>
+#endif
+				<input type="hidden" name="DHCPrange" value="@@form['DHCPrange']"/>
+				<input type="hidden" name="DHCPenable" value="@@form['DHCPenable']"/>
+				<input type="hidden" name="DNS1" value="@@form['DNS1']"/>
+				<input type="hidden" name="DNS2" value="@@form['DNS2']"/>
+				<input type="hidden" name="WINSIP1" value="@@form['WINSIP1']"/>
+				<input type="hidden" name="WINSIP2" value="@@form['WINSIP2']"/>
+				<input type="hidden" name="NTPserver" value="@@form['NTPserver']"/>
+				<input type="hidden" name="DHCPrelay" value="@@form['DHCPrelay']">
+				<input type="hidden" name="DHCPServerAddr" value="@@form['DHCPServerAddr']">
+
+#ifndef V_DHCP_RELAY_WEBUI_none
+				<h2><script language=Javascript>document.write(_("dhcp relay config"))</script></h2>
+				<div class="form-row no-bg-form">
+					<label for="field-2"><script language=Javascript>document.write(_("dhcp relay"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='DHCPRelayConf' id='DHCPRelayConf-0' value=1 onClick="ungreyOutRelayFields()">
+								<label for="DHCPRelayConf-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='DHCPRelayConf' id='DHCPRelayConf-1' value=0 onClick="greyOutRelayFields()">
+								<label for="DHCPRelayConf-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+#endif
+				<div class="grey-box" id="box_dhcp_relay">
+					<div class="form-row">
+#ifndef V_DHCP_RELAY_WEBUI_none
+						<label for="DHCPServerAddr"><script language=Javascript>document.write(_("dhcp serveraddr"))</script></label>
+#endif
+						<script language=javascript>htmlGenIpBlocks("DHCPServerAddr");</script>
+					</div>
+				</div>
+				<div class="box_dhcp_conf">
+					<h2><script language=Javascript>document.write(_("dhcp configuraion"))</script></h2>
+					<div class="form-row no-bg-form">
+						<label for="field-1"><script language=Javascript>document.write(_("DHCP"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch" data-toggle-element="box_dhcp">
+									<input type="radio" name='DHCPConf' id='DHCPConf-0' value='1' class="access" onClick="ungreyOutDHCPFields()">
+									<label for="DHCPConf-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type=radio name='DHCPConf' id='DHCPConf-1' value='0' class="access" onClick="greyOutDHCPFields()">
+									<label for="DHCPConf-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_dhcp">
+						<div class="form-row">
+							<label for="DHCPStart"><script language=Javascript>document.write(_("dhcp start range"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("DHCPStart");</script>
+						</div>
+						<div class="form-row">
+							<label for="DHCPEnd"><script language=Javascript>document.write(_("dhcp end range"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("DHCPEnd");</script>
+						</div>
+						<div class="form-row">
+							<label for="DHCPLease"><script language=Javascript>document.write(_("dhcp lease time")+"("+_("seconds")+")")</script></label>
+							<div class="field">
+								<input type="text" name="DHCPLease" id="DHCPLease" class="large validate[required,funcCall[validate_DHCPLease] required DHCPLease" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['DHCPLease']">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="DDNsuffix"><script language=Javascript>document.write(_("default domainname"))</script></label>
+							<div class="field">
+								<input type="text" name="DDNsuffix" class="large" maxLength="128" onKeyUp="hostNameFilter(this);">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="DNSAddress1"><script language=Javascript>document.write(_("dns1ip"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired("DNSAddress1");</script>
+						</div>
+						<div class="form-row">
+							<label for="DNSAddress2"><script language=Javascript>document.write(_("dns2ip"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired("DNSAddress2");</script>
+						</div>
+						<div class="form-row">
+							<label for="WINSIP1"><script language=Javascript>document.write(_("winsServer1"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired("WINSIP1");</script>
+						</div>
+						<div class="form-row">
+							<label for="WINSIP2"><script language=Javascript>document.write(_("winsServer2"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired("WINSIP2");</script>
+						</div>
+						<div class="form-row">
+							<label for="NTPserver"><script language=Javascript>document.write(_("opt42"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired("NTPserver");</script>
+						</div>
+						<div class="form-row">
+							<label for="TFTPserver"><script language=Javascript>document.write(_("opt66"))</script></label>
+							<div class="field">
+								<input type="text" name="TFTPserver" class="large" maxLength="128" onkeyup="urlFilter(this);">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="option150"><script language=Javascript>document.write(_("opt150"))</script></label>
+							<div class="field">
+								<input type="text" name="option150" class="large" maxLength="128" onkeyup="urlFilter(this);"></td>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="option160"><script language=Javascript>document.write(_("opt160"))</script></label>
+							<div class="field">
+								<input type="text" name="option160" class="large" maxLength="128" onkeyup="urlFilter(this);">
+							</div>
+						</div>
+					</div>
+				</div>
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+				<div class="submit-row">
+					<button type="button" onClick="javascript:submitF1()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+			</form>
+			<div class="box_dhcp_conf box_reservation pad">
+				<div class="hr"></div>
+				<br/>
+				<form name="form3" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?form3">
+					<%appendCsrfToken();%>
+					<input type="hidden" value="0" id="maxReservation" name="maxReservation"/>
+#endif
+					<div id="reservationdiv1">
+						<div class="grid-50">
+							<div class="pad alpha">
+								<h2><script language=Javascript>document.write(_("addr reservation list"))</script></h2>
+							</div>
+						</div>
+						<div class="grid-50">
+							<div class="pad omega">
+								<div class="submit-row-condensed">
+									<button type="button" class="secondary sml fr" id="addbutton01" onClick="addElement('','','0.0.0.0',1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+								</div>
+							</div>
+						</div>
+						<br/>
+						<div class="form-row">
+							<table class="no-border" id="ReservationDiv-title">
+								<colgroup>
+									<col width="140px">
+									<col width="140px">
+									<col width="230px">
+									<col width="auto">
+									<col width="auto">
+								</colgroup>
+								<thead>
+									<tr>
+										<th class="align10"><script language=Javascript>document.write(_("compName"))</script></th>
+										<th class="align10"><script language=Javascript>document.write(_("macAddress"))</script></th>
+										<th class="align10"><script language=Javascript>document.write(_("ip address"))</script></th>
+										<th class="align10"><script language=Javascript>document.write(_("enable"))</script></th>
+										<th></th>
+									</tr>
+								</thead>
+							<tbody id="ReservationDiv"></tbody>
+							</table>
+						</div>
+					</div>
+					<div class="submit-row">
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+						<button type="button" onClick="javascript:submitF1()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						<button type="button" class="secondary" onClick="javascript:cancelForm()"><script language=Javascript>document.write(_("cancel"))</script></button>
+#else
+						<button type="button" onClick="javascript:submitF3()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+#endif
+					</div>
+				</form>
+				<div class="hr"></div>
+				<br/>
+				<form name="form4" class="validate" action="#" novalidate="novalidate">
+					<h2><script language=Javascript>document.write(_("dynamicDhcpClientList"))</script></h2>
+					<table>
+						<colgroup>
+							<col width="20%">
+							<col width="20%">
+							<col width="20%">
+							<col width="20%">
+							<col width="20%">
+						</colgroup>
+						<thead>
+							<tr>
+								<th class="align10"><script language=Javascript>document.write(_("compName"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("macAddress"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("ip address"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("expiry time"))</script></th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="lease_data"></tbody>
+					</table>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "DHCP", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["DHCPLease"]=_("minimumLeaseTime");
+	$.validator.addMethod("DHCPLease",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 120 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.DHCPLease);
+#else
+/********* NTC ValidationEngine **********/
+function validate_DHCPLease(field, rules, i, options) {
+	if( field.val() < 120 ) {
+		return _("minimumLeaseTime");
+	}
+}
+#endif
+/*******************************************/
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+<%	if(request['QUERY_STRING']=="success-1") {%>
+		success_alert("",_("dhcpSubmitSuccess"));
+<%	}
+	else if(request['QUERY_STRING']=="success-3") {%>
+		success_alert("",_("dhcpReservationSubmitSuccess"));
+<%	}%>
+#endif
+</script>
+</body>
+</html>

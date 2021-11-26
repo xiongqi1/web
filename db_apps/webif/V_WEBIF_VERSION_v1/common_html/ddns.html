@@ -1,0 +1,520 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>DDNS</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("ddns");
+var secs
+var timerID = null
+var timerRunning = false
+var timeout = 5
+var delay = 1000
+
+function InitializeTimer() { // Set the length of the timer, in seconds
+	secs = timeout
+	StopTheClock()
+	StartTheTimer()
+}
+
+function StopTheClock() {
+	if(timerRunning)
+		clearTimeout(timerID)
+	timerRunning = false
+}
+
+var http_request = false;
+function StartTheTimer(){
+	if (secs==0) {
+		StopTheClock()
+		$.get("/cgi-bin/ddns.cgi", alertContents);
+		secs = timeout
+		StartTheTimer()
+	}
+	else {
+		self.status = secs
+		secs = secs - 1
+		timerRunning = true
+		timerID = self.setTimeout("StartTheTimer()", delay)
+	}
+}
+
+function alertContents(responseText) {
+	eval(responseText);
+	eval( "document.form.ddnsStatus.value=service_ddns_status" );
+}
+
+function submitF() {
+	if (document.form.password.value != document.form.Vpassword.value) {
+		alert(_("wwan warningMsg2"));
+		return;
+	}
+
+	if (document.form.querytype.value == "1") {
+		if(document.form.queryperiod.value < 300 || document.form.queryperiod.value > 2073600) {
+			alert(_("query period outOfRange"));
+			return;
+		}
+	}
+	else if (document.form.querytype.value != "0"){
+		document.form.querytype.value = "0";
+	}
+
+	document.form.formName.value="DDNS";
+	unGreyOutMappingFields();
+	unGreyOutQueryPeriodFields();
+	document.form.submit();
+}
+
+function unGreyOutQueryPeriodFields() {
+	document.form.queryperiod.disabled = false;
+	document.form.queryserverSelect.disabled = false;
+}
+
+function greyOutQueryPeriodFields() {
+	document.form.queryperiod.disabled = true;
+	document.form.queryserverSelect.disabled = true;
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function unGreyOutMappingFields() {
+	document.form.servermap.disabled = false;
+	document.form.hostname.disabled = false;
+	document.form.username.disabled = false;
+	document.form.password.disabled = false;
+	document.form.Vpassword.disabled = false;
+	document.form.obtainSelect.disabled = false;
+
+	if(document.form.querytype.value=='1') {
+		document.form.obtainSelect.options.selectedIndex='1';
+		unGreyOutQueryPeriodFields();
+	}
+	else {
+		document.form.obtainSelect.options.selectedIndex='0';
+		greyOutQueryPeriodFields();
+	}
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function greyOutMappingFields() {
+	document.form.servermap.disabled = true;
+	document.form.hostname.disabled = true;
+	document.form.username.disabled = true;
+	document.form.password.disabled = true;
+	document.form.Vpassword.disabled = true;
+	document.form.obtainSelect.disabled = true;
+	greyOutQueryPeriodFields();
+}
+
+function checkDDNSConf() {
+if (document.form.ddnsEnable[1].checked == true)
+	greyOutMappingFields();
+else if (document.form.ddnsEnable[0].checked == true)
+	unGreyOutMappingFields();
+}
+function setOption() {
+	var serverlist = <%val=get_single('service.ddns.serverlist');%>"@@val";
+	var ray = new Array();
+	ray = serverlist.split(",");
+	for( i=0; i < ray.length; i++ ) {
+		document.forms[0].servermap[i] = new Option(ray[i], ray[i]);
+	}
+}
+
+function setQueryServerOption() {
+	var queryServers = new Array("Random", "http://www.ipchicken.com", "http://checkip.dyndns.com", "http://ipdetect.dnspark.com", "http://ipswift.com", "http://checkip.dyndns.org", "http://dns.loopia.se/checkip/checkip.php");
+	for( i=0; i < queryServers.length; i++ ) {
+		document.forms[0].queryserverSelect[i] = new Option(queryServers[i], queryServers[i]);
+	}
+}
+function queryTypeChange() {
+	document.form.querytype.value=document.form.obtainSelect.value;
+
+	if(document.form.querytype.value=='1') {
+		unGreyOutQueryPeriodFields();
+	}
+	else {
+		greyOutQueryPeriodFields();
+	}
+}
+
+function queryServerChange() {
+	document.form.queryserver.value=document.form.queryserverSelect.value;
+}
+
+InitializeTimer();
+
+$(document).ready( function() {
+$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+	eval(v);
+	if(service_pppoe_server_0_enable=="1") {
+		$(".hide_for_pppoe_en").css("display", "none");
+		$(".pppoeEnablesMsg").css("display", "");
+	}
+});
+});
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+if(form['formName']=="DDNS") {
+	tempval = form['servermap'];
+	form['ddnsserver'] = tempval;
+	retval = set_single( 'service.ddns.server='+tempval, '-p' );
+	tempval = form['ddnsenable'];
+	retval = set_single( 'service.ddns.enable='+tempval, '-p' );
+	if(tempval == '0')
+		set_single( 'service.ddns.status=Disabled' );
+	else
+		set_single( 'service.ddns.status=Enabled' );
+	tempval = form['hostname'];
+	retval = set_single( 'service.ddns.hostname='+tempval, '-p' );
+	tempval = form['username'];
+	retval = set_single( 'service.ddns.user='+tempval, '-p' );
+	tempval = form['password'];
+	retval = set_single( 'service.ddns.password='+tempval, '-p' );
+	tempval = form['publicIPenable'];
+	retval = set_single( 'service.ddns.pubipen='+tempval, '-p' );
+
+	tempval = form['querytype'];
+	retval = set_single( 'service.ddns.querytype='+tempval, '-p' );
+	tempval = form['queryperiod'];
+	retval = set_single( 'service.ddns.queryperiod='+tempval, '-p' );
+	tempval = form['queryserver'];
+	retval = set_single( 'service.ddns.queryserver='+tempval, '-p' );
+}
+else if(form['formName']=="NSUPDATE") {
+	tempval = form['nsupdateenable'];
+	retval = set_single( 'service.nsupdate.enable='+tempval, '-p' );
+	tempval = form['serveraddr'];
+	retval = set_single( 'service.nsupdate.serveraddr='+tempval, '-p' );
+	tempval = form['serveraddr2'];
+	retval = set_single( 'service.nsupdate.serveraddr2='+tempval, '-p' );
+	tempval = form['dnszone'];
+	retval = set_single( 'service.nsupdate.dnszone='+tempval, '-p' );
+	tempval = form['NShostname'];
+	retval = set_single( 'service.nsupdate.hostname='+tempval, '-p' );
+	tempval = form['expiry'];
+	retval = set_single( 'service.nsupdate.expiry='+tempval, '-p' );
+	tempval = form['onconnect'];
+	retval = set_single( 'service.nsupdate.onconnect='+tempval, '-p' );
+}
+}
+else { /*GET*/ 
+form['ddnsserver'] = get_single( 'service.ddns.server' );
+form['ddnsenable'] = get_single( 'service.ddns.enable' );
+form['hostname'] = get_single( 'service.ddns.hostname' );
+form['username'] = get_single( 'service.ddns.user' );
+
+form['querytype'] = get_single( 'service.ddns.querytype' );
+form['queryperiod'] = get_single( 'service.ddns.queryperiod' );
+form['queryserver'] = get_single( 'service.ddns.queryserver' );
+
+temp = get_single( 'service.ddns.password' );
+form['password'] = temp;
+form['Vpassword'] = temp;
+
+form['nsupdateenable'] = get_single( 'service.nsupdate.enable' );
+form['publicIPenable'] = get_single( 'service.ddns.pubipen' );
+form['serveraddr'] = get_single( 'service.nsupdate.serveraddr' );
+form['serveraddr2'] = get_single( 'service.nsupdate.serveraddr2' );
+form['dnszone'] = get_single( 'service.nsupdate.dnszone' );
+temp = get_single( 'service.nsupdate.hostname' );
+if(temp == '')
+	temp = get_single( 'wwan.0.imei' );
+form['NShostname'] = temp;
+form['expiry'] = get_single( 'service.nsupdate.expiry' );
+form['onconnect'] = temp = get_single( 'service.nsupdate.onconnect' );
+}
+%>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("man ddns"))</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+<tr>
+	<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+	<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+</tr>
+<tr>
+	<td/>
+	<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("man ddns"))</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="ddnsenable" value="@@form['ddnsenable']"/>
+<input type="hidden" name="ddnsserver" value="@@form['ddnsserver']"/>
+<input type="hidden" name="publicIPenable" value="@@form['publicIPenable']"/>
+<input type="hidden" name="querytype" value="@@form['querytype']"/>
+<input type="hidden" name="queryserver" value="@@form['queryserver']"/>
+<input type="hidden" name="formName" value=""/>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("ddnsConfiguration"))</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("ddnsConfiguration"))</script></td>
+	<td><input type=radio name='ddnsEnable' onClick="javascript:document.form.ddnsenable.value='1';unGreyOutMappingFields()">&nbsp;<script language="JavaScript">document.write(_("enable"))</script> &nbsp;&nbsp;
+	<input type=radio name='ddnsEnable' onClick="javascript:document.form.ddnsenable.value='0';greyOutMappingFields()">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+<tr style="display:none">
+	<td><script language="JavaScript">document.write(_("statusinfo"))</script></td>
+	<td><input type="text" name="ddnsStatus" class='cdcsAjax' readonly size="60"/></td>
+</tr>
+</table>
+
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("man ddns setting"))</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("serveraddr"))</script></td>
+	<td><select name="servermap" size="1" ID="Select2">
+	<script language='javascript'>
+	setOption();
+	</script>
+	</select>	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("mesh hostname"))</script></td>
+	<td><input type="text" name="hostname" size="28" maxLength="64" value="@@form['hostname']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("user name"))</script></td>
+	<td><input type="text" name="username" size="28" maxLength="64" value="@@form['username']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("password"))</script></td>
+	<td><input type="password" name="password" size="28" maxLength="64" value="@@form['password']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("verify password"))</script></td>
+	<td><input type="password" name="Vpassword" size="28" maxLength="64" value="@@form['Vpassword']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("obtain IP from"))</script></td>
+	<td><select name="obtainSelect" size="1" onChange="queryTypeChange()">
+	    <option value=0 > WAN Interface</option>
+	    <option value=1 > Internet</option>
+	    </select>
+	</td>
+
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("query period"))</script></td>
+	<td><input type="text" name="queryperiod" size="7" maxLength="64" value="@@form['queryperiod']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("query period range"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("query server"))</script></td>
+	<td><select name="queryserverSelect" size="1" onChange="queryServerChange()">
+	<script language='javascript'>
+	setQueryServerOption();
+	</script>
+	</select>
+	</td>
+
+</tr>
+<tr style="display:none">
+	<td width="38%"><script language="JavaScript">document.write(_("binding pub ip"))</script></td>
+	<td><input type=radio name='publicIPEnable' onClick="javascript:document.form.publicIPenable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"))</script> &nbsp;&nbsp;
+	<input type=radio name='publicIPEnable' onClick="javascript:document.form.publicIPenable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+</table>
+<div align="center"><p></p><input type="Button" value="Save" id="Button1" onClick="javascript:submitF()" style="width:120px;"></div>
+<script language='javascript'>
+	if(document.form.publicIPenable.value=='1') {
+		document.form.publicIPEnable[0].checked=true;
+	}
+	else {
+		document.form.publicIPEnable[1].checked=true;
+	}
+
+	if(document.form.querytype.value=='1') {
+		document.form.obtainSelect.options.selectedIndex='1';
+	}
+	else {
+		document.form.obtainSelect.options.selectedIndex='0';
+	}
+
+	if(document.form.queryperiod.value=='N/A') {
+		document.form.queryperiod.value=7200;
+	}
+
+	if(document.form.queryserver.value=='N/A') {
+		document.form.queryserver.value="Random";
+	}
+
+	if(document.form.ddnsenable.value=='1') {
+		unGreyOutMappingFields()
+		document.form.ddnsEnable[0].checked=true;
+	}
+	else {
+		greyOutMappingFields()
+		document.form.ddnsEnable[1].checked=true;
+	}
+	with ( document.forms[0] ) {
+		setSelect(servermap, document.form.ddnsserver.value);
+		setSelect(queryserverSelect, document.form.queryserver.value);
+	}
+</script>
+
+#if 0
+<script language="JavaScript">
+function valuechanged(cb) {
+	if(cb.checked)
+		document.form.onconnect.value=1;
+	else
+		document.form.onconnect.value=0;
+	document.form.expiry.disabled=cb.checked;
+}
+function submitNSUPDATE() {
+	try {
+		document.form.formName.value="NSUPDATE";
+		NSunGreyOutMappingFields();
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function NSunGreyOutMappingFields() {
+	try {
+		document.form.serveraddr.disabled = false;
+		document.form.serveraddr2.disabled = false;
+		document.form.dnszone.disabled = false;
+		document.form.NShostname.disabled = false;
+		document.form.expiry.disabled = false;
+		document.form.onconnectcb.disabled=false;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function NSgreyOutMappingFields() {
+	try {
+		document.form.serveraddr.disabled = true;
+		document.form.serveraddr2.disabled = true;
+		document.form.dnszone.disabled = true;
+		document.form.NShostname.disabled = true;
+		document.form.expiry.disabled = true;
+		document.form.onconnectcb.disabled=true;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function checkDDNSConf() {
+	try {
+		if (document.form.nsupdateEnable[1].checked == true) {
+			NSgreyOutMappingFields();
+		}
+		else if (document.form.nsupdateEnable[0].checked == true) {
+			NSunGreyOutMappingFields();
+		}
+	}
+	catch (e) {
+		alert(e.message);
+	}
+}
+
+function updateState() {
+	document.form.onconnectcb.checked=document.form.onconnect.value==1;
+	valuechanged(document.form.onconnectcb);
+}
+</script>
+
+<input type="hidden" name="nsupdateenable" value="@@form['nsupdateenable']"/>
+<input type="hidden" name="nsupdateserver" value="@@form['nsupdateserver']"/>
+<table width="75%">
+	<tr><th>NSUPDATE Configuration</th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%">NSUPDATE Configuration</td>
+	<td> <input type=radio name='nsupdateEnable' onClick="javascript:document.form.nsupdateenable.value='1';NSunGreyOutMappingFields();document.form.expiry.disabled = document.form.onconnect.value==1;">&nbsp;Enable &nbsp;&nbsp;
+	<input type=radio name='nsupdateEnable' onClick="javascript:document.form.nsupdateenable.value='0';NSgreyOutMappingFields()">&nbsp;Disable</td>
+</tr>
+</table>
+
+<table width="75%">
+	<tr><th>NSUPDATE Settings</th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%">Server Address</td>
+	<td><input type="text" name="serveraddr" size="18" maxLength="64" value="@@form['serveraddr']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td width="38%">Secondary Server Address</td>
+	<td><input type="text" name="serveraddr2" size="18" maxLength="64" value="@@form['serveraddr2']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td width="38%">DNS Zone</td>
+	<td><input type="text" name="dnszone" size="18" maxLength="64" value="@@form['dnszone']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td>Host Name</td>
+	<td><input type="text" name="NShostname" size="18" maxLength="64" value="@@form['NShostname']"> &nbsp;</td>
+</tr>
+<tr>
+	<td>Expiry Time (in minutes)</td>
+	<td>
+		<input type="hidden" name="onconnect" size="18" maxLength="64" value="@@form['onconnect']"> &nbsp;
+		<p>
+		<input type="checkbox" name="onconnectcb" size="18" maxLength="64" onchange="valuechanged(this);"> On connection only&nbsp;
+		</p>
+		<input type="text" name="expiry" size="18" maxLength="64" value="@@form['expiry']"> &nbsp;
+	</td>
+</tr>
+</table>
+<div align="center"><br/><input type="Button" value="Save" id="Button2" onClick="javascript:submitNSUPDATE()" style="width:120px;"></div>
+</div>
+<script language='javascript'>
+	if(document.form.nsupdateenable.value=='1') {
+		NSunGreyOutMappingFields()
+		document.form.nsupdateEnable[0].checked=true;
+	}
+	else {
+		NSgreyOutMappingFields()
+		document.form.nsupdateEnable[1].checked=true;
+	}
+	document.getElementById("Button2").value=_("CSsave");
+</script>
+#endif
+</form>
+</div>  <!-- <div class="hide_for_pppoe_en"> -->
+</div>  <!-- <div id="contentWrapper"> -->
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("Button1").value=_("CSsave");
+</script>
+</body>
+</html>

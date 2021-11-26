@@ -1,0 +1,516 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Power Profile Settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<%
+function validatePowerProfileInput() {
+  // power.profile.x.trigger
+  validateOnOffRadio(form['powerprofiletrigger']);
+
+  // power.profile.x.profilename
+  profilename=form['profilename'];
+  if (string_regex_match(profilename, "^[.0-9A-Z_a-z-]+$") == false){
+    onBadRequest();
+  }
+
+  // power.profile.x.sleepmode
+  sleepmode=form['sleepmodeH'];
+  if (sleepmode != '1' && sleepmode != '3' && sleepmode != '4') {
+    onBadRequest();
+  }
+
+  // power.profile.x.sleepafter
+  validateBoundedInteger(form['sleepafter'], 2, 65535);
+
+  //power.profile.x.sleepat
+  validateTimeHHMM(form['sleepat']);
+
+  //power.profile.x.sleeponignpinval
+  if (form['sleeponignpinvalH'] !=  "on" && form['sleeponignpinvalH'] != "off"){
+    onBadRequest();
+  }
+
+  //power.profile.x.awakeafterignoff
+  validateBoundedInteger(form['awakeafterignoff'], 2, 255);
+
+  // power.profile.x.wakemode
+  if (form['wakemodeH'] != '2' && form['wakemodeH'] != '3'){
+    onBadRequest();
+  }
+
+  //power.profile.x.wakeonignpinval
+  if (form['wakeonignpinvalH'] !=  "on" && form['wakeonignpinvalH'] != "off"){
+    onBadRequest();
+  }
+
+  //power.profile.x.wakeupat
+  validateTimeHHMM(form['wakeupat']);
+}
+
+syslog(7, "printing stuff");
+//idx=request['QUERY_STRING'];
+idx= form['profileidx'];
+if( idx>=1 && idx<7 ) {
+ form['profileidx'] = idx;
+}
+else {
+ form['profileidx'] = 1;
+}
+i=form['profileidx'];
+
+if (request['REQUEST_METHOD'] == "POST") {
+	validatePowerProfileInput();
+	syslog(7, "printing stuff i="+i);
+	tempval = form['profilename'];
+	retval = set_single( 'power.profile.'+i+'.profilename='+tempval, '-p' );
+	tempval = form['sleepmodeH'];
+	retval = set_single( 'power.profile.'+i+'.sleepmode='+tempval, '-p' );
+	tempval = form['wakemodeH'];
+	retval = set_single( 'power.profile.'+i+'.wakemode='+tempval, '-p' );
+	tempval = form['sleeponignpinvalH'];
+	retval = set_single( 'power.profile.'+i+'.sleeponignpinval='+tempval, '-p' );
+	tempval = form['wakeonignpinvalH'];
+	retval = set_single( 'power.profile.'+i+'.wakeonignpinval='+tempval, '-p' );
+	tempval = form['wakeupafterH'];
+	syslog(7, "wakeupafterH="+tempval);
+	retval = set_single( 'power.profile.'+i+'.wakeupafter='+tempval, '-p' );
+	tempval = form['sleepafter'];
+	syslog(7, "sleepafter="+tempval);
+	retval = set_single( 'power.profile.'+i+'.sleepafter='+tempval, '-p' );
+	tempval = form['wakeupat'];
+	syslog(7, "wakeupat="+tempval);
+	retval = set_single( 'power.profile.'+i+'.wakeupat='+tempval, '-p' );
+	tempval = form['sleepat'];
+	syslog(7, "sleepat="+tempval);
+	retval = set_single( 'power.profile.'+i+'.sleepat='+tempval, '-p' );
+	tempval = form['powerprofiletrigger'];
+	retval = set_single( 'power.profile.'+i+'.trigger='+tempval, '-p' );
+	tempval = form['awakeafterignoff'];
+	retval = set_single( 'power.profile.'+i+'.awakeafterignoff='+tempval, '-p' );
+
+redirect('/low_power_standby.html?success');
+}
+else { //GET
+
+	  form['powerprofiletrigger'] = get_single( 'power.profile.'+i+'.trigger' );
+	  form['profilename'] = get_single( 'power.profile.'+i+'.profilename' );
+	  form['wakemodeH'] = get_single( 'power.profile.'+i+'.wakemode' );
+	  form['sleepmodeH'] = get_single( 'power.profile.'+i+'.sleepmode' );
+	  form['sleeponignpinvalH'] = get_single( 'power.profile.'+i+'.sleeponignpinval' );
+	  form['sleepafter'] = get_single( 'power.profile.'+i+'.sleepafter' );
+	  form['sleepat'] = get_single( 'power.profile.'+i+'.sleepat' );
+	  form['wakeonignpinvalH'] = get_single( 'power.profile.'+i+'.wakeonignpinval' );
+	  form['wakeupafterH'] = get_single( 'power.profile.'+i+'.wakeupafter' );
+	  form['wakeupat'] = get_single( 'power.profile.'+i+'.wakeupat' );
+	  form['awakeafterignoff'] = get_single( 'power.profile.'+i+'.awakeafterignoff' );
+
+}
+
+%>
+<script language='javascript'>
+if(is_edge_browser()) {
+	$("head").append("<style type='text/css'>#sleepMode,#wakeMode{width: 245px;}</style>");
+}
+else {
+	$("head").append("<style type='text/css'>#sleepMode,#wakeMode{width: auto;}</style>");
+}
+
+#include "net_util.js"
+
+function Init_Form() {
+ var i = document.getElementById("profileidx").value;
+ if(i=="") {
+  i=0;
+ }
+ //$("#profilename").val("PowerProfile"+i);
+}
+function checkEnabledProfiles() {
+ var j = document.getElementById("profileidx").value-1;
+ en=0;
+ for( i=0; i<stpf.length; i++ ) {
+  if( (i!=j) && stpf[i].enable == 1) {
+   en++;
+  }
+ }
+ return en;
+}
+function profile_enable(en) {
+ //clear_alert();
+}
+function showhideSleepDiv(elem) {
+  if(elem.value == 1) {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', '');
+      $('#sleepIgnition-div').css('display', 'none');
+      $('#scheduletime-div').css('display', 'none');
+  }
+  else if(elem.value == 4) {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', 'none');
+      $('#sleepIgnition-div').css('display', '');
+      $('#scheduletime-div').css('display', 'none');
+  }
+  else if(elem.value == 3) {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', 'none');
+      $('#sleepIgnition-div').css('display', 'none');
+      $('#scheduletime-div').css('display', '');
+  }
+
+}
+
+function showhideWakeDiv(elem) {
+  if(elem.value == 2) {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#wakeIgnition-div').css('display', '');
+      $('#wakescheduletimer-div').css('display', 'none');
+
+  }
+  else if(elem.value == 3) {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#wakeIgnition-div').css('display', 'none');
+      $('#wakescheduletimer-div').css('display', '');
+  }
+
+}
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+ <div class="container">
+ <aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+ <div class="grid-9 omega">
+  <form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+  <%appendCsrfToken();%>
+  <div class="right-column white-box">
+   <div class="pad">
+    <h2><script language=Javascript>document.write(_("powerProfileSettings"))</script></h2>
+    <input type="hidden" name="profileidx" id="profileidx" value="@@form['profileidx']">
+    <input type="hidden" name="powerswitchenable" id="powerswitchenable" value="@@form['powerswitchenable']"/>
+    <input type="hidden" name="powerprofiletrigger" id="powerprofiletrigger" value="@@form['powerprofiletrigger']"/>
+    <input type="hidden" name="sleepmodeH" id="sleepmodeH" value="@@form['sleepmodeH']"/>
+     <input type="hidden" name="sleeponignpinvalH" id="sleeponignpinvalH" value="@@form['sleeponignpinvalH']"/>
+     <input type="hidden" name="wakemodeH" id="wakemodeH" value="@@form['wakemodeH']"/>
+     <input type="hidden" name="wakeonignpinvalH" id="wakeonignpinvalH" value="@@form['wakeonignpinvalH']"/>
+     <!--<input type="hidden" name="wakeupafterH" id="wakeupafterH" value="@@form['wakeupafterH']"/> -->
+
+    <div class="form-row no-bg-form" >
+     <label for="pppAutoCon"><script language=Javascript>document.write(_("profile"))</script></label>
+     <div class="field">
+      <div class="location-settings">
+       <div class="radio-switch">
+        <input type="radio" id="pppAutoCon-0" name="pppAutoCon" class="access" value="1">
+        <label for="pppAutoCon-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+        <input type="radio" id="pppAutoCon-1" name="pppAutoCon" class="access" value="0">
+        <label for="pppAutoCon-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div class="form-row">
+     <label for="profilename"><script language=Javascript>document.write(_("profile name"))</script></label>
+     <div class="field">
+      <input type="text" class="validate[required] required large" name="profilename" id="profilename" onKeyUp="nameFilter(this);" value="@@form['profilename']">
+     </div>
+    </div>
+
+
+    <!-- cut paste start   -->
+   <div id="sleep-settings-div">
+    <h2><script language=Javascript>document.write(_("sleepSettings"))</script></h2>
+
+     <div class="p-des-full-width">
+      <div class="form-row">
+       <label for="sleepMode"><script language=Javascript>document.write(_("sleepMode"))</script></label>
+       <div class="field">
+        <select name="sleepMode" id="sleepMode" onchange="$('#sleepmodeH').val(this.value);showhideSleepDiv(this);">
+         <option value="1"><script language=Javascript>document.write(_("sleepAfterTimer"))</script></option>
+         <option value="3"><script language=Javascript>document.write(_("sleepAtScheduleTimer"))</script></option>
+         <option value="4"><script language=Javascript>document.write(_("sleepTriggeredByIgnPin"))</script></option>
+         <!-- <option value="4"><script language=Javascript>document.write(_("sleepByTimerOrIgnition"))</script></option> -->
+        </select>
+       </div>
+      </div>
+
+      <div class="p-des-full-width" id="sleepaftertimer-div">
+      <div class="form-row" id="sleep_time1-div">
+
+       <label for="sleep after mins"><script language=Javascript>document.write(_("Sleep after"))</script></label>
+       <div class="field">
+        <input type="text" name="sleepafter" id="sleepaftermins" class="large validate[required,custom[integer],min[2],max[65535]] required sleeptimer" onKeyUp='NumfieldEntry(this)' maxLength="5" value="@@form['sleepafter']">
+        </div>
+        <div>
+        <span class="normal-text">&nbsp;<script language=Javascript>document.write("&nbsp;&nbsp;minutes")</script></span>
+       </div>
+      </div>
+     </div>
+
+      <div class="form-row" id="sleepIgnition-div">
+       <label for="sleepIgnition_0"><script language=Javascript>document.write(_("sleepByIgnitionCondition"))</script></label>
+       <div class="field">
+        <div class="radio-box-group">
+         <div class="radio-box">
+          <input type="radio" class="access" name='sleepIgnition' id='sleepIgnition_0' value="off" onClick="$('#sleeponignpinvalH').val(this.value);" checked>
+          <label for="sleepIgnition_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+         </div>
+         <div class="radio-box">
+          <input type="radio" class="access" name='sleepIgnition' id='sleepIgnition_1' value="on" onClick="$('#sleeponignpinvalH').val(this.value);">
+          <label for="sleepIgnition_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+         </div>
+        </div>
+       </div>
+       <div class="p-des-full-width" id="after_ign_sleep_time-div">
+       <div class="form-row" id="awake_after_ign_sleep_time-div" style="padding-top:22px">
+       <label for="awakeafterignoff"><script language=Javascript>document.write(_("awakeAfterIgn"))</script></label>
+       <div class="field">
+        <input type="text" name="awakeafterignoff" id="awakeafterignoff" class="large validate[required,custom[integer],min[2],max[255]] required awaketimer" onKeyUp='NumfieldEntry(this)' maxLength="3" value="@@form['awakeafterignoff']">
+        </div>
+        <div>
+        <span class="normal-text">&nbsp;<script language=Javascript>document.write("&nbsp;&nbsp;minutes")</script></span>
+       </div>
+      </div>
+      </div>
+      </div>
+
+	<div class="p-des-full-width" id="scheduletime-div">
+		<div class="form-row" id="sleep_time-div">
+			<label for="sleepat"><script language=Javascript>document.write(_("scheduleSleepAt"))</script></label>
+			<div class="field">
+				<input type="text" name="sleepat" id="sleepat" class="large required sleeptime validate[required,funcCall[validate_sleeptime]]" onKeyUp='NumfieldEntry(this)' maxlength=4 value="@@form['sleepat']">
+			</div>
+			<div>
+				<span class="normal-text">&nbsp;&nbsp;<script language=Javascript>document.write(_("hhmmFormat"))</script></span>
+			</div>
+		</div>
+	</div>
+    </div>
+    <div id="wake-settings-div">
+     <h2><script language=Javascript>document.write(_("wakeSettings"))</script></h2>
+     <div class="p-des-full-width">
+
+      </div>
+    <!-- </div>
+
+    </div> -->
+    <div class="form-row">
+       <label for="wakeMode"><script language=Javascript>document.write(_("wakeMode"))</script></label>
+       <div class="field">
+        <select name="wakeMode" id="wakeMode" onchange="$('#wakemodeH').val(this.value);showhideWakeDiv(this)">
+         <!-- <option value="1"><script language=Javascript>document.write(_("wakeByTimerAndIgnition"))</script></option> -->
+         <option value="2"><script language=Javascript>document.write(_("wakeTriggeredByIgnPin"))</script></option>
+         <option value="3"><script language=Javascript>document.write(_("wakeAtScheduleTimer"))</script></option>
+	 <!-- <option value="2"><script language=Javascript>document.write("wake up by RTC timer")</script></option> -->
+        </select>
+       </div>
+    </div>
+    <div class="form-row no-bg-form" id="wakeIgnition-div">
+       <label for="wakeIgnition_0"><script language=Javascript>document.write(_("wakeByIgnitionCondition"))</script></label>
+       <div class="field">
+        <div class="radio-box-group">
+         <div class="radio-box">
+          <input type="radio" class="access" name='wakeIgnition' id='wakeIgnition_0' value="off" onClick="$('#wakeonignpinvalH').val(this.value);">
+          <label for="wakeIgnition_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+         </div>
+         <div class="radio-box">
+          <input type="radio" class="access" name='wakeIgnition' id='wakeIgnition_1' value="on" onClick="$('#wakeonignpinvalH').val(this.value);">
+          <label for="wakeIgnition_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+         </div>
+        </div>
+       </div>
+      </div>
+
+     <div class="p-des-full-width" id="wakescheduletimer-div">
+      <div class="form-row" id="guard2_time-div">
+       <label for="wakeupat"><script language=Javascript>document.write(_("scheduleWakeUpAt"))</script></label>
+       <div class="field">
+        <input type="text" name="wakeupat" id="wakeupat" class="large required sleeptime validate[required,funcCall[validate_sleeptime]]" onKeyUp='NumfieldEntry(this)' maxlength=4 value="@@form['wakeupat']">
+        </div>
+        <div>
+        <span class="normal-text">&nbsp;&nbsp;<script language=Javascript>document.write(_("hhmmFormat"))</script></span>
+       </div>
+      </div>
+     </div>
+  </div>
+    <div class="submit-row">
+     <button type="button" id="save" name="save"><script language=Javascript>document.write(_("CSsave"))</script></button>
+     <button type="button" class="secondary" onClick="window.location='low_power_standby.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+    </div>
+   </div>
+  </div>
+  </form>
+ </div>
+</div>
+</div>
+<footer class="footer">
+ <div class="container">
+  <p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+ </div>
+</footer>
+<script language='javascript'>
+#ifdef V_WEBIF_SPEC_vdf
+set_menu("Services", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#else
+set_menu("System", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#endif
+var selected1;
+var selected2;
+var selected3;
+$('#form input').on('change', function() {
+	selected1 = $('input[name="usbuserswitch"]:checked', '#form').val();
+	selected2 = $('input[name="wanuserswitch"]:checked', '#form').val();
+	selected3 = $('input[name="wifiuserswitch"]:checked', '#form').val();
+});
+
+$( "#save" ).click(function() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			validate_alert("","");
+			return;
+		}
+#endif
+	var p_sw_en;
+	switches=new Array();
+
+	if(selected1=="1") {
+		switches.push("USB");
+	}
+
+	if(selected2=="1")
+		switches.push("WAN");
+
+
+	if(selected3=="1")
+		switches.push("WIFI");
+
+	p_sw_en=switches.join(",");
+	$('input[name="powerswitchenable"]').val(p_sw_en);
+	$('input[name="powerprofiletrigger"]').val($('input[name="pppAutoCon"]:checked', '#form').val());
+	$("form[name=form]").submit();
+});
+
+$(document).ready(function() {
+  var i = document.getElementById('profileidx').value;
+  Init_Form();
+  if(document.form.powerprofiletrigger.value=='1') {
+   $("#pppAutoCon-0").attr("checked", "checked");
+  }
+  else {
+   $("#pppAutoCon-1").attr("checked", "checked");
+  }
+
+  if($("#sleepmodeH").val()=='1') {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', '');
+      $('#sleepIgnition-div').css('display', 'none');
+      $('#scheduletime-div').css('display', 'none');
+      $("#sleepMode").val(1);
+  }
+  else if($("#sleepmodeH").val()=='4') {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', 'none');
+      $('#sleepIgnition-div').css('display', '');
+      $('#scheduletime-div').css('display', 'none');
+      $("#sleepMode").val(4);
+      if(document.form.sleeponignpinvalH.value=="on") {
+        $("#sleepIgnition_1").attr("checked", "checked");
+      }
+      else {
+        $("#sleepIgnition_0").attr("checked", "checked");
+
+      }
+  }
+  else if($("#sleepmodeH").val()=='3') {
+      //document.getElementById('sleepaftertimer-div').style.display = "block";
+      $('#sleepaftertimer-div').css('display', 'none');
+      $('#sleepIgnition-div').css('display', 'none');
+      $('#scheduletime-div').css('display', '');
+      $("#sleepMode").val(3);
+  }
+
+  if($("#wakemodeH").val()=='2') {
+    $('#wakeIgnition-div').css('display', '');
+    $('#wakescheduletimer-div').css('display', 'none');
+    $("#wakeMode").val(2);
+    if(document.form.wakeonignpinvalH.value=="on") {
+        $("#wakeIgnition_1").attr("checked", "checked");
+    }
+    else {
+        $("#wakeIgnition_0").attr("checked", "checked");
+
+    }
+  }
+  else if($("#wakemodeH").val() == 3) {
+    $('#wakeIgnition-div').css('display', 'none');
+    $('#wakescheduletimer-div').css('display', '');
+    $("#wakeMode").val(3);
+  }
+ });
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+
+function check_HHMM(s) {
+	hh=parseInt(s.substring(0, 2));
+	mm=parseInt(s.substring(2, 4));
+	if( s.length!=4 || hh>23 || mm>59) {
+		return false;
+	}
+	return true;
+}
+
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("sleeptime",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			return check_HHMM(c);
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("hhmmFormatErr"));
+
+	$.validator.addMethod("awaketimer",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 2 || c > 255 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field2and255"));
+
+	$.validator.addMethod("sleeptimer",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 2 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field2and65535"));
+#else
+	function validate_sleeptime(field, rules, i, options) {
+		if(!check_HHMM(field.val())) {
+			return _("hhmmFormatErr");
+		}
+	}
+#endif
+</script>
+</body>
+</html>

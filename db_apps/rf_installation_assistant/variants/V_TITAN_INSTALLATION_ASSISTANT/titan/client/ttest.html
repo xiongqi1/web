@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+    <script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Starting test automatically");
+        runTtest("/rf_restart_ttest/landing/auto");
+    });
+
+    function runTtest(url) {
+        //console.log("Run ttest requested");
+        recordTimestamp("testStart");
+        ajaxDeleteRequest(url);
+    }
+    </script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="ttest-main">
+        <div class="box-header">
+            <h2>Speed Test</h2>
+        </div>
+        <div class="box-content">
+            <div id="ttResult"></div>
+            <div id="TtestRestart">
+                <button class='med' id='ReRunButtonId' disabled='true' onclick="runTtest('/rf_restart_ttest/landing/rerun')">Rerun</button>
+            </div><br>
+        </div>
+    </div>
+    <div class="box" id="ttest-buttons">
+        <div class="box-content">
+            <p>Click 'Report' to complete the installation OR 'Back' to go back to Network Scan page</p>
+            <div class="submit-row">
+                <form action="/scan.html" method="GET">
+                    <button class='tinyfont'>Back</button>
+                </form>
+                <form action="/report.html" method="GET">
+                    <button class='tinyfont'>Report</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

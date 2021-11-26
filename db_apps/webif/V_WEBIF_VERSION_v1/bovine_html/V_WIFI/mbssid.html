@@ -1,0 +1,623 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<% include mbssid.inc %>
+<title>Multiple SSID</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['rdbCmd'];
+	if( tempval != "" )
+		set_list( tempval, '-p' );
+
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="javascript">
+Butterlate.setTextDomain("mbssid");
+
+var bssid_num=<%val=get_single('wlan.0.bssid_num');%>"@@val";
+
+function hideWlSecInfo(hidden) {
+	var status = 'visible';
+	with ( document.forms[0] ) {
+		var i = 0;
+		if ( hidden == 1 ) {
+		status = 'hidden';
+		wlMbSsid.disabled = 1;
+		document.getElementById( "SecurityDiv" ).style['display']='none';
+		} else {
+			wlMbSsid.disabled = 0;
+			document.getElementById( "SecurityDiv" ).style['display']='';
+		}
+	}
+}
+
+function checkHex(str) {
+	var len = str.length;
+	for (var i=0; i<str.length; i++) {
+		if ((str.charAt(i) >= '0' && str.charAt(i) <= '9') ||hideWlSecInfo
+		(str.charAt(i) >= 'a' && str.charAt(i) <= 'f') ||
+		(str.charAt(i) >= 'A' && str.charAt(i) <= 'F') ) {
+			continue;
+		} else
+	        return false;
+	}
+	return true;
+}
+
+function setKey(k) {
+var myid = document.getElementById("WEP_KEY" + k);
+var textid = document.getElementById("TEXT" + k);
+var keyValue = myid.value;
+var keylength = keyValue.length;
+
+	if ( keylength != 0 ) {
+		if(keylength != 10 && keylength != 26) {
+			myid.style.color = "BLACK";
+			textid.innerHTML="";
+		}
+		else {
+			myid.style.color = "GREEN";
+			if(keylength == 10) {
+				textid.innerHTML="&nbsp;&nbsp;64 bit&nbsp;&nbsp;HEX";
+				document.form.wlKeyBit.value = "64";
+			}
+			else {
+				textid.innerHTML="&nbsp;&nbsp;128 bit&nbsp;&nbsp;HEX";
+				document.form.wlKeyBit.value = "128";
+			}
+			if( isValidKey(keyValue, 5)==false && isValidKey(keyValue, 13)==false )	
+				myid.style.color = "RED";
+		}
+		if( checkHex( keyValue ) == false) {
+			myid.style.color = "RED";
+		}
+	}
+}
+
+function isValidWPAPskKey(val) {
+var ret = false;
+var len = val.length;
+var maxSize = 64;
+var minSize = 8;
+
+	if ( len >= minSize && len < maxSize )
+		ret = true;
+	else if ( len == maxSize ) {
+		for ( i = 0; i < maxSize; i++ )
+			if ( isHexaDigit(val.charAt(i)) == false )
+			break;
+		if ( i == maxSize )
+			ret = true;
+	} else
+		ret = false;
+	return ret;
+}
+
+function hideAllElements() {
+	$("#encryptionTypeD").css("display","none");
+	$("#wpaPreShareKey").css("display","none");
+	$("#wpaGTKRekey").css("display","none");
+	$("#wlRadius").css("display","none");
+	$("#Preauth").css("display","none");
+	$("#NetReauth").css("display","none");
+	$("#wlWepD").css("display","none");
+	$("#keyInfo").css("display","none");
+	$("#div_8021x_wep").css("display","none");
+}
+
+function authModeChange( alertMsg ) {
+	with ( document.forms[0] ) {
+	
+		var keyIdx=mbssidST[MbSsidIdx.value].network_key_id;
+		var authMode = getSelect(wlAuthMode);
+		hideAllElements();
+		switch ( authMode ) {
+		case 'OPEN':
+			if(wlWep.value=="disabled")
+				encryptionType.value="NONE";
+			else
+				encryptionType.value="WEP";
+			$("#wlWepD").css("display","");
+			wlWep.disabled=0;
+		break;
+		case 'SHARED':
+			wlWep.value="enabled";
+			wlWep.disabled=1;
+			encryptionType.value="WEP";
+			$("#wlWepD").css("display","");
+		break;
+		case 'WPA':
+			if(alertMsg)
+				alert(_("restrictAccess"));
+			$("#wlWepD").css("display","none");
+			$("#wpaGTKRekey").css("display","");
+			encryptionType.value="TKIP"; 
+			$("#encryptionTypeD").css("display","");
+			$("#wlRadius").css("display","");
+		break;
+		case 'WPAPSK':
+			$("#wlWepD").css("display","none");
+			$("#wpaPreShareKey").css("display","");
+			$("#wpaGTKRekey").css("display","");
+			encryptionType.value="TKIP"; 
+			$("#encryptionTypeD").css("display","");
+			break;
+		case 'WPA2':
+			$("#wlWepD").css("display","none");
+			$("#wpaGTKRekey").css("display","");
+			encryptionType.value="TKIP"; 
+			$("#encryptionTypeD").css("display","");
+			$("#wlRadius").css("display","");
+		break;
+		case 'WPA2PSK':
+			$("#wlWepD").css("display","none");
+			$("#wpaPreShareKey").css("display","");;
+			$("#wpaGTKRekey").css("display","");
+			encryptionType.value="AES";
+			$("#encryptionTypeD").css("display","");
+			break;
+		case 'WPAPSKWPA2PSK':
+			$("#wlWepD").css("display","none");
+			$("#wpaPreShareKey").css("display","");
+			$("#wpaGTKRekey").css("display","");
+			encryptionType.value="AES";
+			$("#encryptionTypeD").css("display","");
+		break;
+		case 'WPA1WPA2':
+			$("#wlWepD").css("display","none");
+			$("#wpaGTKRekey").css("display","");
+			$("#wlRadius").css("display","");
+			encryptionType.value="AES";
+			$("#encryptionTypeD").css("display","");
+		break;
+		case 'IEEE8021X':
+			$("#div_8021x_wep").css("display","");;
+			$("#wlRadius").css("display","");
+		break;
+		}
+		if (authMode == "OPEN" || authMode == "SHARED" || authMode == "WEPAUTO") {
+			if (getSelect(wlWep) == "enabled") {
+				$("#keyInfo").css("display","");
+				if(alertMsg)
+					alert(_("wepExplanation"));
+			}
+			wlKeys1.disabled = 0;
+			wlKeys2.disabled = 0;
+			wlKeys3.disabled = 0;
+			wlKeys4.disabled = 0;
+			wlKeyIndex.length = 0;
+			wlKeyIndex[0] = new Option("1", "1");
+			wlKeyIndex[1] = new Option("2", "2");
+			wlKeyIndex[2] = new Option("3", "3");
+			wlKeyIndex[3] = new Option("4", "4");
+			wlKeyIndex.selectedIndex = parseInt(keyIdx)-1;
+		}
+		else {
+			$("#keyInfo").css("display","none");
+		}
+	}
+}
+
+function wpapsk_window() {
+	wpaPskKey=document.form.wlWpaPsk.value;
+var psk_window = window.open("", "", "toolbar=no,width=500,height=100");
+	if(Butterlate.getLang()=="ar")
+		psk_window.document.write("<style>body { direction:rtl; }</style>");
+	psk_window.document.write(_("WEPtext4")+"<b>&nbsp;"+wpaPskKey+"</b>");
+	psk_window.document.close();
+}
+
+function formLoad(Idx) {
+	
+   with ( document.forms[0] ) {
+		var MbEntry;
+		if(Idx > 0 && Idx < 5)
+			MbSsidIdx.value = Idx;
+		else if(Idx==-1)
+			MbSsidIdx.value=<%val=get_single('wlan.currssid');%>"@@val";;
+		MbEntry= mbssidST[MbSsidIdx.value];
+		setSelect(wlAuthMode, MbEntry.network_auth);	
+		if(MbEntry.encryption_type =="WEP")
+			wlWep[1].selected = true;
+		else
+			wlWep[0].selected = true;
+		wlWpaPsk.value = MbEntry.wpa_pre_shared_key;
+		wlWpaGtkRekey.value = MbEntry.wpa_group_rekey_interval;
+		wlRadiusIPAddr.value = MbEntry.radius_server_ip;
+		wlRadiusPort.value = MbEntry.radius_port;
+		wlRadiusKey.value = MbEntry.radius_key;
+		wlPreauth.selectedIndex = parseInt(MbEntry.wpa2_preauthentication);
+		wlNetReauth.value = MbEntry.net_re_auth_interval;
+		wlMbSsid.value=MbEntry.ssid;
+		wlKeys1.value=MbEntry.network_key1;
+		wlKeys2.value=MbEntry.network_key2;
+		wlKeys3.value=MbEntry.network_key3;
+		wlKeys4.value=MbEntry.network_key4;
+		mbssidEnH.value=MbEntry.enable;
+		
+		hidessidH.value=MbEntry.hide_accesspoint;
+			
+		if(MbEntry.wep8021x =="1")
+			ieee8021x_wep[1].checked=true;
+		else
+			ieee8021x_wep[0].checked=true;
+				
+		if(mbssidEnH.value==1)
+			mbssidEn[0].checked = true;
+		else
+			mbssidEn[1].checked = true;
+
+		if(hidessidH.value==1)
+			broadcastEn[1].checked = true;
+		else
+			broadcastEn[0].checked = true;
+		submitForm.value="   "+_("CSsave")+"   ";
+	}
+	authModeChange(0);
+	for( var i=1; i<=4; i++ ){
+		setKey(i);
+	}
+}
+
+function btnApply() {
+var swep = getSelect(document.forms[0].wlWep);
+	with ( document.forms[0] ) {
+		var authMode = getSelect(wlAuthMode);
+		var value;
+		
+		if(authMode!="IEEE8021X")
+			wep8021x.value="0";
+		
+		if (authMode.indexOf("PSK")!= -1) { 
+			value = wlWpaPsk.value;
+			if ( isValidWPAPskKey(value) == false ) {
+				alert(_("wlan warningMsg1"));
+			//'WPA Pre-Shared Key should be between 8 and 63 ASCII characters or 64 hexadecimal digits.'
+				return 0;
+			}
+		}   
+		if (authMode.indexOf("WPA")!= -1 || authMode.indexOf("PSK")!= -1) { 
+			//check GTK interval
+			value = parseInt(wlWpaGtkRekey.value);
+			if (  isNaN(value) == true || value < 0 || value > 0xffffffff ) {
+				alert(_("wlan warningMsg3"));
+				//'WPA Group Rekey Interval "' + wlWpaGtkRekey.value + '" should be between 0 and 4294967295.'
+				return 0;
+			}
+			//check Reauth interval
+			value = parseInt(wlNetReauth.value);
+			if (  isNaN(value) == true || value < 0 || value > 0xffffffff ) {
+				alert(_("wlan warningMsg11"));
+				//WPA Network Reauthentication Interval should be between 0 and 4294967295.'
+				return 0;
+			}
+		}
+
+		if (getSelect(wlWep) == "enabled") {
+			var i, val;
+			var cbit = wlKeyBit.value;
+			var num = parseInt(getSelect(wlKeyIndex))-1;
+			switch(num)
+			{
+			case 0:
+				val = wlKeys1.value;
+			break;
+			case 1:
+				val = wlKeys2.value;
+			break;
+			case 2:
+				val = wlKeys3.value;
+			break;
+			case 3:
+				val = wlKeys4.value;
+			break;
+			}
+			if ( val == '' && !(swep == 'enabled' && authMode == 'radius')) {
+				alert(_("wlan warningMsg12"));//'Cannot choose key that has empty value.'
+				return 0;
+			}
+			if ( val.length != 10 && val.length != 26 ) {
+				alert(_("secure warningMsg22"));//Please input 10 or 26 characters of WEP key
+				return 0;
+			}
+		}
+		if ( wlMbSsid.value == '' ) {
+			alert(_("wlan warningMsg4"));//SSID should not be empty.
+			return 0;
+		}
+		
+		var str = new String();
+		str = wlMbSsid.value;
+		if ( str.length > 32 ) {
+			alert(_("wlan warningMsg5"));//'SSID should not be longer than 32 characters.');
+			wlMbSsid.value = "";
+			return 0;
+		}
+		if (mbssidEn[0].checked == true)
+			mbssidEnH.value=1;
+		else
+			mbssidEnH.value=0;
+
+		if (broadcastEn[0].checked == true)
+			hidessidH.value=0;
+		else
+			hidessidH.value=1;
+
+		makeCmd();
+		return 1;
+	}
+}
+
+var wds_mode = <%val=get_single('wlan.0.wds_mode');%>"@@val";
+function makeCmd() {
+	with ( document.forms[0] ) {
+		i=MbSsidIdx.value;
+		if(hidessidH.value =="1")
+			hide_ssid = "1";
+		else
+			hide_ssid = "0";
+
+		var	header = "&wlan."+i+".";
+		rdbCmd.value = "wlan.currssid="+i+"&wlan."+i+".network_auth="+wlAuthMode.value
+		+header+"wpa2_preauthentication="+wlPreauth.value
+		+header+"net_re_auth_interval="+wlNetReauth.value
+		+header+"wpa_pre_shared_key="+wlWpaPsk.value
+		+header+"wpa_group_rekey_interval="+wlWpaGtkRekey.value
+		+header+"radius_server_ip="+wlRadiusIPAddr.value
+		+header+"radius_port="+wlRadiusPort.value
+		+header+"radius_key="+wlRadiusKey.value
+		+header+"encryption_type="+encryptionType.value
+		+header+"network_key_id="+wlKeyIndex.value
+		+header+"network_key1="+wlKeys1.value
+		+header+"network_key2="+wlKeys2.value
+		+header+"network_key3="+wlKeys3.value
+		+header+"network_key4="+wlKeys4.value
+		+header+"wep8021x="+wep8021x.value
+		+header+"encryption_strength="+wlKeyBit.value
+		+header+"ssid="+wlMbSsid.value
+		+header+"enable="+mbssidEnH.value
+		+header+"hide_accesspoint="+hide_ssid;
+		// In order to take effect WDS mode setting,
+		// wifi HW should be reset.
+		if (wds_mode != '' && wds_mode != '0') {
+			rdbCmd.value += "&wlan.0.wds_trigger="+wds_mode;
+		}
+	}
+}
+
+function Refresh(place) {
+	var code = 'location="' + place + '"'; 
+	eval(code);
+}
+
+
+function submitF1() {
+	if( btnApply() ) {
+		if(confirm(_("warningChangeSecurity"))) {
+			hideWlSecInfo(0);
+			document.form.submitForm.disabled=true;
+			document.form.submit();
+		}
+	}
+}
+
+function makeList() {   
+	for (var i = 1; i < 5; i++) {
+		document.write("<tr>"); 
+		document.write("<td><div align=\"center\"><a href=javascript:formLoad("+i+") >"+(i)+"</a></div></td>");
+		document.write("<td><div align=\"center\"><input type=checkbox "+(mbssidST[i].enable=='1'?'checked=true':'')+"disabled=true></div></td>");
+        	document.write("<td><div align=\"center\">"+mbssidST[i].ssid+"</div></td>");
+	    	document.write("<td><div align=\"center\">"+mbssidST[i].network_auth+"</div></td>");
+		document.write("<td><div align=\"center\">"+mbssidST[i].encryption_type+"</div></td>");
+		document.write("<td><div align=\"center\">"+(mbssidST[i].hide_accesspoint=='1'?'Off':'On')+"</div></td>");
+		document.write("</tr>");
+	}
+}
+
+$(document).ready( function() {formLoad(-1);} );
+</script>
+
+<form name="form" method='POST' autocomplete="off" action="@@request['SCRIPT_NAME']"/>
+<input type="hidden" name='rdbCmd' value="@@form['rdbCmd']">
+<input type="hidden" name='wep8021x' value="@@form['wep8021x']">
+<input type="hidden" name='wlKeyBit' value="@@form['wlKeyBit']">
+<input type="hidden" name='mbssidEnH' value="@@form['mbssidEnH']">
+<input type="hidden" name='hidessidH' value="@@form['hidessidH']">
+
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("mbssid"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+
+
+<table id="MbSsidIdxD" width="80%">
+<tr>
+<td width='28%'><script language="JavaScript">document.write( _("ssid select"))</script>:</td>
+<td>
+<select name='MbSsidIdx' size="1" onchange='formLoad(-2)'">
+	<option value="1"><b>1</b></option>
+	<option value="2"><b>2</b></option>
+	<option value="3"><b>3</b></option>
+	<option value="4"><b>4</b></option>
+</select>
+</td>
+</tr>
+</table>
+
+
+<table id="SecurityDiv" width="80%">
+<tr><th colspan="2"><script language="JavaScript">document.write(_("mbssid setting"))</script></th></tr>
+
+<tr> 
+	<td width="28%" id="mbssidEnTxt"><script language="JavaScript">document.write( _("enable multi ssid"))</script></td>
+	<td>
+		<input type=radio name=mbssidEn id="mbssidEn" value="1" >&nbsp;<font id="mbssidEnF" ><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=mbssidEn id="mbssidEn" value="0" >&nbsp;<font id="mbssidEnF"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+
+<tr> 
+	<td width="28%" id="hideAccessPointTxt"><script language="JavaScript">document.write( _("Broadcast This Network Name (SSID)"))</script></td>
+	<td>
+		<input type=radio name=broadcastEn value="1">&nbsp;<font id="broadcastEnF"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=broadcastEn value="0">&nbsp;<font id="broadcastEnF"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td  width='28%'><script language="JavaScript">document.write(_("station ssid"))</script>:</td>
+	<td><input type='text' name='wlMbSsid' maxlength="32" size="32" value="@@form['wlMbSsid']"/></td>
+</tr>
+
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("netAuth"))</script>:</td>
+	<td>
+		<select name='wlAuthMode' size="1" onchange='authModeChange(1)'>
+		<option value="OPEN"><script language="JavaScript">document.write(_("CSopen"))</script></option>
+		<option value="SHARED"><script language="JavaScript">document.write(_("shared"))</script></option>
+		<option value="WPA">WPA</option>
+		<option value="WPAPSK">WPA-PSK</option>
+		<option value="WPA2">WPA2</option>
+		<option value="WPA2PSK">WPA2-PSK</option>
+		<option value="WPAPSKWPA2PSK">WPA-PSK-WPA2-PSK</option>
+		<option value="WPA1WPA2">WPA1-WPA2</option>
+<!-- remove 820.1x option			<option value="IEEE8021X">802.1X</option> -->
+		</select>
+	</td>
+</tr>
+</table>
+
+<table id="Preauth" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("secure wpa preauth"))</script>:</td>
+	<td><select name='wlPreauth' size="1">
+		<option value="off"><script language="JavaScript">document.write(_("disabled"))</script></option>
+		<option value="on"><script language="JavaScript">document.write(_("enabled"))</script></option>                        
+	</select></td>
+</tr>
+</table>   
+    
+<table id="NetReauth" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("networkReauthInterval"))</script>:</td>
+	<td><input type='text' name='wlNetReauth' size='20' maxlength='10' value="@@form['wlNetReauth']"/></td>
+</tr>
+</table>
+
+<table id="wpaPreShareKey" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WPApreSharedKey"))</script>:</td>
+	<td><input type='password' name='wlWpaPsk' size='20' maxlength='64' value="@@form['wlWpaPsk']"/></td>
+	<td> <A HREF="javascript:wpapsk_window()"><script language="JavaScript">document.write(_("clickHereToDisplay"))</script></A></td>                     
+</tr>
+</table>
+
+<table id="wpaGTKRekey" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("wpaRekeyInterval"))</script>:</td>
+	<td><input type='text' name='wlWpaGtkRekey' size='20' maxlength='10' value="@@form['wlWpaGtkRekey']"/></td>
+</tr>
+</table>
+
+<table id="wlRadius" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("radiusServerIpAddress"))</script>:</td>
+	<td><input type='text' name='wlRadiusIPAddr' size='20' maxlength='15' value="@@form['wlRadiusIPAddr']"/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("radiusPort"))</script>:</td>
+	<td><input type='text' name='wlRadiusPort' size='20' maxlength='5' value="@@form['wlRadiusPort']"/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("radiusKey"))</script>:</td>
+	<td><input type='password' name='wlRadiusKey' size='20' maxlength='80' value="@@form['wlRadiusKey']"/></td>
+</tr>
+</table>
+
+<table id="encryptionTypeD" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WPAencryption"))</script>:</td>
+	<td><input type="text"  name='encryptionType' value="@@form['encryptionType']" class='cdcsAjax' readonly/></td>
+</tr>
+</table>
+
+<table id="wlWepD" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WEPencryption"))</script>:</td>
+	<td><select name="wlWep" onChange='authModeChange(1)' value="@@form['wlWep']">
+		<option value="disabled"><script language="JavaScript">document.write(_("disabled"))</script></option>
+		<option value="enabled"><script language="JavaScript">document.write(_("enabled"))</script></option>
+	</select></td>
+</tr>
+</table>
+
+<!-- 802.1x -->
+<!-- WEP  -->
+<table id="div_8021x_wep" name="div_8021x_wep">
+	<tr><td width='28%' colspan="2"><script language="JavaScript">document.write(_("secure 8021x wep"))</script></td>
+	<td>
+		<input name="ieee8021x_wep" value="0" type="radio" onClick="document.form.wep8021x.value='0';">&nbsp;<script language="JavaScript">document.write( _("disable"))</script> &nbsp;
+		<input name="ieee8021x_wep" value="1" type="radio" onClick="document.form.wep8021x.value='1';">&nbsp;<script language="JavaScript">document.write( _("enable"))</script>
+	</td>
+	</tr>
+</table>
+<table id='keyInfo' width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("currentNetworkKey"))</script>:</td>
+	<td><select name='wlKeyIndex' size='1'></select></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 1:</td>
+	<td><input type='text' name='wlKeys1' size='30' maxlength=26 id="WEP_KEY1" onKeyUp="setKey(1)" value="@@form['wlKeys1']"/>&nbsp;&nbsp;<b id="TEXT1"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 2:</td>
+	<td><input type='text' name='wlKeys2' size='30' maxlength=26 id="WEP_KEY2" onKeyUp="setKey(2)" value="@@form['wlKeys2']"/>&nbsp;&nbsp;<b id="TEXT2"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 3:</td>
+	<td><input type='text' name='wlKeys3' size='30' maxlength=26 id="WEP_KEY3" onKeyUp="setKey(3)" value="@@form['wlKeys3']"/>&nbsp;&nbsp;<b id="TEXT3"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 4:</td>
+	<td><input type='text' name='wlKeys4' size='30' maxlength=26 id="WEP_KEY4" onKeyUp="setKey(4)" value="@@form['wlKeys4']"/>&nbsp;&nbsp;<b id="TEXT4"></b></td>
+</tr>
+<tr> 
+	<td>&nbsp;</td><td><script language="JavaScript">document.write(_("Msg60"))</script></td>
+</tr>
+</table>
+
+<div align="center"></p></p><input type="button" name="submitForm" onClick='submitF1();' value="Save"></div>
+</form>
+</form>
+
+<form name="formList" method="POST" action="@@request['SCRIPT_NAME']">
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="85%">
+<tr><th colspan="6"><script language="JavaScript">document.write(_("mbssid list"))</script></th></tr>
+<tr>
+	<td width="5%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("mapping no"));</script></b></div></td>
+	<td width="5%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("Enable"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("SSID"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("Network Authentication"));</script></b></div></td>
+	<td width="15%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("Encryption"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("basic broadcast ssid"));</script></b></div></td>
+</tr>
+<script language="Javascript">
+makeList();
+</script>
+</table>
+</form>
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,784 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SMS Diagnostics</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<style>
+.emptyFieldAlert {
+	border-color: red;
+}
+</style>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+<script type="text/javascript" src="/js/zxcvbn.js"></script>
+#endif
+
+<script language="JavaScript">
+
+var sms_onoff=<%var sms_enabled=get_single("smstools.enable");%>"@@sms_enabled";
+var sim_status="<%_v=get_single('wwan.0.sim.status.status');%>@@_v";
+
+var max_wl_tx_dst_idx;
+var DiagUserNo = new Array();
+var DiagPassword = new Array();
+var UseWhiteList, EnableSetCmdAck, UseFixedAckDest, FixedAckDestNo, EnableErrorNoti;
+var UseFixedErrorNotiDest, FixedErrorNotiDestNo, MaxDiagSmsTxLimit, MaxDiagSmsTxLimitPer, MaxWlTxDstIdx;
+
+var GDSP_counter=0;
+#ifdef V_WEBIF_SPEC_vdf
+var GDSP_number=["310000214", "310000202", "8823993560000", "8823903560000"];
+function is_GDSP_number(myNumber) {
+	var ret=false;
+	$.each( GDSP_number, function(item, val) {
+		if(val==myNumber) {
+			ret= true;
+			return false;
+		}
+	});
+	return ret;
+}
+#endif
+#if defined(V_PRODUCT_ntc_220)
+var dummyPW="**********";
+#endif
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+#if (0)
+/*-----------------------------------------------------------------------*/
+// combine multiple line warning messages
+/*-----------------------------------------------------------------------*/
+
+/* password warning message for submit
+
+   Passwords configured on the router must meet the following criteria:
+     • Be a minimum of 8 characters and no more than 128 characters in length.
+     • Contain at least one upper case and one number.
+     • Contain at least one of the following special characters: !*()?/
+ */
+#endif
+var pwdWarn1=[];
+	pwdWarn1[0] = _("passwordWarning6");
+	pwdWarn1[1] = bulletHead+_("passwordWarning2");
+	pwdWarn1[2] = bulletHead+_("passwordWarning3");
+	pwdWarn1[3] = bulletHead+_("passwordWarning8") + convert_to_html_entity('!*()?/.');
+#endif
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+#if (0)
+/*-----------------------------------------------------------------------*/
+#endif
+
+function checkPassStrength(i) {
+	var f, t;
+	f = document.getElementById("DiagPassword"+i);
+	t = document.getElementById("PasswordStrength"+i);
+#if defined(V_PRODUCT_ntc_220)
+	if( f.value != dummyPW ) {
+        smsPassStrength(f, t);
+	}
+	else {
+        updatePassStrengthField(t, "", 0);
+	}
+#else
+    smsPassStrength(f, t);
+#endif
+}
+#endif
+
+function update_whitelist() {
+	var	h="";
+	var diplay_style="";
+	var hide="";
+	var disabled="";
+
+    for(i=0,j=0; i<DiagUserNo.length; i++) {
+#ifdef V_WEBIF_SPEC_vdf
+		disabled="";
+		if(roam_simcard!="1") {
+			if( is_GDSP_number(DiagUserNo[i]) ) {
+				hide="none";
+				GDSP_counter++;
+			}
+			else {
+				hide="";
+				j++;
+			}
+		}
+		else {
+			if( is_GDSP_number(DiagUserNo[i]) ) {
+				disabled="disabled";
+			}
+
+			j++;
+		}
+#else
+		j++;
+#endif
+		h+="<tr id='whitelist"+i+"' style='display:"+hide+"'>";
+		if (j < 10)
+			h+="<td style='text-align:center'> 0"+j+"</td>";
+		else
+			h+="<td style='text-align:center'>"+j+"</td>";
+		h+="<td style='text-align:center'>";
+		h+="<input type='text' id='DiagUserNo"+i+"' value='"+DiagUserNo[i]+"' onkeyup='check_phoneRegex(this)'/></td>";
+		h+="<td style='text-align:center'>";
+#if defined(V_PRODUCT_ntc_220)
+		pass=DiagPassword[i].length>0?dummyPW:"";
+#else
+        pass=DiagPassword[i];
+#endif
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+		h+="<input type='text' id='DiagPassword"+i+"' value='"+pass+"' onKeyUp='checkPassStrength("+i+");'/></td>";
+		h+="<td style='text-align:left'>";
+		h+="<span id='PasswordStrength"+i+"' class='normal-text'></span></td>";
+#else
+		h+="<input type='text' id='DiagPassword"+i+"' value='"+pass+"' onKeyUp='nameFilter(this);'/></td>";
+#endif
+		h+="<td style='padding-right:0'>";
+		h+="<button type='button' class='secondary sml' name='delete_wl' onclick='DeleteWhiteList("+i+")' style='padding:0;border:0' "+disabled+" ><i class='icon close'></i></button>";
+		h+="</td>";
+		h+="</tr>";
+	}
+	$("#white_list").html(h);
+	for(i=DiagUserNo.length-1; i>=0; i--) {
+		if(DiagUserNo[i]=="") {
+			$("#whitelist"+i).css("display", "none");
+		}
+		else {
+			break;
+		}
+	}
+
+	if(i<0) {
+		$("#whitelistEmpty").css("display", "");
+		$("#whitelistTitle").css("display", "none");
+	}
+	else {
+		$("#whitelistEmpty").css("display", "none");
+		$("#whitelistTitle").css("display", "");
+	}
+	max_wl_tx_dst_idx=i;
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+	// update password strength
+	for(; i>=0; i--) {
+		checkPassStrength(i);
+	}
+#endif
+
+// Dynamically display maximum while list index from 20 to (20-GDSP	numbers)
+	max_wl_number_desc=_("diag wl desc");
+#ifdef V_WEBIF_SPEC_vdf
+	max_wl_number_limit = 20 - GDSP_counter;
+	new_msg=max_wl_number_desc.replace("20", max_wl_number_limit);
+	new_msg=new_msg.replace("outbox", "sent items");
+#else
+	new_msg=max_wl_number_desc.replace("outbox", "sent items");
+#endif
+	$("#max_wl_number_desc").html(new_msg);
+
+}
+
+function DiagConfigGetHandler(v) {
+	eval(v);
+
+	document.SMS.menuUseWhiteList.value = UseWhiteList;
+	if (document.SMS.menuUseWhiteList.value=='1')
+		$("#UseWhiteList-0").attr("checked","checked");
+	else if (document.SMS.menuUseWhiteList.value=='0')
+		$("#UseWhiteList-1").attr("checked","checked");
+	else {
+		document.SMS.menuUseWhiteList.value='0';
+		$("#UseWhiteList-1").attr("checked","checked");
+	}
+	document.SMS.menuEnableSetCmdAck.value = EnableSetCmdAck;
+	if (document.SMS.menuEnableSetCmdAck.value=='1')
+		$("#EnableSetCmdAck-0").attr("checked","checked");
+	else if (document.SMS.menuEnableSetCmdAck.value=='0')
+		$("#EnableSetCmdAck-1").attr("checked","checked");
+	else {
+		document.SMS.menuEnableSetCmdAck.value=='0';
+		$("#EnableSetCmdAck-1").attr("checked","checked");
+	}
+	document.SMS.menuUseFixedAckDest.value = UseFixedAckDest;
+	if (document.SMS.menuUseFixedAckDest.value=='1') {
+		$("#UseFixedAckDest-0").attr("checked","checked");
+		$('#FixedAckDestNo-div').css('display','')
+	}
+	else if (document.SMS.menuUseFixedAckDest.value=='0') {
+		$("#UseFixedAckDest-1").attr("checked","checked");
+		$('#FixedAckDestNo-div').css('display','none')
+	}
+	else {
+		document.SMS.menuUseFixedAckDest.value=='0';
+		$("#UseFixedAckDest-1").attr("checked","checked");
+		$('#FixedAckDestNo-div').css('display','none');
+	}
+	document.SMS.FixedAckDestNo.value = FixedAckDestNo;
+	document.SMS.menuEnableErrorNoti.value = EnableErrorNoti;
+	if(document.SMS.menuEnableErrorNoti.value=='1') {
+		$("#EnableErrorNoti-0").attr("checked","checked");
+	}
+	else if (document.SMS.menuEnableErrorNoti.value=='0') {
+		$("#EnableErrorNoti-1").attr("checked","checked");
+	}
+	else {
+		document.SMS.menuEnableErrorNoti.value=='0';
+		$("#EnableErrorNoti-1").attr("checked","checked");
+	}
+	document.SMS.menuUseFixedErrorNotiDest.value = UseFixedErrorNotiDest;
+	if(document.SMS.menuUseFixedErrorNotiDest.value=='1') {
+		document.SMS.UseFixedErrorNotiDest[0].checked=true;
+		$('#FixedErrorNotiDestNo-div').css('display','');
+	}
+	else if (document.SMS.menuUseFixedErrorNotiDest.value=='0') {
+		document.SMS.UseFixedErrorNotiDest[1].checked=true;
+		$('#FixedErrorNotiDestNo-div').css('display','none');
+	}
+	else {
+		document.SMS.menuUseFixedErrorNotiDest.value=='0';
+		document.SMS.UseFixedErrorNotiDest[1].checked=true;
+		$('#FixedErrorNotiDestNo-div').css('display','none');
+	}
+	document.SMS.FixedErrorNotiDestNo.value = FixedErrorNotiDestNo;
+	document.SMS.MaxDiagSmsTxLimit.value = MaxDiagSmsTxLimit;
+	document.SMS.MaxDiagSmsTxLimitPer.value = MaxDiagSmsTxLimitPer;
+
+	document.SMS.menuAccessGenericRdbVars.value = AccessGenericRdbVars;
+	if (document.SMS.menuAccessGenericRdbVars.value=='1')
+		$("#AccessGenericRdbVars-0").attr("checked","checked");
+	else if (document.SMS.menuEnableSetCmdAck.value=='0')
+		$("#AccessGenericRdbVars-1").attr("checked","checked");
+	else {
+		document.SMS.menuAccessGenericRdbVars.value='0';
+		$("#AccessGenericRdbVars-1").attr("checked","checked");
+	}
+	document.SMS.menuAllowGenericCmds.value = AllowGenericCmds;
+	if (document.SMS.menuAllowGenericCmds.value=='1')
+		$("#AllowGenericCmds-0").attr("checked","checked");
+	else if (document.SMS.menuEnableSetCmdAck.value=='0')
+		$("#AllowGenericCmds-1").attr("checked","checked");
+	else {
+		document.SMS.menuAllowGenericCmds.value='0';
+		$("#AllowGenericCmds-1").attr("checked","checked");
+	}
+
+	$("#SMSTxCnt").html( SmsTxCnt+' / '+MaxDiagSmsTxLimit+"   "+_("msg sent"));
+
+	update_whitelist();
+}
+
+function DeleteWhiteList(idx) {
+	var i;
+
+	for(i=idx; i<max_wl_tx_dst_idx; i++) {
+		$("#DiagUserNo"+i).val( $("#DiagUserNo"+(i+1)).val());
+		$("#DiagPassword"+i).val( $("#DiagPassword"+(i+1)).val());
+
+	}
+	$("#whitelist"+max_wl_tx_dst_idx).css("display", "none");
+	max_wl_tx_dst_idx--;
+	$("#DiagUserNo"+i).val('');
+	$("#DiagPassword"+i).val('');
+	if($("#DiagUserNo0").val()=="" && $("#DiagPassword0").val()=="") {
+		$("#whitelistEmpty").css("display", "");
+		$("#whitelistTitle").css("display", "none");
+	}
+}
+
+function IncreaseWlMaxTxDstIdx() {
+	if (max_wl_tx_dst_idx >= parseInt(MaxWlTxDstIdx)) {
+		validate_alert("", _("sms warning03"));
+		return;
+	}
+	$("#whitelistEmpty").css("display", "none");
+	$("#whitelistTitle").css("display", "");
+	clear_alert();
+	max_wl_tx_dst_idx++;
+	$("#whitelist"+max_wl_tx_dst_idx).css("display", "");
+	$("#DiagUserNo"+max_wl_tx_dst_idx).focus();
+}
+
+function IsSameNumber(num1, num2) {
+	var num1_len = num1.length;
+	var num2_len = num2.length;
+	var comp_num1 = num1;
+	var comp_num2 = num2;
+	if (num1_len > 9) {
+		comp_num1 = num1.substr(num1_len-9);
+	}
+	if (num2_len > 9) {
+		comp_num2 = num2.substr(num2_len-9);
+	}
+	return (comp_num1 == comp_num2);
+}
+
+function DiagConfigGet() {
+	$.get("/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=DIAG_CONF_GET", DiagConfigGetHandler);
+}
+
+function DiagCheckDuplicatedWhiteList() {
+	var i, j, val;
+
+	for(i=GDSP_counter; i<=max_wl_tx_dst_idx; i++) {
+		val=$("#DiagUserNo"+i).val();
+#ifdef V_WEBIF_SPEC_vdf
+		if( roam_simcard!="1" && is_GDSP_number(val) ) {
+			validate_alert("", _("white list")+" ["+(i+1-GDSP_counter)+"] "+val+" "+_("isInvalidNumber"));
+			return false;
+		}
+#endif
+		for(j=i+1; j<=max_wl_tx_dst_idx; j++) {
+			if (i == j || val == '')
+				continue;
+			if ( IsSameNumber(val, $("#DiagUserNo"+j).val()) ) {
+				validate_alert("", _("white list")+" ["+(i+1-GDSP_counter)+"] "+val+" "+_("sms warning15")+" ["+(j+1-GDSP_counter)+"] "+$("#DiagUserNo"+j).val()+"\n"+_("sms warning16"));
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+function DiagConfigSetHandler() {
+	while( max_wl_tx_dst_idx>0 && $("#DiagUserNo"+max_wl_tx_dst_idx).val()=="") {
+		max_wl_tx_dst_idx--;
+	}
+	if(max_wl_tx_dst_idx<0) {
+		$("#whitelistEmpty").css("display", "");
+		$("#whitelistTitle").css("display", "none");
+	}
+	$("#wtSave").removeAttr("disabled");
+
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SMS_CONF_SET&";
+	contents_body="RedirMobile="+$("#RedirMobile").val()+"&"+
+		"RedirTCP="+$("#RedirTCP").val()+"&"+
+		"TCPport="+$("#TCPport").val()+"&"+
+		"RedirUDP="+$("#RedirUDP").val()+"&"+
+		"UDPport="+$("#UDPport").val()+"&"+
+		"EncodingScheme="+$("#menuEncodingScheme").val()+"&"+
+		"RemoteCommand="+$("[name=RemoteCommand]:checked").val()+"&"+
+		"RedirEmail=<%_v1=get_single('smstools.conf.redirect_email');%>@@_v1"+"&"+
+		"MoService=<%_v2=get_single('smstools.conf.mo_service');%>@@_v2"+"&"+
+		"UseExtSmsClient=<%_v3=get_single('smstools.conf.use_ext_client');%>@@_v3"+"&"+
+		"ExtSmsClientIp1=<%_v4=get_single('smstools.conf.ext_client_ip1');%>@@_v4"+"&"+
+		"ExtSmsClientIp2=<%_v5=get_single('smstools.conf.ext_client_ip2');%>@@_v5"+"&"+
+		"ExtSmsClientPort=<%_v6=get_single('smstools.conf.ext_client_port');%>@@_v6"+"&"+
+		"MsgsPerPage="+$("#msgsperpage").val();
+	$.get(cmd_line+contents_body, function (){window.location.href="/SMS_Diagnostics.html?success"});
+}
+
+function DiagConfigSet() {
+	var i;
+	var dst_cnt = 0;
+	var temp_pwd;
+	clear_alert();
+	if (DiagCheckDuplicatedWhiteList() == false) {
+		return;
+	}
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#if 0
+	// MR3 Security Requirement 14.01:
+	// 1. The embedded GDSP numbers should be possible to have/not to have PWD protection
+	// 2. Any MO number that is whitelisted SHOULD have PWD protection. This should be accompanied
+	// by a warning message that warns users to the necessity of entering PWD before the option is saved
+#endif
+	var emptyPassword = 0;
+	for(i=0; i<=max_wl_tx_dst_idx; i++) {
+		var diagNumber = $("#DiagUserNo"+i).val();
+		if (diagNumber != "" && $("#DiagPassword"+i).val() == "" && !is_GDSP_number(diagNumber)) {
+			$("#DiagPassword"+i).addClass("emptyFieldAlert");
+			emptyPassword = 1;
+		}
+		else {
+			$("#DiagPassword"+i).removeClass("emptyFieldAlert");
+		}
+	}
+	if (emptyPassword == 1) {
+		alert(_("warningOnEmptySmsDiagnosticNumberPassword"));
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+
+	// check empty destination number field while its password is set.
+	var emptyNumber = 0;
+	for(i=0; i<=max_wl_tx_dst_idx; i++) {
+		if ($("#DiagUserNo"+i).val() == "" && $("#DiagPassword"+i).val() != "") {
+			$("#DiagUserNo"+i).addClass("emptyFieldAlert");
+			emptyNumber = 1;
+		}
+		else {
+			$("#DiagUserNo"+i).removeClass("emptyFieldAlert");
+		}
+	}
+	if (emptyNumber == 1) {
+		alert(_("warningOnEmptySmsDiagDestNumber"));
+		return;
+	}
+
+	blockUI_wait(_("GUI pleaseWait"));
+	$("#wtSave").attr("disabled", true);
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=DIAG_CONF_SET&";
+
+	// send diag configuration via content type bacause it could be over 256 bytes which
+	// is default limit of url length defined in mpr.h
+	contents_body="UseWhiteList=\""+document.SMS.menuUseWhiteList.value+"\"&"+
+		"EnableSetCmdAck=\""+document.SMS.menuEnableSetCmdAck.value+"\"&"+
+		"UseFixedAckDest=\""+document.SMS.menuUseFixedAckDest.value+"\"&"+
+		"FixedAckDestNo=\""+document.SMS.FixedAckDestNo.value+"\"&"+
+		"EnableErrorNoti=\""+document.SMS.menuEnableErrorNoti.value+"\"&"+
+		"UseFixedErrorNotiDest=\""+document.SMS.menuUseFixedErrorNotiDest.value+"\"&"+
+		"FixedErrorNotiDestNo=\""+document.SMS.FixedErrorNotiDestNo.value+"\"&"+
+		"MaxDiagSmsTxLimit=\""+document.SMS.MaxDiagSmsTxLimit.value+"\"&"+
+		"MaxDiagSmsTxLimitPer=\""+document.SMS.MaxDiagSmsTxLimitPer.value+"\"&"+
+		"AccessGenericRdbVars=\""+document.SMS.menuAccessGenericRdbVars.value+"\"&"+
+		"AllowGenericCmds=\""+document.SMS.menuAllowGenericCmds.value+"\"&";
+
+	for(i=0; i<=max_wl_tx_dst_idx; i++) {
+		// check if password has keyword(get, set, execute)
+		temp_pwd = $("#DiagPassword"+i).val();
+		temp_pwd = temp_pwd.toUpperCase();
+		if (temp_pwd.search("GET") >= 0 || temp_pwd.search("SET") >= 0 ||
+		    temp_pwd.search("EXECUTE") >= 0) {
+			alert(_("sms warning36"));	// Password should not include diagnostic keywords such as get, set, execute!
+			$("#wtSave").removeAttr("disabled");
+			return;
+		}
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+		temp_pwd = $("#DiagPassword"+i).val();
+		// password should have no more than 128 characters in length
+#ifdef V_WEBIF_SPEC_vdf
+		// Zero length of SMS diagnostic password is accepted so don't need to
+		// check strength for empty password.
+#if defined(V_PRODUCT_ntc_220)
+		if ((temp_pwd.length > 0 && temp_pwd != dummyPW && passStrengthValidation(temp_pwd) == false) || temp_pwd.length > 128) {
+#else
+        if ((temp_pwd.length > 0 && passStrengthValidation(temp_pwd) == false) || temp_pwd.length > 128) {
+#endif
+#else
+#if defined(V_PRODUCT_ntc_220)
+		if ( (temp_pwd != dummyPW && passStrengthValidation(temp_pwd) == false) || temp_pwd.length > 128) {
+#else
+        if (passStrengthValidation(temp_pwd) == false || temp_pwd.length > 128) {
+#endif
+#endif
+			validate_alert(_("securityAdvise"), pwdWarn1, true);	// Passwords configured on the router must meet the following criteria:...
+			$("#wtSave").removeAttr("disabled");
+			return;
+		}
+#endif
+#if defined(V_PRODUCT_ntc_220)
+		if( $("#DiagPassword"+i).val() != dummyPW && $("#DiagPassword"+i).val().length>0 ) {
+            pass=Base64.encode($("#DiagPassword"+i).val());
+		}
+		else {
+            pass=dummyPW;
+		}
+#else
+        pass=Base64.encode($("#DiagPassword"+i).val());
+#endif
+		contents_body+="DiagUserNo"+i+"=\""+$("#DiagUserNo"+i).val()+"\"&"+
+		"DiagPassword"+i+"=\""+pass+"\"&";
+	}
+	$.post(cmd_line, contents_body, DiagConfigSetHandler);
+}
+
+function confirm_disable_auth() {
+	document.SMS.menuUseWhiteList.value='1';
+	load_value_to_element($("input:radio[name=UseWhiteList]"), true);
+	function confirmed_func() {
+		document.SMS.menuUseWhiteList.value='0';
+		load_value_to_element($("input:radio[name=UseWhiteList]"), false);
+	}
+	blockUI_confirm_l(_("disableAuthWarningMsg"), confirmed_func);
+}
+
+function ConfirmGenericRdbAccessOption() {
+	document.SMS.menuAccessGenericRdbVars.value='0';
+	load_value_to_element($("input:radio[name=AccessGenericRdbVars]"), false);
+	function confirmed_func() {
+		document.SMS.menuAccessGenericRdbVars.value='1';
+		load_value_to_element($("input:radio[name=AccessGenericRdbVars]"), true);
+	}
+	blockUI_confirm_l(_("access generic rdb warning"), confirmed_func);
+}
+
+function ConfirmGenericCmdsOption() {
+	document.SMS.menuAllowGenericCmds.value='0';
+	load_value_to_element($("input:radio[name=AllowGenericCmds]"), false);
+	function confirmed_func() {
+		document.SMS.menuAllowGenericCmds.value='1';
+		load_value_to_element($("input:radio[name=AllowGenericCmds]"), true);
+	}
+	blockUI_confirm_l(_("access generic rdb warning"), confirmed_func);
+}
+
+$(document).ready( function() {
+	if (sms_onoff != "1") {
+		h="<table class='border-top white-box' style='height:39px'><tr><th style='text-align:center'>"+_("smsDisabled")+"</th></tr></table>";
+		$("#form").html(h);
+		return;
+	}
+	$.get("/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SET_MAX_WL_TX_IDX&new_idx=19", function(){DiagConfigGet();});
+	if(parseInt(MaxWlTxDstIdx)==0) {
+		DiagConfigGet();
+	}
+	load_values_to_elements(
+		{"input:radio.access[name=RemoteCommand]":"<% get_single_direct('smstools.conf.enable_remote_cmd'); %>"==1}
+	);
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	$("#passwordInfo").prop("title", _("passwordWarning10"));
+#endif
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="SMS" id="form" class="validate div-all" action="#" novalidate="novalidate">
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("sms diag setup title"))</script></h2>
+				<input type="hidden" name="menuUseWhiteList"/>
+				<input type="hidden" name="menuEnableSetCmdAck"/>
+				<input type="hidden" name="menuUseFixedAckDest"/>
+				<input type="hidden" name="menuEnableErrorNoti"/>
+				<input type="hidden" name="menuUseFixedErrorNotiDest"/>
+				<input type="hidden" name="menuUseExtSmsClient"/>
+				<input type="hidden" name="created" value="@@form['created']"/>
+				<input type="hidden" id="menuEncodingScheme" value=<%var _s=get_single('smstools.conf.coding_scheme');%>"@@_s"/>
+				<input type="hidden" id="msgsperpage" value=<%var _pp=get_single('smstools.conf.msg_no_per_page');%>"@@_pp"/>
+				<input type="hidden" id="UDPport" value=<%var _up=get_single('smstools.conf.redirect_udp_port');%>"@@_up"/>
+				<input type="hidden" id="RedirUDP" value=<%var _ru=get_single('smstools.conf.redirect_udp');%>"@@_ru"/>
+				<input type="hidden" id="TCPport" value=<%var _tp=get_single('smstools.conf.redirect_tcp_port');%>"@@_tp"/>
+				<input type="hidden" id="RedirTCP" value=<%var _rt=get_single('smstools.conf.redirect_tcp');%>"@@_rt"/>
+				<input type="hidden" id="RedirMobile" value=<%var _rm=get_single('smstools.conf.redirect_mob');%>"@@_rm"/>
+				<input type="hidden" name="menuAccessGenericRdbVars"/>
+				<input type="hidden" name="menuAllowGenericCmds"/>
+
+				<div class="form-row no-bg-form">
+					<label for="RemoteCommand"><script language=Javascript>document.write(_("sms remote diag"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_2145_pin" data-toggle-disabled="btn_2145_change">
+								<input type="radio" class="access" name='RemoteCommand' id='RemoteCommand-0' value=1>
+								<label for="RemoteCommand-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='RemoteCommand' id='RemoteCommand-1' value=0>
+								<label for="RemoteCommand-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="box_2145_pin">
+					<div class="form-row no-bg-form">
+						<label for="UseWhiteList"><script language=Javascript>document.write(_("station auth"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='UseWhiteList' id='UseWhiteList-0' onClick="javascript:document.SMS.menuUseWhiteList.value='1';" >
+									<label for="UseWhiteList-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='UseWhiteList' id='UseWhiteList-1' onClick="confirm_disable_auth();">
+									<label for="UseWhiteList-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="EnableSetCmdAck"><script language=Javascript>document.write(_("send tx ack sel"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='EnableSetCmdAck' id='EnableSetCmdAck-0' onClick="javascript:document.SMS.menuEnableSetCmdAck.value='1';">
+									<label for="EnableSetCmdAck-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='EnableSetCmdAck' id='EnableSetCmdAck-1' onClick="javascript:document.SMS.menuEnableSetCmdAck.value='0';">
+									<label for="EnableSetCmdAck-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="AccessGenericRdbVars"><script language=Javascript>document.write(_("access generic rdb menu"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='AccessGenericRdbVars' id='AccessGenericRdbVars-0' onClick="javascript:ConfirmGenericRdbAccessOption();">
+									<label for="AccessGenericRdbVars-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='AccessGenericRdbVars' id='AccessGenericRdbVars-1' onClick="javascript:document.SMS.menuAccessGenericRdbVars.value='0';">
+									<label for="AccessGenericRdbVars-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="AllowGenericCmds"><script language=Javascript>document.write(_("allow generic cmd menu"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='AllowGenericCmds' id='AllowGenericCmds-0' onClick="javascript:ConfirmGenericCmdsOption();">
+									<label for="AllowGenericCmds-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='AllowGenericCmds' id='AllowGenericCmds-1' onClick="javascript:document.SMS.menuAllowGenericCmds.value='0';">
+									<label for="AllowGenericCmds-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="UseFixedAckDest"><script language=Javascript>document.write(_("send tx ack dst"))</script></label>
+						<div class="field">
+							<div class="radio-box-group">
+								<div class="radio-box">
+									<input type="radio" class="access" name='UseFixedAckDest' id='UseFixedAckDest-0' onClick="document.SMS.menuUseFixedAckDest.value='1';$('#FixedAckDestNo-div').css('display','')">
+									<label for="UseFixedAckDest-0"><div class="radioText"><script language=Javascript>document.write(_("fixed number"))</script></div></label>
+								</div>
+								<div class="radio-box">
+									<input type="radio" class="access" name='UseFixedAckDest' id='UseFixedAckDest-1' onClick="document.SMS.menuUseFixedAckDest.value='0';$('#FixedAckDestNo-div').css('display','none')">
+									<label for="UseFixedAckDest-1"><div class="radioText"><script language=Javascript>document.write(_("sender number"))</script></div></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row" id="FixedAckDestNo-div">
+						<label for="FixedAckDestNo"><script language=Javascript>document.write(_("fixed ack no"))</script></label>
+						<div class="field">
+							<input type="text" name="FixedAckDestNo" id="FixedAckDestNo" class="large" onkeyup="check_phoneRegex(this)">
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="EnableErrorNoti"><script language=Javascript>document.write(_("send tx err sel"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='EnableErrorNoti' id='EnableErrorNoti-0' onClick="javascript:document.SMS.menuEnableErrorNoti.value='1';">
+									<label for="EnableErrorNoti-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='EnableErrorNoti' id='EnableErrorNoti-1' onClick="javascript:document.SMS.menuEnableErrorNoti.value='0';">
+									<label for="EnableErrorNoti-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="UseFixedErrorNotiDest"><script language=Javascript>document.write(_("send tx err dst"))</script></label>
+						<div class="field">
+							<div class="radio-box-group">
+								<div class="radio-box">
+									<input type="radio" class="access" name='UseFixedErrorNotiDest' id='UseFixedErrorNotiDest-0' onClick="document.SMS.menuUseFixedErrorNotiDest.value='1';$('#FixedErrorNotiDestNo-div').css('display','')">
+									<label for="UseFixedErrorNotiDest-0"><div class="radioText"><script language=Javascript>document.write(_("fixed number"))</script></div></label>
+								</div>
+								<div class="radio-box">
+									<input type="radio" class="access" name='UseFixedErrorNotiDest' id='UseFixedErrorNotiDest-1' onClick="document.SMS.menuUseFixedErrorNotiDest.value='0';$('#FixedErrorNotiDestNo-div').css('display','none')">
+									<label for="UseFixedErrorNotiDest-1"><div class="radioText"><script language=Javascript>document.write(_("sender number"))</script></div></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row" id="FixedErrorNotiDestNo-div">
+						<label for="FixedErrorNotiDestNo"><script language=Javascript>document.write(_("fixed err no"))</script></label>
+						<div class="field">
+							<input type="text" name="FixedErrorNotiDestNo" id="FixedErrorNotiDestNo" class="large" onkeyup="check_phoneRegex(this)" value="@@form['FixedErrorNotiDestNo']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="MaxDiagSmsTxLimit"><script language=Javascript>document.write(_("max diag tx limit"))</script></label>
+						<div class="field">
+							<input type="text" name="MaxDiagSmsTxLimit" class="validate[required] required mini" id="MaxDiagSmsTxLimit" value="@@form['MaxDiagSmsTxLimit']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div class="sub-field">
+							<label for="MaxDiagSmsTxLimitPer"><script language=Javascript>document.write(_("msg per"))</script></label>
+							<div class="field">
+								<select name="MaxDiagSmsTxLimitPer" class="med" style="margin-top:0;">
+									<option id="SmsDiagTxLimHour" value="HOUR"><script>document.write(_("hour"))</script></option>
+									<option id="SmsDiagTxLimDay" value="DAY"><script>document.write(_("day"))</script></option>
+									<option id="SmsDiagTxLimWeek" value="WEEK"><script>document.write(_("week"))</script></option>
+									<option id="SmsDiagTxLimMonth" value="MONTH"><script>document.write(_("month"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="field-des sml">
+							<span id="SMSTxCnt" style="color:black"></span>
+						</div>
+						<div class="field-des message">
+							<script language=Javascript>document.write(_("diag tx lim desc"))</script>
+						</div>
+					</div>
+					<div class="hr"></div>
+					<h2><script language=Javascript>document.write(_("diag wl title"))</script></h2>
+					<div class="p-des-full-width">
+						<p><span id="max_wl_number_desc"></span></p>
+					</div>
+					<div class="button-row">
+						<button type="button" class="secondary sml" onclick="IncreaseWlMaxTxDstIdx()"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+					</div>
+					<table>
+						<colgroup>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+						<col width="4%">
+						<col width="30%">
+						<col width="30%">
+						<col width="26%">
+						<col width="10%">
+#else
+						<col width="4%">
+						<col width="30%">
+						<col width="56%">
+						<col width="10%">
+#endif
+						</colgroup>
+						<thead id="whitelistTitle" style="display:none">
+							<tr>
+								<th class="align10">#</th>
+								<th class="align10"><script language=Javascript>document.write(_("dest number"))</script></th>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+								<th class="align10"><script language=Javascript>document.write(_("password"))</script>
+								<a href='javascript:showStrongSmsPasswordInfo();' id="passwordInfo" style='background-color:transparent;'>
+								<i id='net-info' style='margin:5px;padding:5px 30px 10px 0px;'></i></a>
+								</th>
+#else
+								<th class="align10"><script language=Javascript>document.write(_("password"))</script></th>
+#endif
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+								<th class="align10"></th>
+#endif
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="whitelistEmpty" style="display:none"><tr><th colspan=4 style='text-align:center'><script language=Javascript>document.write(_("whitelistEmpty"))</script></th></tr></tbody>
+						<tbody id="white_list"></tbody>
+					</table>
+				</div>
+				<div class="submit-row">
+					<button type="button" id="wtSave" onClick="DiagConfigSet()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='SMS_Diagnostics.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "SMS_Diag", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('smsDiagnosticsSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

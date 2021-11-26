@@ -1,0 +1,132 @@
+#define WRITE(str) <script language=Javascript>document.write(str)</script>
+
+<!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>QOS CBQ INIT</title>
+</head>
+
+<%include topinc_v2.inc%>
+#include "redirectOnSessionTimeout.inc"
+
+<!-- Include the server side ESP script  -->
+<%
+#include "qos_cbq_init_esp.js"
+%>
+
+<!-- Only put code here that needs RDB expansion on the server.
+     All other script should go in the .js file -->
+<script language="JavaScript">
+
+// Load the form input element values from the RDB values for this module.
+// Note: the form elements contain all the required RDB settings.
+function setFormElementsFromRdb() {
+
+  $("#id_enabled").val(<%val=get_single('qos.cbqInit.enable');%>"@@val");
+}
+
+// Include this so the internationalisation strings are created (rather than srcing it).
+#include "qos_cbq_init.js"
+</script>
+
+<body>
+  <div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+  <div id="content" class="site-content">
+  <div class="container">
+  <aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+  <div class="grid-9 omega">
+    <form><!--place holder for validation--></form>
+    <div class="right-column white-box">
+
+      <!-- form id should be always 'form' for embedded validation engine -->
+      <form name="cbqInit"
+            id="form"
+            method="POST"
+            action="@@request['SCRIPT_NAME']"
+            class="validate"
+            novalidate="novalidate"
+            autocomplete="off">
+      <%appendCsrfToken();%>
+      <div class="pad" id="cbqInit_block">
+        <h2>WRITE(_("cbqInit"))</h2>
+
+        <div id="cbqInit_setup">
+
+          <!-- on/off -->
+          <input type="hidden" name="id_enabled" id="id_enabled" value="@@form['id_enabled']"/>
+          <div class="form-row no-bg-form">
+            <label>WRITE(_("enabled"))</label>
+            <div class="field">
+              <div class="location-settings">
+                <div class="radio-switch">
+                  <input type="radio" class="access" name="enabledButton" id="enabledButton_0">
+                  <label for="enabledButton_0" class="on" >WRITE(_("on"))</label>
+                  <input type="radio" class="access" name="enabledButton" id="enabledButton_1">
+                  <label for="enabledButton_1" class="off">WRITE(_("off"))</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="submit-row">
+            <button type="button" name="submit_form" id="submit_form">WRITE(_("CSsave"))</button>
+          </div>
+
+        </div> <!-- cbqInit_setup -->
+      </div>   <!-- cbqInit_block -->
+      </form>  <!-- cbqInit -->
+
+      <!-- File uploads -->
+      <div id="file_uploads" class="form-row no-bg-form">
+        <br>
+        <br>
+        <label>WRITE(" ")</label>
+        <form>
+          <span class="file-wrapper">
+            <input type="file" name="cbqInitFile" id="id_uploadCbqInitFile">
+            <span class="button secondary">WRITE(_("upload"))</span>
+          </span>
+        </form>
+      </div>
+
+      <div class="pad" id="cbqFiles_block">
+        <br/>
+        <h2>WRITE(_("cbqInstalledFileList"))</h2>
+        <table width="80%" style="text-align:left;" class="no-border">
+          <thead>
+            <tr>
+              <th width="10%">WRITE(_("index"))</th>
+              <th width="70%">WRITE(_("File"))</th>
+              <th width="10%"></th>
+              <th width="10%"></th>
+            </tr>
+          </thead>
+
+          <tbody id="tbody_cbqFiles"></tbody>
+        </table>
+      </div>    <!-- cbqFiles_block -->
+
+    </div>  <!-- div class="right-column white-box" -->
+  </div>    <!-- div class="grid-9 omega" -->
+  </div>    <!-- div class="container" -->
+  </div>    <!-- div id="content" -->
+
+  <footer class="footer">
+    <div class="container">
+      <p class="copy-right">WRITE(_("powered by netComm"))</p>
+    </div>
+  </footer>
+
+  <script language='javascript'>
+    // This must go after the content
+    set_menu("Internet", "cbqInit_menuItem", <%_val = session["user"];%>"@@_val");
+<%    if(request['QUERY_STRING']=="success") {%>
+      success_alert("", "");
+<%    }%>
+  </script>
+
+</body>
+</html>

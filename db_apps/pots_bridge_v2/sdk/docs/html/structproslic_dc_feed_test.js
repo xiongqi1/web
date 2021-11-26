@@ -1,0 +1,27 @@
+var structproslic_dc_feed_test =
+[
+    [ "abortIfLineInUse", "structproslic_dc_feed_test.html#acb654590ffd5a1a9a9525ea86fcf87ea", null ],
+    [ "altLcrOffThresh", "structproslic_dc_feed_test.html#adf33d7d0026828258c191ef608d535a9", null ],
+    [ "altLcrOnThresh", "structproslic_dc_feed_test.html#a40764643cf2a70b901678cc30858a461", null ],
+    [ "applyLcrThresh", "structproslic_dc_feed_test.html#ac2096fd18215afe29711d25a7a69d8ec", null ],
+    [ "dcfeedIlongOffhook", "structproslic_dc_feed_test.html#ab3175811dc6b5989705e276438e9bfe1", null ],
+    [ "dcfeedIlongOnhook", "structproslic_dc_feed_test.html#ad44645496282f24604a3d37772d71880", null ],
+    [ "dcfeedIloopOffhook", "structproslic_dc_feed_test.html#aad5d592651cf6d0ab1a1ead067fad492", null ],
+    [ "dcfeedIloopOnhook", "structproslic_dc_feed_test.html#ac7a2f16181e7619bc0e267a322ce4fbb", null ],
+    [ "dcfeedIringOffhook", "structproslic_dc_feed_test.html#ac4d0f1949d6c331918a15433b3cd638b", null ],
+    [ "dcfeedIringOnhook", "structproslic_dc_feed_test.html#ae39b8b946c317bc0f7ebbeac437819c9", null ],
+    [ "dcfeedItipOffhook", "structproslic_dc_feed_test.html#a2ad80110abf7075a918da0defbaaffaf", null ],
+    [ "dcfeedItipOnhook", "structproslic_dc_feed_test.html#a6c825e160b8e02cd4cda774a97415aff", null ],
+    [ "dcfeedVbatOffhook", "structproslic_dc_feed_test.html#a4d2524552554483196348b5d8645b1b5", null ],
+    [ "dcfeedVbatOnhook", "structproslic_dc_feed_test.html#a13c19e1774f82752b9e58a23d6a7a082", null ],
+    [ "dcfeedVloopOffhook", "structproslic_dc_feed_test.html#a974bd3a04cd6504cd11d7d5e301c3088", null ],
+    [ "dcfeedVloopOnhook", "structproslic_dc_feed_test.html#a6693ce3b267782767a4cc3447d6d32e5", null ],
+    [ "dcfeedVringOffhook", "structproslic_dc_feed_test.html#a9ef1355812f82dfc36480313983f7d4b", null ],
+    [ "dcfeedVringOnhook", "structproslic_dc_feed_test.html#a10d0d7ec3770734c7b86832816b6e8a6", null ],
+    [ "dcfeedVtipOffhook", "structproslic_dc_feed_test.html#a84d61274d8af6ded9eab15e6183929ca", null ],
+    [ "dcfeedVtipOnhook", "structproslic_dc_feed_test.html#aa678eb9962003b875de33c8ea7d153a5", null ],
+    [ "lcrStatus", "structproslic_dc_feed_test.html#ab360ca300bc23c828796c82e2897d053", null ],
+    [ "testDataValid", "structproslic_dc_feed_test.html#a0509797edcda009abc855e0402350379", null ],
+    [ "testEnable", "structproslic_dc_feed_test.html#a0b991711c9b21a42f7b449c7444db650", null ],
+    [ "testResult", "structproslic_dc_feed_test.html#a449a5ed5af61dfbf2ffda62defc01451", null ]
+];

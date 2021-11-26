@@ -1,0 +1,433 @@
+var err_ip='The number in ip address entry box should be between 0 - 255.';
+var err_port='Port numbers you entered are invalid.The number in port entry box should be between 1 - 65535.';
+var err_protocol='Protocol filed error!';
+var err_mac='MAC address error! format: 00:01:02:03:04:05';
+var err_hop='Hop error! range: 0 - 16';
+var err_dns='The number in dns address entry box should be between 0 - 255.';
+var color1="#DEE3EF";
+var color2="#CCCCCC";
+var OnTopTimeOutSec = 0.1;
+function alwaysOnTop()
+{
+	setInterval('self.focus()',OnTopTimeOutSec*1000);
+}
+function isInt(aInt)
+{
+  return !isNaN(parseInt(aInt)) && (parseInt(aInt) == aInt);
+}
+function isFloat(aFloat)
+{
+  return !isNaN(parseFloat(aFloat)) && (parseFloat(aFloat) == aFloat);
+}
+function isNum(aNumber)
+{
+  return !isNaN(parseFloat(aNumber));
+}
+function isValidPort(s)
+{
+	var portNum = (isInt(s)) ? parseInt(s) : -1;
+	var isValid = !(portNum < 1 || portNum > 65535);
+	return isValid;
+}
+function isValidIpByte(s)
+{
+	var ipByteNum = (isInt(s)) ? parseInt(s) : -1;
+	var isValid = !(ipByteNum < 0 || ipByteNum > 255);
+	return isValid;
+}
+function isValidHop(s)
+{
+	var HopNum = (isInt(s)) ? parseInt(s) : -1;
+	var isValid = !(HopNum < 0 || HopNum > 16);
+	return isValid;
+}
+function isValidProtocol(s)
+{
+	var protocolNum = (isInt(s)) ? parseInt(s) : -1;
+	var isValid = !(protocolNum< 0 || protocolNum > 2);
+	return isValid;	 
+}
+function isValidMac(s)
+{
+	var checkReg = [/^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$/];
+	return checkReg[0].test(s);	 
+}
+function isValidHex(s)
+{
+	var checkReg = [/^([0-9a-fA-F])$/];
+	return checkReg[0].test(s);	 
+}
+function isValidHexByte(s)
+{
+	var checkReg = [/^([0-9a-fA-F][0-9a-fA-F])$/];
+	return checkReg[0].test(s);	 
+}
+function isValidWEP(key,size)
+{
+	if(size==10)
+		var checkReg = [/^([0-9a-fA-F]){10}$/];
+	else
+		var checkReg = [/^([0-9a-fA-F]){26}$/];
+	return checkReg[0].test(key);	 
+}
+function isNValidIP(s)
+{
+	if((isBlank(s))||(isNaN(s))||(s<0||s>255)) 
+		return true;
+	else
+		return false;
+}
+function sprintf(fmt)
+{
+  var reg = /%s/;
+  var result = new String(fmt);
+  for (var i = 1; i < arguments.length; i++) 
+  {      
+  	result = result.replace(reg, new String(arguments[i]));
+  }
+  return result; 
+}
+function printf(fmt)
+{
+  var reg = /%s/;
+  var result = new String(fmt);
+  for (var i = 1; i < arguments.length; i++) 
+  {      
+  	result = result.replace(reg, new String(arguments[i]));
+  }
+  document.write(result); 
+}
+function setCookie(name, value, expiresSec)
+{
+  var exp = new Date();
+  exp.setTime(exp.getTime()+ (expiresSec * 1000));
+  document.cookie = name + "=" + escape(value) + "; path=/" + "; expires=" + exp.toGMTString();
+}
+function getElementValue(obj)
+{
+	if (obj.options) /* if exist obj.options object */
+	{
+		return obj.options[obj.selectedIndex].value;
+	}
+	if (obj.type == "hidden" || obj.type =="text" || obj.type == "password")
+	{
+		return obj.value;
+	}
+	else if (obj.type == "radio" || obj.type == "checkbox")
+	{
+		if (obj.checked)
+		{
+			if (obj.value && obj.value !== "")
+			{
+				return obj.value;
+			}
+			else
+			{ 
+				return obj.checked;
+			}
+		}
+		return obj.checked;
+		
+	}
+    return "";
+}
+function isBlank(s) 
+{
+	for (i=0;i<s.length;i++) 
+	{
+		c=s.charAt(i);
+		if ((c!=' ') && (c!='\n') && (c!='\t'))
+			return false;
+	}
+	return true;
+}
+
+function htmlGenIpBlocks(name_in)
+{
+	var name = new String(name_in);	
+	printf("<input maxLength='3' name='%s1' size='3' onkeyup=WinExpIP_1(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s2' size='3' onkeyup=WinExpIP(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s3' size='3' onkeyup=WinExpIP(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s4' size='3' onkeyup=WinExpIP(this,event);>",name);
+}
+
+function htmlGenMaskBlocks(name_in)
+{
+	var name = new String(name_in);	
+	printf("<input maxLength='3' name='%s1' size='3' onkeyup=WinExpIP(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s2' size='3' onkeyup=WinExpIP(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s3' size='3' onkeyup=WinExpIP(this,event);> <b>.</b> ",name);
+	printf("<input maxLength='3' name='%s4' size='3' onkeyup=WinExpIP(this,event);>",name);
+}
+
+function htmlGenMacBlocks(name_in)
+{
+	var name = new String(name_in);
+	var boxsize="1";
+	var space=" ";
+	if(navigator.appName=="Netscape")
+		boxsize="2";
+	else
+		space="";
+	printf("<input maxLength='2' name='%s1' size='%s' onkeyup=WinExpMAC(this,event);>%s<b>:</b>%s",name,boxsize,space,space);
+	printf("<input maxLength='2' name='%s2' size='%s' onkeyup=WinExpMAC(this,event);>%s<b>:</b>%s",name,boxsize,space,space);
+	printf("<input maxLength='2' name='%s3' size='%s' onkeyup=WinExpMAC(this,event);>%s<b>:</b>%s",name,boxsize,space,space);
+	printf("<input maxLength='2' name='%s4' size='%s' onkeyup=WinExpMAC(this,event);>%s<b>:</b>%s",name,boxsize,space,space);
+	printf("<input maxLength='2' name='%s5' size='%s' onkeyup=WinExpMAC(this,event);>%s<b>:</b>%s",name,boxsize,space,space);
+	printf("<input maxLength='2' name='%s6' size='%s' onkeyup=WinExpMAC(this,event);>",name,boxsize,space,space);
+}
+function findObj(n, d) { //v4.01
+	var p,i,x;  
+	if(!d) d=document;
+	if((p=n.indexOf("?"))>0 && parent.frames.length) 
+	{
+		d=parent.frames[n.substring(p+1)].document; 
+		n=n.substring(0,p);
+	}
+	if(!(x=d[n]) && d.all) 
+		x=d.all[n];
+	for (i=0;!x && i < d.forms.length;i++) 
+		x=d.forms[i][n];
+  	for(i=0;!x && d.layers && id.layers.length;i++) 
+		x=findObj(n,d.layers[i].document);
+	if(!x && d.getElementById)
+		x=d.getElementById(n);
+	return x;
+}
+function isNeedReset(flag)
+{
+	if(flag=="true")
+	{
+		top.topFrame.document.getElementById('reset').src="images/reset_2.gif";
+		return true;
+	}
+	else
+	{
+		top.topFrame.document.getElementById('reset').src="images/reset_0.gif";
+		return false;	
+	}
+}
+function KeyCode(e){
+	if(e&&e.which){ //NN
+		e=e;
+		return(e.which);
+	}
+	else{
+		e=event;
+		return(e.keyCode);
+	}
+}
+function WinExpIP(field,e){
+	if(KeyCode(e)!=9){
+		IPfieldEntry(field);
+		if(lastEntryChar(field,' '))
+			field.value=field.value.substring(0,field.value.length);
+		if(lastEntryChar(field,'.')||field.value.length==3)
+		{
+			if(isNValidIP(field.value))
+			{
+				alert(field.value+" is not a valid entry. Please specify a value between 0 and 255.");
+				field.value="255";
+				field.select();
+			}
+			else if(field.value.length<3)
+				focusOnNext(field);
+		}	
+	}
+}
+function WinExpIP_1(field,e){
+	if(KeyCode(e)!=9){
+		IPfieldEntry(field);
+		if(lastEntryChar(field,' '))
+			field.value=field.value.substring(0,field.value.length);
+		if(lastEntryChar(field,'.')||field.value.length==3)
+		{
+			if(isNValidIP(field.value) || field.value <1 || field.value >223)
+			{
+				alert(field.value+" is not a valid entry. Please specify a value between 1 and 223.");
+				field.value="192";
+				field.select();
+			}
+            else if(field.value==127)
+            {
+            	alert("IP addresses starting with 127 are not valid because they are reserved for loopback address. Please specify some other valid value between 1 and 223.");
+				field.value="192";
+				field.select();
+            }
+			else if(field.value.length<3)
+				focusOnNext(field);
+		}	
+	}  
+}
+function WinExpMAC(field,e){
+	if(KeyCode(e)!=9){
+		MACfieldEntry(field);
+		if(lastEntryChar(field,':')||field.value.length==2)
+		{
+			if(!isValidHexByte(field.value))
+			{
+				alert(field.value+" is not a valid entry. Please specify a HEX value (0-9,A-F) .");
+				field.select();
+			}
+			else
+				focusOnNext(field);
+		}
+	}	
+}
+function validateIP4(thisip) {
+	var ip = thisip.split('.');
+	if (ip.length!=4 || isNValidIP(ip[0]) || ip[0]==0) {
+		alert(thisip+" is not a valid IP address.");
+		return 0;
+	}
+    for (var i = 1; i <= 3; i ++) {    
+        if(isNValidIP(ip[i])) {  
+            alert(thisip+" is not a valid IP address.");
+            return 0;
+        }
+    }
+	return 1;
+}
+function validateNetMask(mask) {
+//m[0] can be 128, 192, 224, 240, 248, 252, 254, 255
+//m[1] can be 128, 192, 224, 240, 248, 252, 254, 255 if m[0] is 255, else m[1] must be 0
+//m[2] can be 128, 192, 224, 240, 248, 252, 254, 255 if m[1] is 255, else m[2] must be 0
+//m[3] can be 128, 192, 224, 240, 248, 252, 254, 255 if m[2] is 255, else m[3] must be 0
+	var correct_range = {128:1,192:1,224:1,240:1,248:1,252:1,254:1,255:1,0:1};
+	var m = mask.split('.');
+	if (m.length!=4 || (m[0] == 0) || (m[0] != 255 && m[1] != 0) || (m[1] != 255 && m[2] != 0) || (m[2] != 255 && m[3] != 0)) {
+    	alert(mask+" is not a valid subnet mask.");
+        return 0;
+	}    
+	for (var i = 0; i <= 3; i ++) {
+		if (!(m[i] in correct_range)) {
+			alert("The subnet mask has to be contiguous. Please enter a valid mask.");
+			return 0;
+		}
+	}
+	return 1;
+}
+function focusOnNext(field)
+{
+	var elno=0;
+	for(i=0;i<document.form1.elements.length;i++)
+		if(document.form1.elements[i].name==field.name)
+			elno=i;
+	if(document.form1.elements[elno+1])
+		if(document.form1.elements[elno+1].name.slice(0,document.form1.elements[elno+1].name.length-1)==field.name.slice(0,field.name.length-1))
+		{
+			document.form1.elements[elno+1].focus();
+			document.form1.elements[elno+1].select();
+		}
+}
+function lastEntryChar(field,spchar){
+	if(field.value.charAt(field.value.length-1)==spchar)
+	{
+		field.value=field.value.slice(0,field.value.length-1);
+		if(field.value.length)
+			return(1);
+	}
+return(0);
+}
+function IPfieldEntry(field){
+	if(isNaN(field.value.charAt(field.value.length-1))&&field.value.charAt(field.value.length-1)!='.')
+		field.value=field.value.slice(0,field.value.length-1);
+}
+function MACfieldEntry(field){
+	if(!isValidHex(field.value.charAt(field.value.length-1))&&field.value.charAt(field.value.length-1)!=':')
+		field.value=field.value.slice(0,field.value.length-1);
+}
+function NumfieldEntry(field){
+	if(isNaN(field.value.charAt(field.value.length-1))&&field.value.charAt(field.value.length-1)!='.')
+		field.value=field.value.slice(0,field.value.length-1);
+}
+
+var spchrtable=['@','#','$','%','^','&','+','=','\\','|','[',']','{','}',';',':','"',',','/','<','>','?','`'];
+var hexchr=['%40','%23','%24','%25','%5E','%26','%2B','%3D','%5C','%7C','%5B','%5D','%7B','%7D','%3B','%3A','%22','%2C','%2F','%3C','%3E','%3F','%60'];
+
+function makeIpVars(ip,f,s){
+	for(i=1;i<5;i++){
+		s.elements[ip.name].value+=f.elements[ip.name+i].value;
+		if(i<4)
+			s.elements[ip.name].value+='.';
+	}
+}
+
+function MyencodeURIComponent(input)
+{
+var chr='';
+var output="";
+var flag=0;
+	
+	for(i=0;i<input.length;i++)
+	{
+		chr=input.charAt(i);
+		for(j=0;j<23;j++){
+			if(chr==spchrtable[j]){
+				output+=hexchr[j];
+				flag=1;
+				break;
+			}
+		}
+		if(!flag)
+			output+=chr;
+		else
+			flag=0;
+	}
+	return(output);
+}
+function IpCheck(IP1,IP2,IP3,IP4)
+{ 
+if (((isBlank(IP1))||(isNaN(IP1))||(IP1<0||IP1>255))||((isBlank(IP2))||(isNaN(IP2))||(IP2<0||IP2>255))||((isBlank(IP3))||(isNaN(IP3))||(IP3<0||IP3>255)) || ((isBlank(IP4))||(isNaN(IP4))||(IP4<0||IP4>255)))
+		{ return false;}
+return true;
+}
+
+function UrlDecode(str) {
+var unicode = 0;
+var ret = "";
+	for (var i = 0; i < str.length; i+=3)
+	{
+		var val = parseInt("0x" + str.substring(i + 1 , i + 3) );
+		if(val > 127 || val < 32)
+		{
+			unicode = 1;
+			break;
+		}
+	}
+	for (var i = 0; i < str.length; i++)
+	{
+	var chr = str.charAt(i);
+	
+		if (chr == "+")
+		{
+			ret += " ";
+		}
+		else
+		{
+			if (chr == "%")
+			{
+				var asc = str.substring(i + 1 , i + 3);
+				if (unicode)
+				{
+					temp = parseInt("0x" + str.substring(i + 4 , i + 6) + asc );
+					rt = "&#"+temp.toString()+";";
+					ret += rt;
+					i += 5;
+				}
+				else
+				{
+					rt = "&#x"+asc+";";
+					ret += rt;
+					i += 2;
+				}
+			}
+			else
+			{
+				ret += chr;
+			}
+		}
+	}
+	return ret;
+}
+

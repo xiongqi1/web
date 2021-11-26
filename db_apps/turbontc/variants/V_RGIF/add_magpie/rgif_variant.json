@@ -1,0 +1,678 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA API",
+        "description": "OWA RESTful API",
+        "version": "1.6.1"
+    },
+    "basePath": "/api/v1",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/SAS": {
+            "get": {
+                "summary": "Provides information about the current SAS parameters and status on the OWA.",
+                "description": "The SAS endpoint returns information on the current SAS parameters and status on the OWA, including registration information and antenna positioning",
+                "tags": [
+                    "CBRS"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/SAS"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Modifies the current SAS parameters.",
+                "tags": [
+                    "CBRS"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Param",
+                        "description": "Name of the configuration parameter to be modified",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Value",
+                        "description": "Value to be assigned to the configuration parameter",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/SAS/Config": {
+            "get": {
+                "summary": "Provides configuration values for the SAS client on the OWA.",
+                "tags": [
+                    "CBRS"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Configuration values for the SAS client on the OWA.",
+                        "schema": {
+                            "$ref": "#/definitions/SASConfig"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Modifies the SAS client configuration values on the OWA.",
+                "tags": [
+                    "CBRS"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Param",
+                        "description": "Name of the configuration parameter to be modified",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Value",
+                        "description": "Value to be assigned to the configuration parameter",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/SAS/History": {
+            "get": {
+                "summary": "Provides transaction history information about the SAS configuration of the OWA.",
+                "tags": [
+                    "CBRS"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Time-stamped record of the messages exchanged between the OWA and the SAS within the last 24 hours.",
+                        "schema": {
+                            "$ref": "#/definitions/SASHistory"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/CarrierAggregation/History": {
+            "get": {
+                "summary": "This gets the historical information on carrier aggregation.",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cell usage and CA mode.",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CarrierAggregationHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove all carrier aggregation history",
+                "description": "",
+                "tags": [
+                    "WAN"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/RunFieldTest": {
+            "get": {
+                "summary": "Get filed test related result, which could be a SIM file content, PCell, SCell information, next Device Initiated Session event etc.",
+                "description": "",
+                "tags": [
+                    "Device"
+                 ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "Run",
+                        "description": "It can be SIMFile, GetLTEStatus, DeviceInitiatedSession or ModuleLog",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Data",
+                        "description": "When \"Run\" = \"SIMFile\", \"Data\" can be ICCID, MSISDN, MBDN, HPPLMN, LOCI, PSLOCI, ACC, AD, FPLMN, AHPLMN, PNN, OPL, OPLMNACT, PLMNSEL or IMPU. When \"Run\" = \"GetLTEStatus\", \"Data\" can be RRCModeStatus, IMSRegistration, ServCellInfo or ActivePDPContextInfo.  When \"Run\" = \"DeviceInitiatedSession\", no \"Data\" is required. When \"Run\" = \"ModuleLog\", no \"Data\" is required.",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                 "responses" : {
+                     "200": {
+                         "description": "Field test result",
+                         "schema": {
+                            "$ref": "#/definitions/FieldTestResult"
+                         }
+                     },
+                     "default": {
+                         "description": "Unexpected error",
+                         "schema": {
+                            "$ref": "#/definitions/Error"
+                         }
+                    }
+                 }
+            },
+            "put": {
+                "summary": "Schedule a next Device Initiated Session",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Run",
+                        "description": "DeviceInitiatedSession or ModuleLog",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Data",
+                        "description": "When \"Run\" = \"DeviceInitiatedSession\",  \"Data\" should be a date in a format like \"2019-12-01T01:20:34Z\" in UTC timezone.  When \"Run\" = \"ModuleLog\", \"Data\" can be \"enable\" or \"disable\", followed by the last six digits of IMEI, for example: \"enable,123456\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/Neighbor/History": {
+            "get": {
+                "summary": "This gets the historical information on neighbour cell measurement.",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Neighbour cell measurement data.",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/NeighborHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "PDPContextHistory": {
+            "properties": {
+                "DefaultBearerNormalRelease": {
+                    "type": "integer",
+                    "description": "Count of E-RAB default bearers that were released normally during the measurement period"
+                },
+                "DefaultBearerAbnormalRelease": {
+                    "type": "integer",
+                    "description": "Count of E-RAB default bearers that were released abnormally during the measurement period"
+                }
+            }
+        },
+        "ServCellHistory": {
+            "properties": {
+                "PCellList": {
+                    "type": "array",
+                    "description": "Array of the primary cells serving the UE during the measurement period",
+                    "items": {
+                        "$ref": "#/definitions/PCellHistory"
+                    }
+                }
+            }
+        },
+        "PCellHistory": {
+            "properties": {
+                "CellID": {
+                    "type": "string",
+                    "description": "The cell identify of the primary cell (as specified in SIB1 in [Section 6.2.2 and Section 6.3.4/3GPP-TS.36.331])"
+                },
+                "RSRP": {
+                    "type": "string",
+                    "description": "Received RSRP level of the detected EUTRA cell in dBm, as specified in [Section 5.1.1/3GPP-TS.36.214]"
+                },
+                "RSRQ": {
+                    "type": "string",
+                    "description": "Received RSRQ level of the detected EUTRA cell in dB, as specified in [Section 5.1.3/3GPP-TS.36.214] with a minimum resolution of at least 0.5dB"
+                },
+                "RSSINR": {
+                    "type": "string",
+                    "description": "E-UTRA Carrier reference signal-signal to noise and interference ratio (RS-SINR), specified in dB"
+                },
+                "HandoverAttempt": {
+                    "type": "integer",
+                    "description": "The number of handover attempts to handover this cell to a different cell in the measurement period"
+                },
+                "HandoverSuccess": {
+                    "type": "integer",
+                    "description": "The number of times the cell was successfully handover to a different cell in the measurement period"
+                },
+                "MACiBLERReceived": {
+                    "type": "integer",
+                    "description": "Ratio of the total number of NACKs to total number of ACKs and NACKs for the first HARQ transmission in the downlink, i.e., iBLER = Number of NACKs over all first HARQ transmissions / (Number of ACKs over all first HARQ transmissions + Number of NACKs over all first HARQ transmissions)"
+                },
+                "MACiBLERSent": {
+                    "type": "integer",
+                    "description": "Ratio of the total number of NACKs to total number of ACKs and NACKs for the first HARQ transmission in the uplink, i.e., iBLER = Number of NACKs over all first HARQ transmissions / (Number of ACKs over all first HARQ transmissions + Number of NACKs over all first HARQ transmissions)"
+                },
+                "MACrBLERReceived": {
+                    "type": "integer",
+                    "description": "Ratio of the total number of NACKs for the last (4th) HARQ transmission to total number of ACKs for any HARQ transmission and NACKs for the last (4th) HARQ transmission in the downlink, i.e. rBLER = Number of NACKs over all the last HARQ retransmissions / (Number of ACKs over all MAC layer transmissions + Number of NACKs over all the last HARQ retransmissions)"
+                },
+                "MACrBLERSent": {
+                    "type": "integer",
+                    "description": "Ratio of the total number of NACKs for the last (4th) HARQ transmission to total number of ACKs for any HARQ transmission and NACKs for the last (4th) HARQ transmission in the uplink, i.e. rBLER = Number of NACKs over all the last HARQ retransmissions / (Number of ACKs over all MAC layer transmissions + Number of NACKs over all the last HARQ retransmissions)"
+                },
+                "AvgCQI": {
+                    "type": "integer",
+                    "description": "Downlink wideband Channel Quality Indicator (CQI) of PCell"
+                },
+                "TotalPRBsReceived": {
+                    "type": "integer",
+                    "description": "Total number of Physical Resource Blocks allocated on the downlink over all the active TTIs. Each TTI is 1 ms"
+                },
+                "TotalPRBsSent": {
+                    "type": "integer",
+                    "description": "Total number of Physical Resource Blocks allocated on the uplink over all the active TTIs. Each TTI is 1 ms"
+                },
+                "TotalActiveTTIsReceived": {
+                    "type": "integer",
+                    "description": "Total number of TTIs during which there is a DL MAC transmission. Each TTI is 1 ms"
+                },
+                "TotalActiveTTIsSent": {
+                    "type": "integer",
+                    "description": "Total number of Physical Resource Blocks allocated on the uplink over all the active TTIs. Each TTI is 1 ms"
+                },
+                "PMIDistribution": {
+                    "type": "string",
+                    "description": "Provides the distribution of PMI values over the measurement period. PMI value range is (0,15). The field contains a comma separated list of 16 values. The first value in the list represent the count of PMI with value 0, so on so forth"
+                },
+                "RIDistribution": {
+                    "type": "string",
+                    "description": "Provides the distribution of RI values over the measurement period. RI value range is (0, 3). The field contains a comma separated list of 4 values. The first value in the list represent the count of RI with value 0, so on so forth"
+                },
+                "ReceivedModulationDistribution": {
+                    "type": "string",
+                    "description": "Provides the distribution of modulation method used in the downlink direction over the measurement period. The possible modulation methods are, QPSK, 16 QAM, 64 QAM or 256 QAM. The field contains a comma separated list of 4 values. The first value in the list represent the count using QPSK modulation. The second, third and forth values represent count using 16 QAM, 64 QAM and 256 QAM respectively"
+                },
+                "SendModulationDistribution": {
+                    "type": "string",
+                    "description": "Provides the distribution of modulation method used in the uplink direction over the measurement period. The possible modulation methods are, QPSK, 16 QAM or 64 QAM. The field contains a comma separated list of 3 values. The first value in the list represent the count using QPSK modulation. The second and third values represent count using 16 QAM and 64 QAM respectively"
+                },
+                "PUSCHTransmitPowerDistribution": {
+                    "type": "string",
+                    "description": "Break down of PUSCH Tx Power value distribution in the measurement period. Only need to distinguish whether the Tx Power is at max value or not. The field contains a comma separated list of 2 values. The first value in the list represent the count of sample with max Tx power. The second value represent count of sample with below-max Tx power"
+                },
+                "RLFCount": {
+                    "type": "integer",
+                    "description": "The number of physical radio link failures in the measurement period"
+                },
+                "NumberofRRCEstabAttempts": {
+                    "type": "integer",
+                    "description": "The number of RRC Establishment Attempted in the measurement period"
+                },
+                "NumberofRRCEstabFailures": {
+                    "type": "integer",
+                    "description": "The number of RRC Establishment Failures in the measurement period"
+                },
+                "RRCEstabLatency": {
+                    "type": "integer",
+                    "description": "The average RRC Establishment Latency in the measurement period"
+                },
+                "NumberofRRCReEstabAttempts": {
+                    "type": "integer",
+                    "description": "The number of RRC Re-establishment Attempted in the measurement period"
+                },
+                "NumberofRRCReEstabFailures": {
+                    "type": "integer",
+                    "description": "The number of RRC Re-establishment Failures in the measurement period"
+                },
+                "RRCReEstabLatency": {
+                    "type": "integer",
+                    "description": "The average RRC Re-establishment Latency in the measurement period"
+                }
+            }
+        },
+        "RRC": {
+            "properties": {
+                "CellList": {
+                    "type": "array",
+                    "description": "Array of cells that the UE had traffic with during the RRC session, where the first array element will always be the primary cell, with any additional secondary cells at subsequent array indices",
+                    "items": {
+                        "$ref": "#/definitions/RRCCell"
+                    }
+                }
+            }
+        },
+        "RRCCell": {
+            "properties": {
+                "MaxPUSCHTxPower": {
+                    "type": "integer",
+                    "description": "Maximum UE transmit power for PUSCH transmission (measured in dBm) during the measurement period"
+                },
+                "AvgPUSCHTxPower": {
+                    "type": "integer",
+                    "description": "Average UE transmit power for PUSCH transmission (measured in dBm) during the measurement period"
+                },
+                "MaxPUCCHTxPower": {
+                    "type": "integer",
+                    "description": "Maximum UE transmit power for PUCCH transmission (measured in dBm) during the measurement period"
+                },
+                "AvgPUCCHTxPower": {
+                    "type": "integer",
+                    "description": "Average UE transmit power for PUCCH transmission (measured in dBm) during the measurement period"
+                },
+                "AvgCQI": {
+                    "type": "integer",
+                    "description": "Average wideband Channel Quality Indicator (CQI) of the cell. The average CQI for each cell should be calculated as average of both codeword 1 wideband CQI and codeword 2 wideband CQI for that cell. Each cell's CQI is computed by taking ALL the CQI measurements reported to the RAN for that cell during the RRC session"
+                }
+            }
+        },
+        "RF": {
+            "properties": {
+                "CQI": {
+                    "type": "integer",
+                    "description": "Downlink wideband Channel Quality Indicator (CQI) of PCell"
+                }
+            }
+        },
+        "SCell": {
+            "properties": {
+                "EARFCN": {
+                    "type": "integer",
+                    "description": "The EARFCN of the cell"
+                },
+                "PhyCellID": {
+                    "type": "string",
+                    "description": "Physical cell ID (as specified in [Section 6.11/3GPP-TS.36.211]) of the cell"
+                },
+                "Bandwidth": {
+                    "type": "integer",
+                    "description": "Downlink/uplink transmission bandwidth, specified in number of resource blocks. Corresponds to parameter dl_Bandwidth in RRC connection request for SCell activation"
+                },
+                "TDDConfig": {
+                    "type": "string",
+                    "description": "TDD config for SCell as defined in Table 4.2-2 of TS 36.211 as specified in RRC connection request for SCell activation"
+                },
+                "RSRP": {
+                    "type": "string",
+                    "description": "Received RSRP level of the detected EUTRA cell, specified in dBm, as specified in [Section 5.1.1/3GPP-TS.36.214]. The reporting range is specified in [Section 9.1.4/3GPP-TS.36.133]"
+                },
+                "RSRQ": {
+                    "type": "string",
+                    "description": "Received RSRQ level of the detected EUTRA cell in dB, as specified in [Section 5.1.3/3GPP-TS.36.214] with a minimum resolution of at least 0.5dB"
+                },
+                "RSSI": {
+                    "type": "integer",
+                    "description": "E-UTRA Carrier Received Signal Strength Indicator (RSSI), specified in dBm, as specified in [Section 5.1.3/3GPP-TS.36.214]"
+                },
+                "RSSINR": {
+                    "type": "string",
+                    "description": "E-UTRA Carrier Received Signal SINR, specified in dBm"
+                },
+                "CQI": {
+                    "type": "integer",
+                    "description": "Downlink wideband Channel Quality Indicator (CQI) of SCell"
+                }
+            }
+        },
+        "SAS": {
+            "properties": {
+                "CBSDID": {
+                    "type": "string",
+                    "description": "Unique identifier for the CBSD assigned by SAS if registration successful, or an empty string otherwise"
+                },
+                "AntennaAzimuth": {
+                    "type": "integer",
+                    "description": "Boresight direction of the horizontal plane of the antenna in degrees relative to true north, as a positive integer value measured in a clockwise direction (so 0 would be true north, 90 would be true east, etc.)"
+                },
+                "AntennaDowntilt": {
+                    "type": "integer",
+                    "description": "Antenna downtilt in degrees relative to horizontal, from -90 (directly upward) to +90 (directly downward)"
+                },
+                "Latitude": {
+                    "type": "string",
+                    "description": "Latitude of the CBSD as set during installation, expressed as a decimal value from -90.000000 (south) to +90.000000 (north) using 6 digits to the right of the decimal point (microdegree resolution)."
+                },
+                "Longitude": {
+                    "type": "string",
+                    "description": "Longitude of the CBSD as set during installation, expressed as a decimal value from -180.000000 (west) to +180.000000 (east) using 6 digits to the right of the decimal point (microdegree resolution)."
+                },
+                "Height": {
+                    "type": "string",
+                    "description": "Heigh of the CBSD as set during installation, expressed as a decimal value in meters with respect to WGS84 datum."
+                },
+                "GroupingParam": {
+                    "type": "string",
+                    "description": "Comma separated string array representing all the CBSD groups that the CBSD is part of. Each string represents a group. For each group, the group ID and group type information is included and separated by '|' character. Eg: example-group-3|INTERFERENCE_COORDINATION,example-group-4|INTERFERENCE_COORDINATION"
+                },
+                "CBSDSerialNumber": {
+                    "type": "string",
+                    "description": "Unique serial number assigned to the CBSD"
+                },
+                "CallSign": {
+                    "type": "string",
+                    "description": "The call sign of the licensee (as assigned by FCC)"
+                },
+                "GrantList": {
+                    "type": "array",
+                    "description": "Information relating to current SAS grants",
+                    "items": {
+                        "$ref": "#/definitions/SASGrant"
+                    }
+                }
+            }
+        },
+        "SASGrant": {
+            "properties": {
+                "GrantID": {
+                    "type": "string",
+                    "description": "Unique identifier for the grant"
+                },
+                "FreqRangeLow": {
+                    "type": "integer",
+                    "description": "Low frequency of the channel frequency range in Hz"
+                },
+                "FreqRangeHigh": {
+                    "type": "integer",
+                    "description": "High frequency of the channel frequency range in Hz"
+                },
+                "MaxEIRP": {
+                    "type": "integer",
+                    "description": "Maximum EIRP permitted by the SAS in units of dBm/MHz (integer between -137 and +37)"
+                },
+                "GrantExpireTime": {
+                    "type": "string",
+                    "description": "Expiration time of the Grant in ISO-8601 format"
+                },
+                "ChannelType": {
+                    "type": "string",
+                    "description": "Enumerated value indicating type of grant (“PAL” or “GAA”)"
+                },
+                "GrantState": {
+                    "type": "string",
+                    "description": "Enumerated value indicating current state of the grant"
+                },
+                "GrantReason": {
+                    "type": "string",
+                    "description": "Enumerated value indicating for which purpose the grant is required"
+                },
+                "GrantHeatbeatTime": {
+                    "type": "string",
+                    "description": "Next heartbeat time for the grant in ISO-8601 format, or empty if there are no further heartbeats required"
+                },
+                "CellList": {
+                    "type": "array",
+                    "description": "List of cells covering the frequency range of the grant",
+                    "items": {
+                        "$ref": "#/definitions/SASCell"
+                    }
+                }
+            }
+        },
+        "SASCell": {
+            "properties": {
+                "ECGI": {
+                    "type": "string",
+                    "description": "ECGI of the cell"
+                }
+            }
+        },
+        "SASConfig": {
+            "properties": {
+                "GrantRelinquishWaitTime": {
+                    "type": "integer",
+                    "description": "Time in minutes that the CBSD will wait before relinquishing an existing grant for a frequency that is no longer in the SIB5 neighbor list."
+                },
+                "GrantRetryWaitTime": {
+                    "type": "integer",
+                    "description": "Time in minutes that the CBSD will wait after a grant request is rejected by the SAS before again attempting to obtain a grant request for that frequency range."
+                }
+            }
+        },
+        "SASHistory": {
+            "properties": {
+                "Log": {
+                    "type": "string",
+                    "description": "Time-stamped record of the messages exchanged between the OWA and the SAS within the last 24 hours."
+                }
+            }
+        },
+        "CarrierAggregationHistory": {
+            "properties": {
+                "StartTime": {
+                    "type": "string",
+                    "description": "Time Stamp of Period Start time"
+                },
+                "CellUsage": {
+                    "type": "string",
+                    "description": "Cell usage"
+                },
+                "CAMode": {
+                    "type": "string",
+                    "description": "Carrier aggregation mode"
+                }
+            }
+        },
+        "NeighborHistory": {
+            "properties": {
+                "StartTime": {
+                    "type": "string",
+                    "description": "Time Stamp of Measurement Period Start time"
+                },
+                "CellMeasurement": {
+                    "type": "string",
+                    "description": " EARFCN, Physical cell ID, RSRP, RSRQ of all neighboring cells"
+                }
+            }
+        }
+    }
+}

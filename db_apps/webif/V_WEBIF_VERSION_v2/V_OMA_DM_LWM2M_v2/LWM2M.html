@@ -1,0 +1,252 @@
+<%
+if (form['ajax']) {
+useSession();
+if (
+    request["SESSION_ID"] != session["sessionid"]) {
+  exit(403);
+}
+}
+%><!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>LWM2M</title>
+<% include topinc_v2.inc %>
+<!-- Common include to check the session is current -->
+<%
+useSession();
+if (
+    request["SESSION_ID"] != session["sessionid"]) {
+  redirect('/index.html?src=' + request["SCRIPT_NAME"]);
+  exit(403);
+}
+%>
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+  if (form["LWM2M_enable"] == "1") {
+    if (form["LWM2M_override"] == "1") {
+        set_single("service.lwm2m.override.once="       + form["LWM2M_over_once"], "-p");
+        set_single("service.lwm2m.override.server-uri=" + form["LWM2M_over_serveruri"], "-p");
+        set_single("service.lwm2m.override.bootstrap="  + form["LWM2M_over_bootstrap"], "-p");
+        set_single("service.lwm2m.override.queue="      + form["LWM2M_over_queue"], "-p");
+        set_single("service.lwm2m.override.lifetime="   + form["LWM2M_over_lifetime"], "-p");
+        set_single("service.lwm2m.override.sec-mode="   + form["LWM2M_over_secmode"], "-p");
+        if (form["LWM2M_over_secmode"] == "psk") {
+            set_single("service.lwm2m.override.psk-id="  + form["LWM2M_over_pskid"], "-p");
+            set_single("service.lwm2m.override.psk-key=" + form["LWM2M_over_pskkey"], "-p");
+        }
+    }
+    set_single("service.lwm2m.override.enable=" + form["LWM2M_override"], "-p");
+  }
+  set_single("service.lwm2m.enable=" + form["LWM2M_enable"], "-p");
+  redirect("/LWM2M.html?success");
+}
+else { /*GET*/
+  form["LWM2M_enable"]         = get_single("service.lwm2m.enable");
+  form["LWM2M_override"]       = get_single("service.lwm2m.override.enable");
+  form["LWM2M_over_once"]      = get_single("service.lwm2m.override.once");
+  form["LWM2M_over_serveruri"] = get_single("service.lwm2m.override.server-uri");
+  form["LWM2M_over_bootstrap"] = get_single("service.lwm2m.override.bootstrap");
+  form["LWM2M_over_queue"]     = get_single("service.lwm2m.override.queue");
+  form["LWM2M_over_lifetime"]  = get_single("service.lwm2m.override.lifetime");
+  form["LWM2M_over_secmode"]   = get_single("service.lwm2m.override.sec-mode");
+  form["LWM2M_over_pskid"]     = get_single("service.lwm2m.override.psk-id");
+  form["LWM2M_over_pskkey"]    = get_single("service.lwm2m.override.psk-key");
+}
+endpoint = get_single("service.lwm2m.endpoint");
+if (endpoint == "N/A" || endpoint == "") {
+  endpoint = get_single("system.product.model") + ":" + get_single("uboot.sn")
+}
+%>
+<script language="JavaScript">
+// look at current settings and show/hide elements that aren't applicable
+function hideElements() {
+ $("#LWM2M_configuration").toggle($("#__LWM2M_enable-0").is(':checked'));
+ $("#LWM2M_override_configuration").toggle($("#__LWM2M_override-0").is(':checked'));
+ var secmode = $("#LWM2M_over_secmode").val();
+ $("#LWM2M_over_pskid").closest("div.form-row").toggle(secmode == "psk");
+ $("#LWM2M_over_pskkey").closest("div.form-row").toggle(secmode == "psk");
+}
+function submitF() {
+ clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+ if (!$("#form").valid()) {
+  return;
+ }
+#else
+ if(!$("#form").validationEngine("validate")) {
+  validate_alert("","");
+  return;
+ }
+#endif
+ $("#LWM2M_enable").val($("input:radio.access[name=__LWM2M_enable]:checked").val());
+ $("#LWM2M_override").val($("input:radio.access[name=__LWM2M_override]:checked").val());
+ $("#LWM2M_over_once").val($("input:radio.access[name=__LWM2M_over_once]:checked").val());
+ $("#LWM2M_over_bootstrap").val($("input:radio.access[name=__LWM2M_over_bootstrap]:checked").val());
+ $("#LWM2M_over_queue").val($("input:radio.access[name=__LWM2M_over_queue]:checked").val());
+ document.form.submit();
+}
+$(document).ready(function() {
+ load_value_to_element("input:radio.access[name=__LWM2M_enable]",$("#LWM2M_enable").val()=="1");
+ load_value_to_element("input:radio.access[name=__LWM2M_override]",$("#LWM2M_override").val()=="1");
+ load_value_to_element("input:radio.access[name=__LWM2M_over_once]",$("#LWM2M_over_once").val()=="1");
+ load_value_to_element("input:radio.access[name=__LWM2M_over_bootstrap]",$("#LWM2M_over_bootstrap").val()=="1");
+ load_value_to_element("input:radio.access[name=__LWM2M_over_queue]",$("#LWM2M_over_queue").val()=="1");
+ $("#LWM2M_over_secmode").val("@@form['LWM2M_over_secmode']");
+ $("[name=__LWM2M_enable]").click(function() {
+  clear_alert();
+  hideElements();
+ });
+ $("[name=__LWM2M_override]").click(function() {
+  clear_alert();
+  hideElements();
+ });
+ $("#LWM2M_over_secmode").change(hideElements);
+ hideElements();
+});
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+ <div class="container">
+ <aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+  <div class="grid-9 omega">
+   <form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+   <%appendCsrfToken();%>
+   <div class="right-column white-box">
+    <div class="pad">
+     <h2><script language=Javascript>document.write(_("LWM2M_title"))</script></h2>
+     <div class="form-row"<% if (endpoint=='') write(' style="display:none"'); %>>
+      <label><script language=Javascript>document.write(_("LWM2M_endpoint"))</script></label>
+      <span class="normal-text">@@endpoint</span>
+     </div>
+     <input type="hidden" name="LWM2M_enable" id="LWM2M_enable" value="@@form['LWM2M_enable']"/>
+     <div class="form-row no-bg-form">
+      <label for="field-0"><script language=Javascript>document.write(_("LWM2M_enable"))</script></label>
+      <div class="field">
+       <div class="location-settings">
+        <div class="radio-switch">
+         <input type="radio" id="__LWM2M_enable-0" name="__LWM2M_enable" class="access" value=1>
+         <label for="__LWM2M_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+         <input type="radio" id="__LWM2M_enable-1" name="__LWM2M_enable" class="access" value=0>
+         <label for="__LWM2M_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="grey-box" id="LWM2M_configuration" >
+      <div class="form-row">
+       <input type="hidden" name="LWM2M_override" id="LWM2M_override" value="@@form['LWM2M_override']"/>
+       <label for="field-1"><script language=Javascript>document.write(_("LWM2M_override"))</script></label>
+       <div class="field">
+        <div class="location-settings">
+         <div class="radio-switch">
+          <input type="radio" id="__LWM2M_override-0" name="__LWM2M_override" class="access" value=1>
+          <label for="__LWM2M_override-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+          <input type="radio" id="__LWM2M_override-1" name="__LWM2M_override" class="access" value=0>
+          <label for="__LWM2M_override-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+         </div>
+        </div>
+       </div>
+      </div>
+      <div class="grey-box" id="LWM2M_override_configuration">
+       <div class="form-row">
+        <input type="hidden" name="LWM2M_over_once" id="LWM2M_over_once" value="@@form['LWM2M_over_once']"/>
+        <label for="field-1"><script language=Javascript>document.write(_("LWM2M_over_once"))</script></label>
+        <div class="field">
+         <div class="location-settings">
+          <div class="radio-switch">
+           <input type="radio" id="__LWM2M_over_once-0" name="__LWM2M_over_once" class="access" value=1>
+           <label for="__LWM2M_over_once-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+           <input type="radio" id="__LWM2M_over_once-1" name="__LWM2M_over_once" class="access" value=0>
+           <label for="__LWM2M_over_once-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+          </div>
+         </div>
+        </div>
+       </div>
+       <div class="form-row">
+        <label for="hostname"><script language=Javascript>document.write(_("LWM2M_serveruri"))</script></label>
+        <div class="field">
+         <input type="text" class="validate[required,custom[coapurl]] required large" name="LWM2M_over_serveruri" id="LWM2M_over_serveruri" value="@@form['LWM2M_over_serveruri']">
+        </div>
+       </div>
+       <div class="form-row">
+        <label for="hostname"><script language=Javascript>document.write(_("LWM2M_lifetime"))</script></label>
+        <div class="field">
+         <input type="text" class="validate[required,custom[integer]] required large" name="LWM2M_over_lifetime" id="LWM2M_over_lifetime" value="@@form['LWM2M_over_lifetime']">
+        </div>
+       </div>
+       <div class="form-row">
+        <input type="hidden" name="LWM2M_over_bootstrap" id="LWM2M_over_bootstrap" value="@@form['LWM2M_over_bootstrap']"/>
+        <label for="field-1"><script language=Javascript>document.write(_("LWM2M_bootstrap"))</script></label>
+        <div class="field">
+         <div class="location-settings">
+          <div class="radio-switch">
+           <input type="radio" id="__LWM2M_over_bootstrap-0" name="__LWM2M_over_bootstrap" class="access" value=1>
+           <label for="__LWM2M_over_bootstrap-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+           <input type="radio" id="__LWM2M_over_bootstrap-1" name="__LWM2M_over_bootstrap" class="access" value=0>
+           <label for="__LWM2M_over_bootstrap-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+          </div>
+         </div>
+        </div>
+       </div>
+       <div class="form-row">
+        <input type="hidden" name="LWM2M_over_queue" id="LWM2M_over_queue" value="@@form['LWM2M_over_queue']"/>
+        <label for="field-1"><script language=Javascript>document.write(_("LWM2M_queue"))</script></label>
+        <div class="field">
+         <div class="location-settings">
+          <div class="radio-switch">
+           <input type="radio" id="__LWM2M_over_queue-0" name="__LWM2M_over_queue" class="access" value=1>
+           <label for="__LWM2M_over_queue-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+           <input type="radio" id="__LWM2M_over_queue-1" name="__LWM2M_over_queue" class="access" value=0>
+           <label for="__LWM2M_over_queue-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+          </div>
+         </div>
+        </div>
+       </div>
+       <div class="form-row">
+        <label for="hostname"><script language=Javascript>document.write(_("LWM2M_secmode"))</script></label>
+        <div class="field">
+         <select name="LWM2M_over_secmode" id="LWM2M_over_secmode" style="width:auto;">
+          <option value="psk">Pre-Shared Key</option>
+          <option value="nosec">No Security</option>
+         </select>
+        </div>
+       </div>
+       <div class="form-row">
+        <label for="hostname"><script language=Javascript>document.write(_("LWM2M_pskid"))</script></label>
+        <div class="field">
+         <input type="text" class="large" name="LWM2M_over_pskid" id="LWM2M_over_pskid" value="@@form['LWM2M_over_pskid']">
+        </div>
+       </div>
+       <div class="form-row">
+        <label for="hostname"><script language=Javascript>document.write(_("LWM2M_pskkey"))</script></label>
+        <div class="field">
+         <input type="text" class="large" name="LWM2M_over_pskkey" id="LWM2M_over_pskkey" value="@@form['LWM2M_over_pskkey']">
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="submit-row">
+      <button type="button" onclick="submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+     </div>
+    </div>
+   </div>
+   </form>
+  </div>
+ </div>
+</div>
+<footer class="footer">
+<div class="container">
+ <p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+</div>
+</footer>
+<script language='javascript'>
+        set_menu("Services", "LWM2M", <%_val = session["user"];%>"@@_val");
+<% if(request['QUERY_STRING']=="success") {%>
+  success_alert("","");
+<% }%>
+</script>
+</body>
+</html>

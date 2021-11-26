@@ -1,0 +1,180 @@
+#!/bin/sh -f
+#
+# Connect script for Sierra Wireless Packetized modules
+#
+# This script is called by wwand_deamon as follows:-
+#
+# SUSBNET <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+#
+# <action> is only used for internal purpose
+#
+
+
+PROFILE=$1
+INSTANCE=$2
+
+BIN=$0
+ACTION=$3
+
+test -z "$ACTION" && ACTION=start
+
+BOARD=`rdb_get "system.board"`
+NETIF_CFG=`rdb_get wwan.0.netif`
+NETIF_UDEV=`rdb_get wwan.0.netif_udev`
+
+# use udev interface name if it exists - udev interface name is more reliable
+if [ -n "$NETIF_UDEV" ]; then
+	NETIF="$NETIF_UDEV"
+	log "using udev interface name NETIF=$NETIF"
+# use interface name in config (/etc/cdcs_init_wwan_pm.conf) - assume the device is the first one
+elif [ -n "$NETIF_CFG" ]; then
+	NETIF="${NETIF_CFG}0"
+	log "using config interface name NETIF=$NETIF"
+else
+	NETIF="wwan0"
+	log "no interface name available - use default name NETIF=$NETIF"
+fi
+
+log() {
+	logger SUSBNET-SWI -- $@
+}
+
+execWait() {
+	timeout=$1
+	shift
+	eval "$@ &"
+	
+	pid=$!
+	count=0
+	while [ -e /proc/$pid ]; do
+
+		count=$(( $count + 1 ))
+		if [ $count -gt  $timeout ]; then
+			break;
+		fi
+	
+		sleep 1
+	done
+	
+	ret=$?
+
+	if [ -e /proc/$pid ]; then
+		kill -9 $pid
+		ret=255
+	fi
+
+	wait $pid
+
+	return $ret
+}
+
+getUsbNetIp() {
+	LINE=`ifconfig $NETIF | grep "inet addr"`
+	LINE=${LINE##*addr:}
+	echo ${LINE%% Bcast*}
+}
+
+startUsbNet() {
+	# get the interface up
+	if ! ifconfig $NETIF up; then
+		log "ifconfig failed - having the interface up"
+		return 1
+	fi
+
+	# udhcpc also sets metric - maintains nwif information for the script (ref. wan.template)
+	metric=$(rdb_get "link.profile.$PROFILE.defaultroutemetric")
+	rdb_set "nwif.${NETIF}.metric" "$metric"
+	log "nwif.${NETIF}.metric=$metric"
+	
+	# find the script - udhcpc script is located in variable places. It depends on the platform
+	if [ -x "/bin/udhcpc.sh" ]; then
+		udhcpc_script="/bin/udhcpc.sh"
+	elif [ -x "/sbin/udhcpc.sh" ]; then
+		udhcpc_script="/sbin/udhcpc.sh"
+	else
+		udhcpc_script=""
+	fi
+	
+	# get ip address from the driver - fake dhcp server
+	if [ -n "$udhcpc_script" ]; then
+		if ! execWait 20 "udhcpc -f -q -i $NETIF -s $udhcpc_script"; then
+			log "failed to get ip address in udhcpc"
+			return 1
+		fi
+	else
+		if ! execWait 20 "udhcpc -f -q -i $NETIF"; then
+			log "failed to get ip address in udhcpc"
+			return 1
+		fi
+	fi
+
+	log "usbnet connection up"
+
+	# build environment variables for ip-up script 
+	PPP_IFACE="$NETIF"
+	PPP_TTY=""
+	PPP_SPEED=""
+	PPP_LOCAL=`getUsbNetIp`
+	PPP_REMOTE="0.0.0.0"
+	PPP_IPPARAM="$PROFILE"
+
+	rdb_set "wwan.${INSTANCE}.ifname"	"ppp${INSTANCE}"
+
+	echo "$$" > "/var/lock/ppp-${PROFILE}.pid"
+	/etc/ppp/ip-up "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+	log "ip-up script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+stopUsbNet() {
+	if ifconfig $NETIF > /dev/null; then
+		# get the interface down
+		if ! ifconfig $NETIF down; then
+			log "ifconfig failed - having the interface down"
+		fi
+	
+		log "usbnet connection down"
+	fi
+
+	rm -f "/var/lock/ppp-${PROFILE}.pid"
+
+	# build environment variables for ip-up script 
+	PPP_IFACE="$NETIF"
+	PPP_TTY=""
+	PPP_SPEED=""
+	PPP_LOCAL=`getUsbNetIp`
+	PPP_REMOTE="0.0.0.0"
+	PPP_IPPARAM="$PROFILE"
+
+	/etc/ppp/ip-down "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+	log "ip-down script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+RUNONTERM="runonterm"
+
+if [ "$WWANID" = '10' ]; then
+	RUNONTERM="runonterm10"
+fi
+
+
+case $ACTION in
+	'start')
+		# start usb net
+		if startUsbNet; then
+			# stopusbNet on term signal
+			exec $RUNONTERM "$BIN $PROFILE $INSTANCE stop"
+		fi
+		;;
+
+	'stop')
+		stopUsbNet;
+		;;
+esac
+

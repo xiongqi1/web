@@ -1,0 +1,14 @@
+#!/bin/sh
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+profile="$1"
+
+dev=$(rdb_get "link.profile.$profile.interface")
+log << EOF
+dev='$dev'
+EOF
+
+term_pf_daemons.sh "$profile"
+
+log "done."

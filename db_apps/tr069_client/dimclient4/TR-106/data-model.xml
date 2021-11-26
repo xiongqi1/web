@@ -1,0 +1,1671 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<dm:document spec="http://tempuri.org" xmlns:dm="urn:broadband-forum-org:cwmp:datamodel-1-2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:broadband-forum-org:cwmp:datamodel-1-2 data/cwmp-datamodel-1-2-dimark.xsd cwmp-datamodel-1-2-dimark.xsd">
+  <model name="data-model">
+    <object base="Device." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DeviceSummary" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Device:1.0[](Baseline:1, IPPing:1),STBService:1.0[](Baseline:1)"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Info." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="ManufacturerOUI" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="999999"/>
+        </syntax>
+      </parameter>
+      <parameter base="SerialNumber" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1234567890-Device"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProductClass" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Dimark Sample TR-106/TR-135/TR-196 Device"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.GatewayInfo." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="ManufacturerOUI" access="readOnly" notification="2" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="ProductClass" access="readOnly" notification="2" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="SerialNumber" access="readOnly" notification="2" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.DeviceInfo." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Manufacturer" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Dimark Software, Inc."/>
+        </syntax>
+      </parameter>
+      <parameter base="ManufacturerOUI" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="999999"/>
+        </syntax>
+      </parameter>
+      <parameter base="ModelName" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="TR-106 Device"/>
+        </syntax>
+      </parameter>
+      <parameter base="Description" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Sample TR-106 Configuration"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProductClass" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Dimark Sample TR-106/TR-135/TR-196 Device"/>
+        </syntax>
+      </parameter>
+      <parameter base="SerialNumber" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1234567890-Device"/>
+        </syntax>
+      </parameter>
+      <parameter base="HardwareVersion" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="SoftwareVersion" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="4.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="ModemFirmwareVersion" access="readOnly" notification="0" maxNotification="0" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Dimark Client v4.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="EnabledOptions" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="AdditionalHardwareVersion" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="AdditionalSoftwareVersion" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="4.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="SpecVersion" access="readOnly" notification="0" maxNotification="0" instance="0" reboot="3" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProvisioningCode" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="UpTime" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="FirstUseDate" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="DeviceLog" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.ManagementServer." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="URL" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="http://test.dimark.com:8080/dps/TR069"/>
+        </syntax>
+      </parameter>
+      <parameter base="Username" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="tr069"/>
+        </syntax>
+      </parameter>
+      <parameter base="Password" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="-1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="tr069"/>
+        </syntax>
+      </parameter>
+      <parameter base="PeriodicInformEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PeriodicInformInterval" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="600"/>
+        </syntax>
+      </parameter>
+      <parameter base="PeriodicInformTime" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="ParameterKey" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="ConnectionRequestURL" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="117" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="ConnectionRequestUsername" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="dps"/>
+        </syntax>
+      </parameter>
+      <parameter base="ConnectionRequestPassword" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="-1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="dps"/>
+        </syntax>
+      </parameter>
+      <parameter base="UpgradesManaged" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="KickURL" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="192.168.15.250"/>
+        </syntax>
+      </parameter>
+      <parameter base="DownloadProgressURL" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="UDPConnectionRequestAddress" access="readOnly" notification="3" alwaysInclude="true" maxNotification="3" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="UDPConnectionRequestAddressNotificationLimit" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNServerAddress" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="test.dimark.com"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNServerPort" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="3478"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNUsername" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="dps"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNPassword" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="dps"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNMaximumKeepAlivePeriod" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <int/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="STUNMinimumKeepAlivePeriod" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="101"/>
+        </syntax>
+      </parameter>
+      <parameter base="NATDetected" access="readOnly" notification="3" alwaysInclude="true" maxNotification="2" instance="0" reboot="1" initIdx="-1" getIdx="0" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.LAN." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AddressingType" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="DHCP"/>
+        </syntax>
+      </parameter>
+      <parameter base="IPAddress" access="readOnly" notification="3" alwaysInclude="true" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="SubnetMask" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="255.255.255.0"/>
+        </syntax>
+      </parameter>
+      <parameter base="DefaultGateway" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="DNSServers" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="194.44.157.113,194.44.157.126"/>
+        </syntax>
+      </parameter>
+      <parameter base="MACAddress" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="00:11:22:33:44"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.LAN.Stats." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="ConnectionUpTime" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalBytesSent" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalBytesReceived" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalPacketsSent" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalPacketsReceived" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.LAN.IPPingDiagnostics." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DiagnosticsState" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1000">
+        <syntax>
+          <string/>
+          <default type="factory" value="None"/>
+        </syntax>
+      </parameter>
+      <parameter base="Host" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="NumberOfRepetitions" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="Timeout" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="DataBlockSize" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="DSCP" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="SuccessCount" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="FailureCount" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="AverageResponseTime" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="MinimumResponseTime" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="MaximumResponseTime" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="STBServiceNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="FAPServiceNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Capabilities." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="MaxActiveAVStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxActiveAVPlayers" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.PVR." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="MaxIOStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxRecordingStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxPlaybackStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxTimeDelay" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.AudioDecoder." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioStandard" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MPEG2-Part3-Layer2,MPEG2-Part3-Layer3,MPEG4-AAC-LC,MPEG4-AAC-MP,MPEG4-BSAC,MPEG4-AAC-HE-v,MPEG-Surround,DOLBY-AC3,DOLBY-DD+,DTS,DTS-HD"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="VideoStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MPEG2-Part2,MPEG4-Part4,MPEG4-Part10"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG2Part2." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MPEG2-Part3-Layer2,MPEG2-Part3-Layer3"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProfileLevelNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG2Part2.ProfileLevel." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG2Part2.ProfileLevel.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Profile" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="HP"/>
+        </syntax>
+      </parameter>
+      <parameter base="Level" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="H-14"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaximumDecodingCapability" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="10240"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part2." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MPEG4-AAC-LC,MPEG4-AAC-MP,MPEG4-BSAC,MPEG-Surround,DOLBY-AC3,DOLBY-DD+,DTS,DTS-HD"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProfileLevelNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part2.ProfileLevel." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part2.ProfileLevel.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Profile" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MAIN"/>
+        </syntax>
+      </parameter>
+      <parameter base="Level" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="L3"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaximumDecodingCapability" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part10." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MPEG4-AAC-LC,MPEG4-AAC-MP,MPEG4-BSAC,MPEG-Surround,DOLBY-AC3,DOLBY-DD+,DTS,DTS-HD"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProfileLevelNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part10.ProfileLevel." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.MPEG4Part10.ProfileLevel.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Profile" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MAIN"/>
+        </syntax>
+      </parameter>
+      <parameter base="Level" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="5.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaximumDecodingCapability" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="102400"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.SMPTEVC1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="DOLBY-DD+"/>
+        </syntax>
+      </parameter>
+      <parameter base="ProfileNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.SMPTEVC1.ProfileLevel." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Capabilities.VideoDecoder.SMPTEVC1.ProfileLevel.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Profile" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="MP"/>
+        </syntax>
+      </parameter>
+      <parameter base="Level" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="ML"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaximumDecodingCapability" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="102400"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.AudioOutput." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AudioFormats" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="ANALOG-MONO,ANALOG-2-CHANNELS,ANALOG-5.1-CHANNELS,DIGITAL-OPTICAL-SP/DIF,DIGITAL-COAXIAL-SP/DIF,HDMI,RF"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.VideoOutput." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="CompositeVideoStandards" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="NTSC-J,NTSC-M,PAL-B,PAD-D,PAL-G,PAL-H,PAL-I,PAL-N,PAL-M,SECAM-B,SECAM-G,SECAM-H,SECAM-D,SECAM-K,SECAM-K1,SECAM-L"/>
+        </syntax>
+      </parameter>
+      <parameter base="VideoFormats" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="CVBS,S-Video,YPrPb,RGsB,RGB,HDMI,DVI,RF"/>
+        </syntax>
+      </parameter>
+      <parameter base="Macrovision" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="6.2"/>
+        </syntax>
+      </parameter>
+      <parameter base="HDCP" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="3.2"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.CA." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="CASystems" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.DRM." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DRMSystems" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Capabilities.ServiceMonitoring." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="MaxActiveMainStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MinSampleInterval" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxReportSamples" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="HighLevelMetricsNames" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="NONE"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="FrontEndNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioDecoderNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="VideoDecoderNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioOutputNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="VideoOutputNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components.FrontEnd." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Components.FrontEnd.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Video Front End Component"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components.AudioDecoder." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Components.AudioDecoder.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The Audio Decoder Component"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioStandard" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="DOLBE-DD+"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components.VideoDecoder." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Components.VideoDecoder.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The Video Decoder Component"/>
+        </syntax>
+      </parameter>
+      <parameter base="MPEG2Part2" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MPEG4Part2" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MPEG4Part10" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value=".Capabilities.VideoDecoder.MPEG4Part10.ProfileLevel.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="SMPTEVC1" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="ContentAspectRatio" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="16:9"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components.AudioOutput." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Components.AudioOutput.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The Audio Output Component"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioFormat" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="DOLBY-DD+"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioLevel" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="50"/>
+        </syntax>
+      </parameter>
+      <parameter base="CancelMute" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.Components.VideoOutput." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.Components.VideoOutput.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The Video Output Component"/>
+        </syntax>
+      </parameter>
+      <parameter base="CompositeVideoStandard" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="PAL-M"/>
+        </syntax>
+      </parameter>
+      <parameter base="VideoFormat" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="HDMI"/>
+        </syntax>
+      </parameter>
+      <parameter base="AspectRatioBehaviour" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="None"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.AVStreams." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="ActiveAVStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AVSTreamNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.AVStreams.AVStream." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.AVStreams.AVStream.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The AV Stream"/>
+        </syntax>
+      </parameter>
+      <parameter base="FrontEnd" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Components.FrontEnd.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioDecoder" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Components.AudioDecoder.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="VideoDecoder" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Components.VideoDecoder.1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.AVPlayers." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="ActiveAVPlayers" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AVPlayerNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PreferredAudioLanguage" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="English"/>
+        </syntax>
+      </parameter>
+      <parameter base="PreferredSubtitlingLanguage" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="English"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.STBService.1.AVPlayers.AVPlayer." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.STBService.1.AVPlayers.AVPlayer.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Status" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Enabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="Name" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="The AV Player"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioLanguage" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="English"/>
+        </syntax>
+      </parameter>
+      <parameter base="SubtitlingStatus" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Disabled"/>
+        </syntax>
+      </parameter>
+      <parameter base="SubtitlingLanguage" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="English"/>
+        </syntax>
+      </parameter>
+      <parameter base="AudioOutputs" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Components.AudioOutput.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MainStream" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value=".AVStreams.AVStream.1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PIPStreams" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value=".AVStreams.AVStream.1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.FAPService.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DeviceType" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Integrated"/>
+        </syntax>
+      </parameter>
+      <parameter base="DNPrefix" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="SubNetwork=1,IRPAgent=1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.Capabilities." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="GPSEquipped" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxTxPower" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="21"/>
+        </syntax>
+      </parameter>
+      <parameter base="SupportedSystems" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="UMTS"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxChildSAPerIKE" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxIKESessions" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.Capabilities.UMTS." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DuplexMode" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="FDDMode"/>
+        </syntax>
+      </parameter>
+      <parameter base="GSMRxSupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="HSDPASupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxHSDPADataRateSuppoted" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="10"/>
+        </syntax>
+      </parameter>
+      <parameter base="HSUPASupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxHSUPADataRateSuppoted" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="10"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxHSPDSCHsSuppoted" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="10"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxHSSCCHsSupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="10"/>
+        </syntax>
+      </parameter>
+      <parameter base="FDDBandsSupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="I,II,V"/>
+        </syntax>
+      </parameter>
+      <parameter base="GSMRxBandsSupported" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <string/>
+          <default type="factory" value="GSM850,PCS1900"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.Capabilities.UMTS.SelfConfig." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="UARFCNConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PrimaryScramblingCodeConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxFAPTxPowerConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PCPICHPowerConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxULTxPowerConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="LACRACURAConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="NeighborListConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="CellReSelectionConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="IntraFreqMeasConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="InterFreqMeasConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="InterRATMeasConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="UEInternalMeasConfig" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.FAPControl." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="OpState" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="AdminState" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="RFTxStatus" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="SelfConfigEvents" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="EnclosureTamperingDetected" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.FAPControl.UMTS." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Services.FAPService.1.FAPControl.UMTS.SelfConfig." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="UARFCNSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PrimaryScramblingCodeSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxFAPTxPowerSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="PCPICHPowerSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxULTxPowerSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="LACRACURASelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="NeighborListSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="CellReSelectionSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="IntraFreqMeasSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="InterFreqMeasSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="InterRATMeasSelfConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="UEInternalMeasConfigEnable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.FAPControl.UMTS.Gateway." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="SecGWServer1" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="test1.dimark.com"/>
+        </syntax>
+      </parameter>
+      <parameter base="SecGWServer2" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="127.127.127.127"/>
+        </syntax>
+      </parameter>
+      <parameter base="SecGWServer3" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="127.127.127.127"/>
+        </syntax>
+      </parameter>
+      <parameter base="FAPGWServer1" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="127.127.127.127"/>
+        </syntax>
+      </parameter>
+      <parameter base="FAPGWServer2" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="127.127.127.127"/>
+        </syntax>
+      </parameter>
+      <parameter base="FAPGWServer3" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="127.127.127.127"/>
+        </syntax>
+      </parameter>
+      <parameter base="FAPGWPort" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="80"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.AccessMgmt." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="AccessMode" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Hybrid Access"/>
+        </syntax>
+      </parameter>
+      <parameter base="NonCSGUEAccessDecision" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="Query FAP-GW"/>
+        </syntax>
+      </parameter>
+      <parameter base="CSGMembershipDeterminedLocally" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="HNBIdentifier" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="HomeZoneName" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxConcurrentCSGUsers" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <int/>
+          <default type="factory" value="-1"/>
+        </syntax>
+      </parameter>
+      <parameter base="CSGID" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="AccessControlList" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="1234567890,1234567891"/>
+        </syntax>
+      </parameter>
+      <parameter base="MaxMemberDetailEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="5"/>
+        </syntax>
+      </parameter>
+      <parameter base="MemberDetailNumberOfEntries" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="2"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.AccessMgmt.MemberDetail.{i}." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Enable" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="object" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="IMSI" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MSISDN" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MembershipExpires" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+          <default type="object" value="0001-01-01T00:00:00Z"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.AccessMgmt.MemberDetail.1." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Enable" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="IMSI" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MSISDN" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MembershipExpires" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+          <default type="factory" value="0001-01-01T00:00:00Z"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Services.FAPService.1.AccessMgmt.MemberDetail.2." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Enable" access="readOnly" notification="0" maxNotification="1" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="1"/>
+        </syntax>
+      </parameter>
+      <parameter base="IMSI" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MSISDN" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="MembershipExpires" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+          <default type="factory" value="0001-01-01T00:00:00Z"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.Capabilities." access="readOnly" minEntries="1" maxEntries="unbounded"/>
+    <object base="Device.Capabilities.PerformanceDiagnostic." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DownloadTransports" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="HTTP,FTP "/>
+        </syntax>
+      </parameter>
+      <parameter base="UploadTransports" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+          <default type="factory" value="HTTP,FTP"/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.DownloadDiagnostics." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DiagnosticsState" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="3000">
+        <syntax>
+          <string/>
+          <default type="factory" value="None"/>
+        </syntax>
+      </parameter>
+      <parameter base="Interface" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="DownloadURL" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="DSCP" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="EthernetPriority" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="ROMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="BOMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="EOMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="TestBytesReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalBytesReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="TCPOpenRequestTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="TCPOpenResponseTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.UploadDiagnostics." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="DiagnosticsState" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="4000">
+        <syntax>
+          <string/>
+          <default type="factory" value="None"/>
+        </syntax>
+      </parameter>
+      <parameter base="Interface" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="UploadURL" access="readOnly" notification="0" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="DSCP" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="EthernetPriority" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="TestFileLength" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="10"/>
+        </syntax>
+      </parameter>
+      <parameter base="ROMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="BOMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="EOMTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="TotalBytesSent" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="TCPOpenRequestTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="TCPOpenResponseTime" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+    </object>
+    <object base="Device.UDPEchoConfig." access="readOnly" minEntries="1" maxEntries="unbounded">
+      <parameter base="Enable" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="5000">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="Interface" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="SourceIPAddress" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <string/>
+        </syntax>
+      </parameter>
+      <parameter base="UDPPort" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="0" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <unsignedInt/>
+          <default type="factory" value="64201"/>
+        </syntax>
+      </parameter>
+      <parameter base="EchoPlusEnabled" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="EchoPlusSupported" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="1">
+        <syntax>
+          <boolean/>
+          <default type="factory" value="0"/>
+        </syntax>
+      </parameter>
+      <parameter base="PacketsReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="PacketsResponded" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="BytesReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="BytesResponded" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <unsignedInt/>
+        </syntax>
+      </parameter>
+      <parameter base="TimeFirstPacketReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+      <parameter base="TimeLastPacketReceived" access="readOnly" notification="1" maxNotification="2" instance="0" reboot="1" initIdx="1" getIdx="1" setIdx="-1">
+        <syntax>
+          <dateTime/>
+        </syntax>
+      </parameter>
+    </object>
+  </model>
+</dm:document>

@@ -1,0 +1,83 @@
+#!/bin/sh
+
+#
+# SMS Tool enable   : smstools.enable
+#
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is for internal system use only."
+	echo "It is used for enabling/disabling SMS functionality."
+    echo "Please do not run this script manually."
+    echo ""
+	exit 0
+fi
+
+log() {
+	logger -t "sms_onoff.template" -- $@
+}
+
+
+log "Begin enable/disable of SMS functionality..."
+
+# Don't need to relaunch during initial template browsing
+if [ "$2" = "init" ]; then
+	exit 0
+fi
+
+SMSTOOL_ENABLE=?<smstools.enable>;
+
+# if simple_at_manager or cnsmgr is launched already, relaunch with new option
+simple_at_exist=`ps | grep simple_at_manager | grep -v grep`
+cnsmgr_exist=`ps | grep cnsmgr | grep -v grep`
+dccd_exist=`ps | grep dccd | grep -v grep`
+relaunch=""
+if [ "$simple_at_exist" != "" ]; then
+	simple_at_sms_opt=`cat /proc/$(pidof simple_at_manager)/cmdline | grep "\-x" | grep -v grep`
+	if [ "$SMSTOOL_ENABLE" != "0" -a  "$simple_at_sms_opt" != "" ] ||
+	[ "$SMSTOOL_ENABLE" = "0" -a  "$simple_at_sms_opt" = "" ]; then
+		relaunch="1"
+	fi
+fi
+
+if [ "$cnsmgr_exist" != "" ]; then
+	cnsmgr_sms_opt=`cat /proc/$(pidof cnsmgr)/cmdline | grep "\-x" | grep -v grep`
+	if [ "$SMSTOOL_ENABLE" != "0" -a  "$cnsmgr_sms_opt" != "" ] ||
+	[ "$SMSTOOL_ENABLE" = "0" -a  "$cnsmgr_sms_opt" = "" ]; then
+		relaunch="1"
+	fi
+fi
+
+if [ "$dccd_exist" != "" ]; then
+	relaunch="1"
+fi
+
+test "$relaunch" != "1" && log "Completed without relaunching phone module manager." && exit 0
+
+# check if Platypus platform
+. /etc/platform.txt
+
+if [ "$platform" = "Platypus" ]; then
+	oldcmd=`cat /proc/$(pidof simple_at_manager)/cmdline | awk '{print $0}'`
+	if [ "$SMSTOOL_ENABLE" = "0" ]; then
+		newcmd=$oldcmd" -x"
+	else
+		newcmd=`echo $oldcmd | sed 's/\-x//'`
+	fi
+	log "oldcmd = $oldcmd"
+	log "newcmd = $newcmd"
+	killall simple_at_manager
+	$newcmd
+elif [ "$platform" = "Avian" ]; then
+	killall simple_at_manager
+else
+	# In some case, PDP context activation never successes with no module system reboot.
+#	/usr/bin/cdcs_init_wwan_pm&
+	log "rebooting module..."
+	reboot_module.sh
+fi
+
+log "Completed after relaunching phone module manager."

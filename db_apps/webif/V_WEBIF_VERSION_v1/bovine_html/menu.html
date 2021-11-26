@@ -1,0 +1,427 @@
+<script language="JavaScript" src="/jquery-1.6.min.js"></script>
+<%useSession();_sv=get_single('sw.version'); _lang=get_single('webinterface.language'); if( _lang == "ar") { %>
+<link href="GUI-ntcStyle-ar.css?@@_sv" rel="stylesheet" type="text/css"/>
+<%}%>
+
+#define HASH_NAV #nav
+<%if( _lang=="fr") {%>
+<style>
+HASH_NAV li:hover ul.sub {
+	left:1px; /*position-x*/
+	top:32px; /*position-y*/
+	padding:0 0px 5px;
+
+	white-space:nowrap;
+	width:210px;
+	height:auto;
+	z-index:300;
+}
+HASH_NAV li:hover ul.sub li:hover li:hover a { width:210px; }
+HASH_NAV li:hover ul.sub li a {
+	display:block;
+	font-size:12px;
+	height:18px;
+	width:205px;
+	line-height:18px;
+	text-indent:5px;
+	text-decoration:none;
+}
+HASH_NAV li ul.sub li a.fly {
+	background:#fff url(/images/arrow.gif) 122px 10px no-repeat;
+}
+HASH_NAV li:hover li:hover ul,
+HASH_NAV li:hover li:hover li:hover ul,
+HASH_NAV li:hover li:hover li:hover li:hover ul,
+HASH_NAV li:hover li:hover li:hover li:hover li:hover ul
+{left:120px;width:210px;}
+
+</style>
+<%}%>
+
+<script type="text/javascript" src="/lang/b28n.js?@@_sv"></script>
+<script type="text/javascript" src="/stuHover.js?@@_sv"></script>
+<script type="text/javascript" src="/util.js?@@_sv"></script>
+<script type="text/javascript">
+
+Butterlate.setTextDomain("menu");
+</script>
+<div>
+	<div id="logo"><img src="/images/NetComm_GUI_banner.jpg?@@_sv" width="840" height="92" usemap="#netcomm"/>
+#if !defined (V_PRODUCT_mob_30wv) && !defined (V_PRODUCT_mob_40wv)
+		<map name="netcomm"><area shape="rect" coords="16,18,167,74" href="http://www.netcommwireless.com/" alt="www.netcommwireless.com" target="_blank"/></map>
+#endif
+	</div>
+#if defined (V_PRODUCT_mob_30wv) || defined (V_PRODUCT_mob_40wv)
+    <h4 id="productTitle"></h4> 
+#else
+    <h4 id="productTitle"><%val=get_single('system.product.title');%>@@val</h4> 
+#endif
+</div>
+
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+<div class="sideNav">
+	<ul id="nav">
+		<li class="top"><a href="/status.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status"));</script></span></a></li>
+<%
+val=get_single('system.product.title');
+if( val=='WiFi2Go' )
+{%>
+		<li class="top"><a href="/usage.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Data Usage</span></a></li>
+<%}%>
+		<li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("treeapp internet settings"));</script></span></a>
+		<ul class="sub">
+			<li><a class="fly"><script language="JavaScript">document.write(_("mobile broadband"));</script></a>
+			<ul class="sub2">
+#if defined (V_PRODUCT_ntc_30w)  || defined (V_PRODUCT_ntc_30wv) ||\
+	defined (V_PRODUCT_ntc_40wv) || defined (V_PRODUCT_ntc_8000) || defined (V_PRODUCT_ntc_8000m) || defined (V_PRODUCT_ntc_40)
+<%if( session["userlevel"] == '0' ) {%>
+				<li><a href="/3gwwan.html"><script language="JavaScript">document.write(_("connection"));</script></a></li>
+<%}%>
+				<li><a href="/LAN.html?pppoe">PPPoE</a></li>
+<%if( session["userlevel"] == '0' ) {%>
+				<li><a href="/setband.html"><script language="JavaScript">document.write(_("band bandTitle"));</script></a></li>
+<%}%>
+				<li><a href="/pinsettings.html"><script language="JavaScript">document.write(_("simSecurity"));</script></a></li>
+#else
+				<li><a href="/3gwwan.html"><script language="JavaScript">document.write(_("connection"));</script></a></li>
+				<li><a href="/LAN.html?pppoe">PPPoE</a></li>
+				<li><a href="/setband.html"><script language="JavaScript">document.write(_("band bandTitle"));</script></a></li>
+				<li><a href="/pinsettings.html"><script language="JavaScript">document.write(_("simSecurity"));</script></a></li>
+#if 0
+<!-- V_BOARD_6308 -->
+				<li><a href="/moduleActivation.html">Activation</a></li>
+				<li><a href="/modulePRLSetting.html">PRL Update</a></li>
+				<li><a href="/moduleFUMOSetting.html">Firmware Update</a></li>
+				<li><a href="/moduleRoaming.html">Roaming Perference</a></li>
+#endif
+#endif
+			</ul>
+			</li>
+			<li><a class="fly"><script language="JavaScript">document.write(_("lan"));</script></a>
+			<ul class="sub2">
+				<li><a href="/LAN.html?ipsetup"><script language="JavaScript">document.write(_("ipSetup"));</script></a></li>
+				<li><a href="/dhcp.html"><script language="JavaScript">document.write(_("DHCP"));</script></a></li>
+			</ul>
+			</li>
+
+			<li><a class="fly"><script language="JavaScript">document.write(_("routing"));</script></a>
+			<ul class="sub2">
+				<li><a href="/routing.html?Static"><script language="JavaScript">document.write(_("static"));</script></a></li>
+				<li><a href="/routing.html?Rip"><script language="JavaScript">document.write(_("RIP"));</script></a></li>
+				<li><a href="/routing.html?Vrrp"><script language="JavaScript">document.write(_("VRRP"));</script></a></li>
+				<li><a href="/nat.html"><script language="JavaScript">document.write(_("NAT"));</script></a></li>
+				<!--li><a href="/firewall.html">Firewall</a></li-->
+#ifdef V_DMZ_y
+				<li><a href="/dmz.html"><script language="JavaScript">document.write(_("treeapp dmz"));</script></a></li>
+#endif
+				<li><a href="/port_filtering.html"><script language="JavaScript">document.write(_("port basic filter"))</script></a></li>
+			</ul>
+			</li>
+#if defined(V_VPN_y)
+			<li><a class="fly"><script language="JavaScript">document.write(_("VPN"));</script></a>
+			<ul class="sub2">
+				<li><a href="/VPN_ipsec.html"><script language="JavaScript">document.write(_("IPsec"));</script></a></li>
+				<li><a href="/VPN_openvpn.html"><script language="JavaScript">document.write(_("OpenVPN"));</script></a></li>
+				<li><a href="/VPN_pptpc.html"><script language="JavaScript">document.write(_("pptpClient"));</script></a></li>
+				<li><a href="/VPN_gre.html"><script language="JavaScript">document.write(_("GRE"));</script></a></li>
+			</ul>
+			</li>
+			
+#endif
+#if (defined V_USSD)
+			<li><a href="/ussd.html"><span><script language="JavaScript">document.write(_("ussd"));</script></span></a></li>
+#endif
+		</ul>
+		</li>
+
+<%
+val=get_single('wlan.0.wifi_mode');
+if( val=='AP' )
+{%>
+#if defined(V_WIFI)
+	<li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wirelessLAN"))</script></span></a>
+	<ul class="sub">
+#if defined(V_WIFI_MBSSID)
+		<li><a href="/wlan.html"><script language="JavaScript">document.write(_("wireless basic"))</script></a></li>
+#else
+		<li><a href="/singlewlan.html"><script language="JavaScript">document.write(_("wireless basic"))</script></a></li>
+#endif
+		<li><a href="/advanced.html"><script language="JavaScript">document.write(_("advanced"))</script></a></li>
+#if defined(V_WIFI_MBSSID)
+		<li><a href="/wds.html"><script language="JavaScript">document.write(_("WDS"))</script></a></li>
+#endif
+		<li><a href="/wifimacblock.html"><script language="JavaScript">document.write(_("mac blocking"))</script></a></li>
+		<!--li><a href="/wlBridge.html">Wireless Bridge</a></li-->
+		<li><a href="/wlstationlist.html"><script language="JavaScript">document.write(_("stationInfo"))</script></a></li>
+#if defined (V_PRODUCT_ntc_8000) || defined (V_PRODUCT_ntc_8000m) || defined (V_PRODUCT_ntc_8000c)
+#if defined (V_PRODUCT_ntc_8000c)
+<%
+val=get_single('uboot.wificalmode');
+if( val=='calmode' )
+{%>
+#endif
+		<li><a href="/wlanswitch.html"><script language="JavaScript">document.write(_("wlmode"))</script></a></li>
+#if defined (V_PRODUCT_ntc_8000c)
+<%}%>
+#endif
+#endif
+	</ul>
+	</li>
+#endif
+<%}else{%>
+#if defined(V_WIFI_CLIENT)
+	<li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wirelessLAN"))</script></span></a>
+	<ul class="sub">
+		<li><a href="/wlan_sta.html"><script language="JavaScript">document.write(_("Client Configuration"))</script></a></li>
+#if defined (V_PRODUCT_ntc_8000) || defined (V_PRODUCT_ntc_8000m) || defined (V_PRODUCT_ntc_8000c)
+#if defined (V_PRODUCT_ntc_8000c)
+<%
+val=get_single('uboot.wificalmode');
+if( val=='calmode' )
+{%>
+#endif
+		<li><a href="/wlanswitch.html"><script language="JavaScript">document.write(_("wlmode"))</script></a></li>
+#if defined (V_PRODUCT_ntc_8000c)
+<%}%>
+#endif
+#endif
+	</ul>
+	</li>
+
+#endif
+
+<%}%>
+
+	<li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("services"));</script></span></a>
+		<ul class="sub">
+			<li><a href="/ddns.html"><script language="JavaScript">document.write(_("man ddns"));</script></a></li>
+			<li><a href="/NTP.html"><script language="JavaScript">document.write(_("NTP"));</script></a></li>
+			<li><a href="/ltph.html"><script language="JavaScript">document.write(_("treeapp sysMonitor"));</script></a></li>
+
+<% adv_snmp=get_single('webinterface.adv_snmp'); if(adv_snmp=="1") {%>
+			<li><a href="/adv_snmp.html"><script language="JavaScript">document.write(_("SNMP"));</script></a></li>
+<%}else{%>
+			<li><a href="/snmp.html"><script language="JavaScript">document.write(_("SNMP"));</script></a></li>
+<%}%>
+
+#if !defined(V_SERIAL_none)
+<%	confv250_enable = get_single( 'confv250.enable' );
+	confv250_padd_enable = get_single( 'confv250.padd_enable' );
+	if ( confv250_enable == 1) {%>
+			<li><a href="/v250.html"><script language="JavaScript">document.write(_("modem"));</script></a></li>
+	<%}%>
+#endif
+<!-- 	<li><a href="/WEC.html">WEC</a></li>  -->
+
+#ifdef V_GPS
+<% gps_port = get_single( 'wwan.0.gps_if' ); if (gps_port != '') {%>
+			<li><a href="/gps.html"><script language="JavaScript">document.write(_("gps"));</script></a></li>
+<%}%>
+#endif
+
+#ifdef V_DNP3_bovine
+
+			<li><a href="/dnp3.html"><script language="JavaScript">document.write(_("dnp3"));</script></a></li>
+
+#endif
+#ifdef V_SMS
+			<li><a class="fly"><script language="JavaScript">document.write(_("sms title"));</script></a>
+			<ul class="sub2">
+				<li><a href="/sms.html?config"><script language="JavaScript">document.write(_("setup"));</script></a></li>
+				<li><a href="/sms.html?newmsg"><script language="JavaScript">document.write(_("newmsg"));</script></a></li>
+				<li><a href="/sms.html?inbox"><script language="JavaScript">document.write(_("inbox"));</script></a></li>
+				<li><a href="/sms.html?outbox"><script language="JavaScript">document.write(_("outbox"));</script></a></li>
+<%diag_blked=get_single('smstools.diagtool_blocked');if(diag_blked!="1") {%>
+				<li><a href="/sms.html?diag"><script language="JavaScript">document.write(_("diag"));</script></a></li>
+<%}%>
+			</ul>
+			</li>
+#endif
+#if !defined(V_SERIAL_none)
+<%if( confv250_enable == 1) {%>
+			<li><a href="/padd.html"><script language="JavaScript">document.write(_("PADD"));</script></a></li>
+<%}%>
+#endif
+#ifdef V_AUTODIAL
+<%pots_disabled=get_single('potsbridge_disabled');pots_status=get_single('pots.status');
+if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+			<li><a href="/autodial.html"><script language="JavaScript">document.write(_("auto dial"));</script></a></li>
+<%}%>
+#endif
+		</ul>
+	</li>
+<% 
+	//  maxnode = get_single( "menu.maxNode" );
+	//  if( maxnode == "N/A" )
+	{
+	//	maxnode = 20;
+		maxnode = 0;
+	}
+	for(i = 0; i<maxnode; i++) {
+		myurl = "menu.nodeURL"+i;
+		nodeURL = get_single( myurl );
+		mynodeName = "menu.nodeName"+i;
+		nodeName = get_single( mynodeName );  
+		if( nodeURL != "N/A" ) {
+			%><li><a href='@@nodeURL' target="main">@@nodeName</a></li><%
+		}
+	}
+%> 
+<%if( session["userlevel"] == '0' )
+{%>
+		<li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("system"));</script></span></a>
+		<ul class="sub">
+			<li><a href="/logfile.html"><script language="JavaScript">document.write(_("log"));</script></a></li>
+			<li><a class="fly"><script language="JavaScript">document.write(_("LoadSave"));</script></a>
+				<ul class="sub2">
+					<li><a href="/SaveLoadSettings.html"><script language="JavaScript">document.write(_("settings"));</script></a></li>
+					<li><a href="/AppUpload.html"><script language="JavaScript">document.write(_("upload"));</script></a></li>
+					<li><a href="pkManager.html"><script language="JavaScript">document.write(_("pkg manager"));</script></a></li>
+				</ul>
+			</li>
+			<li><a href="/administration.html"><script language="JavaScript">document.write(_("administration"));</script></a></li>
+#ifdef defined(V_SSH_y) && !defined (V_PRODUCT_ntc_8000c)					
+			<li><a href="/SSH.html"><script language="JavaScript">document.write(_("sshManagement"));</script></a></li>
+#endif			
+#ifdef V_SYSCONFIG_y
+			<li><a href="system_config.html"><script language="JavaScript">document.write(_("system config"));</script></a></li>
+#endif
+#ifdef V_TR069_bovine
+			<li><a href="TR069.html"><script language="JavaScript">document.write(_("tr069"));</script></a></li>
+#endif
+#ifdef V_WEBIF_DEVTOOLS_y
+			<li><a href="user_interface_utility.html"><script language="JavaScript">document.write(_("ui utility"));</script></a></li>
+#endif
+			<li><a href="/index.html?logoff"><script language="JavaScript">document.write(_("logoff"));</script></a></li>
+			<li><a href="/system_reset.html"><script language="JavaScript">document.write(_("setman reboot"));</script></a></li>
+		</ul>
+		</li>
+<%}else{%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("system"));</script></span></a>
+		<ul class="sub">
+			<li><a href="/logfile.html"><script language="JavaScript">document.write(_("log"));</script></a></li>
+			<li><a href="/administration.html"><script language="JavaScript">document.write(_("administration"));</script></a></li>
+			<li><a href="/index.html?logoff"><script language="JavaScript">document.write(_("logoff"));</script></a></li>
+		</ul>
+		</li>
+<%}%>
+<% include /usermenu.html %>
+	</ul>
+</div>
+
+<%}else{%>
+<div class="sideNav">
+	<ul id="nav">
+		<li class="top"><a href="/status.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status"));</script></span></a></li>
+<%
+val=get_single('system.product.title');
+if( val=='WiFi2Go' )
+{%>
+		<li class="top"><a href="/usage.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Data Usage</span></a></li>
+<%}else{%> 
+		<li class="top"><a href="/index.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("login"));</script></span></a></li>
+<%}%> 
+	</ul>
+</div>
+<%}%>
+
+#if 0
+<!--V_BOARD_6308-->
+<script type="text/javascript">
+var mouseoverlogo = false;
+var key_string = "";
+
+document.getElementById("productTitle").onmouseover = function() {
+mouseoverlogo = true;
+key_string = "";
+}
+
+document.getElementById("productTitle").onmouseout = function() {
+mouseoverlogo = false;
+key_string = "";
+}
+
+document.onkeypress = function(e) {
+if(mouseoverlogo == true) {
+	var characterCode;
+	var input_string;
+		if(e && e.which) {// NN4 specific code
+			e = e;
+			characterCode = e.which;
+		}
+		else {
+			e = event
+			characterCode = e.keyCode; // IE specific code
+		}
+
+		if(characterCode == 16) //shift key
+			return true;
+
+		key_string += String.fromCharCode(characterCode);
+
+		if (key_string.match(/##DEBUG#/i) != null) {
+			key_string = "";
+			document.location = "moduleRFinfo.html";
+		}
+		else if(key_string.match(/##DATA#/i) != null) {
+			key_string = "";
+			document.location = "moduleMobileIP.html";
+		}
+		else if(key_string.match(/##RTN#/i) != null) {
+			key_string = "";
+			document.location = "moduleRevLogistics.html";
+		}
+		else if(key_string.match(/##PRL#/i) != null) {
+			key_string = "";
+			document.location = "modulePRLupdate.html";
+		}
+		return false;
+	}
+}
+</script>
+#endif
+
+<script type="text/javascript">
+function setCopyRight() {
+	document.getElementById('copyRight').innerHTML=_("copyright");
+}
+function CopyRight() {
+var footerid=document.getElementById('footer');
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%> 
+	footerid.innerHTML=_("user name")+":&nbsp;&nbsp;&nbsp;"+'<%write(session["user"]);%>'+"<div style='text-align:right'>"+_("copyright")+"</div>";
+<%} else {%>
+	footerid.innerHTML="<div style='text-align:right'>"+_("copyright")+"</div>" 
+<%}%>
+}
+	$("#nav > li > a").click(function () { // binding onclick
+		if ($(this).parent().hasClass('selected')) {
+			$("#nav .selected").removeClass("selected");
+		}
+		else {
+			$("#nav .selected").removeClass("selected");
+			if ($(this).next(".sub").length) {
+				$(this).parent().addClass("selected"); // display popup
+				$(this).next(".sub").children().slideDown(200);
+			}
+		}
+	});
+	$("#nav > li > a").hover(function () {
+		if (!$(this).parent().hasClass('selected')) {
+			$("#nav .selected").removeClass("selected");
+		}
+	});
+	/*******************************/
+	$("#nav li ul.sub li a.fly").click(function () { // binding onclick
+		if ($(this).parent().hasClass('selected2')) {
+			$("#nav .selected2").removeClass("selected2");
+		}
+		else {
+			$("#nav .selected2").removeClass("selected2");
+			if ($(this).next(".sub2").length) {
+				$(this).parent().addClass("selected2"); // display popup
+				$(this).next(".sub2").children().slideDown(200);
+			}
+		}
+	})
+	set_var_tag();
+</script>

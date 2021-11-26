@@ -1,0 +1,31 @@
+digraph "ProSLIC API"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node7 [label="Hook Change detection",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___h_c___d_e_t_e_c_t.html"];
+  Node1 [label="Diagnostics",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___d_i_a_g_n_o_s_t_i_c_s.html"];
+  Node10 [label="DC Feed Setup and control",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_c_f_e_e_d.html"];
+  Node5 [label="Signaling - ring &\l line state, and hook state",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_g_n_a_l_i_n_g.html"];
+  Node0 [label="ProSLIC API",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node9 [label="LB Calibration",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___l_b___c_a_l_i_b_r_a_t_i_o_n.html"];
+  Node2 [label="General configuration",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___g_e_n___c_f_g.html"];
+  Node12 [label="MISC. routines",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___m_i_s_c.html"];
+  Node4 [label="Interrupt control and\l decode",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___i_n_t_e_r_r_u_p_t_s.html"];
+  Node11 [label="Message Waiting Indicator\l routines",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___m_e_s_s_a_g_e___w_a_i_t_i_n_g.html"];
+  Node3 [label="Pulse Metering",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___p_u_l_s_e___m_e_t_e_r.html"];
+  Node8 [label="Power Converter control",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___p_o_w_e_r___c_o_n_v_e_r_t_e_r.html"];
+  Node6 [label="Audio",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___a_u_d_i_o.html"];
+  Node0->Node1 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node6 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node7 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node8 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node9 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node10 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node11 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node12 [shape=plaintext, dir="back", style="solid"];
+}

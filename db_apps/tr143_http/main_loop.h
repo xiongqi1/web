@@ -1,0 +1,8 @@
+#ifndef __MAIN_LOOP_H
+#define __MAIN_LOOP_H
+#include "http.h"
+
+////////////////////////////////////////////////////////////////////////////////
+int main_loop(TParameters *pParameter);
+
+#endif

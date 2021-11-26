@@ -1,0 +1,258 @@
+#!/bin/sh
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is sending a event notification to"
+	echo "event notification clients like SMS, Email, TR069 etcs."
+    echo ""
+	exit 0
+fi
+
+log()
+{
+	logger "event `basename ${0}`: ${1}"
+}
+
+EVENT_PREFIX="service.eventnoti.event"
+EVENT_DEST_NAME=`rdb_get $EVENT_PREFIX.$1.name`
+log "event noti index : $1, client : $2, destination : $EVENT_DEST_NAME"
+NOTI_IDX=$1
+NOTI_CLIENT=$2
+EVENT_TYPE=`rdb_get $EVENT_PREFIX.$NOTI_IDX.type`
+EVENT_TEXT=`rdb_get $EVENT_PREFIX.$NOTI_IDX.text`
+EVENT_LOG_TEXT=`rdb_get $EVENT_PREFIX.$NOTI_IDX.logtext`
+
+# read sms common variables - the location depends on the platoform
+if [ -e "/var/sms/sms_common.cfg" ]; then
+	. /var/sms/sms_common.cfg
+elif [ -e "/usr/etc/sms/sms_common.cfg" ]; then
+	. /usr/etc/sms/sms_common.cfg
+elif [ "$NOTI_CLIENT" = "sms" ]; then
+	log "failed to get sms_common.cfg"
+	set_notification_result 0
+	exit 1
+fi
+
+# load sms configurations
+. $SMS_LIB_PATH/sms_utils
+. $config_file
+. $diag_config_file
+
+set_notification_result()
+{
+	rdb_set service.eventnoti.cmd.result $1
+}
+
+increase_sms_tx_count_by_one() {
+
+    read_variable "smstools.diagsms_txcnt" && CUR_SMS_TX_CNT=${RD_VAL}
+    let "CUR_SMS_TX_CNT+=1"
+	log "cur_cnt $CUR_SMS_TX_CNT > max cnt $MAX_DIAG_SMS_TX_LIMIT ?"
+    if [ "$CUR_SMS_TX_CNT" -gt "$MAX_DIAG_SMS_TX_LIMIT" ]; then
+        log "SMS LIMIT EXCEED ($MAX_DIAG_SMS_TX_LIMIT)"
+        return 1
+    fi
+    write_variable "smstools.diagsms_txcnt" $CUR_SMS_TX_CNT
+    return 0
+}
+
+send_event_noti_via_sms()
+{
+	EVTNOTI_SMS_DESTS=`rdb_get $EVENT_PREFIX.$NOTI_IDX.sms_dests | sed 's/\,/\ /g'`
+	FAILED_SMS_DESTS="$EVTNOTI_SMS_DESTS"
+	if [ "$EVTNOTI_SMS_DESTS" = "" ]; then
+		log "empty destination, do not send this notification"
+		set_notification_result 1
+		return
+	fi
+
+	# check registration status
+	REG_STAT=`rdb_get wwan.0.system_network_status.reg_stat`
+	if [ "$REG_STAT" != "1" -a "$REG_STAT" != "5" ]; then
+		log "can not send SMS event notification: not registered to the network yet, retry later"
+		set_notification_result 0
+		return
+	fi
+	
+	log "EVTNOTI_SMS_DESTS = $EVTNOTI_SMS_DESTS"
+
+	# check if other application is processing sms diag, if so, wait
+	SMS_RUNNING=$(pidof sms_admin.sh)
+	let "TIMEOUT=30"
+	while [ $TIMEOUT -gt 0 ]; do
+		test -z "$SMS_RUNNING" && break
+		log "Other application is using sms_admin, timeout = $TIMEOUT"
+		sleep 2
+		let "TIMEOUT-=2"
+		SMS_RUNNING=$(pidof sms_admin.sh)
+	done
+	if [ $TIMEOUT -eq 0 ]; then
+		log "give up this event notification"
+		set_notification_result 0
+		return
+	fi
+
+	for SMS_ADDR in $EVTNOTI_SMS_DESTS; do
+		# increase sms count - check daily limitation
+		if ! increase_sms_tx_count_by_one; then
+			# update destination buffer with failed list to retry later
+			rdb_set $EVENT_PREFIX.$NOTI_IDX.sms_dests "$FAILED_SMS_DESTS"
+			set_notification_result 0
+			return
+		fi
+
+		log "sending event noti $EVENT_TYPE to $SMS_ADDR via SMS"
+		/usr/bin/sendsms "$SMS_ADDR" "$EVENT_TEXT" "DIAG"
+		SEND_RESULT=`rdb_get wwan.0.sms.cmd.send.status`
+		if [ "${SEND_RESULT}" = "[done] send" ]; then
+			log "SMS event notification to [$SMS_ADDR]=\"Success\""
+			FAILED_SMS_DESTS=`echo $FAILED_SMS_DESTS | sed -e "s/$SMS_ADDR//"`
+		else
+			log "SMS event notification to [$SMS_ADDR]=\"Failure\""
+		fi
+	done
+	if [ "$FAILED_SMS_DESTS" = "" ]; then
+		log "SMS event notification has been sent to all destination successfully"
+		set_notification_result 1
+	else
+		log "SMS event notification has failed to send to some destinations"
+		# update destination buffer with failed list to retry later
+		rdb_set $EVENT_PREFIX.$NOTI_IDX.sms_dests "$FAILED_SMS_DESTS"
+		set_notification_result 0
+	fi
+}
+
+send_event_noti_to_email()
+{
+	EVTNOTI_EMAIL_DESTS=`rdb_get $EVENT_PREFIX.$NOTI_IDX.email_dests | sed 's/\,/\ /g'`
+	FAILED_EMAIL_DESTS="$EVTNOTI_EMAIL_DESTS"
+	for EMAIL_ADDR in $EVTNOTI_EMAIL_DESTS; do
+		log "sending event noti $EVENT_TYPE to $EMAIL_ADDR via network"
+		/usr/bin/send_email.sh "$EMAIL_ADDR" "$EVENT_TEXT" "EVENTNOTI" "$EVENT_TYPE"
+		SEND_RESULT=$?
+		if [ "${SEND_RESULT}" = "1" ]; then
+			log "Email event notification to [$EMAIL_ADDR]=\"Success\""
+			FAILED_EMAIL_DESTS=`echo $FAILED_EMAIL_DESTS | sed -e "s/$EMAIL_ADDR//"`
+		else
+			log "Email event notification to [$EMAIL_ADDR]=\"Failure\""
+		fi
+	done
+	if [ "$FAILED_EMAIL_DESTS" = "" ]; then
+		log "Email event notification has been sent to all destination successfully"
+		set_notification_result 1
+	else
+		log "Email event notification has failed to send to some destinations"
+		# update destination buffer with failed list to retry later
+		rdb_set $EVENT_PREFIX.$NOTI_IDX.email_dests "$FAILED_EMAIL_DESTS"
+		set_notification_result 0
+	fi
+}
+
+send_event_noti_to_tcp_udp()
+{
+	if [ "$1" = "tcp" ]; then
+		DESTS_RDB_NAME="$EVENT_PREFIX.$NOTI_IDX.tcp_dests"
+		PORT_RDB_NAME="$EVENT_PREFIX.$NOTI_IDX.tcp_port"
+	else
+		DESTS_RDB_NAME="$EVENT_PREFIX.$NOTI_IDX.udp_dests"
+		PORT_RDB_NAME="$EVENT_PREFIX.$NOTI_IDX.udp_port"
+	fi
+	DESTS=`rdb_get $DESTS_RDB_NAME | sed 's/\,/\ /g'`
+	PORT=`rdb_get $PORT_RDB_NAME`
+
+	if [ "$DESTS" = "" ]; then
+		log "empty destination, do not send this notification"
+		set_notification_result 1
+		return
+	fi
+
+	FAILED_DESTS="$DESTS"
+	for ADDR in $DESTS; do
+		log "sending event noti $EVENT_TYPE to $1 $ADDR:$PORT"
+		if [ "$1" = "tcp" ]; then
+			echo $EVENT_LOG_TEXT | nc $ADDR $PORT
+		else
+			echo $EVENT_LOG_TEXT | socat - udp4:$ADDR:$PORT
+		fi
+		SEND_RESULT="$?"
+		#log "SEND_RESULT = $SEND_RESULT"
+		if [ "${SEND_RESULT}" = "0" ]; then
+			log "$1 event notification to [$ADDR:$PORT]=\"Success\""
+			FAILED_DESTS=`echo $FAILED_DESTS | sed -e "s/$ADDR//"`
+		else
+			log "$1 event notification to [$ADDR:$PORT]=\"Failure\""
+		fi
+	done
+	if [ "$FAILED_DESTS" = "" ]; then
+		log "$1 event notification has been sent to all destination successfully"
+		set_notification_result 1
+	else
+		log "$1 event notification has failed to send to some destinations"
+		# update destination buffer with failed list to retry later
+		rdb_set $DESTS_RDB_NAME "$FAILED_DESTS"
+		set_notification_result 0
+	fi
+}
+
+send_event_noti_to_command()
+{
+	local COMMAND=$(rdb_get $EVENT_PREFIX.$NOTI_IDX.cmd)
+	if [ -z "$COMMAND" ]; then
+		log "No command specified, do not send this notification."
+		set_notification_result 1
+		return
+	fi
+
+	log "Sending event notification $EVENT_TYPE to \"$COMMAND\"."
+
+	if ($COMMAND); then
+		log "Event notification to \"$COMMAND\" succeeded."
+		set_notification_result 1
+	else
+		log "Event notification to \"$COMMAND\" failed."
+		set_notification_result 0
+	fi
+}
+
+# The log priority that event notifications will use.
+# Currently hard coded. Future enhancement to make this
+# configurable.
+EVENT_LOG_LEVEL=user.alert
+send_event_noti_to_log()
+{
+	logger -p$EVENT_LOG_LEVEL $EVENT_TEXT
+
+	if [ $? -eq 0 ]
+	then
+		set_notification_result 1
+	else
+		set_notification_result 0
+	fi
+}
+
+case $NOTI_CLIENT in
+	sms)
+		send_event_noti_via_sms
+		;;
+	email)
+		send_event_noti_to_email
+		;;
+	tcp|udp)
+		send_event_noti_to_tcp_udp $NOTI_CLIENT
+		;;
+	cmd)
+		send_event_noti_to_command
+		;;
+	log)
+		send_event_noti_to_log
+		;;
+	*)
+		log "Unknown client '$NOTI_CLIENT'"
+		set_notification_result 0
+		;;
+esac
+
+exit 0

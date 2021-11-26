@@ -1,0 +1,413 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<title>System Configuration</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+</head>
+<%
+diag_if=get_single( 'wwan.0.diag_if');
+//if(diag_if=='')
+	diag_exist=0;
+/*else
+	diag_exist=1;*/
+
+if (request['REQUEST_METHOD'] == "POST") {
+	enable = form['keepaliveEnable'];
+	if(enable=='1') {
+		tempval = form['keepaliveTime'];
+		retval = set_single( 'system.config.tcp_keepalive_time='+tempval, '-p' );
+		tempval = form['intvl'];
+		retval = set_single( 'system.config.tcp_keepalive_intvl='+tempval, '-p' );
+		tempval = form['probes'];
+		retval = set_single( 'system.config.tcp_keepalive_probes='+tempval, '-p' );
+	}
+	retval=set_single( 'system.config.tcp_keepalive_enable='+enable, '-p' );
+	tempval = form['syslogServer'];
+	set_single( 'service.syslog.option.remote='+tempval, '-p' );
+	tempval = form['syslogSavetoFile'];
+	set_single( 'service.syslog.option.logtofile='+tempval, '-p' );
+	if(diag_exist) {
+		tempval = form['rfmtoolEnableVal'];
+		set_single( 'service.rfmtool.enable='+tempval, '-p' );
+		tempval = form['rfmtoolTCPPortVal'];
+		set_single( 'service.rfmtool.tcp_port='+tempval, '-p' );
+	}
+#if (defined V_POWERSAVE_y)
+#ifdef NO_USE
+	tempval = form['pstime'];
+	set_single('service.powersave.waittime='+tempval, '-p');
+#endif
+	tempval = form['psEnable'];
+	set_single('service.powersave.enable='+tempval, '-p' );
+#endif
+#if (defined V_SFTPC_y)
+	tempval = form['sftpuser'];
+	set_single('service.powersave.pbv_conf_user='+tempval, '-p');
+	tempval = form['sftppass'];
+	set_single('service.powersave.pbv_conf_pass='+tempval, '-p' );
+#endif
+#if (defined V_LEDPW_SAVE_y)
+	set_single('service.led.override_timer='+form['hidden_timeout'], '-p');
+	set_single('service.led.reset_timer=1');
+	set_single('service.led.timer_triggered=1');
+#endif
+	form['hidden_timeout']=get_single('service.led.override_timer');
+#if (defined V_SLIC)
+	tempval = form['VoiceCallEn'];
+	if (tempval=='1') {
+		set_single('potsbridge_disabled=0', '-p');
+		set_single('wwan.0.potsbridge_disabled=0', '-p');
+	} else {
+		set_single('potsbridge_disabled=1', '-p');
+		set_single('wwan.0.potsbridge_disabled=1', '-p');
+	}
+#endif
+
+}
+
+#if (defined V_POWERSAVE_y)
+form['psEnable'] = get_single( 'service.powersave.enable');
+#ifdef NO_USE
+form['pstime'] = get_single( 'service.powersave.waittime');
+#endif
+#endif
+
+#if (defined V_SFTPC_y)
+form['sftpuser'] = get_single( 'service.powersave.pbv_conf_user');
+form['sftppass'] = get_single( 'service.powersave.pbv_conf_pass');
+#endif
+
+form['keepaliveEnable'] = get_single( 'system.config.tcp_keepalive_enable');
+form['keepaliveTime'] = get_single( 'system.config.tcp_keepalive_time');
+form['intvl'] = get_single( 'system.config.tcp_keepalive_intvl');
+form['probes'] = get_single( 'system.config.tcp_keepalive_probes');
+tempval=get_single( 'service.syslog.option.remote' );
+if(tempval=="N/A")
+	tempval="";
+form['syslogServer'] = tempval;
+tempval=get_single( 'service.syslog.option.logtofile' );
+form['syslogSavetoFile'] = tempval;
+if(diag_exist) {
+	tempval=get_single( 'service.rfmtool.enable' );
+	form['rfmtoolEnableVal']=tempval;
+	tempval=get_single( 'service.rfmtool.tcp_port' );
+	form['rfmtoolTCPPortVal']=tempval;
+}
+#if (defined V_SLIC)
+tempval = get_single( 'potsbridge_disabled' );
+if (tempval=='1')
+	form['VoiceCallEn'] = '0';
+else
+	form['VoiceCallEn'] = '1';
+#endif
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("system_config");
+var profiles_connection_op=0;
+
+function updateState() {
+var f=document.form;
+	if(!isInt(f.keepaliveEnable.value) )
+		f.keepaliveEnable.value=1;
+	if( parseInt(f.keepaliveEnable.value)==0 )
+		f.enable_keepalive[1].checked=true;
+	else
+		f.enable_keepalive[0].checked=true;
+	if(!isInt(f.keepaliveTime.value) || f.keepaliveTime.value<60 || f.keepaliveTime.value>65535)
+		f.keepaliveTime.value=1800;
+	if(!isInt(f.intvl.value) || f.intvl.value<10 || f.intvl.value>28800)
+		f.intvl.value=60;
+	if(!isInt(f.probes.value) || f.probes.value<1 || f.probes.value>1000)
+		f.probes.value=9;
+	choption(f.keepaliveEnable.value);
+	for( i=0; i<stpf.length; i++) {
+		if(stpf[i].connection_op==3) {
+			profiles_connection_op=3;
+			break;
+		}
+	}
+	f.syslogSavetoFileEnable[0].checked=f.syslogSavetoFile.value!=0;
+	f.syslogSavetoFileEnable[1].checked=f.syslogSavetoFile.value==0;
+<%if(diag_exist) {%>
+	f.rfmtoolTCPPort.disabled=f.rfmtoolEnableVal.value==0;
+	f.rfmtoolEnable[0].checked=f.rfmtoolEnableVal.value!=0;
+	f.rfmtoolEnable[1].checked=f.rfmtoolEnableVal.value==0;
+<%}%>
+#if (defined V_POWERSAVE_y)
+	if( parseInt(f.psEnable.value)==0 )
+		f.enable_powersave[1].checked=true;
+	else
+		f.enable_powersave[0].checked=true;
+#endif
+
+#if (defined V_SLIC)
+	f.VoiceCallEnable[0].checked=f.VoiceCallEn.value!=0;
+	f.VoiceCallEnable[1].checked=f.VoiceCallEn.value==0;
+#endif
+
+}
+
+function choption(val) {
+var f=document.form;
+var d=(val==0)?true:false;
+	if(val==0 && profiles_connection_op==3) {
+		f.enable_keepalive[0].checked=true;
+		alert(_("Msg113"));//PAD Server TCP New Connection Option is set to 'Rejected during existing session'. You can't have Keepalive disabled.
+		return;
+	}
+	f.keepaliveEnable.value=val;
+	f.keepaliveTime.disabled=d;
+	f.intvl.disabled=d;
+	f.probes.disabled=d;
+}
+
+function formCheck() {
+var f=document.form;
+	if(!isInt(f.keepaliveTime.value) || f.keepaliveTime.value<60 || f.keepaliveTime.value>65535) {
+		alert(_("Msg114"));//Keepalive Time must have a value between 60 and 65535.
+		return;
+	}
+	if(!isInt(f.intvl.value) || f.intvl.value<10 || f.intvl.value>28800) {
+		alert(_("Msg115"));//Keepalive Interval must have a value between 10 and 28800.
+		return;
+	}
+	if(!isInt(f.probes.value) || f.probes.value<1 || f.probes.value>1000) {
+		alert(_("Msg116"));//Keepalive Probes must have a value between 1 and 1000.
+		return;
+	}
+	while(f.syslogServer.value.substring(0,1)==" ") {
+		f.syslogServer.value=f.syslogServer.value.substring(1,f.syslogServer.value.length);
+	}
+
+<%if(diag_exist) {%>
+	if(!isInt(f.probes.value)){
+		alert(_("Msg117"));//TCP port number must have a value between 1 and 65535, better starting from 1000.
+		return;
+	}
+	f.rfmtoolTCPPortVal.value=f.rfmtoolTCPPort.value;
+<%}%>
+#ifdef NO_USE
+#if (defined V_POWERSAVE_y)
+	if( f.enable_powersave[0].checked==true )
+		f.psEnable.value='1';
+	else
+		f.psEnable.value='0';
+#endif
+#endif
+	f.submit();
+}
+$(document).ready(function() {
+	$("#KeepaliveApply").val(_("CSsave"));
+	updateState();
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("system config"));</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+
+<form class="content" name="form" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="keepaliveEnable" value="@@form['keepaliveEnable']"/>
+<input type="hidden" name="psEnable" value="@@form['psEnable']"/>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("remote syslog server"));</script></th></tr>
+</table>
+<table width="80%">
+<input type="hidden" name="syslogSavetoFile" value="@@form['syslogSavetoFile']"/>
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("ip hostname"));</script></td>
+	<td><input type=input size="30" name="syslogServer"  value="@@form['syslogServer']"></td>
+</tr>
+</table>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("diag")+" "+_("log"));</script></th></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("syslog to file"));</script></td>
+	<td>
+		<input type=radio onClick="javascript:document.form.syslogSavetoFile.value='1';updateState()" name='syslogSavetoFileEnable'/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio onClick="javascript:document.form.syslogSavetoFile.value='0';updateState()" name='syslogSavetoFileEnable'/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+</table>
+<table width="80%" <%title=get_single('system.product.title'); if(title=='NetComm NTC-5000 Series Cellular Router') {%>style="display:none"<%}%> >
+	<tr><th colSpan="2"><script language="JavaScript">document.write(_("keepalive settings"));</script></th></tr>
+<tr>
+<td><script language="JavaScript">document.write(_("keepalive"));</script></td>
+	<td>
+		<input type=radio name="enable_keepalive" value="1" onclick="choption(this.value);">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio name="enable_keepalive" value="0" onclick="choption(this.value);">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+<tr>
+	<td  width="38%"><script language="JavaScript">document.write(_("keepalive time"));</script></td>
+	<td><input type=text name="keepaliveTime" size=8 maxLength=5 onkeyup="NumfieldEntry(this);" value="@@form['keepaliveTime']"> &nbsp;<script language="JavaScript">document.write(_("sec60"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("keepalive interval"));</script></td>
+	<td><input type=text name="intvl" size=8 maxLength=5 onkeyup="NumfieldEntry(this);" value="@@form['intvl']"> &nbsp;<script language="JavaScript">document.write(_("sec10"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("keepalive probes"));</script></td>
+	<td><input type=text name="probes" size=8 maxLength=5 onkeyup="NumfieldEntry(this);" value="@@form['probes']"> &nbsp;<script language="JavaScript">document.write(_("times1000"));</script></td>
+</tr>
+</table>
+<% if(diag_exist) { %>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("dian port config"));</script></th></tr>
+</table>
+
+<table width="80%">
+	<input type="hidden" name="rfmtoolTCPPortVal" value="@@form['rfmtoolTCPPortVal']"/>
+	<input type="hidden" name="rfmtoolEnableVal" value="@@form['rfmtoolEnableVal']"/>
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("dian config"));</script></td>
+		<td>
+			<input type=radio onClick="javascript:document.form.rfmtoolEnableVal.value='1';updateState()" name='rfmtoolEnable'/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio onClick="javascript:document.form.rfmtoolEnableVal.value='0';updateState()" name='rfmtoolEnable'/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("dian tcp port"));</script></td>
+		<td>
+			<input type=input size="30" name="rfmtoolTCPPort"  value="@@form['rfmtoolTCPPortVal']"/>
+		</td>
+	</tr>
+</table>
+<%}%>
+#if (defined V_POWERSAVE_y)
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("power save settings"));</script></th></tr>
+</table>
+<table width="80%">
+<tr>
+<td width="38%"><script language="JavaScript">document.write(_("power save mode"));</script></td>
+	<td>
+		<input type=radio name="enable_powersave" value="1" onclick="javascript:document.form.psEnable.value='1';updateState()"/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio name="enable_powersave" value="0" onclick="javascript:document.form.psEnable.value='0';updateState()"/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+#ifdef NO_USE
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("powerSaveDelay"));</script></td>
+	<td><input type=input size="30" name="pstime"  value="@@form['pstime']"> secs</td>
+</tr>
+#endif
+</table>
+#endif
+#if (defined V_SFTPC_y)
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("sftpSettings"));</script></th></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("sftpUsername"));</script></td>
+	<td><input type=input size="30" name="sftpuser"  value="@@form['sftpuser']"></td>
+
+</tr>
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("sftpPassword"));</script></td>
+	<td><input type='password' size="30" name="sftppass"  value="@@form['sftppass']"></td>
+</tr>
+</table>
+#endif
+#if (defined V_LEDPW_SAVE_y)
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("ledPowerSaveSettings"));</script></th></tr>
+</table>
+
+<input type="hidden" name="hidden_timeout" value="@@form['hidden_timeout']"/>
+
+<table width="80%">
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("ledTimeout"));</script></td>
+		<td><select name="led_timeout" size="1" onChange="timeoutOnchange(this.value)">
+			<option value="0"><script language="JavaScript">document.write(_("disabled"));</script></option>
+			<option value="60">1 <script language="JavaScript">document.write(_("minute"));</script></option>
+			<option value="300">5 <script language="JavaScript">document.write(_("wan operation mode minutes"));</script></option>
+			<option value="600">10 <script language="JavaScript">document.write(_("wan operation mode minutes"));</script></option>
+			<option value="1800">30 <script language="JavaScript">document.write(_("wan operation mode minutes"));</script></option>
+			<option value="3600">1 <script language="JavaScript">document.write(_("hour"));</script></option>
+			<option value="7200">2 <script language="JavaScript">document.write(_("hours"));</script></option>
+			<option value="14400">4 <script language="JavaScript">document.write(_("hours"));</script></option>
+			<option value="21600">6 <script language="JavaScript">document.write(_("hours"));</script></option>
+			<option value="43200">12 <script language="JavaScript">document.write(_("hours"));</script></option>
+		</select></td>
+	</tr>
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("ledPowerSaveStatus"));</script></td>
+		<td id="leds_status"></td>
+	</tr>
+</table>
+<script language="JavaScript" type="text/javascript">
+function time_string(time_val) {
+	if( time_val=="%-0" )
+		return _("ledTurnedOff");//LEDs are now turned off
+	else if( time_val=="" )
+		return _("ledPowerSaveModeDisabled");//LED power save mode is disabled
+	else
+		return _("ledTimeRemaining")+": "+toUpTime(parseInt(time_val));//Time remaining until LEDs turn off
+}
+
+var intval="";
+function timeoutOnchange(v) {
+	document.form.hidden_timeout.value=v;
+	if(v=="0") {
+		if(intval!="")
+			window.clearInterval(intval);
+	}
+	else {
+		var startPoll = function() {
+			$.get('/cgi-bin/rdb.cgi?service.led.timeout', function(t){eval(t); $("#leds_status").html(time_string(service_led_timeout));});
+		}
+		if(intval=="")
+			intval=window.setInterval(startPoll, 1000);
+	}
+}
+
+if(document.form.hidden_timeout.value=="" || document.form.hidden_timeout.value=="N/A" || document.form.hidden_timeout.value=="0") {
+	$("#leds_status").html(_("ledPowerSaveModeDisabled"));//LED power save mode is disabled
+	document.form.led_timeout.value="0";
+}
+else {
+	document.form.led_timeout.value=document.form.hidden_timeout.value;
+}
+timeoutOnchange(document.form.led_timeout.value);
+</script>
+#endif
+
+#if (defined V_SLIC)
+<input type="hidden" name="VoiceCallEn" value="@@form['VoiceCallEn']"/>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("voice call menu"));</script></th></tr>
+	<tr><td><script language="JavaScript">document.write(_("voice call menu desc"));</script></td></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("voice call onoff"));</script></td>
+	<td>
+		<input type=radio onClick="javascript:document.form.VoiceCallEn.value='1';updateState()" name='VoiceCallEnable'/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio onClick="javascript:document.form.VoiceCallEn.value='0';updateState()" name='VoiceCallEnable'/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+</table>
+#endif
+
+<div align="center">
+<p></p>
+	<input type="button" value="Save" id="KeepaliveApply" name="Apply" onClick="return formCheck()" style="width:120px;">
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

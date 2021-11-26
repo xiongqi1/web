@@ -1,0 +1,118 @@
+<link href="MyZoneStyle-ar.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script type="text/javascript">
+updateStylesheet();
+Butterlate.setTextDomain("main");
+</script>
+<% if( request['SESSION_ID']==session["sessionid"] ) {%>
+    <ul>
+    	<li class="top">&nbsp;&nbsp;&nbsp;&nbsp;<a href="/index.html" class="top_link"><span><script language="JavaScript">document.write(_("home"));</script></span></a></li>
+    	<li class="top">&nbsp;&nbsp;&nbsp;&nbsp;<a href="/status.html" class="top_link"><span><script language="JavaScript">document.write(_("status"));</script></span></a></li>
+    	<%
+    	//val=get_single('system.product.title');
+        if( session["user"]=='hotspot-admin' )
+        {%>
+        	<li class="top"><a href="/usage.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Data Usage</span></a></li>
+		<%}%>
+        
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wwan3g"));</script></span></a>
+		<ul class="sub">
+            <li><a href="/3gwwan.html"><script language="JavaScript">document.write(_("connection"));</script></a></li>
+            <li><a href="/setband.html"><script language="JavaScript">document.write(_("bandProvider"));</script></a></li>
+            <li><a href="/pinsettings.html"><script language="JavaScript">document.write(_("simSecurity"));</script></a></li>
+            <li><a href="/ussd.html"><script language="JavaScript">document.write(_("ussd"));</script></a></li>
+        </ul>
+        </li>
+        <%
+        val=get_single('system.product.title');
+        if( val != "CDCS CDR-6908 Cellular Router" && val != "NetComm NTC-6908 Cellular Router")
+        {
+        %>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wirelessLAN"));</script></span></a>
+		<ul class="sub">
+			<li><a href="/wlan.html"><script language="JavaScript">document.write(_("configuration"));</script></a></li>
+			<!--li><a href="/wlConfiguration.html">Advanced</a></li-->
+			<!--li><a href="/wlBridge.html">Wireless Bridge</a></li-->
+            <li><a href="/wlstationlist.html"><script language="JavaScript">document.write(_("stationInfo"));</script></a></li>       
+		</ul>
+		</li>
+        <%}%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("services"));</script></span></a>
+        <ul class="sub">
+        	<li><a href="/dhcp.html"><script language="JavaScript">document.write(_("DHCP"));</script></a></li>
+            <li><a class="fly"><script language="JavaScript">document.write(_("routing"));</script></a>
+            <ul>
+                <li><a href="/routing.html?Static"><script language="JavaScript">document.write(_("static"));</script></a></li>
+                <li><a href="/routing.html?Rip"><script language="JavaScript">document.write(_("RIP"));</script></a></li>
+                <li><a href="/nat.html"><script language="JavaScript">document.write(_("NAT"));</script></a></li>
+                <!--li><a href="/firewall.html">Firewall</a></li-->
+            </ul>
+			</li>           
+            <!--li><a href="/VPN.html">VPN</a></li-->
+            <li><a href="/ddns.html"><script language="JavaScript">document.write(_("DDNS"));</script></a></li>
+            <li><a href="/NTP.html"><script language="JavaScript">document.write(_("NTP"));</script></a></li>
+            <li><a href="/ltph.html"><script language="JavaScript">document.write(_("treeapp sysMonitor"));</script></a></li>
+	    <li><a class="fly"><script language="JavaScript">document.write(_("sms title"));</script></a>
+	    <ul>
+                <li><a href="/sms.html?config"><script language="JavaScript">document.write(_("setup"));</script></a></li>
+                <li><a href="/sms.html?newmsg"><script language="JavaScript">document.write(_("newmsg"));</script></a></li>
+                <li><a href="/sms.html?inbox"><script language="JavaScript">document.write(_("inbox"));</script></a></li>
+                <li><a href="/sms.html?outbox"><script language="JavaScript">document.write(_("outbox"));</script></a></li>
+                <!--<li><a href="/sms.html?diag"><script language="JavaScript">document.write(_("diag"));</script></a></li>-->
+	    </ul>
+	    </li>  
+        </ul>
+        </li>
+        <% 
+      //  maxnode = get_single( "menu.maxNode" );
+      //  if( maxnode == "N/A" )
+        {
+        //	maxnode = 20;
+            maxnode = 0;
+        }
+        for(i = 0; i<maxnode; i++)
+        {
+            myurl = "menu.nodeURL"+i;
+            nodeURL = get_single( myurl );
+            mynodeName = "menu.nodeName"+i;
+            nodeName = get_single( mynodeName );  
+            if( nodeURL != "N/A" )
+            {
+                %><li><a href='@@nodeURL' target="main">@@nodeName</a></li><%
+            }
+        }
+        %> 
+        <%if( session["userlevel"] == '0' )
+		{%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("system"));</script></span></a>
+		<ul class="sub">
+       		<li><a href="/logfile.html"><script language="JavaScript">document.write(_("log"));</script></a></li>
+			<li><a href="" class="fly"><script language="JavaScript">document.write(_("LoadSave"));</script></a>
+				<ul>
+					<li><a href="/SaveLoadSettings.html"><script language="JavaScript">document.write(_("settings"));</script></a></li>
+					<!--li><a href="/AppUpload.html">Upload</a></li-->
+					<li><a href="pkManager.html"><script language="JavaScript">document.write(_("pkg manager"));</script></a></li>
+				</ul>
+			</li>
+            <li><a href="/LAN.html?pass"><script language="JavaScript">document.write(_("administration"));</script></a></li>
+            <li><a href="/login.html?logoff"><script language="JavaScript">document.write(_("logoff"));</script></a></li>
+            <li><a href="/system_reset.html"><script language="JavaScript">document.write(_("setman reboot"));</script></a></li>
+		</ul>
+		</li>
+        <%}else{%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("system"));</script></span></a>
+		<ul class="sub">
+       		<li><a href="/logfile.html"><script language="JavaScript">document.write(_("log"));</script></a></li>
+            <li><a href="/SaveLoadSettings.html"><script language="JavaScript">document.write(_("settings"));</script></a></li>
+            <li><a href="/administration.html"><script language="JavaScript">document.write(_("administration"));</script></a></li>
+            <li><a href="/login.html?logoff"><script language="JavaScript">document.write(_("logoff"));</script></a></li>
+            <li><a href="/system_reset.html"><script language="JavaScript">document.write(_("setman reboot"));</script></a></li>
+		</ul>
+		</li>     
+        <!--li class="top"><a href="/logfile.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Log</span></a></li> 
+        <li class="top"><a href="/LAN.html?pass" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Administration</span></a></li>
+        <li class="top"><a href="/system_reset.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Reboot</span></a></li-->
+        <%}%>
+	</ul>
+<%}%>
+

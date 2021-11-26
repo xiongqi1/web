@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>Reboot</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+var counter=0;
+var estTime=60;
+var rebootok=0;
+
+function check_reload() {
+	defaultIP="192.168.1.1";
+	counter++;
+	percentage=parseInt(50*counter/estTime);
+	if( percentage<100 ) {
+		document.getElementById( "rebootMsg" ).innerHTML="System rebooting ...";
+		document.getElementById( "rebootCt" ).innerHTML=percentage+" %"
+	}
+	else {
+		document.getElementById( "rebootCt" ).innerHTML=""
+		setTimeout("window.location='http://" + defaultIP + "/index.html'", 3000);
+	}
+
+	if(percentage>60 && (counter%10)==0 ) {
+		$.get("/cgi-bin/ajax.cgi", function (){ rebootok++; });
+	}
+	if(rebootok) {
+		document.getElementById( "rebootCt" ).innerHTML="100 %"
+		document.getElementById( "rebootMsg" ).innerHTML="Reboot is successful, now redirecting to the Status page...";
+		setTimeout("window.location='/index.html'", 5000);
+	}
+}
+
+function doConfirm() {
+	if(confirm("Note: It may take about 60 seconds to reboot the device. Do you really want to reboot?")) {
+		$.get("/cgi-bin/system_reset.cgi");
+		document.getElementById("contentWrapper").style['display']='none';
+		document.getElementById("rebootFm").style['display']='';
+		setInterval(check_reload, 500);
+	}
+}
+</script>
+
+<form name='form' class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>Reboot</h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%"><tr><th>&nbsp;</th></tr></table>
+
+<table border="0" cellspacing="1" cellpadding="5" width="75%">
+<tr align="left"> 
+	<td height="33" colspan="2">&nbsp;</td>
+</tr>
+
+<tr align="left"> 
+	<td colspan="2" ><p style="font-size:16px">To perform the reboot, click on the "Reboot" button below. You will be asked to confirm your decision.</p>
+</tr>
+
+<tr align="left"> 
+	<td colspan="2"> <div align="center">
+	<input name="button" type="button" onClick="doConfirm()" value="Reboot" />
+	</div></td>
+</tr>
+</table>
+</form>
+<div id="footer"><div id="copyRight" style="text-align:right; padding:20px 20px 0 0"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</div>
+
+<div id="rebootFm" style="display:none">
+	<div id="rebootMsg" align="center" style="font-size:16px; font-weight:bold; position:relative; top:80px;">
+	"Rebooting ..."
+	</div>
+	<div align="center" style="position:relative; top:120px;">
+	<img width="500px" height="12px" src="/images/progress_bar.gif">&nbsp;&nbsp;
+	<b id="rebootCt" style="top:220px; left:400px">0 %</b>
+	</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1118 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>WLAN</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<%
+
+if (request['REQUEST_METHOD'] == "GET") {
+        myip = get_single( 'link.profile.0.address' );
+        form['LANIP'] = myip;
+        mymask = get_single( 'link.profile.0.netmask' );
+        form['LANSubIP'] = mymask;
+        masq = get_single( 'service.dns.masquerade' );
+        form['dnsMasq'] = masq;
+		form['DHCPrange'] = get_single( 'service.dhcp.range.0' );
+        hotpass=get_single( 'hotspot.user.password' );
+        form['hotpass1']=hotpass;
+        form['hotpass2']=hotpass;
+       // form['wlEnbl'] = get_single('wlan.0.enable');
+        form['wlHide'] = get_single('wlan.0.hide_accesspoint');
+        form['wlEnbl_2'] = get_single('wlan.1.enable');
+        form['wlKeys1'] = get_single('wlan.0.network_key1');
+        form['wlKeys2'] = get_single('wlan.0.network_key2');  
+        form['wlKeys3'] = get_single('wlan.0.network_key3');
+        form['wlKeys4'] = get_single('wlan.0.network_key4');
+}
+else {
+	mydata1="link.profile.0.address="+form['LANIP']+
+	"&link.profile.0.netmask="+form['LANSubIP']+
+	"&service.dhcp.range.0="+form['DHCPrange']+
+	"&service.dns.masquerade="+form['dnsMasq'];
+	if(headers['HOST'] != form['LANIP']) {
+		set_list( mydata1 );
+		redirect('http://'+form['LANIP']+'/#'); 
+	}
+	if(form['wlAuthMode']=="hotspot") {
+		//tempval = form['hotpass1'];
+		//set_single( 'hotspot.user.password='+tempval, '-p' );
+		mydata2="&hotspot.user.password="+form['hotpass1'];
+	}
+	else {
+		mydata2="";
+	}
+	i=form['wlSsidIdx']; 
+	mydata3="&wlan."+i+".network_auth="+form['wlAuthMode']+
+	"&wlan."+i+".wpa2_preauthentication="+form['wlPreauth']+
+	"&wlan."+i+".net_re_auth_interval="+form['wlNetReauth']+
+	"&wlan."+i+".wpa_pre_shared_key="+form['wlWpaPsk']+
+	"&wlan."+i+".wpa_group_rekey_interval="+form['wlWpaGtkRekey']+
+	"&wlan."+i+".radius_server_ip="+form['wlRadiusIPAddr']+
+	"&wlan."+i+".radius_port="+form['wlRadiusPort']+
+	"&wlan."+i+".radius_key="+form['wlRadiusKey']+
+	"&wlan."+i+".wpa_encryption="+form['wlWpa']+
+	"&wlan."+i+".wep_encryption="+form['wep_encryption']+
+	"&wlan."+i+".encryption_strength="+form['wlKeyBit']+
+	"&wlan."+i+".network_key="+form['wlKeyIndex']+
+	"&wlan.0.network_key1="+form['wlKeys1']+
+	"&wlan.0.network_key2="+form['wlKeys2']+
+	"&wlan.0.network_key3="+form['wlKeys3']+
+	"&wlan.0.network_key4="+form['wlKeys4']+     
+	"&wlan.0.conf.channel="+form['szChannel']+  
+	"&wlan.ssididx="+i;
+	if( ( form['wlSsid'] != '' )&&( form['wlSsid_2'] != '' ) ) {       
+		mydata4="&wlan.0.enable=1"+
+		"&wlan.0.hide_accesspoint="+form['wlHide']+
+		"&wlan.0.ssid="+form['wlSsid']+
+		"&localisation.region="+form['wlCountry']+
+		"&wlan.1.enable="+form['wlEnbl_2']+
+		"&wlan.1.ssid="+form['wlSsid_2'];
+	}
+	else {
+		mydata4="";
+	}
+	set_list( mydata1+mydata2+mydata3+mydata4 );     
+} 	
+if(form['wlEnbl_2']=='0')
+	form['wlSsidIdx']='0';
+if( session["ssidIdx"]!=form['wlSsidIdx'] )
+	session["ssidIdx"]=form['wlSsidIdx'];
+
+if((session["ssidIdx"]!='0')&&(session["ssidIdx"]!='1')) {
+	i = get_single('wlan.ssididx');
+        if( (i!='0')&&(i!='1') ) i='0';
+		session["ssidIdx"] = i;
+		form['wlSsidIdx'] = i; 
+}
+else {
+	i = session["ssidIdx"];
+}
+session["radiusServerIP"] = get_single('wlan.'+i+'.radius_server_ip');
+session["mode"] = get_single('wlan.'+i+'.network_auth');
+tmpval = get_single('wlan.'+i+'.encryption_strength');
+if(tmpval==128)
+	session["bit"] = '0';
+else
+	session["bit"] = '1';              
+session["wpaPskKey"] = get_single('wlan.'+i+'.wpa_pre_shared_key');
+session["wpaGTKRekey"] = get_single('wlan.'+i+'.wpa_group_rekey_interval');
+session["radiusPort"] = get_single('wlan.'+i+'.radius_port');
+session["radiusKey"] = get_single('wlan.'+i+'.radius_key');
+session["wlwpa"] = get_single('wlan.'+i+'.wpa_encryption');
+session["wlwep"] = get_single('wlan.'+i+'.wep_encryption');
+session["varNetReauth"] = get_single('wlan.'+i+'.net_re_auth_interval');
+%>
+
+<body onLoad='frmLoad();frmLoad1()'>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript">
+Butterlate.setTextDomain("wireless");
+
+/*********** setup **********/
+var ssid = <%val=get_single('wlan.0.ssid');%>"@@val";
+var ssid_2 = <%val=get_single('wlan.1.ssid');%>"@@val";
+
+var country = <%val=get_single('localisation.region');%>"@@val";
+var band= <%val=get_single('wlan.0.conf.band');%>"@@val";
+/***************************/
+var ssidIdx = <%i=session["ssidIdx"];%>"@@i";
+if( ssidIdx!='0' && ssidIdx!='1')
+	ssidIdx = '0';
+var radiusServerIP = <%val=session["radiusServerIP"];%>"@@val";
+var mode = <%val=session["mode"];%>"@@val";
+if ( mode == '' ||  mode == 'N/A' )
+	mode = 'psk2';
+var bit = <%val=session["bit"];%>"@@val";
+var keyIdx = <%val=get_single('wlan.0.network_key');%>"@@val";
+if( keyIdx == "N/A") keyIdx = 1;
+var wpaPskKey = <%val=session["wpaPskKey"];%>"@@val";
+if(wpaPskKey == ''||wpaPskKey == 'N/A')
+	wpaPskKey='';
+var wpaGTKRekey = <%val=session["wpaGTKRekey"];%>"@@val";
+if(wpaGTKRekey=='N/A') wpaGTKRekey=0;
+var radiusPort = <%val=session["radiusPort"];%>"@@val";
+var radiusKey = <%val=session["radiusKey"];%>"@@val";
+var wpa = <%val=session["wlwpa"];%>"@@val";
+var wep = <%val=session["wlwep"];%>"@@val";
+var wlCorerev = '9';
+var varPreauth = '0';
+var varNetReauth = <%val=session["varNetReauth"];%>"@@val";
+if ( varNetReauth == '' || isNaN(varNetReauth) == true || varNetReauth < 0 || varNetReauth > 0xffffffff )
+	varNetReauth = '36000';
+var channel = <%val=get_single("wlan.0.conf.channel");%>"@@val";
+if( channel == '' || channel == "N/A") channel = 8;
+
+ChannelList_24G = new Array(14);
+ChannelList_24G[0] = "2412MHz ("+_("channel")+" 1)";
+ChannelList_24G[1] = "2417MHz ("+_("channel")+" 2)";
+ChannelList_24G[2] = "2422MHz ("+_("channel")+" 3)";
+ChannelList_24G[3] = "2427MHz ("+_("channel")+" 4)";
+ChannelList_24G[4] = "2432MHz ("+_("channel")+" 5)";
+ChannelList_24G[5] = "2437MHz ("+_("channel")+" 6)";
+ChannelList_24G[6] = "2442MHz ("+_("channel")+" 7)";
+ChannelList_24G[7] = "2447MHz ("+_("channel")+" 8)";
+ChannelList_24G[8] = "2452MHz ("+_("channel")+" 9)";
+ChannelList_24G[9] = "2457MHz ("+_("channel")+" 10)";
+ChannelList_24G[10] = "2462MHz ("+_("channel")+" 11)";
+ChannelList_24G[11] = "2467MHz ("+_("channel")+" 12)";
+ChannelList_24G[12] = "2472MHz ("+_("channel")+" 13)";
+ChannelList_24G[13] = "2484MHz ("+_("channel")+" 14)";
+
+function CreateChannelOption()
+{
+	var x = document.getElementById("szChannel");
+	var maxchannel=11;
+	if (country=="N/A"||country==""||country=="AU"||country=="JP"||country=="TW"||country=="FR"||country=="IE"||country=="CN"||country=="HK"||country=="ALL")
+		maxchannel=13;
+		
+	for (i = x.length - 1; i>=0; i--)
+		x.remove(i);		
+	for( var i=0; i<maxchannel; i++ )
+	{
+		var y = document.createElement('option');
+		y.text = ChannelList_24G[i];
+		y.value = i+1;	
+		try {
+			x.add(y,null); // standards compliant
+		}
+		catch(ex) {
+			x.add(y); // IE only
+		}
+	}
+	setSelect(document.form.szChannel, channel);
+}
+
+function hideWlSecInfo(hidden) {
+   var status = 'visible';
+
+   with ( document.forms[0] ) {
+      var i = 0;
+      if ( hidden == 1 ) {
+	status = 'hidden';
+	wlSsid.disabled = 1;
+	wlCountry.disabled = 1;
+	wanEnbl_2[0].disabled = 1;
+	wanEnbl_2[1].disabled = 1;
+	document.form.wlSsid_2.disabled=1;
+	document.getElementById( "SecurityDiv" ).style['display']='none';
+      } else {
+		wlSsid.disabled = 0;
+		wlCountry.disabled = 0;
+		wanEnbl_2[0].disabled = 0;
+		wanEnbl_2[1].disabled = 0;
+		document.form.wlSsid_2.disabled=0;
+		document.getElementById( "SecurityDiv" ).style['display']='';
+      }
+   }
+}
+function checkHex(str){
+	var len = str.length;
+	for (var i=0; i<str.length; i++) {
+		if ((str.charAt(i) >= '0' && str.charAt(i) <= '9') ||
+		(str.charAt(i) >= 'a' && str.charAt(i) <= 'f') ||
+		(str.charAt(i) >= 'A' && str.charAt(i) <= 'F') ) {
+			continue;
+		} else
+	        return false;
+	}
+	return true;
+}
+function setKey(k)
+{
+var format;
+var myid = document.getElementById("WEP_KEY" + k);
+var textid = document.getElementById("TEXT" + k);
+var keyValue = myid.value;
+var keylength = keyValue.length;
+
+	if(keylength==10 || keylength>13)
+		format = '0';
+	else
+		format = '1'; //ASCII
+	if ( keylength != 0 )
+	{
+		if ( format == '1' ) //ASCII
+		{
+			if( keylength != 5 && keylength != 13 )
+			{	
+				myid.style.color = "BLACK";
+				textid.innerHTML="";
+			}
+			else
+			{	
+				myid.style.color = "GREEN";
+				if(keylength == 5)
+				{
+					textid.innerHTML="&nbsp;&nbsp;64 bit&nbsp;&nbsp;ASCII";
+					document.form.wlKeyBit.value = "64";
+				}
+				else
+				{
+					textid.innerHTML="&nbsp;&nbsp;128 bit&nbsp;&nbsp;ASCII"
+					document.form.wlKeyBit.value = "128";
+				}
+				if( isValidKey(keyValue, 5)==false && isValidKey(keyValue, 13)==false )
+					myid.style.color = "RED";
+			}
+		
+		}
+		else if(format == '0' ) //HEX
+		{	
+			if(keylength != 10 && keylength != 26)
+			{
+				myid.style.color = "BLACK";
+				textid.innerHTML="";
+			}
+			else
+			{
+				myid.style.color = "GREEN";
+				if(keylength == 10)
+				{
+					textid.innerHTML="&nbsp;&nbsp;64 bit&nbsp;&nbsp;HEX";
+					document.form.wlKeyBit.value = "64";
+				}
+				else
+				{
+					textid.innerHTML="&nbsp;&nbsp;128 bit&nbsp;&nbsp;HEX";
+					document.form.wlKeyBit.value = "128";
+				}
+				if( isValidKey(keyValue, 5)==false && isValidKey(keyValue, 13)==false )	
+					myid.style.color = "RED";
+			}
+			if( keylength >13 && checkHex( keyValue ) == false)
+			{
+				myid.style.color = "RED";
+			}
+		}
+	}
+}
+
+function wlLoadCountryList()
+{
+   var phytype = "b";
+   var cur = 0;
+   var sel = 0;
+   var i = 0;
+
+   if (band == "1") { // 5G    
+   } else {
+      document.forms[0].wlCountry[0] = new Option(_("AMERICAN SAMOA"), "AS");
+document.forms[0].wlCountry[1] = new Option(_("ANTIGUA AND BARBUDA"), "AG");
+document.forms[0].wlCountry[2] = new Option(_("ARGENTINA"), "AR");
+document.forms[0].wlCountry[3] = new Option(_("ARUBA"), "AW");
+document.forms[0].wlCountry[4] = new Option(_("AUSTRALIA"), "AU");
+document.forms[0].wlCountry[5] = new Option(_("AUSTRIA"), "AT");
+document.forms[0].wlCountry[6] = new Option(_("AZERBAIJAN"), "AZ");
+document.forms[0].wlCountry[7] = new Option(_("BAHAMAS"), "BS");
+document.forms[0].wlCountry[8] = new Option(_("BAHRAIN"), "BH");
+document.forms[0].wlCountry[9] = new Option(_("BANGLADESH"), "BD");
+document.forms[0].wlCountry[10] = new Option(_("BARBADOS"), "BB");
+document.forms[0].wlCountry[11] = new Option(_("BELARUS"), "BY");
+document.forms[0].wlCountry[12] = new Option(_("BELGIUM"), "BE");
+document.forms[0].wlCountry[13] = new Option(_("BERMUDA"), "BM");
+document.forms[0].wlCountry[14] = new Option(_("BHUTAN"), "BT");
+document.forms[0].wlCountry[15] = new Option(_("BOLIVIA"), "BO");
+document.forms[0].wlCountry[16] = new Option(_("BOSNIA AND HERZEGOVINA"), "BA");
+document.forms[0].wlCountry[17] = new Option(_("BRAZIL"), "BR");
+document.forms[0].wlCountry[18] = new Option(_("BRUNEI DARUSSALAM"), "BN");
+document.forms[0].wlCountry[19] = new Option(_("BULGARIA"), "BG");
+document.forms[0].wlCountry[20] = new Option(_("CANADA"), "CA");
+document.forms[0].wlCountry[21] = new Option(_("CAPE VERDE"), "CV");
+document.forms[0].wlCountry[22] = new Option(_("CAYMAN ISLANDS"), "KY");
+document.forms[0].wlCountry[23] = new Option(_("CHILE"), "CL");
+document.forms[0].wlCountry[24] = new Option(_("CHINA"), "CN");
+document.forms[0].wlCountry[25] = new Option(_("COLOMBIA"), "CO");
+document.forms[0].wlCountry[26] = new Option(_("COSTA RICA"), "CR");
+document.forms[0].wlCountry[27] = new Option(_("CROATIA"), "HR");
+document.forms[0].wlCountry[28] = new Option(_("CYPRUS"), "CY");
+document.forms[0].wlCountry[29] = new Option(_("CZECH REPUBLIC"), "CZ");
+document.forms[0].wlCountry[30] = new Option(_("DENMARK"), "DK");
+document.forms[0].wlCountry[31] = new Option(_("DOMINICA"), "DM");
+document.forms[0].wlCountry[32] = new Option(_("DOMINICAN REPUBLIC"), "DO");
+document.forms[0].wlCountry[33] = new Option(_("ECUADOR"), "EC");
+document.forms[0].wlCountry[34] = new Option(_("EGYPT"), "EG");
+document.forms[0].wlCountry[35] = new Option(_("EL SALVADOR"), "SV");
+document.forms[0].wlCountry[36] = new Option(_("ESTONIA"), "EE");
+document.forms[0].wlCountry[37] = new Option(_("FALKLAND ISLANDS"), "FK");
+document.forms[0].wlCountry[38] = new Option(_("FINLAND"), "FI");
+document.forms[0].wlCountry[39] = new Option(_("FRENCH GUIANA"), "GF");
+document.forms[0].wlCountry[40] = new Option(_("FRANCE"), "FR");
+document.forms[0].wlCountry[41] = new Option(_("GIBRALTAR"), "GI");
+document.forms[0].wlCountry[42] = new Option(_("GERMANY"), "DE");
+document.forms[0].wlCountry[43] = new Option(_("GREECE"), "GR");
+document.forms[0].wlCountry[44] = new Option(_("GUADELOUPE"), "GP");
+document.forms[0].wlCountry[45] = new Option(_("GUAM"), "GU");
+document.forms[0].wlCountry[46] = new Option(_("GUATEMALA"), "GT");
+document.forms[0].wlCountry[47] = new Option(_("GUERNSEY"), "GG");
+document.forms[0].wlCountry[48] = new Option(_("HAITI"), "HT");
+document.forms[0].wlCountry[49] = new Option(_("HOLY SEE"), "VA");
+document.forms[0].wlCountry[50] = new Option(_("HONDURAS"), "HN");
+document.forms[0].wlCountry[51] = new Option(_("HONG KONG"), "HK");
+document.forms[0].wlCountry[52] = new Option(_("HUNGARY"), "HU");
+document.forms[0].wlCountry[53] = new Option(_("ICELAND"), "IS");
+document.forms[0].wlCountry[54] = new Option(_("INDIA"), "IN");
+document.forms[0].wlCountry[55] = new Option(_("INDONESIA"), "ID");
+document.forms[0].wlCountry[56] = new Option(_("IRAN"), "IR");
+document.forms[0].wlCountry[57] = new Option(_("IRELAND"), "IE");
+document.forms[0].wlCountry[58] = new Option(_("ISRAEL"), "IL");
+document.forms[0].wlCountry[59] = new Option(_("ITALY"), "IT");
+document.forms[0].wlCountry[60] = new Option(_("JAMAICA"), "JM");
+document.forms[0].wlCountry[61] = new Option(_("JAPAN"), "JP");
+document.forms[0].wlCountry[62] = new Option(_("JERSEY"), "JE");
+document.forms[0].wlCountry[63] = new Option(_("JORDAN"), "JO");
+document.forms[0].wlCountry[64] = new Option(_("KENYA"), "KE");
+document.forms[0].wlCountry[65] = new Option(_("KOREA"), "KR");
+document.forms[0].wlCountry[66] = new Option(_("LATVIA"), "LV");
+document.forms[0].wlCountry[67] = new Option(_("LIECHTENSTEIN"), "LI");
+document.forms[0].wlCountry[68] = new Option(_("LITHUANIA"), "LT");
+document.forms[0].wlCountry[69] = new Option(_("LUXEMBOURG"), "LU");
+document.forms[0].wlCountry[70] = new Option(_("MACEDONIA"), "MK");
+document.forms[0].wlCountry[71] = new Option(_("MALAWI"), "MW");
+document.forms[0].wlCountry[72] = new Option(_("MACAO"), "MO");
+document.forms[0].wlCountry[73] = new Option(_("MALAYSIA"), "MY");
+document.forms[0].wlCountry[74] = new Option(_("MALDIVES"), "MV");
+document.forms[0].wlCountry[75] = new Option(_("MALTA"), "MT");
+document.forms[0].wlCountry[76] = new Option(_("MAN"), "IM");
+document.forms[0].wlCountry[77] = new Option(_("MARTINIQUE"), "MQ");
+document.forms[0].wlCountry[78] = new Option(_("MAURITANIA"), "MR");
+document.forms[0].wlCountry[79] = new Option(_("MAURITIUS"), "MU");
+document.forms[0].wlCountry[80] = new Option(_("MAYOTTE"), "YT");
+document.forms[0].wlCountry[81] = new Option(_("MEXICO"), "MX");
+document.forms[0].wlCountry[82] = new Option(_("MICRONESIA"), "FM");
+document.forms[0].wlCountry[83] = new Option(_("MONACO"), "MC");
+document.forms[0].wlCountry[84] = new Option(_("NETHERLANDS"), "NL");
+document.forms[0].wlCountry[85] = new Option(_("NETHERLANDS ANTILLES"), "AN");
+document.forms[0].wlCountry[86] = new Option(_("NEW ZEALAND"), "NZ");
+document.forms[0].wlCountry[87] = new Option(_("NICARAGUA"), "NI");
+document.forms[0].wlCountry[88] = new Option(_("NIGERIA"), "NG");
+document.forms[0].wlCountry[89] = new Option(_("NORTHERN MARIANA ISLANDS"), "MP");
+document.forms[0].wlCountry[90] = new Option(_("NORWAY"), "NO");
+document.forms[0].wlCountry[91] = new Option(_("PAKISTAN"), "PK");
+document.forms[0].wlCountry[92] = new Option(_("PANAMA"), "PA");
+document.forms[0].wlCountry[93] = new Option(_("PAPUA NEW GUINEA"), "PG");
+document.forms[0].wlCountry[94] = new Option(_("PERU"), "PE");
+document.forms[0].wlCountry[95] = new Option(_("PHILIPPINES"), "PH");
+document.forms[0].wlCountry[96] = new Option(_("POLAND"), "PL");
+document.forms[0].wlCountry[97] = new Option(_("PORTUGAL"), "PT");
+document.forms[0].wlCountry[98] = new Option(_("PUERTO RICO"), "PR");
+document.forms[0].wlCountry[99] = new Option(_("REUNION"), "RE");
+document.forms[0].wlCountry[100] = new Option(_("ROMANIA"), "RO");
+document.forms[0].wlCountry[101] = new Option(_("RUSSIAN FEDERATION"), "RU");
+document.forms[0].wlCountry[102] = new Option(_("SAINT PIERRE AND MIQUELON"), "PM");
+document.forms[0].wlCountry[103] = new Option(_("SAUDI ARABIA"), "SA");
+document.forms[0].wlCountry[104] = new Option(_("SINGAPORE"), "SG");
+document.forms[0].wlCountry[105] = new Option(_("SLOVAKIA"), "SK");
+document.forms[0].wlCountry[106] = new Option(_("SLOVENIA"), "SI");
+document.forms[0].wlCountry[107] = new Option(_("SOUTH AFRICA"), "ZA");
+document.forms[0].wlCountry[108] = new Option(_("SPAIN"), "ES");
+document.forms[0].wlCountry[109] = new Option(_("SRI LANKA"), "LK");
+document.forms[0].wlCountry[110] = new Option(_("SWEDEN"), "SE");
+document.forms[0].wlCountry[111] = new Option(_("SWITZERLAND"), "CH");
+document.forms[0].wlCountry[112] = new Option(_("TAIWAN"), "TW");
+document.forms[0].wlCountry[113] = new Option(_("TANZANIA"), "TZ");
+document.forms[0].wlCountry[114] = new Option(_("THAILAND"), "TH");
+document.forms[0].wlCountry[115] = new Option(_("TURKEY"), "TR");
+document.forms[0].wlCountry[116] = new Option(_("UKRAINE"), "UA");
+document.forms[0].wlCountry[117] = new Option(_("UNITED ARAB EMIRATES"), "AE");
+document.forms[0].wlCountry[118] = new Option(_("UNITED KINGDOM"), "GB");
+document.forms[0].wlCountry[119] = new Option(_("UNITED STATES"), "US");
+document.forms[0].wlCountry[120] = new Option(_("UNITED STATES MINOR OUTLYING ISLANDS"), "UM");
+document.forms[0].wlCountry[121] = new Option(_("URUGUAY"), "UY");
+document.forms[0].wlCountry[122] = new Option(_("UZBEKISTAN"), "UZ");
+document.forms[0].wlCountry[123] = new Option(_("VENEZUELA"), "VE");
+document.forms[0].wlCountry[124] = new Option(_("VIET NAM"), "VN");
+document.forms[0].wlCountry[125] = new Option(_("VIRGIN ISLANDS, BRITISH"), "VG");
+document.forms[0].wlCountry[126] = new Option(_("VIRGIN ISLANDS, U.S."), "VI");
+document.forms[0].wlCountry[127] = new Option(_("YUGOSLAVIA"), "YU");
+document.forms[0].wlCountry[128] = new Option(_("ZAMBIA"), "ZM");
+document.forms[0].wlCountry[129] = new Option(_("BAKER ISLAND"), "Z2");
+document.forms[0].wlCountry[130] = new Option(_("ALL CHANNELS"), "ALL");
+   }
+   for (i=0; i< document.forms[0].wlCountry.options.length; i++) {
+      if (document.forms[0].wlCountry.options[i].value == country) {
+         document.forms[0].wlCountry.options[i].selected = true;
+         break;
+      }
+   }
+   /* set to all(the last one) if not found */
+   if( i == document.forms[0].wlCountry.options.length )   
+      document.forms[0].wlCountry.options[i-1].selected = true;
+   
+}
+var ray_dhcp_start = new Array();
+var ray_dhcp_end = new Array();
+
+function frmLoad1() {
+	wlLoadCountryList();
+
+	with ( document.forms[0] ) {
+		document.form.wlSsid.value = ssid;	
+		document.form.wlSsid_2.value = ssid_2;
+		if( document.form.wlEnbl_2.value=='1' )
+		{
+			document.form.wanEnbl_2[0].checked=true;
+			document.form.wlSsid_2.disabled=false;
+		}
+		else
+		{
+			document.form.wanEnbl_2[1].checked=true;
+			document.form.wlSsid_2.disabled=true;;
+		}
+		ray_dhcp_start = document.form.DHCPrange.value.split(",")[0].split(".");
+		if(ray_dhcp_start.length != 4 ){ray_dhcp_start[0]='0'; ray_dhcp_start[1]='0';ray_dhcp_start[2]='0'; ray_dhcp_start[3]='0';}
+		ray_dhcp_end = document.form.DHCPrange.value.split(",")[1].split(".");
+		if(ray_dhcp_end.length != 4 ){ray_dhcp_end[0]='0'; ray_dhcp_end[1]='0';ray_dhcp_end[2]='0'; ray_dhcp_end[3]='0';}
+	}
+	for( var i=1; i<=4; i++ )
+		setKey(i);
+}
+
+function btnApply1()
+{
+	if ( document.form.wlSsid.value == '' )
+	{
+		alert(_("wlan warningMsg4"));//SSID should not be empty.
+		return 0;
+	}
+	if ( document.form.wlSsid_2.value == '' )
+	{
+		alert(_("wlan warningMsg10"));//'Guest SSID should not be empty.'
+		return 0;
+	}
+	var str = new String();
+	str = document.form.wlSsid.value;
+	if ( str.length > 32 )
+	{
+		alert(_("wlan warningMsg5"));//'SSID should not be longer than 32 characters.');
+		document.form.wlSsid.value = "";
+		return 0;
+	}
+	document.form.wlSsid_2.disabled=0;
+	return 1;
+}
+
+
+function getPreauth(wlPreauth) {
+var ret;
+
+	if ( wlPreauth == "on" )
+		ret = 1;
+	else
+		ret = 0;
+	return ret;
+}
+
+function isValidWPAPskKey(val) {
+var ret = false;
+var len = val.length;
+var maxSize = 64;
+var minSize = 8;
+
+	if ( len >= minSize && len < maxSize )
+		ret = true;
+	else if ( len == maxSize ) {
+		for ( i = 0; i < maxSize; i++ )
+			if ( isHexaDigit(val.charAt(i)) == false )
+			break;
+		if ( i == maxSize )
+			ret = true;
+	} else
+		ret = false;
+	return ret;
+}
+
+function hideAllElements()
+{
+	showhide("wlWpaD", 0);
+	showhide("wpaPreShareKey", 0);
+	showhide("wpaGTKRekey", 0);
+	showhide("wlRadius", 0);
+	showhide("Preauth", 0);
+	showhide("NetReauth", 0);
+	//showhide("wlWepD", 0);
+	showhide("keyInfo", 0);
+	showhide("hotspotpass", 0);
+}
+
+function encrypChange()
+{
+   with ( document.forms[0] ) {
+      var cwep = getSelect(wlWep);
+      var authMode = getSelect(wlAuthMode)
+
+      if (cwep == "enabled")
+	  {
+         showhide("keyInfo", 1);
+         if (authMode != "open" && authMode != "shared") {
+            wlKeys1.disabled = 1;
+            wlKeys2.disabled = 0;
+            wlKeys3.disabled = 0;
+            wlKeys4.disabled = 1;
+            wlKeyIndex.length = 0;
+            wlKeyIndex[0] = new Option("2", "2");
+            wlKeyIndex[1] = new Option("3", "3");
+            if (keyIdx != "2" && keyIdx != "3") {
+                keyIdx = "2";
+            }
+            wlKeyIndex.selectedIndex = parseInt(keyIdx) - 2;
+         }
+         else {
+			
+            wlKeys1.disabled = 0;
+            wlKeys2.disabled = 0;
+            wlKeys3.disabled = 0;
+            wlKeys4.disabled = 0;
+            wlKeyIndex.length = 0;
+            wlKeyIndex[0] = new Option("1", "1");
+            wlKeyIndex[1] = new Option("2", "2");
+            wlKeyIndex[2] = new Option("3", "3");
+            wlKeyIndex[3] = new Option("4", "4");
+            wlKeyIndex.selectedIndex = parseInt(keyIdx) - 1;
+			//if (authMode == "open" )  hideAllElements();
+         }
+      } 
+      else {
+         showhide("keyInfo", 0);
+      }
+   }
+}
+
+
+function authModeChange(OnPageLoad) {
+
+   with ( document.forms[0] ) {
+      var authMode = getSelect(wlAuthMode);
+      var i, algos;
+      var disableWepD = false;
+      //alert('authModeChange:authMode= "' + authMode+ '" (EOM).');
+      hideAllElements();
+      //show adequate forms for each mode
+      switch ( authMode ) {										
+	  case 'open':	 
+		showhide("wlWepD", 1);
+		break;
+	  case 'hotspot':
+	     showhide("wlWepD", 0);
+		 showhide("hotspotpass", 1);
+		 disableWepD = true;
+	     break;
+	  case 'shared':
+	     showhide("wlWepD", 1);
+	     showhide("keyInfo", 1);
+	     break;   
+	  case 'radius':
+	     showhide("wlRadius", 1);
+	     showhide("wlWepD", 0);
+	     if ( wlKeyBit.value == '128')
+	     	wlKeys1.value=""; //yyltest
+	     break;   	     
+	  case 'wpa2':      
+	  case 'wpa2mix':
+	     showhide("Preauth", 1);
+	     showhide("NetReauth", 1); 
+	  case 'wpa':
+	     showhide("wlWpaD", 1);
+		 showhide("wlWepD", 0);
+	     showhide("wlRadius", 1);
+	     showhide("wpaGTKRekey", 1);
+	     disableWepD = true;<!--Y.Y.L, 2008/2/27, disable  WEP Encryption -->
+	     break;        
+	  case 'psk2':   	     
+	  case 'psk2mix': 
+	  case 'psk':  
+	     showhide("wlWpaD", 1);
+		 showhide("wlWepD", 0);
+	     showhide("wpaGTKRekey", 1);
+	     showhide("wpaPreShareKey", 1);
+             disableWepD = true; <!--Y.Y.L, 2008/2/27, disable  WEP Encryption -->
+	     break;           
+      } 	   	   
+	  
+	  if(authMode == "psk")
+		wlWpa.value="TKIP";    		
+	  else if( authMode == "psk2" || authMode == "psk2mix")
+		wlWpa.value="AES";			        	
+      wpa=wlWpa.value.toLowerCase();	 
+	        
+      // wep options
+      wlWep.length = 0;
+      if (authMode == "shared" || authMode == "radius") {  // shared and radius must have wep on
+	  	 wlWep[0] = new Option(_("disabled"), "disabled");
+         wlWep[1] = new Option(_("enabled"), "enabled");
+         wlWep[1].selected = true;
+      }
+      else {
+         wlWep[0] = new Option(_("disabled"), "disabled");
+         wlWep[1] = new Option(_("enabled"), "enabled");
+         if ((authMode.indexOf("wpa")!= -1 || authMode.indexOf("psk")!= -1) && (mode == "open" || mode == "shared" || mode == "radius")) { // set wep off if switch to wpa modes
+            wlWep[0].selected = true;
+         }
+         else if (wep == "enabled") {
+            wlWep[1].selected = true;
+         }
+         else {
+            wlWep[0].selected = true;
+         }
+      } 
+      if(disableWepD) {
+         setSelect(wlWep, "disabled");
+         wlWep.disabled = 1;
+      } else {
+         wlWep.disabled = 0;
+      }                 
+   }
+   encrypChange();  
+}
+
+function wpapsk_window() 
+{
+var psk_window = window.open("", "", "toolbar=no,width=500,height=100");
+	if(Butterlate.getLang()=="ar")
+		psk_window.document.write("<style>body { direction:rtl; }</style>");
+	psk_window.document.write(_("WEPtext4")+"<b>&nbsp;"+wpaPskKey+"</b>");
+	psk_window.document.close();
+}
+
+function frmLoad() {
+   with ( document.forms[0] ) {
+		if(document.form.wlEnbl_2.value=='0')
+		{
+			document.form.wlSsidIdx.options[0].seleted=1;
+			document.form.wlSsidIdx.options[1].disabled=1;
+			ssidIdx = 0;
+		}
+		setSelect(wlSsidIdx, ssidIdx);
+		setSelect(wlAuthMode, mode);
+		wlWpaPsk.value = wpaPskKey;
+		wlWpaGtkRekey.value = wpaGTKRekey;
+		wlRadiusIPAddr.value = radiusServerIP;
+		wlRadiusPort.value = radiusPort;
+		wlRadiusKey.value = radiusKey;
+		//wlKeyBit.selectedIndex = parseInt(bit);
+		wlPreauth.selectedIndex = parseInt(varPreauth);
+		wlNetReauth.value = varNetReauth;
+		submitForm.value="   "+_("CSsave")+"   ";
+   }
+   authModeChange(1);
+}
+
+function btnApply() {
+   var swep = getSelect(document.forms[0].wlWep);
+   with ( document.forms[0] ) {
+	var authMode = getSelect(wlAuthMode);
+	var value;
+	wlWpa.value=wlWpa.value.toLowerCase();
+	var swpa = wlWpa.value;
+
+	if (authMode.indexOf("psk")!= -1) { 
+		value = wlWpaPsk.value;
+		if ( isValidWPAPskKey(value) == false ) {
+			alert(_("wlan warningMsg1"));
+		//'WPA Pre-Shared Key should be between 8 and 63 ASCII characters or 64 hexadecimal digits.'
+			return 0;
+		}
+	}   
+	if (authMode.indexOf("wpa")!= -1 || authMode.indexOf("psk")!= -1) { 
+		//check GTK interval
+		value = parseInt(wlWpaGtkRekey.value);
+		if (  isNaN(value) == true || value < 0 || value > 0xffffffff ) {
+			alert(_("wlan warningMsg3"));
+			//'WPA Group Rekey Interval "' + wlWpaGtkRekey.value + '" should be between 0 and 4294967295.'
+			return 0;
+		}
+		//check Reauth interval
+		value = parseInt(wlNetReauth.value);
+		if (  isNaN(value) == true || value < 0 || value > 0xffffffff ) {
+			alert(_("wlan warningMsg11"));
+			//WPA Network Reauthentication Interval should be between 0 and 4294967295.'
+			return 0;
+		}
+	}
+	if (authMode.indexOf("wpa")!= -1 || authMode == 'radius') {
+		if ( isValidIpAddress(wlRadiusIPAddr.value) == false ) {
+			alert(_("wlan warningMsg9"));
+			//'RADIUS Server IP Address "' + wlRadiusIPAddr.value + '" is invalid IP address.'
+			return 0;
+		}
+	}
+	if (getSelect(wlWep) == "enabled") {
+		var i, val;
+		var cbit = wlKeyBit.value;
+		var num = parseInt(getSelect(wlKeyIndex))-1;
+		switch(num)
+		{
+		case 0:
+			val = wlKeys1.value;
+		break;
+		case 1:
+			val = wlKeys2.value;
+		break;
+		case 2:
+			val = wlKeys3.value;
+		break;
+		case 3:
+			val = wlKeys4.value;
+		break;
+		}
+		if ( val == '' && !(swep == 'enabled' && authMode == 'radius')) {
+			alert(_("wlan warningMsg12"));//'Cannot choose key that has empty value.'
+			return 0;
+		}
+		if ( val != '' ) {
+			if ( cbit == '128' ) {
+				if ( isValidKey(val, 13) == false ) {
+					alert(_("wlan warningMsg13"));
+					//alert('Key "' + val + '" is invalid. Please enter 13 ASCII characters or 26 hexadecimal digits for a 128-bit WEP encryption key.');
+					return 0;
+				}
+			} else {
+				if ( isValidKey(val, 5) == false ) {
+					alert(_("wlan warningMsg14"));
+					//alert('Key "' + val + '" is invalid. Please enter 5 ASCII characters or 10 hexadecimal digits for a 64-bit WEP encryption key.');
+					return 0;
+				}
+			}
+		}
+	}
+	document.form.LANIP.value = document.form.LANEtherIP1.value + "."  + document.form.LANEtherIP2.value + "." + document.form.LANEtherIP3.value + "." + document.form.LANEtherIP4.value;
+	document.form.LANSubIP.value = document.form.LANEtherMask1.value + "."  + document.form.LANEtherMask2.value + "." + document.form.LANEtherMask3.value + "." + document.form.LANEtherMask4.value;
+	
+		if( ray_dhcp_start[0]&&ray_dhcp_start[1]&&ray_dhcp_start[2]&&ray_dhcp_start[3]&&ray_dhcp_end[0]&&ray_dhcp_end[1]&&ray_dhcp_end[2]&&ray_dhcp_end[3])
+		{
+		    document.form.DHCPrange.value=document.form.LANEtherIP1.value+"."+document.form.LANEtherIP2.value+"."+document.form.LANEtherIP3.value+"."+ray_dhcp_start[3]+","+document.form.LANEtherIP1.value+"."+document.form.LANEtherIP2.value+"."+document.form.LANEtherIP3.value+"." +ray_dhcp_end[3];
+		}
+	return 1;
+   }
+}
+
+function Refresh(place) {
+	var code = 'location="' + place + '"'; 
+	eval(code);
+}
+
+function submitF1()
+{
+f=document.form;
+	
+	if (f.hotpass1.value != f.hotpass2.value) {
+		alert(_("wlan warningMsg6"));//Hotspot Passwords do not match!
+		return;
+	}
+	if( f.hotpass1.value.toString().length<4 ) {
+		alert("wlan warningMsg15");//Hotspot Password must at least 4 digits long!
+		return;
+	}
+	f.wep_encryption.value = getSelect(f.wlWep);
+	if(btnApply() && btnApply1() ) {
+		switch(isValidSubnetMask(f.LANSubIP.value)) {
+			case -1:
+				alert(_("invalidSubnetMask"));
+				//alert(f.LANSubIP.value+" is not a valid subnet mask.");
+				return;
+			break;
+			case -2:
+				alert(_("wlan warningMsg16"));//The subnet mask has to be contiguous. Please enter a valid mask
+				return;
+			break;
+		}
+		if( !isValidIpAddress(f.LANIP.value) ) {
+			alert(_("warningMsg05"));
+			//alert(f.LANIP.value+" is not a valid IP address.");
+			return;
+		}
+		if(confirm(_("warningChangeSecurity"))) {
+			hideWlSecInfo(0);
+			
+			
+			
+			f.submitForm.disabled=true;
+			f.submit();
+		}
+	}
+	else {
+		document.location.reload();
+	}	
+}
+function WinExpIP(field,event){
+	var val=field.value;
+	if(!isValidIpEntry(field,event))
+		alert(_("dhcp warningMsg11"));
+		//alert(val+" is not a valid entry. Please specify a value between 0 and 255.");
+}
+function WinExpIP_1(field,event){
+	var val=field.value;
+	switch(isValidIpEntry_1(field,event)) {
+	case -1:
+		alert(_("dhcp warningMsg12"));
+		//alert(val+" is not a valid entry. Please specify a value between 1 and 223.");
+	break;
+	case -2:
+		alert(_("dhcp warningMsg13"));
+		//alert("IP addresses starting with 127 are not valid because they are reserved for loopback address. Please specify some other valid value between 1 and 223.");
+	break;
+	}
+}
+</script>
+
+<form name="form" method='POST' action="@@request['SCRIPT_NAME']"/>
+<input type="hidden"  name='wlEnbl' value="@@form['wlEnbl']"/>
+<input type="hidden"  name='wlHide' value="@@form['wlHide']"/>
+<input type="hidden"  name='wlEnbl_2' value="@@form['wlEnbl_2']"/>
+<input type="hidden"  name='wep_encryption' value="@@form['wep_encryption']"/>
+<!--input type="hidden"  name='country' value="@@form['country']"/-->
+
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("configuration"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<input type="hidden" name="LANIP" value="@@form['LANIP']"/>
+<input type="hidden" name="LANSubIP" value="@@form['LANSubIP']"/>
+<input type="hidden" name="dnsMasq" value="@@form['dnsMasq']"/>
+<input type="hidden" name="greyedout" >
+<input type="hidden" name='wlKeyBit' value="@@form['wlKeyBit']">
+<input type="hidden" name="DHCPrange" value="@@form['DHCPrange']">
+<table width="80%">
+    <tr><th><script language="JavaScript">document.write(_("wlanConfiguration"))</script></th></tr>
+</table>
+
+<table width="80%">
+<tr> 
+<td width="28%"><script language="JavaScript">document.write(_("ip address"))</script></font></td>
+    <td class="td_ltr"><!--script language=javascript>htmlGenIpBlocks("LANEtherIP");</script-->
+    <input name="LANEtherIP1" size="3" maxLength="3" onKeyUp="WinExpIP_1(this,event);"> <b>.</b>
+    <input name="LANEtherIP2" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> <b>.</b>
+    <input name="LANEtherIP3" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> <b>.</b> 
+    <input name="LANEtherIP4" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> 
+    </td>
+</tr>
+
+<script type="text/javascript">
+var ray = new Array();
+ray = document.form.LANIP.value.split(".");
+if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+document.form.LANEtherIP1.value=ray[0];document.form.LANEtherIP2.value=ray[1];
+document.form.LANEtherIP3.value=ray[2];document.form.LANEtherIP4.value=ray[3];
+</script>
+<tr> 
+    <td><script language="JavaScript">document.write(_("subnet mask"))</script></td>
+    <td class="td_ltr">
+    <input name="LANEtherMask1" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> <b>.</b>
+    <input name="LANEtherMask2" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> <b>.</b>
+    <input name="LANEtherMask3" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);"> <b>.</b> 
+    <input name="LANEtherMask4" size="3" maxLength="3" onKeyUp="WinExpIP(this,event);">
+</tr>
+<script type="text/javascript">
+var ray = new Array();
+ray = document.form.LANSubIP.value.split(".");
+if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+document.form.LANEtherMask1.value=ray[0];document.form.LANEtherMask2.value=ray[1];
+document.form.LANEtherMask3.value=ray[2];document.form.LANEtherMask4.value=ray[3];
+document.form.LANEtherIP4.focus();
+</script>
+</table>
+
+<table width="80%">
+    <tr><th><script language="JavaScript">document.write(_("dnsMasq"))</script></th></tr>
+</table>
+
+<table width="80%">
+<tr> 
+    <td width="28%"><script language="JavaScript">document.write(_("dnsMasq"))</script></td>
+    <td><input type=radio name='DNSMasq' onClick="javascript:document.form.dnsMasq.value='1'" >&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+    	<input type=radio name='DNSMasq' onClick="javascript:document.form.dnsMasq.value='0'" >&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+        
+<script type="text/javascript">   
+if(parseInt(document.form.dnsMasq.value)==1)   
+	document.form.DNSMasq[0].checked=true;
+else
+	document.form.DNSMasq[1].checked=true;
+</script>        
+        
+</tr>
+</table>
+<table width="80%">
+    <tr><th><script language="JavaScript">document.write(_("wirelessSetup"))</script></th></tr>
+</table>
+<table width="80%">
+
+<tr>
+	<td><script language="JavaScript">document.write(_("country"))</script>:</td>
+	<td><senter><select name='wlCountry' size="1" value="@@form['wlCountry']" onchange="country=this.value;CreateChannelOption()">
+		</select></senter></td>
+</tr>
+<tr id="div_11g_channel" name="div_11g_channel">
+	<td><script language="JavaScript">document.write(_("basic frequency"))</script></td>
+	<td>
+    <select id="szChannel" name="szChannel" size="1" @@form['szChannel']>
+    <!--option value=0 id="basicFreqGAuto">AutoSelect</option-->
+    <script type="text/javascript">
+    CreateChannelOption();
+	</script>
+    </select>
+    </td>
+</tr>
+</table>
+<table style="display:none">
+<tr>
+    <td><script language="JavaScript">document.write(_("enableGuestNetwork"))</script></td>
+    <td>&nbsp;&nbsp;<input type="radio" name='wanEnbl_2' onClick="document.form.wlEnbl_2.value='1';document.form.wlSsid_2.disabled=0;document.form.wlSsidIdx.options[1].disabled=0;">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+    <input type="radio" name='wanEnbl_2' onClick="document.form.wlEnbl_2.value='0';document.form.submit();">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>   
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("secondSsid"))</script>:</td>
+	<td><input type='text' name='wlSsid_2' maxlength="32" size="32" onkeyup="isValidNameEntry(this,event);" onchange="document.form.wlSsidIdx[1]=new Option(this.value, '1');ssidIdx=1;setSelect(wlSsidIdx, ssidIdx);" value="@@form['wlSsid_2']"/></td>
+</tr>
+</table>
+
+<div id="SecurityDiv">
+<table width="80%">
+    <tr><th><script language="JavaScript">document.write(_("securitySettings"))</script></th></tr>
+</table>
+<table width="80%">
+<tr style="display:none">
+	<td width='28%'><script language="JavaScript">document.write(_("secure select ssid"))</script>:</td>
+	<td><select name="wlSsidIdx" onChange="javascript:document.form.submit();">
+		<option value='0'><%write(get_single('wlan.0.ssid'));%></option>
+		<!--option value='1'><%write(get_single('wlan.1.ssid'));%></option-->
+		</select></td>
+</tr>
+<tr>
+	<td  width='28%'><script language="JavaScript">document.write(_("station ssid"))</script>:</td>
+    <td><input type='text' name='wlSsid' maxlength="32" size="32" onkeyup="isValidNameEntry(this,event);" onchange="document.form.wlSsidIdx[0]=new Option(this.value, '0');ssidIdx=0;setSelect(wlSsidIdx, ssidIdx);" value="@@form['wlSsid']"/></td>
+</tr>
+
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("netAuth"))</script>:</td>
+	<td><select name='wlAuthMode' size="1" onchange='authModeChange(0)'>
+		<option value="open"><script language="JavaScript">document.write(_("CSopen"))</script></option>
+		<option value="hotspot">HotSpot</option>
+		<!--option value="shared">Shared</option-->
+		<option value="psk">WPA-PSK</option>
+		<option value="psk2">WPA2-PSK</option> 
+		<!--option value="psk2mix">Mixed WPA2/WPA -PSK</option-->                                                
+        </select>
+     </td>
+</tr>
+</table>
+
+<div id="hotspotpass"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("hotspotKey"))</script>:</td>
+	<td><input type='password' name='hotpass1' size='20' maxlength='10' value="@@form['hotpass1']"/></td>
+	<td><script language="JavaScript">document.write(_("CSconfirmKey"))</script>:&nbsp;&nbsp;
+	<input type='password' name='hotpass2' size='20' maxlength='10' value="@@form['hotpass2']"/></td>
+</tr>
+</table>
+</div> 
+
+<div id="Preauth"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("secure wpa preauth"))</script>:</td>
+	<td><select name='wlPreauth' size="1">
+		<option value="off"><script language="JavaScript">document.write(_("disabled"))</script></option>
+		<option value="on"><script language="JavaScript">document.write(_("enabled"))</script></option>                        
+		</select></td>
+</tr>
+</table>
+</div>   
+    
+<div id="NetReauth"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("networkReauthInterval"))</script>:</td>
+	<td><input type='text' name='wlNetReauth' size='20' maxlength='10' value="@@form['wlNetReauth']"/></td>
+</tr>
+</table>
+</div>  
+                
+<div id="wpaPreShareKey"><table border="0" cellpadding="4" cellspacing="0" width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WPApreSharedKey"))</script>:</td>
+	<td><input type='password' name='wlWpaPsk' size='20' maxlength='64' value="@@form['wlWpaPsk']"/></td>
+	<td> <A HREF="javascript:wpapsk_window()"><script language="JavaScript">document.write(_("clickHereToDisplay"))</script></A></td>                     
+</tr>
+</table>
+</div>
+
+<div id="wpaGTKRekey"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("wpaRekeyInterval"))</script>:</td>
+	<td><input type='text' name='wlWpaGtkRekey' size='20' maxlength='10' value="@@form['wlWpaGtkRekey']"/></td>
+</tr>
+</table>
+</div>
+
+<div id="wlRadius"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("radiusServerIpAddress"))</script>:</td>
+	<td><input type='text' name='wlRadiusIPAddr' size='20' maxlength='15' value="@@form['wlRadiusIPAddr']"/></td>
+</tr>
+<tr>
+	<td>RADIUS Port<script language="JavaScript">document.write(_("radiusPort"))</script>:</td>
+	<td><input type='text' name='wlRadiusPort' size='20' maxlength='5' value="@@form['wlRadiusPort']"/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("radiusKey"))</script>:</td>
+	<td><input type='password' name='wlRadiusKey' size='20' maxlength='80' value="@@form['wlRadiusKey']"/></td>
+</tr>
+</table>
+</div>
+
+<div id="wlWpaD"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WPAencryption"))</script>:</td>
+    <td><input type='text' name='wlWpa' value="@@form['wlWpa']" class='cdcsAjax' readonly/></td>
+</tr>
+</table>
+</div>
+
+<div id="wlWepD"><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("WEPencryption"))</script>:</td>
+	<td><select name="wlWep" onChange='encrypChange()' value="@@form['wlWep']">
+	</select></td>
+</tr>
+</table>
+</div>
+
+<div id='keyInfo'><table width="80%">
+<tr>
+	<td width='28%'><script language="JavaScript">document.write(_("currentNetworkKey"))</script>:</td>
+	<td><select name='wlKeyIndex' size='1'></select></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 1:</td>
+	<td><input type='text' name='wlKeys1' size='30' maxlength=26 id="WEP_KEY1" onKeyUp="setKey(1)" value="@@form['wlKeys1']"/>&nbsp;&nbsp;<b id="TEXT1"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 2:</td>
+	<td><input type='text' name='wlKeys2' size='30' maxlength=26 id="WEP_KEY2" onKeyUp="setKey(2)" value="@@form['wlKeys2']"/>&nbsp;&nbsp;<b id="TEXT2"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 3:</td>
+	<td><input type='text' name='wlKeys3' size='30' maxlength=26 id="WEP_KEY3" onKeyUp="setKey(3)" value="@@form['wlKeys3']"/>&nbsp;&nbsp;<b id="TEXT3"></b></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("networkKey"))</script> 4:</td>
+	<td><input type='text' name='wlKeys4' size='30' maxlength=26 id="WEP_KEY4" onKeyUp="setKey(4)" value="@@form['wlKeys4']"/>&nbsp;&nbsp;<b id="TEXT4"></b></td>
+</tr>
+<tr> 
+	<td>&nbsp;</td><td><script language="JavaScript">document.write(_("Msg55"))</script></td>
+</tr><tr>
+	<td>&nbsp;</td><td><script language="JavaScript">document.write(_("Msg56"))</script></td>
+</tr>
+</table>
+</div>
+</div>
+<p></p>
+<div align="right" style="margin-right:20%"><input type="button" name="submitForm" onClick='submitF1();' value="Save"></div>
+<p></p>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,878 @@
+###########################################################################
+#   Copyright (C) 2004-2010 by Dimark Software Inc.                       #
+#   support@dimark.com                                                    #
+###########################################################################
+
+1. [v4.0.1c1] {feature} task 8183
+	Description:
+		Minor editorial changes
+	File(s):
+		Changed:		./*.*
+		
+2. [v4.0.1c2] {feature} task 
+	Description:
+		Connecting CPE through proxy servers
+	File(s):
+		Changed:		./dimclient.c
+
+3. [v4.0.1c3] {feature} task 
+	Description:
+		Supporting IPv6 
+	File(s):
+		Changed:		./.
+
+
+Changes Version 4.0:
+
+1. [v4.0c1] {feature} task 7394 
+	Description:
+		Refactoring initial parameters to be read from XML file 
+	File(s):
+		Changed:		./Makefile
+		Renamed:		./host_if.c To ./host-if.c
+		Added:			./conv-util.c
+		Changed:		./start.sh
+		Added:			./data-model.xml (TR-098, TR-106)
+		Removed:		./dps.param (TR-098, TR-106)
+		Added:			./conv.jar
+		Added:			./clientEditor.jar
+		Renamed:		./098/ To ./TR-098/
+		Renamed:		./106/ To ./TR-106/
+		Changed:		./src/host/storage.h
+		
+2. [v4.0c2] {bug} task 7657 
+	Description:
+		Download is not accepted on empty 'Target name' using ACS 2.3.2 for WL  
+	File(s):
+		Changed:		./src/filetransfer.c
+
+3. [v4.0c3] {feature} task 7749 
+	Description:
+		Refactoring debug log   
+	File(s):
+		Changed:		./*.*
+		Created:		./DOC/
+		Created:		./README/
+		Added:			./log.config
+		Moved:			./README To ./README/README.txt
+		Moved:			./README_compile.txt To ./README/README_compile.txt
+		Moved:			./README_sslauth.txt To ./README/README_sslauth.txt
+		Moved:			./src/tr111/TR111_README.txt To ./README/README_tr111.txt
+		Added:			./DOC/Client Implementation Guide 3.2.0.pdf
+		
+4. [v4.0c4] {feature} task 7544 
+	Description:
+		Callback function is called before a file is downloaded by the CPE		   
+	File(s):
+		Changed:		./dimclient.c
+		Changed:		./filetransfer.c
+		Changed:		./filetransfer.h
+		Changed:		./ftcallback.c
+		Changed:		./ftcallback.h
+
+5. [v4.0c5] {feature} task 5638 
+	Description:
+		TransferComplete MUST be called only after the transfer has successfully completed,
+		and in the case of a download, the downloaded file has been successfully applied
+	File(s):
+		Changed:		./filetransfer.c
+		Changed:		./filetransfer.h
+		
+6. [v4.0c6] {feature} (frozen) task 8108
+	Description:
+		Migration from gSOAP 2.7.6c to gSOAP 2.8.0
+	File(s):
+		Changed:		./src/dimclient.c
+		Changed:		./gsoap/*.*
+
+7. [v4.0c7] {feature} task 8183
+	Description:
+		Minor editorial changes
+	File(s):
+		Removed:		./*.*
+
+8. [v4.0c8] {bug} task 8525
+	Description:
+		URL is changed after the end of the session only		
+	File(s):
+		Changed:		./paramaccess.c
+		Changed:		./paramaccess.h
+		Changed:		./utils.c
+
+9. [v4.0c9] {bug} task 8427
+	Description:
+		 Correction of RPC methods 
+	File(s):
+		Changed:		./methods.h
+		Changed:		./methods.c
+		Changed:		./dimclient.c
+
+10. [v4.0c10] {bug} (frozen) task NONE 
+	Description:
+		 HTTP from ACS without Content-Length: 0 
+	File(s):
+		Changed:		./dimclient.c
+
+11. [v4.0c11] {bug} task NONE 
+	Description:
+		 Incorrect parameter ConnectionRequestURL when it isn't defined in ./data-model.xml 
+	File(s):
+		Changed:		./paramconvenient.c
+
+
+Changes Version 3.1.0:
+
+1. [v3.1.0c1] {feature} (unfrozen v310c7) task 6204 
+	Description:
+		Handling of
+		GetAllQueuedTransfers Responding,
+		AutonomousTransferComplete Calling,
+		10 AUTONOMOUS TRANSFER COMPLETE Event
+	File(s):
+		Changed:		./dps.param (TR-098, TR-106)
+		Changed:		./src/dimclient.c
+		Changed:		./src/dimclient.h
+		Changed:		./src/filetransfer.c
+		Changed:		./src/filetransfer.h
+		Changed:		./src/globals.h
+		Changed:		./src/parameter.h
+
+2. [v3.1.0c2] {feature} (frozen) task 5397
+	Description:
+		Android porting
+	File(s):
+		Changed:		./src/.
+
+3. [v3.1.0c3] {bug} task 6605
+	Description:
+		CONTINUE is defined by different variables 
+	File(s):
+		Changed:		./src/dimclient.c
+
+4. [v3.1.0c4] {bug} (frozen) task 6606
+	Description:
+		Warnings in compilation time 
+	File(s):
+		Changed:		./*.*
+		Removed:		./src/copyright.h
+		Renamed:		./src/server.h To ./src/serverdata.h
+		Renamed:		./src/convenientParameter.[ch] To ./src/paramconvenient.[ch]
+		Created:		./src/handlers
+		Added:			./src/handlers/acshandler.[ch]
+		Moved:			./src/hosthandler.[ch] To ./src/handlers/hosthandler.[ch]
+		Added:			./src/handlers/kickedhandler.[ch]
+		Added:			./src/handlers/timehandler.[ch]
+		Added:			./src/handlers/transfershandler.[ch]
+		Added:			./src/handlers/stunhandler.[ch]
+		Added:			./src/methods.[ch]
+
+5. [v3.1.0c5] {feature} task 5400
+	Description:
+		From TCP Echo to UDP Echo
+	File(s):
+		Changed:		./src/host/diagParameter.c
+
+6. [v3.1.0c6] {feature} (unfrozen v310c34) (frozen) task 6102
+	Description:
+		Microsecond precision for DateTimeType (11) (from 0001-01-01T00:00:00Z to 2008-04-09T15:01:05.123456)
+	File(s):
+		Changed:		./src/.
+		
+/*	
+#include <sys/time.h>
+	
+struct timeval
+  {
+    __time_t tv_sec;		/* Seconds.  */
+    __suseconds_t tv_usec;	/* Microseconds.  */
+  };
+  
+int gettimeofday(struct timeval *restrict tp, void *restrict tzp);
+
+DateTimeType
+DefDateTimeType
+xsd__dateTime(time_t)
+*/
+
+
+Changes Version 3.0.10:
+
+0. [v310c0]
+	Description:
+		Mark's changes
+	File(s):
+		None
+		
+1. [v310c1] {feature}
+	Description:
+		Changing of the absolute path (/tmp) into the relative path (./tmp)
+		for all temporary folders and files
+	File(s):
+    	Changed and remove form ./test to ./:	./start.sh
+    	Changed:								./src/host/storage.h
+    	Changed:								./src/dimclient.c
+    	Changed:								./src/filetransfer.c
+    	Made:									./tmp
+    	Made:									./etc
+    	Made:									./mnt
+
+2. [v310c2] {feature}
+	Description:
+		If a login and/or a password for FTP downloads/uploads are absent in the ACS
+		then the login is assigned to ?œanonymous??and/or
+		the password is assigned to ?œguest??    File(s):
+    	Changed:	./src/ftp/cmds.c
+    	
+3. [v310c3] {feature}
+	Description:
+		 Ability to reboot Client after Reboot, FactoryReset or parameter value change was added		
+    File(s):
+    	Changed:	./dimclient.c
+    	Changed:	./start.sh
+    	
+4. [v310c4] {feature}
+	Description:
+		make clean removes dimclient too
+	File(s):
+		Changed:	./Makefile
+		
+5. [v310c5] {feature}
+	Description:
+		Device-Gateway Association (Annex F)
+	File(s):
+		Changed:	./src/hosthandler.h
+		Changed:	./src/hosthandler.c
+		Changed:	./src/parameter.h
+		Changed:	./src/convenientParameter.c
+		
+6. [v310c6] {bug}
+	Description:
+		If HTTP/HTTPS upload had been successful ACS was informed that it was unsuccessful
+	File(s):
+		Changed:	./src/filetransfer.c
+		
+7. [v310c7] {feature} (frozen)
+	Description:
+		The Client Amendment 1 to The Ð¡lient Amendment 2
+	File(s):
+		Changed:	./src/dimclient.c
+		Changed:	./src/dimclient.h 
+		Changed:	./src/globals.h	
+		Changed:	./src/filetransfer.c
+		
+8. [v310c8] {bug}
+	Description:
+		Connection Request via NAT Gateway (Annex G).
+		Wrong name of parameters for TR-106 Data Model
+	File(s):
+		Changed:	./src/tr111/stun_dimark.c
+		
+9. [v310c9] {bug}
+	Description:
+		When in ACS the field 'Size (in Bytes):' equal to zero
+		than CPE must download without a mistake (HTTP/HTTPS) 
+	File(s):
+		Changed:	./src/filetransfer.c
+		
+10. [v310c10] {bug}
+	Description:
+		 Parameters update in ./tmp/cpe3/parameter worked incorrectly
+	File(s):
+		Changed:		./src/host/parameterStore.c
+		Changed:		./host_if.c
+		Changed:		./dps.param
+		
+11. [v310c11] {bug}
+	Description:
+		Wrong name of parameters for IPPingDiagnostics example
+	File(s):
+		Changed:		./src/host/diagParameter.c
+		
+12. [v310c12] {feature}
+	Description:
+		ScheduleInform responding (Table 5 ??RPC message requirements)
+	File(s):
+		Changed:		./src/dimclient.c	
+		
+13. [v310c13] {feature} (frozen)
+	Description:
+		Host notification of parameters change, object addition and deletion
+	File(s):
+		Changed:		./src/hosthandler.c	
+		
+14. [v310c14] {feature}
+	Description:
+		Kicked calling
+	File(s):
+		Changed:		./src/dimclient.c
+		Changed:		./src/dimclient.h	
+
+15. [v310c15] {feature}
+	Description:
+		RequestDownload calling
+	File(s):
+		Changed:		./src/dimclient.c
+		Changed:		./src/dimclient.h
+
+16. [v310c16] {bug}
+	Description:
+		A small correction of debug.h
+	File(s):
+		Changed:		./src/debug.h
+		
+17. [v310c17] {feature}
+	Description:
+		KickURL. LAN-accessible URL from which the CPE can be ?œkicked??		to initiate the Kicked RPC method call.
+	File(s):
+		Changed:		./src/parameter.h
+		Changed:		./src/dimclient.c
+		
+18. [v310c18] {bug}
+	Description:
+		When in ACS the field 'Size (in Bytes):' equal to zero
+		than CPE must download without a mistake (FTP) 
+	File(s):
+		Changed:		./src/filetransfer.c
+		
+19. [v310c19] {feature}
+	Description:
+		GetQueuedTransfers responding
+	File(s):
+		Changed:		./src/dimclient.c
+		Changed:		./src/dimclient.h
+		Changed:		./src/filetransfer.c
+		Changed:		./src/filetransfer.h
+		
+20. [v310c20] {bug}
+	Description:
+		Wrong FTP download target file name
+	File(s):
+		Changed:		./src/host/storage.h
+		
+21. [v310c21] {feature}
+	Description:
+		The CPE MUST NOT apply any of the specified
+		changes without applying all of them (SetParameterAttributes)
+	File(s):
+		Changed:		./src/parameter.c
+		
+22. [v310c22] {feature} (frozen) task 5638  
+	Description:
+		The CPE MUST only indicate successful completion of the download
+		after the downloaded file has been both successfully transferred and applied
+		(not only transferred). The CPE SHOULD consider a downloaded file to be successfully
+		applied only after the file is installed.
+	File(s):
+		Changed:		./src/host/eventStore.h
+		Changed:		./src/host/eventStore.c
+		Changed:		./src/host/storage.h
+		Changed:		./src/dimclient.c
+		Changed:		./src/eventcode.c
+		Changed:		./src/filetransfer.c
+		Changed:		./src/filetransfer.h
+		Changed:		./src/ftcallback.c
+		Changed:		./src/ftcallback.h
+		Changed:		./src/globals.h
+		Changed:		./Makefile
+		
+23. [v310c23] {feature} task 5385  
+	Description:
+		Allow several instances of the client to run on the same PC	
+	File(s):
+		Changed:		./src/hosthandler.c
+		Changed:		./src/globals.h
+		Changed:		./src/dimclient.c
+		
+24. [v310c24] {feature} task 5527  
+	Description:
+		M * Events (M ScheduleInform, M Download, M Upload) are added
+	File(s):
+		Changed:		./src/host/diagParameter.c
+		Changed:		./src/tr111/stun_dimark.c
+		Changed:		./src/dimclient.c
+		Changed:		./src/eventcode.c
+		Changed:		./src/eventcode.h
+		Changed:		./src/filetransfer.c
+		Changed:		./src/filetransfer.h		
+		Changed:		./src/global.h
+		Changed:		./src/parameter.c
+		
+25. [v310c25] {bug} task 5389
+	Description:
+		Anonymous, basic, digest authorization for upload and download	
+	File(s):
+		Changed:		./plugin/httpda.c
+		Changed:		./src/convenientParameter.c
+		Changed:		./src/dimclient.c
+		Changed:		./src/filetransfer.c
+		
+26. [v310c26] {feature} task 5401, 5383, 5402, 5404, 5922
+	Description:
+		FTP&HTTP Upload&Download Diagnostics (TR-143) 	
+	File(s):
+		Changed:		./src/paramaccess.c
+		Changed:		./src/filetransfer.h
+		Changed:		./src/filetransfer.c
+		Changed:		./src/host/diagParameter.h
+		Changed:		./src/host/diagParameter.c
+		Changed:		./src/globals.h
+		Changed:		./src/ftp/ftp.c
+		Changed:		./dps.param (TR-098, TR-106)
+		
+27. [v310c27] {feature} task 5901
+	Description:
+		Implemented an ability to change parameter of DateTimeType (11) type
+		by host interface and then notify ACS of applied changes .
+	File(s):
+		Changed:		./src/parameter.c
+		
+28. [v310c28] {feature} task 5923
+	Description:
+		UDP Echo (TR-143)
+	File(s):
+		Changed:		./dps.param (TR-098, TR-106)
+		Changed:		./src/host/diagParameter.h
+		Changed:		./src/paramaccess.c
+		Changed:		./src/globals.h
+		Changed:		./src/dimclient.c
+
+29. [v310c29] {feature} task 5868
+	Description:
+		KickedURL MUST be an absolute URL including
+		a host name or IP address as would be used on
+		the LAN side of the CPE
+	File(s):
+		Changed:		./src/diclient.c
+		
+30. [v310c30] {bug} task 6004
+	Description:
+		HTTP 500 Internal Server Error did not be analysed correctly
+	File(s):
+		Changed:		./src/convenientParameter.c
+		
+31. [v310c31] {bug} task 6001
+	Description:
+		Wrong analysing of KickedURL
+	File(s):
+		Changed:		./src/diclient.c
+
+32. [v310c32] {feature} task 5688
+	Description:
+		Event "0 BOOTSTRAP" indicates that the session was
+		established due to first-time CPE
+        installation or a change to the ACS URL.
+		In particular first time connection of the CPE to the ACS after the ACS URL
+		has been modified in any way
+	File(s):
+		Changed:		./host_if.c
+		Changed:		./src/convenientParameter.c
+		
+33. [v310c33] {bug} task 6027
+	Description:
+		Memory allocation problem
+	File(s):
+		Changed:		./src/convenientParameter.c
+		Changed:		./src/dimclient.c
+		
+34. [v310c34] {feature} (frozen) task 6102
+	Description:
+		Microsecond precision for DateTimeType(11) (from 0001-01-01T00:00:00Z to 2008-04-09T15:01:05.123456)
+	File(s):
+		None
+
+35. [v310c35] {feature} task 6192
+	Description:
+		HTTP 401 Unauthorized did not be analysed correctly (changing of nonce)
+	File(s):
+		Changed:		./plugin/httpda.c
+		Changed:		./src/dimclient.c
+
+36. [v310c36] {feature} task 5869
+	Description:
+		If a CPE needs to deliver more than 64 events in a single Inform (this
+		would be expected to occur only under exceptional circumstances and
+		on rare occasions), it MUST discard the oldest ?œM??(method-related)
+		events in order to avoid exceeding the maximum array size (EventStruct[64])
+	File(s):
+		Changed:		./src/eventcode.c
+		Changed:		./src/globals.h
+
+37. [v310c37] {bug} task 6333
+	Description:
+		None CommandKey is associated with "M Reboot" event
+	File(s):
+		Changed:		./src/dimclient.c
+		Changed:		./src/dimclient.h
+
+38. [v310c38] {feature} task 6341
+	Description:
+		Size/memory footprint optimizations 
+	File(s):
+		Changed:		./src/ftp/cmds.c
+		Changed:		./src/ftp/ftp_ft.c
+		Changed:		./src/ftp/ftp.c
+		Changed:		./src/host/diagParameter.c
+		Changed:		./src/callback.c
+		Changed:		./src/debug.c
+		Changed:		./src/debug.h
+		Changed:		./src/dimclient.c
+		Changed:		./src/eventcode.c
+		Changed:		./src/filetransfer.c
+		Changed:		./src/filetransfer.h
+		Changed:		./src/ftcallback.c
+		Changed:		./src/globals.h
+		Changed:		./src/parameter.c
+		Changed:		./src/utils.c
+		Changed:		./Makefile
+		
+39. [v310c39] {feature} task 6356
+	Description:
+		GetRPCMethods Calling 
+	File(s):
+		Changed:		./src/globals.h
+		Changed:		./src/dimclient.h
+		Changed:		./src/dimclient.c
+		
+		
+Changes Version 3.0.9:
+
+1. Renamed src/wt104/ directory to src/tr104/ to track formalization of
+   the specification document.  Made changes to files and Makefile
+   for the change.  Filenames under src/tr104/ did not change.
+   [20090109 0000181]
+
+2. Updated copyright dates from 2008 to 2009 as needed.
+   [20090302 0000185]
+
+3. Augment existing embedded client to include "STUN client" support 
+   to meet TR-111 Part 2 requirements. Interoperate with Dimark ACS 
+   with co-located STUN Server system. See src/tr111/TR111_README.txt 
+   file for system description and implementation/operation overview.
+
+   GENERAL STUN CHANGE NOTES:
+   a) Source files for stun_client are contained under the 
+      src/tr111 directory.
+   b) "WITH_UDP" compile flag as been deprecated and replaced with 
+      "WITH_STUN_CLIENT".
+   c) Previous UDP code in src/dimclient.c has been removed and 
+      replaced with the new STUN client code. Previous separate thread 
+      process "acsUDPHandler()" has been replaced by "stunHandler()".
+   d) gSoap is no longer used for UDP Connection Request processing.
+   e) OpenSSL HMAC/SHA1 support is now used for UDP Connection Request 
+      validation authentication processing. See "man HMAC" and 
+      /usr/include/openssl/hmac.h
+   f) Utility procedures/features have been added in other code files 
+      to accommodate the additional needs of the STUN client. Changes 
+      are in thefiles in src/:
+        dimclient.c   	     convenientParameter.c
+	paramaccess.[ch]     parameter.h
+
+   [20090302 0000186]
+
+4. Added support for reporting TR111 STUN Part 1 Client information
+   that is obtained from a compatible/updated Busybox or dhcpcd 
+   client via TR111 Part 1 Option 125 information from a TR111 enabled
+   DHCP server. See ./README_tr111.txt for more information.
+   [20091101 0000227]
+
+5. Add additional logging information to stdout (ongoing).
+   Added some extra output showing sendInform count, delayCnt delays,
+   and gethostbyname() to show more information about client's 
+   reaction to network connectivity issues. 
+   [20090302 0000189]
+
+6. In gsoap/stdsoap2.c changed several explicit socket blocking setups 
+   to strictly non-blocking.  This also requires specifying soap timeout
+   values in src/dimclient.c. and src/filetransfer.c.  Additional code
+   added to tcp_disconnect() in gsoap/stdsoap2.c that will appear in the
+   gSoap 2.7.14 release.
+   [20090713 0000207]
+
+7. Changed storage method of ManagementServer.URL internal from malloc()
+   to global fixed in convenientParameter.c
+   [20090713 0000208]
+
+8. Changed SOAP_BUFLEN from 8192 to 65536 in gsoap/soapdefs.h to 
+   accommodate larger SSL messages for clients with a large number of
+   parameters.  Devices with smaller numbers may not need to take up 
+   as much reserved memory.  The symptoms of too small a buffer are 
+   SSL conversations that just stop.  If the client is compiled with 
+   SOAP debugging turned on (DEBUG, SOAP_DEBUG) then the SENT.log file 
+   would show a last larger message sent from the client to the server 
+   that is truncated. 
+   [20090820 0000217 ] replaces/updates [20081123 0000153]
+ 
+9. Previous changes to disable "old netscape cookie" processing in
+   gsoap/stdsoap2.c were moved from soap_putsetcookies() to 
+   soap_enocde_cookie().  It was found that the previous location
+   didn't catch all the cookie processing needed for Motiv ACS
+   compliance testing.
+   [20091101 0000228]
+
+10. Added setlinebuf() treatment for stdout and stderr in src/dimclient.c
+    [20091101 0000229]
+
+11. Added setParameterModified() procedure in src/parameter.c that may
+    be called by an external process to indicate to the client that
+    a parameter has been "modified externally" and to sample the
+    notification flag and to determine Active notification status.
+    [20091101 0000230]
+
+12. Added more defines in src/parameter.h for parameter name use
+    [20091101 0000231]
+
+13. Added printing out client compilation configuration information
+    on startup on stdout.
+    [20091101 000232]
+
+14. Added a readme file for SSL Auth certification set up in the client.
+    See ./README_sslauth.txt
+    [20091101 000233]
+
+15. Added more information for "Parent Not Found" error feedback.
+    [20090723 0000209]
+
+16. Fixed "if" clause issue in 3.0.9rc in src/convenientParameters.c
+    [20090326 0000202]
+
+Changes Version 3.0.8:
+
+1. Updated src/dimclient.c procedure checkDigestResponse() to remedy an
+   infrequent problem with MD5 hashsum values.
+   [20080922 0000079]
+
+2. Updated src/dimclient.c myHttpGet() to properly check URL path and
+   return 404 error with message for connection request attempts.
+   [20081111 0000133]
+
+3. Added copyright.h include file.
+   [20081115 0000141]
+
+4. Changed all malloc()'s to calloc()'s to initialize memory to zero.
+   [20080922 0000076]
+
+5. Updated gsoap/stdsoap.c soap_http_parse() to handle 401 messages with
+   a large amount of body content sometimes produced by MOTIV ACS.
+   [20080922 0000077]
+
+6. Changed declaration of cwmp__Upload parameters to correct problem of
+   null values being passed to execUpload() in src/dimclient.c. Fixed
+   define typo in dimclient.c for listing Upload in supported methods.
+   [20081114 0000142]
+
+7. MOTIV ACS does not follow TR-069 by not processing original Netscape
+   cookie escape code processing.  Escape creation has been turned off
+   with edits in gsoap/stdsoap2.c.
+   [20080923 0000074]
+
+8. Fixed typo in src/filetransfer.c for ftp_login() return value
+   [20080604 0000015]
+
+9. This release ships with gSoap files included in the distribution, these
+   no longer need to be distributed separately.  Files now included in
+   distribution are gsoap/* and plugin/*
+   [20080922 0000082]
+
+10. Strict type checking relaxation with setParameterValue method call
+    value specifications.  Previously ACS and Client must have matching
+    xsd:<type> otherwise the client would reject the parameter value.
+    Now: if sent type is xsd:string, client target type is evaluated and
+    conversion is done (if possible): i.e., string to boolean, string to 
+    int, string to unsigned int, string to datetime, etc.  If sent type
+    is other than xsd:string, types must match.  This change was done
+    to accomodate a valid interpretation of TR-069 value handling.
+    [20080929 00000043]
+
+11. Changed soap->recvfd initialization from 0 to -1 in gsoap/stdsoap2.c.
+    This prevents soap stdin from attaching to the terminal for bad URL
+    specifications.
+    [20080927 0000055]	
+
+12. Fixed declaration typo in utils.c.  "ParamterType" to "ParameterType"
+    on line 36
+    [20080718 0000047]
+
+16. Fix typo in globals.h: "_CHANDE" to "_CHANGE" line 17.
+    [20080612 0000034]
+
+17. Increased size of SOAP_BUF length from 2048 to 8192 bytes in file
+    gsoap/soapdefs.h to correct message truncation problem under SSL
+    [20081123 0000153]
+
+18. Added startup test script for testing as test/start.sh.  Place
+    it, dimclient, and dps.param in same directory and run the 
+    script. It will initialize /tmp/cpe3/* by creating the needed
+    directories (if non-existent) and remove previous data files to
+    create a bootstrap run.  The dps.parm file is copied from
+    the current test directory to the target /tmp/cpe3 directory.
+    Modify the current test directory version before running 
+    start.sh again to update the target. Any changes made to
+    /tmp/cpe3/dps.param will be overwritten.  Read the script
+    to see the actual details.
+
+Changes Version 3.0.7 - Interim release version number.  Ignore.
+	
+Changes Version 3.0.6m:
+
+1. Modified how memory is malloc()'s and free()'d in dimclient.c procedures to
+   free memory on a per message basis rather than on a per Soap session basis.
+   This reduces peak memory allocation during conversation with the ACS where
+   there may be significant parameters sets and gets over a session.
+   New Feature [080715 0000019]
+	
+2. First version fix of a memory leak issue in plugin/md5evp.c where internal
+   data buffer pointed to by ctx->md_data was being lost. Also changed malloc()
+   in gsoap/stdsoap2.h to calloc() to create zero-fill memory allocations.
+   [080715 0000018]
+
+3. Removed user-defined SOAP_MALLOC define from gsoap/soapdefs.h. Due to the
+   way cpp processes, httpda.c was getting the wrong routine when SOAP_DEBUG
+   was enabled, creating a memory leak as it's allocated memory was being
+   malloc()'s outside of the gSoap debug malloc(), but still be freed by
+   the soap debug free() routines that tracked previous memory allocations.
+   [080620 0000044]
+
+4. Fixed getparameterNames() tree descent problem.  Now conforms to TR-069
+   Amendment 1 example precisely.  [080701 0000039]
+	
+Changes Version 3.0.6
+
+1. Defaultvalues of Parameters with getIdx > 0 where stored correctly. During creation of a new Object
+   the initIdx function is called. Therefor the initIdx must be the same like getIdx or putIdx.
+
+2. Defaultvalues of Parameters stored in memory get lost after a reboot. They are now stored in
+   the metafile of the parameter. 
+
+3. DateTimeType handling of REGMan has changed. In former releases it uses integers, now ISO Dates like
+   all other ACSs.
+
+
+Changes Version 3.0.5.x
+
+1. Using InitIdx during Bootstrap phase. InitIdx is now used when a bootstrap ( not normal boot ) happens,
+   and a parameter is new created by an addObject call.
+   During both calls the initfunction is called with the default value from dps.param.
+   It is necessary to enter an init indexnumber in the dps.param for all get-/set- indices with value 1.
+   You can use the following awk script to change the initidx number of all entries which have 1 in get- or
+   set- index.
+--- cut here
+BEGIN {
+    FS=";"
+}
+{
+    initIdx = $7
+    getIdx = $8
+    setIdx = $9
+    if ( getIdx == 1 || setIdx == 1 )
+       initIdx = 1
+    printf( "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n", $1, $2,$3, $4, $5, $6, initIdx, getIdx, setIdx, $10, $11)
+}
+
+--- cut here
+   shell>awk -f edit.awk < dps.param > dps.param1
+   shell>cp dps.param dps.param1
+
+
+2. Additional Callbackfunction after loading parameters from storage. If you need information about the
+   bootstage, call isBootstrap().
+
+
+Changes Version 3.0.5
+
+1. The size of the Digest structure fields are extended by 1 byte, to store the EOS byte.
+
+2. Customers has reported, that some embedded C-libs have problems with the atoi and atol functions.
+   Therefor these functions are now wrapped in utils.c. The function can there be changed in case
+   you have one of these problems.
+
+3. Changes in UPD ConnectionRequest. DoS taken from TCP ConnectionRequest implemented.
+
+4. Types of UploadResponse StartTime and CompleteTime changed to String for supporting UNKNOWN_TIME
+   like Download.
+    
+
+Changes Version 3.0.4
+
+1. Fileupload is now supported for HTTP protocol. Same procedure like FTP protocol.
+   Upload callback support, init in dimclient.c implementation in ftcallback.c.
+   Upload callback is called before the upload happens.
+
+2. AddObject and DeleteObject support in hostinterface.
+   AddObject is called by add<NL>objectname<NL>  Returns new instanceno
+   DeleteObject is called by del<NL>objectname<NL> Returns 0 = ok or errorcode
+   ( <NL> is the newline char )
+
+3. AddObject and DeleteObject updates the objectcounter. These counter are located in a parameter
+   with the name <parameter>NumberOfEntries, and is located at the same level as the object.
+   This feature can be enabled by defining HANDLE_NUMBER_OF_ENTRIES in globals.h
+
+4. An example for accessing the hostinterface can be found in host_if.c.
+   It only works with Version 3.0.4 or later.
+   The file is not build by the Makefile, for Linux use:  cc -g host_if.c -o host_if
+
+5. Nodelayed Download returns Status 0 instead of 1.
+ 
+6. Function doDownload() in filetransfer.c added parameter fileType, which is the FileType value
+   from the SOAP call. This can be used to call your own download procedure depending the FileType.
+
+
+Changes Version 3.0.3
+
+Bugfixes:
+
+1. In addObject, if storage of a new parameter fails, the parameterdata was not removed from
+   the tree in memory. The newly created parameter is removed from it's parent and from memory.
+   The service returns with an error code.
+
+2. Fileupload is now supported for FTP protocol. The name of the files to get from the cpe must
+   be defined in filetransfer.c array FILENAMES. The mapping from filetype to filename is made
+   in type2file(). If you want to used a custom type, you have to made an implementation in this
+   function.
+   
+Changes Version 3.0.2
+
+Bugfixes:
+
+1. Access to a boolean value ( also all other types except string ) leads to a core dump, if
+   getIdx = 0 was used.
+
+2. After a call to ChangeParameterAttributes, the NotificationAllways flag was overwriten with the 
+   new value. Therefor the value for NotificationAllways was changed from 3 to 4 ( see parameter.h )
+   During read of dps.param the value 3 will be patched by 4, but the better way is to change
+   dps.param to the new value ( the fourth value in the parameter line )
+
+Changes Version 3.0.x
+
+Bugfixes:
+
+1. In eventhandling different defined names were used for read and write.
+   The defines are resolved to the same physical filename.
+
+2. The returned structure in GetParameterAttributes is renamed from GetParameterAttributesStruct 
+   to ParameterAttributeStruct, requires changes in dimark.[hc] and parameter.[hc]
+
+3. Cookies are handled now correctly. If the ACS sent more than one Cookie, only the first one
+   was returned by the CPE. Fixed now.
+
+4. The CPE does no longer close the connection to the ACS during basic or digest challange phase.
+
+5. In a ConnectionRequest the CPE sent a BASIC and DIGEST response. Fixed now.
+
+6. The ConnectionRequests from ACS are now protected againt DoS attacks. 
+   Two defines MAX_REQUESTS_PER_TIME and MAX_REQUEST_TIME are used to allow only a number of 
+   connectionRequests during a specified period of time. Otherwise a 505 is returned.
+
+7. The parameter PeriodicIntervalTime is now used if set. See WT121 for description of using this
+   parameter.
+
+8. The files and directory were not closed properly in parameterStore.c. Fixed now.
+
+9. There was a problem in setSdCurrentId() if the ACS sent no id. The stringcopy is now save.
+
+10. The nounce value for Digest challange is newly created for every session.
+
+11. The write() in updateParameter() had wrong parameters. the variable buf was used instead of fd.
+     
+12. For ConnectionRequest the CPE is using Digest Authentification and sends now qop="auth" and
+    uses cnonce, qop and ncount for calculation the response.
+

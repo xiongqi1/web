@@ -1,0 +1,5 @@
+{
+    "pin warningMsg1":"Invalid PIN. Please enter 4-8 digits.",
+    "pin warningMsg2":"PINs do not match. Please check and try again.",
+    "puk warningMsg1":"Invalid PUK. Please enter 4-8 digits."
+}

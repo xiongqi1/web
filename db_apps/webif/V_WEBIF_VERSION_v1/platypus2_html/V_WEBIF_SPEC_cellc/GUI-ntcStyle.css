@@ -1,0 +1,274 @@
+/*@font-face {
+	font-family: 'Bryant';
+	/*src: url('Bryant-Medium.otf');*/
+	/*src: url('Bryant-Medium.eot' );*/  /* IE */ 
+	/*src: local('Bryan'), url( 'Bryant-Medium.ttf' ) format("truetype");*/  /* non-IE */ 
+/*}*/
+
+/*@font-face {
+	font-family: Bryant;
+	font-weight: bold;
+	src: url('/Bryant-Bold.otf');
+}*/
+
+body {
+	font-size:11px;
+	font-family:Verdana, Arial;
+	background-color:#000;
+}
+a {
+	font-size:11px;
+	color:#f0f0f0;
+	font-weight:bold;
+}
+
+.a1 {
+	color:#ffffff;
+}
+
+.a2 {
+	font-size: 11px;
+}
+
+#basicLogin {
+	top:140px;
+}
+
+#basicGUI {
+	position:absolute;
+	/*left:558px;
+	top:120px;*/
+}
+#GUI-battery {
+	left:132px;
+	top:59px;
+	position:absolute;
+}
+#GUI-CSQ {
+	left:158px;
+	top:235px;
+	position:absolute;
+}
+#GUI-confirmKey {
+	left:40px;
+	top:154px;
+	position:absolute;
+}
+
+.div_input {
+	left:180px;
+	position:absolute;
+	width: 200px;
+}
+.div_text {
+	color:#000;
+	font-weight:bold;
+	left:47px;
+	position:absolute;
+	font-size:11px;
+}
+.div_small_text {
+	color:#000;
+	font-weight:normal;
+	left: 47px;
+	position:absolute;
+	font-size: 11px;	
+	width:370px;
+	height: 18px;
+}
+.div_button{
+	left:180px;
+	position:absolute;
+	top:478px;
+}
+
+.finchAjax {
+	border-style:none;
+	background-color:transparent;
+}
+
+.app_left {
+	position:absolute;	
+	left:110px;
+}
+
+.app_right {
+	position:absolute;	
+	left:270px;
+}
+
+.app_text {
+	position:absolute;
+	top:85px;
+	left:10px;
+	color:#000;
+}
+
+.Rotate-90-IE10 {
+	direction:ltr;
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+	left:7px;
+	-ms-transform: rotate(-90deg);
+}
+
+.Rotate-90 {
+	direction:ltr;
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+	left:7px;
+
+	filter: progid:DXImageTransform.Microsoft.BasicImage(rotation=3);
+	-moz-transform:rotate(-90deg);
+	/*-moz-transform-origin: bottom left;*/
+	-webkit-transform: rotate(-90deg);
+	/*-webkit-transform-origin: bottom left;*/
+	-o-transform: rotate(-90deg);*/
+	/*-o-transform-origin:  bottom left;*/
+}
+
+.a1:hover,
+.Rotate-90 a:hover {
+	color:#00cc00;/*GREEN;*/
+}
+
+#langTab {
+	display:block;
+	position:absolute;
+	font-size:11px;
+	left:360px;
+	top:-30px;
+}
+#CShelp {
+	display:none;
+}
+
+#tab-login {
+	top:70px; 
+}
+#tab-status {
+	top:-30px;
+}
+#tab-wlan {
+	top:80px;
+}
+#tab-3gwwan {
+	top:180px;
+}
+#tab-acc {
+	top:280px;
+}
+#tab-app {
+	top:390px;
+}
+/* ================================================================ 
+This copyright notice must be kept untouched in the stylesheet at 
+all times.
+
+The original version of this stylesheet and the associated (x)html
+is available at http://www.stunicholls.com/menu/pro_drop_2.html
+Copyright (c) 2005-2007 Stu Nicholls. All rights reserved.
+This stylesheet and the associated (x)html may be modified in any 
+way to fit your requirements.
+=================================================================== */
+
+/*=================================================================== */
+#nav2
+{
+	padding:0;
+	margin:0;
+	list-style:none;
+	height:32px;
+	position:relative;
+	z-index:50;
+	font-family:Verdana, Arial;
+	font-size:11px;
+}
+
+#nav2 li.top
+{
+	display:block;
+	float:left;
+	height:22px;
+	background-color:#ffffff;
+}
+
+#nav2 li:hover {position:relative; z-index:200;}
+
+#nav2 li:hover ul.sub
+{
+	left:1px; /*position-x*/
+	top:20px; /*position-y*/
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #aaaaaa;*/
+	white-space:nowrap;
+	width:132px;/*Country*/
+	height:auto;
+	z-index:300;
+	background-color: #cccccc;
+}
+#nav2 li:hover ul.sub li
+{display:block; height:20px; position:relative; float:left; width:80px; font-weight:normal;}
+
+
+/*#nav2 li:hover ul.sub li a,*/
+#nav2 li:hover ul.sub li span
+{
+	display:block;
+	height:18px;
+	width:130px;/*Country & Carrier*/
+	line-height:18px;
+	text-indent:5px;
+	color:#000;
+	text-decoration:none;
+	border:1px solid #FFFFFF;
+}
+
+/*#nav2 li:hover ul.sub li a:hover,*/ 
+#nav2 li:hover ul.sub li span:hover
+{
+	/*color:#005799;*/
+	border-color:#ffffff;
+	background-color: #aaaaaa;
+}
+
+#nav2 li:hover li:hover ul
+{
+	left:88px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /* Carrier */
+	z-index:400;
+	height:auto;
+}
+
+#nav2 li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover li:hover ul
+{
+	left:120px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /*APN*/
+	z-index:400;
+	height:auto;
+}
+
+#nav2 ul, 
+#nav2 li:hover ul ul,
+#nav2 li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover li:hover ul ul
+{position:absolute; left:-9999px; top:-9999px; list-style:none;}
+
+

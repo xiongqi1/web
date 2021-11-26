@@ -1,0 +1,170 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>String Tools</title>
+</head>
+<%
+_sv=get_single('sw.version');
+if ( request['REQUEST_METHOD'] == "GET" ) {
+	form['qq']=request['QUERY_STRING'];
+}
+%>
+<body>
+<script language="JavaScript" src="jquery.min.js"></script>
+<script type="text/javascript" src="/lang/b28n.min.js?@@_sv"></script>
+<script language='Javascript'>
+qs="<%v=request['QUERY_STRING'];%>@@v";
+var file="status";
+var ref="<%_ref=get_single('webinterface.ref_lang');%>@@_ref";
+var dsp="<%_lang=get_single('webinterface.language');%>@@_lang";
+var r=new Array(); //Reference Language
+var d=new Array(); //Display Language
+if (ref=="" || ref=="N/A") {
+	ref="en";
+}
+if (dsp=="" || dsp=="N/A") {
+	dsp="en";
+}
+function setForm() {
+var	h="<tr><td width='20%'><b>String Id:</b></td><td width='30%'><b>Reference Language String:</b></td><td width='50%'><b>UI Display String:</b></td><tr>"
+	var counter=0;
+	for( i in r ) {
+		counter++;
+		h+="<tr><td>"+i+"</td><td>"+r[i]+"</td><td><input type='text' size='80' id='"+i.replace(/ /g,'_')+"' value=\""+d[i]+"\"]/></td><tr>"
+	}
+	$("#stringTools").html(h);//<label id="idCounter"></label>
+}
+
+function getDsp(v) {
+	eval(v);
+	setForm();
+}
+
+function getRef(v) {
+	eval(v);
+	if(ref != dsp) {
+		$.get("/cgi-bin/xml_arr.cgi?"+file+".xml&"+dsp+"&d", getDsp );
+	}
+	else {
+		d=r;
+		setForm();
+	}
+}
+
+function lang_submit() {
+var s="lang="+dsp+";file="+file+";"
+var found=0;
+	for( i in d ) {
+		id=sprintf("#%s", i.replace(/ /g,'_'));
+		if($(id).length) {
+			if(d[i] != $(id).val()) {
+				s+=i+"\"=\""+$(id).val()+";";
+				found++;
+			}
+		}
+	}
+	if(!found) {
+		alert("No string has been changed.")
+		return;
+	}
+	$("#BtApply").attr("disabled", true);
+	$("#wait").css("display", "");
+	$.get("/cgi-bin/arr-xml.cgi?"+s, function(res){
+		eval(res);
+		if(result=="Done") {
+			if(files.length>1) {
+				var msg="Following language files are successfully updated:\n\n"
+				for(i=0; i<files.length; i++) {
+					msg+=files[i]+"\n";
+				}
+			}
+			else if(files.length==1){
+				var msg="The language file "+files[0]+" is successfully updated.\n"
+			}
+			else {
+				var msg="Error! Can not find the string Ids form all language files\n"+s;
+			}
+			alert(msg);
+		}
+		else {
+			alert("Language file update has failed.\nThe Error message is: "+result);
+		}
+		//location.reload();
+		window.parent.location.reload();
+	});
+}
+
+function search_string(s) {
+/******* Try to find 100% match from id or string 1st ******/
+	for( i in d ) {
+		if(d[i]==s || i==s) {
+			id=sprintf("#%s", i.replace(/ /g,'_'));
+			$(id).focus();
+			return;
+		}
+	}
+	for( i in r ) {
+		if(r[i]==s) {
+			id=sprintf("#%s", i.replace(/ /g,'_'));
+			$(id).focus();
+			return;
+		}
+	}
+/******* If not found, search sub string ******/
+	for( i in d ) {
+		if( d[i].indexOf(s)!=-1 ) {
+			id=sprintf("#%s", i.replace(/ /g,'_'));
+			$(id).focus();
+			return;
+		}
+	}
+	for( i in r ) {
+		if( r[i].indexOf(s)!=-1 ) {
+			id=sprintf("#%s", i.replace(/ /g,'_'));
+			$(id).focus();
+			return;
+		}
+	}
+}
+
+function sprintf(fmt) {
+	var reg = /%s/;
+	var result = new String(fmt);
+	for (var i = 1; i < arguments.length; i++) {
+		result = result.replace(reg, new String(arguments[i]));
+	}
+	return result;
+}
+
+$(document).ready(function() {
+	eval(qs.replace(/%27/g, "'"));
+	//alert(file+"--"+ref+"--"+dsp);
+	$.get("/cgi-bin/rdb.cgi?webinterface.ref_lang", function(v){
+		eval(v.replace(/%22/g, "'"));
+		ref=webinterface_ref_lang;
+		$.get("/cgi-bin/xml_arr.cgi?"+file+".xml&"+ref+"&r", getRef );
+	});
+});
+</script>
+
+<table border=0 cellSpacing=5 cellPadding=5>
+<tbody>
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" >
+<table width="100%">
+	<tr>
+		<td width="20%"><b>Translation Manager</b></td>
+		<td width="40%" id="apply" align="center"><input type="button" id="BtApply" value="Apply Change" onClick="lang_submit()"/>&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/progress_bar.gif" id="wait" style="display:none" /></td>
+		<td width="40%" align="right"><b>String Search:&nbsp;</b><input type="text" name="search" id="search" value=""><input type="button" value="Search" onClick="search_string($('#search').val())"></td>
+	</tr>	
+</table>
+<br/>
+<table id="stringTools">
+</table>
+</form>
+
+</tbody>
+</table>
+
+</body>
+</html>

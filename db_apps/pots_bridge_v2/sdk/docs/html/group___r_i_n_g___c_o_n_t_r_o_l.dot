@@ -1,0 +1,9 @@
+digraph "Ring generation"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node0 [label="Ring generation",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 [label="Signaling - ring &\l line state, and hook state",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_g_n_a_l_i_n_g.html"];
+  Node1->Node0 [shape=plaintext, dir="back", style="solid"];
+}

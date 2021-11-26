@@ -1,0 +1,1212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Setup Wizard</title>
+<script src="stuHover.js" type="text/javascript"></script>
+<%
+var _lang=get_single('webinterface.language');
+var _lang_fr=get_single('webinterface.lang_fr');
+var _lang_ar=get_single('webinterface.lang_ar');
+var _pots_profilelist=get_single('pots.profilelist');
+var _sim_status=get_single("wwan.0.sim.status.status");
+var _ssid_onload=get_single('wlan.0.ssid');
+var _passphrase_onload=get_single('wlan.0.wpa_pre_shared_key');
+var _encrypType_onload=get_single('wlan.0.encryption_type');
+var _security_mode_onload=get_single('wlan.0.network_auth');
+var _apndropdown=get_single('webinterface.3gwwan_apndropdown');
+
+syslog(7,"wizard.html: entering with request '" + request['REQUEST_METHOD'] + "'");
+
+if (request['REQUEST_METHOD'] == "GET") {
+	if( request["SESSION_ID"]==session["sessionid"] )
+		form['passStatus']='pass';
+	else
+		form['passStatus']='';
+	form['wStep']=request['QUERY_STRING'];
+
+	router_user="";
+	router_password="";
+
+	// new login method - name-password method
+	if( rdb_exists("admin.user.name") ) {
+		syslog(7,"wizard.html: configurable user name rdb detected");
+
+		router_user=get_single("admin.user.name");
+		router_password=get_single("admin.user.password");
+	}
+	else {
+		syslog(7,"wizard.html: fixed user name rdb detected");
+
+		router_user="admin"
+		if( rdb_exists("admin.user.admin") ) {
+			router_password=get_single( "admin.user.admin" );
+		}
+	}
+
+	form['admpass']=router_password;
+	form['admpass2']=router_password;
+
+	var sim_pin=get_single('wwan.0.sim.pin');
+	form['pin']=sim_pin;
+	form['confirmPIN']=sim_pin;
+	if(sim_pin!="")
+		form['rememberSIMPIN']="1";
+	else
+		form['rememberSIMPIN']="0";
+	form['ssid']=_ssid_onload;
+	form['passphrase']=_passphrase_onload;
+	form['encryptionType']=_encrypType_onload;
+//	form['encrypType_hidden']=_encrypType_onload;
+	form['security_mode_hidden']=_security_mode_onload;
+	form['autoapn'] = get_single( 'webinterface.autoapn' );
+	tempval = get_single( 'link.profile.profilenum' );
+	if( (tempval == "N/A") || (tempval == "") || (tempval == "0") ) tempval = 1;
+	form['editIndex'] = tempval-1;
+	form['wlHide'] = get_single( 'wlan.0.hide_accesspoint' );
+	form['telephonyProfile'] = get_single('wwan.0.telephony.profile');
+}
+else { /* POST */
+	syslog(7,"wizard.html: setting user name and password - user='"+form['userTextInput']+"'");
+
+	set_single('admin.user.name='+form['userTextInput'], '-p');
+
+	// set the fixed user login if user name is admin. otherwise, we cannot help
+	if( form['userTextInput'] == "admin" )
+		set_single( 'admin.user.admin='+form['admpass'],'-p' );
+	else
+		set_single( 'admin.user.admin=N/A','-p' );
+
+	// update current user name
+	router_user=form['userTextInput'];
+
+	set_single('admin.user.password='+form['admpass'], '-p');
+	var mydata1="system.config.tz="+form['TZ']+
+		"&wlan.0.radio="+form['wlEnbl']+
+		"&wlan.0.hide_accesspoint="+form['wlHide']+
+		"&wlan.0.wireless_mode="+form['wlMode']+
+		"&wlan.0.ssid="+form['ssid']+
+		"&wlan.0.wpa_pre_shared_key="+form['passphrase']+
+		"&wlan.0.encryption_type="+form['encryptionType']+
+		"&wlan.0.network_auth="+form['security_mode_hidden'];
+	set_list( mydata1 );
+	set_single("wizard_status=5", '-p');
+
+	//check remember pin
+	var rememberPin = form['rememberSIMPIN'];
+	set_single('wwan.0.sim.autopin='+rememberPin);
+
+	var potsProfile = form['telephonyProfile'];
+	set_single( 'wwan.0.telephony.profile='+potsProfile );
+
+	var mypin=form['pin'];
+	if(rememberPin!="1")
+		mypin="";
+	set_single("wwan.0.sim.pin="+mypin, '-p');
+	var iccid=get_single("wwan.0.system_network_status.simICCID");
+	if(iccid!="") {
+		set_single("wwan_pin_"+iccid+"="+mypin, '-p');
+	}
+/*----------------------------------------*/
+	i = form['editIndex']+1;
+	if( i > 0 ) {
+		tempval = form['APNName'];
+		retval=set_single( 'link.profile.'+i+'.apn='+tempval, '-p' );
+		tempval = form['pppuser'];
+		retval=set_single( 'link.profile.'+i+'.user='+tempval, '-p' );
+		tempval = form['ppppass'];
+		retval=set_single( 'link.profile.'+i+'.pass='+tempval, '-p' );
+		retval=set_single( 'link.profile.'+i+'.enable=0', '-p' );
+		autoapn=form['autoapn'];
+		set_single( 'webinterface.autoapn='+autoapn, '-p');
+		if(autoapn=='1')
+			tempval='1';
+		else
+			tempval = form['gascEnable'];
+		if( tempval=='1' ) {
+			esp_sleep(2000);
+			retval=set_single( 'link.profile.'+i+'.enable=1', '-p' );
+		}
+	}
+	tempval = form['country'];
+	set_single( 'webinterface.apn_country='+tempval, '-p');
+
+	autoapn=form['autoapn'];
+	set_single( 'webinterface.autoapn='+autoapn, '-p');
+	if(autoapn=='1')
+		tempval='1';
+	else
+		tempval = form['gascEnable'];
+	if( tempval=='1' ) {
+		esp_sleep(2000);
+		retval=set_single( 'link.profile.'+i+'.enable=1', '-p' );
+	}
+	tempval = form['country'];
+	set_single( 'webinterface.apn_country='+tempval, '-p');
+
+	redirect('/wizard.html?saved=1');
+}
+%>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<% if(_lang=='ar') {%>
+<link href="GUI-ntcStyle-ar.css" rel="stylesheet" type="text/css"/>
+<%}%>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+
+#ifdef V_SKIN_ntc
+#define HASH_first_time_setup #firstTimeSetup
+#define HASH_nav2 #nav2
+#define HASH_langDisplay #langDisplay
+#define HASH_div_tz_text #div_tz_text
+#define HASH_div_tz #div_tz
+<style>
+<% if(_lang=="fr") {%>
+HASH_first_time_setup {
+	top:20px;
+	font-size:10px;
+	height:220px;
+	width:220px;
+}
+<%}%>
+HASH_nav2 {padding-left:6px;}
+</style>
+#endif
+
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script type="text/javascript" src="/cgi-bin/timezoneList.cgi"></script>
+</head>
+
+<script language='JavaScript'>
+Butterlate.setTextDomain("wizard");
+var SIMStatus="@@_sim_status";
+var ssid_onload="@@_ssid_onload";
+var passphrase_onload="@@_passphrase_onload";
+var encrypType_onload="@@_encrypType_onload";
+var security_mode_onload="@@_security_mode_onload";
+
+/**************************************/
+function RadioStatusChange(rs) {
+	var myid=document.getElementById( "warning2" );
+	if (rs == 1) {
+		if(myid) myid.style['display']='';
+		document.form.wlEnbl.value = 0;
+	}
+	else {
+		if(myid) myid.style['display']='none';
+		document.form.wlEnbl.value = 1;
+	}
+}
+
+function authModeChange( authMode ) {
+	document.form.security_mode_hidden.value=authMode;
+	switch ( authMode ) {
+	case 'WPAPSK':
+		document.form.encryptionType.value="TKIP";
+		break;
+	case 'WPA2PSK':
+		document.form.encryptionType.value="AES";
+		break;
+	case 'WPAPSKWPA2PSK':
+		document.form.encryptionType.value="AES";
+	break;
+	}
+}
+
+function LoadFields(MBSSID) {
+	var f=document.form;
+	if( f.security_mode_hidden.value!="WPAPSK" && f.security_mode_hidden.value!="WPA2PSK" && f.security_mode_hidden.value!="WPAPSKWPA2PSK")
+		f.security_mode_hidden.value="WPA2PSK"
+
+	sp_select = document.getElementById("security_mode");
+	sp_select.options.length = 0;
+	sp_select.options[sp_select.length] = new Option("WPA-PSK", "WPAPSK", false, f.security_mode_hidden.value == "WPAPSK");
+	sp_select.options[sp_select.length] = new Option("WPA2-PSK","WPA2PSK", false, f.security_mode_hidden.value == "WPA2PSK");
+	sp_select.options[sp_select.length] = new Option("WPA-PSK-WPA2-PSK","WPAPSKWPA2PSK", false, f.security_mode_hidden.value == "WPAPSKWPA2PSK");
+
+/*	switch ( f.encrypType_hidden.value ) {
+		case 'TKIP':
+			f.cipher[0].checked = true;
+		break;
+		case 'AES':
+			f.cipher[1].checked = true;
+		break;
+		case 'TKIPAES':
+			f.cipher[2].checked = true;
+		break;
+		default:
+			f.cipher[2].checked = true;
+			f.encrypType_hidden.value="TKIPAES";
+		break;
+	}*/
+}
+
+function init_Security() {
+	LoadFields(0);
+	checkKey();
+}
+
+function checkKey() {
+	if(document.form.passphrase.value.toString().length >= 8) {
+		document.getElementById( "warning3" ).style['display']='none';
+		document.getElementById( "passphrase" ).style.color = "GREEN";
+		return 0;
+	}
+	else {
+		document.getElementById( "passphrase" ).style.color = "RED";
+		return 1;
+	}
+}
+/*********************************************/
+var ajaxcounter = 0;
+var rebootok = 0;
+
+function waitingHandler() {
+	rebootok++;
+}
+
+function updateStatus() {
+	$.get('/cgi-bin/ajax.cgi', waitingHandler);
+}
+
+function start_timer(myTime) {
+	setTimeout("start_timer(1);", myTime*1000);
+	if(ajaxcounter<5) {
+		setMsg(_("RouterInstallComplete")+" "+_("setman rebooting")+" "+(5-ajaxcounter)+" "+_("seconds"));
+		//installation is complete . System reboot -- "+(5-ajaxcounter)+" seconds");
+	}
+	else if(ajaxcounter==5) {
+		setMsg(_("GUI waitingMsg3"));
+		//setMsg("If you have not inserted a SIM card, please turn off the power and insert the SIM card provided by TELUS.");
+	}
+	else if(ajaxcounter==10) {
+		//setMsg("Rebooting ...");
+		setMsg(_("GUI rebooting"));
+	}
+	else if(ajaxcounter==20) {
+		//setMsg("The reboot will take about 60 seconds. You can choose to close this page now or wait to see the Status page after the reboot.");
+		setMsg(_("GUI waitingMsg4"));
+		document.getElementById( "waitingCnt" ).style['display']='';
+	}
+	else if(ajaxcounter==40) {
+		//Smart Hub"In the Status Page you can check the SIM status, Signal strength, 3G connecting Status etc...");
+		;//setMsg(_("GUI waitingMsg5"));setMsg("Please wait while your Smart Hub reboots.");
+	}
+	else if(ajaxcounter>50 && (ajaxcounter%5)==0 ) {
+		updateStatus();
+	}
+	if(rebootok) {
+		document.getElementById( "waitingCnt" ).innerHTML='';
+		if(rebootok==1)
+			setMsg(_("setman warningMsg7"));//setMsg("Reboot is successful, now redirecting to the Status page...");
+		else if(rebootok>=2)
+			setTimeout("window.location='/GUI-status.asp'", 1000);
+	}
+	else {
+		document.getElementById( "waitingCnt" ).innerHTML=ajaxcounter-20;
+		if(ajaxcounter>90 && ajaxcounter<120)
+			setMsg(_("setman warningMsg5"));//setMsg("If you connected via wireless and changed the password, you will need to reconnect.");
+		else if(ajaxcounter>120)
+			setMsg(_("setman warningMsg6"));//setMsg("The reboot seems to be taking too long, you may need to manually power cycle the Smart Hub.");
+	}
+	ajaxcounter++;
+}
+var boxColor=0;
+function setMsg(mymsg) {
+	var myid=document.getElementById( "waitingMsg" );
+	var lines=parseInt(mymsg.length/70);
+	myid.style['top']=30-lines*8;
+	myid.innerHTML=mymsg;
+	boxColor++;
+	if((boxColor%2)==0) {
+		document.getElementById( "waitingBox" ).style['backgroundColor']='#dddddd';
+		document.getElementById( "waitingMsg" ).style['color']='#d00001';
+	}
+	else {
+		document.getElementById( "waitingBox" ).style['backgroundColor']='#aaaaaa';
+		document.getElementById( "waitingMsg" ).style['color']='#ffffff';
+	}
+}
+
+function submitF() {
+	document.getElementById( "BTwStep4" ).style['display']='none';
+	document.getElementById( "completeMsg" ).style['display']='none';
+	document.getElementById( "THinstallationComplete" ).style['display']='none';
+	document.getElementById( "waitingBox" ).style['display']='';
+	document.form.wStep.value='4';
+	// To prevent consuming pin retry count with wrong pin twice
+	// one is before rebooting and another is after rebooting by simple_at_manager/cnsmgr,
+	// kill all managers before changing rdb variable and rebooting when auto pin is enabled.
+	document.form.rememberSIMPIN.value='1';
+	if(document.form.rememberSIMPIN.value=='1') {
+		$.get('/cgi-bin/killmgr.cgi');
+	}
+	document.form.submit();
+}
+/*******************************************/
+function hideAll() {
+var myid=1;
+	for(var i=0; myid; i++) {
+		myid=document.getElementById( "wStep"+i.toString() )
+		if( myid )
+			myid.style.display = "none";
+	}
+}
+
+function setpage( page ) {
+	hideAll();
+	document.getElementById( "wStep"+page.toString() ).style.display = '';
+	if(page==5)
+		document.getElementById('finish').focus();
+}
+
+function check_ssid_changes() {
+	if(document.form.ssid.value=="") {
+		document.form.ssid.focus();
+		alert(_("wlan warningMsg4"));
+		return;
+	}
+	if(ssid_onload!=document.form.ssid.value) {
+		if(!confirm(_("warningChangeSecurity"))) {
+			document.form.ssid.value=ssid_onload;
+			return;
+		}
+	}
+	if(document.form.radioButton[0].checked==true) {
+		setpage(3);
+		setp4_prev=3;
+		document.form.security_mode.focus();
+	}
+	else {
+		setp4_prev=2;
+		setpage(4);
+	}
+}
+
+function checkpassword() {
+/*	if(document.form.admuser.value=="" ) {
+		alert(_("pleaseEnterUsername"));
+		return 0;
+	}*/
+	if(document.form.admpass.value=="" ) {
+		alert(_("pleaseEnterPassword"));
+		return 0;
+	}
+	else if(document.form.userTextInput.value.length<4) {
+		alert(_("username warning"));
+		document.form.admuser.focus();
+		return 0;
+	}
+	else if(document.form.admpass.value.length<4) {
+		alert(_("wlan warningMsg7"));
+		document.form.admpass.focus();
+		return 0;
+	}
+	if(document.form.admpass.value != document.form.admpass2.value) {
+		document.getElementById( "warning1" ).style['display']='';
+		return 0;
+	}
+	else
+		document.getElementById( "warning1" ).style['display']='none';
+	return 1;
+}
+
+function checkSIM() {
+	document.getElementById( "warning1" ).style['display']='none';
+	if(SIMStatus.indexOf("PIN")!=-1 || SIMStatus.indexOf("locked")!=-1) {
+		if(document.form.rememberSIMPIN.value=='1') {
+			if(document.form.pin.value=="") {
+				alert(_("PINempty"));
+				return 0;
+			}
+			else if(document.form.pin.value !=document.form.confirmPIN.value) {
+				alert(_("wwan warningMsg12"));
+				return 0;
+			}
+			else if(document.form.pin.value.length < 4 || document.form.pin.value.length > 8) {
+				alert(_("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+				return 0;
+			}
+		}
+		else {
+			document.form.pin.value="";
+			document.form.confirmPIN.value="";
+		}
+	}
+	return 1;
+}
+
+function setLanguageText(lang) {
+	switch(lang) {
+	case 'en':
+		return _("english");
+	break;
+	case 'ar':
+		return _("arabicAR");
+	break;
+	case 'fr':
+		return _("man language french");
+	break;
+	}
+	return _("english");
+}
+
+var cipherText=["TKIP","AES","TKIP & AES"];
+
+function initTranslation() {
+	document.getElementById("next0").value = _("GUI next");
+	document.getElementById("next1").value = _("GUI next");
+	document.getElementById("back1").value = _("GUI back");
+	document.getElementById("back2").value = _("GUI back");
+	document.getElementById("next2").value = _("GUI next");
+	document.getElementById("back3").value = _("GUI back");
+	document.getElementById("next3").value = _("GUI next");
+	document.getElementById("next4").value = _("GUI next");
+	document.getElementById("THinstallationComplete").innerHTML = _("RouterInstallComplete");
+	document.getElementById("completeMsg").innerHTML = _("GUI completeMsg1")+"</BR>"+_("GUI completeMsg2");
+	document.getElementById("back4").value = _("GUI back");
+	document.getElementById("back5").value = _("GUI back");
+	document.getElementById("finish").value = _("GUI finish");
+	setMsg(_("GUI waitingMsg1"));
+	document.getElementById("warningPass").innerHTML = _("mismatchedPasswords");
+	document.getElementById("warningWLANdisable").innerHTML = _("GUI warningWLANdisable");
+	document.getElementById("warningKeyMin").innerHTML = _("GUI warningKeyMin");
+	document.getElementById("wz_yes").value = _("GUI wz_yes");
+	document.getElementById("wz_no").value = _("GUI wz_no");
+	document.getElementById("cancel0").value = _("cancel");
+	document.getElementById("cancel1").value = _("cancel");
+	document.getElementById("cancel2").value = _("cancel");
+	document.getElementById("cancel3").value = _("cancel");
+	document.getElementById("cancel4").value = _("cancel");
+	document.getElementById("cancel5").value = _("cancel");
+}
+
+var lang_fr="@@_lang_fr";
+var lang_ar="@@_lang_ar";
+var current_lang="@@_lang";
+var pots_profilelist="@@_pots_profilelist";
+var telphonyProfileIdx="@@form['telephonyProfile']";
+
+function initValue() {
+var lang_element = document.getElementById("langSelection");
+	if (lang_fr == "1" || lang_ar == "1") { // Languaue dropdown + Timezone dropdown
+		lang_element.options.length = 0;
+		lang_element.options[lang_element.length] = new Option(_("english"), 'en');//'English'
+		if (lang_fr == 1) {
+			if(current_lang=="fr")
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, false);
+		}
+		if (lang_ar == 1) {
+			if(current_lang=="ar")
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, false);
+		}
+		if( pots_profilelist!="N/A" ) { // Languaue dropdown + Timezone dropdown + Telephony Profile dropdown
+			document.getElementById("potsDisplay").style["display"]="";
+			document.getElementById("potsSelection").value=telphonyProfileIdx;
+
+			document.getElementById("div_lang_text").style["top"]="-10px";
+			document.getElementById("div_lang").style["top"]="15px";
+
+			document.getElementById("div_tz_text").style["top"]="120px";
+			document.getElementById("div_tz").style["top"]="145px";
+		}
+	}
+	else if( pots_profilelist!="N/A" ){ //Timezone dropdown + Telephony Profile dropdown
+		document.getElementById("langDisplay").style["display"]="none";
+
+		document.getElementById("potsDisplay").style["display"]="";
+		document.getElementById("potsSelection").value=telphonyProfileIdx;
+
+		document.getElementById("div_pots_text").style["top"]="20px";
+		document.getElementById("div_pots").style["top"]="45px";
+
+	/*	document.getElementById("div_tz_text").style["top"]="20px";
+		document.getElementById("div_tz").style["top"]="70px";*/
+	}
+	else { //Timezone dropdown only
+		document.getElementById("langDisplay").style["display"]="none";
+		document.getElementById("div_tz_text").style["top"]="20px";
+		document.getElementById("div_tz").style["top"]="70px";
+	}
+
+	initTranslation();
+	document.form.admuser.value="@@router_user"
+	document.form.userTextInput.value="@@router_user"
+
+	document.form.rememberSIMPIN.value='1';
+	if(SIMStatus.indexOf("PIN")!=-1 || SIMStatus.indexOf("locked")!=-1) {
+		document.getElementById("box1").style['top']="150px";
+		document.getElementById("strip1").style['display']='none';
+		document.getElementById("strip2").style['display']='none';
+	}
+	else {
+		document.getElementById("pin_fileds").style['display']='none';
+	}
+	document.form.wlEnbl.value="1";
+	document.form.wlHide.value="0"
+}
+function checkAPNdev() {
+	document.getElementById( "APNname_Div" ).style['display']='';
+}
+function setPass(val) {
+	if( val ) {
+		$('#apn_pass').animate( { width: "show", paddingLeft: "show", paddingRight: "show", marginLeft: "show", marginRight: "show" }, 1000);
+	}
+	else {
+		$('#apn_pass').animate( { width: "hide", paddingLeft: "hide", paddingRight: "hide", marginLeft: "hide", marginRight: "hide" }, 1000);
+	}
+}
+function submitPass() {
+var i = parseInt(document.form.editIndex.value)+1;
+	cmd="/cgi-bin/rdb.cgi?link.profile."+i+".user="+document.form.pppuser.value+"&link.profile."+i+".pass="+document.form.ppppass.value;
+	$.get(cmd);
+	setPass(0);
+}
+function setPPPHandler(responseText) {
+	if (responseText.length<20 ) return;
+	eval( responseText );
+	for (var i=0; i<stpf.length; i++) {
+		if( parseInt(stpf[i].enable) == 1) {
+			document.form.editIndex.value = i;
+			stpf_readonly=stpf[i].readonly;
+			stpf_APNName=stpf[i].APNName;
+			break;
+		}
+	}
+	i = document.form.editIndex.value;
+	document.form.profilename.value = stpf[i].name;
+	document.form.APNName.value = stpf[i].APNName;
+	document.form.pppuser.value=stpf[i].user;
+	document.form.ppppass.value=stpf[i].pass;
+
+	checkAPNdev();
+	document.form.gascEnable.value = stpf[i].enable;
+	if( parseInt(document.form.gascEnable.value)==1 )
+		document.form.pppAutoCon[0].checked=true;
+	else
+		document.form.pppAutoCon[1].checked=true;
+	if( stpf[i].readonly == '1' ) {
+		document.getElementById( "PFreadonly_0" ).style['display']='none';
+		document.getElementById( "PFreadonly_1" ).style['display']='';
+	//	document.form.APNName.disabled = true;
+<%if(_apndropdown=="1"){%>
+		document.form.countryList.disabled = true;
+<%}%>
+		document.getElementById( "nav2" ).style['display']='none';
+	}
+	else {
+		document.getElementById( "PFreadonly_0" ).style['display']='';
+		document.getElementById( "PFreadonly_1" ).style['display']='none';
+
+<%if(_apndropdown=="1"){%>
+		document.form.countryList.disabled = false;
+<%}%>
+		document.getElementById( "nav2" ).style['display']="";
+	}
+	ckeckAutoAPN();
+	copyToSum();
+}
+
+function no_wizard() {
+	$.get("/cgi-bin/rdb.cgi?wizard_status=5");
+	setTimeout("window.location='/index.html'", 1000);
+}
+
+function tzChange(idx) {
+#ifdef PLATFORM_Bovine
+	document.form.TZ.value=zoneinfo[idx].FL;
+#else
+	document.form.TZ.value=zoneinfo[idx].TZ;
+#endif
+}
+
+function ckeckAutoAPN() {
+	if(document.getElementById("autoapnCK").checked==true) {
+		document.form.autoapn.value="1";
+		document.getElementById("hide_for_autoapn").style['display']="none";
+		var isAnyProfileEnabled=false;
+		for( i=0; i<stpf.length; i++ ) {
+			if(stpf[i].enable == 1) {
+				isAnyProfileEnabled=true;
+				break;
+			}
+		}
+		if(!isAnyProfileEnabled) {
+			document.form.pppAutoCon[0].checked=true;
+			document.form.gascEnable.value='1';
+		}
+	}
+	else {
+		document.form.autoapn.value="0";
+		document.getElementById("hide_for_autoapn").style["display"]="";
+	}
+}
+
+function setAPNHandler(responseText) {
+	if (responseText.length<20 ) return;
+	eval( responseText  );
+	setTimeout(stuHover, 1000);
+	for(i=1; i<st.length; i++)
+		document.form.countryList[i-1] = new Option(st[i], st[i] );
+	document.getElementById('countryList').options.selectedIndex=selectedIdx;
+	document.getElementById("chooseAPN").innerHTML = _("click to choose apn");
+	ckeckAutoAPN();
+}
+
+function setAPN( myapn, myuser, mypass, myauth ) {
+	document.getElementById('wwanAPN').value=myapn;
+	document.form.pppuser.value=myuser;
+	document.form.ppppass.value=mypass;
+	checkAPNdev();
+}
+
+function cgCountry( myval ) {
+	document.form.country.value=myval;
+	$.get("/cgi-bin/wwanGetAPN.cgi?"+myval, setAPNHandler);
+}
+
+function setIndex() {
+<%country=get_single('webinterface.apn_country');%>
+	cgCountry('@@country');
+	$.get('/cgi-bin/ajax.cgi?getProfiles', setPPPHandler);
+	if(document.form.autoapn.value=="1")
+		document.getElementById("autoapnCK").checked=true;
+	else
+		document.getElementById("autoapnCK").checked=false;
+}
+
+$(document).ready(function() {
+	checkIE10();
+	initValue();
+	init_Security();
+	var s=document.form.wStep.value.indexOf("saved=");
+	if(s!=-1) {
+		setpage(5);
+		document.form.TZ.value=<%t=get_single( 'system.config.tz' );%>"@@t";
+		document.form.wlEnbl.value=<%w=get_single( 'wlan.0.radio' );%>"@@w";
+		if(document.form.wlEnbl.value=="1")
+			document.form.radioButton[0].checked=true;
+		else
+			document.form.radioButton[1].checked=true;
+
+		document.getElementById( "BTwStep4" ).style['display']='none';
+		document.getElementById( "completeMsg" ).style['display']='none';
+		document.getElementById( "THinstallationComplete" ).style['display']='none';
+		document.getElementById( "waitingBox" ).style['display']='';
+		document.getElementById( "waitingImg" ).style['display']='';
+		document.getElementById( "CompleteSum" ).style['top']='120px';
+		ajaxcounter = 0;
+		$.get("/cgi-bin/rdb.cgi?service.system.reset=1");
+		setTimeout("start_timer(1)",2000);
+
+		document.form.wlHide.value=<%h=get_single( 'wlan.0.hide_accesspoint' );%>"@@h";
+		if(document.form.wlHide.value=='0')
+			document.form.broadcastssid[0].checked = true;
+		else
+			document.form.broadcastssid[1].checked = true;
+	}
+
+	if(document.form.TZ.value=="" || document.form.TZ.value=="N/A") {
+#ifdef PLATFORM_Bovine
+		document.form.TZ.value="Australia/Sydney";
+#else
+		document.form.TZ.value="EST-10";
+#endif
+	}
+	for (i=0; i<zoneinfo.length; i++) {
+#ifdef PLATFORM_Bovine
+		document.form.time_zone.options[i] = new Option(zoneinfo[i].NAME), zoneinfo[i].FL;
+		if(document.form.TZ.value==zoneinfo[i].FL) {
+#else
+		document.form.time_zone.options[i] = new Option(zoneinfo[i].NAME), zoneinfo[i].TZ;
+		if(document.form.TZ.value==zoneinfo[i].TZ) {
+#endif
+			document.form.time_zone.options[i].selected=true;
+		}
+	}
+	tzChange(document.form.time_zone.options.selectedIndex);
+	setIndex();
+});
+</script>
+
+<body>
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="50,20,250,76" href="http://www.netcommwireless.com/" alt="www.netcommwireless.com" target="_blank"/>
+</map>
+</div>
+
+<form name="form" class="content"  method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name='wStep' value="@@form['wStep']">
+<input type="hidden" name='passStatus' value="@@form['passStatus']">
+<input type="hidden" name='TZ' value="@@form['TZ']">
+<input type="hidden" name="wlEnbl" value="@@form['wlEnbl']">
+<input type="hidden" name="wlHide" value="@@form['wlHide']">
+<input type="hidden" name="admuser" value="<%write(session["user"]);%>">
+<input type="hidden" name="telephonyProfile" value="@@form['telephonyProfile']">
+<!-- <input type="hidden" name="encrypType_hidden" value="@@form['encrypType_hidden']"> -->
+<input type="hidden" name="security_mode_hidden" value="@@form['security_mode_hidden']">
+
+<div id="basicGUI">
+<img src="/images/NTC-GUI-wizard_en.png" border="0" usemap="#1"/>
+
+<div class="Rotate-90" id="firstTimeSetup"><a style="text-decoration:none;"><script language="JavaScript">document.write(_("GUI FirstTimeSetup"));</script></a></div>
+
+<div id="wStep0">
+<div id="wStep0_0">
+#if (defined V_SKIN_ntc)
+	<p style="color:#ffffff; position:absolute; font-size:18px; font-weight:bold; top:25px; left:110px">NetComm Wireless Router</p>
+#elif (defined V_SKIN_tel)
+	<p style="color:#ffffff; position:absolute; font-size:24px; font-weight:bold; top:14px; left:120px">Telstra 3G Gateway</p>
+#endif
+	<img class="strip" style="top:100px;" src='/images/strip.png'/>
+	<div class="div_introduction" style="font-size:12px; top:120px"><script language="JavaScript">document.write(_("GUI FirstTimeIntroduction"));</script></div>
+	<img class="strip" style="top:230px;" src='/images/strip.png'/>
+	<div class="div_button" style="left:93px; top:300px">
+	<input type="button" id="wz_yes" style="width:280px; color:#000"  value="" onClick="document.getElementById('wStep0_0').style.display='none';document.getElementById('wStep0_1').style.display=''"/>
+	<br/><br/>
+	<input type="button" id="wz_no" style="width:280px; color:#000" value="" onClick="no_wizard()"/>
+	</div>
+</div>
+
+<div id="wStep0_1" style="display:none">
+	<div class="div_step">Step 1 of 6</div>
+	<div class="div_introduction">
+#if defined V_SKIN_ro
+	<b><script language="JavaScript">document.write(_("GUI THwizard-ro"));</script></b>
+	<br/>
+	<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI wizardIntroduction-ro"));</script></p>
+#else
+	<b><script language="JavaScript">document.write(_("GUI THwizard"));</script></b>
+	<br/>
+	<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI wizardIntroduction"));</script></p>
+#endif
+	</div>
+	<img class="strip" id="strip1" style="top:185px;" src='/images/strip.png'/>
+	<div class="box" id="box1">
+		<div id="langDisplay">
+			<div class="div_text_n12" style="top:20px" id="div_lang_text">
+				<script language="JavaScript">document.write(_("GUI selectLanguage"));</script>
+			</div>
+			<div class="div_input2" style="top:45px;" id="div_lang">
+				<select name="langSelection" id="langSelection" onkeyup="checkenter(event,'document.form.time_zone.focus();');" onChange="setLanguage(this.value);"></select>
+			</div>
+		</div>
+
+		<div id="potsDisplay" style="display:none">
+			<div class="div_text_n12" style="top:55px" id="div_pots_text">
+				<script language="JavaScript">document.write(_("select telephony profile"));</script>
+			</div>
+			<div class="div_input2" style="top:80px;" id="div_pots">
+				<select name="potsSelection" id="potsSelection" onkeyup="document.form.telephonyProfile.value=this.value;" onChange="document.form.telephonyProfile.value=this.value;">
+				<script type="text/javascript">
+				if(pots_profilelist!="N/A" && pots_profilelist!="" ) {
+					var i;
+					var tel_profiles = new Array();
+					tel_profiles = pots_profilelist.split(';');
+					for(i=0; tel_profiles[i] != ''; i++) {
+						document.write("<option value="+i+" id=\"selTelProfile"+i+"\">"+tel_profiles[i]+"<\/option>");
+					}
+				}
+				</script>
+				</select>
+			</div>
+		</div>
+
+		<div class="div_text_n12" style="top:90px;" id="div_tz_text">
+		<script language="JavaScript">document.write(_("GUI selectTimeZone"));</script>
+		</div>
+		<div class="div_input2" style="top:115px;" id="div_tz">
+		<select onChange="tzChange(this.selectedIndex); checkenter(event,'document.form.next0.focus();');" name="time_zone">
+		</select>
+		</div>
+	</div>
+	<div id="pin_fileds">
+		<div class="div_text_n12" style="top:310px;"><script language="JavaScript">document.write(_("pinSettings")+":");</script></div>
+		<div class="div_text_n12" style="top:340px;"><script language="JavaScript">document.write(_("wps pin num"));</script></div>
+		<div class="div_input" style="top:340px;" >
+			<input type=password name="pin" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " maxlength=8 value="@@form['pin']">
+		</div>
+		<div class="div_text_n12" style="top:372px;"><script language="JavaScript">document.write(_("confirmPin"));</script></div>
+		<div class="div_input" style="top:372px;">
+			<input type=password name="confirmPIN" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " maxlength=8 value="@@form['confirmPIN']">
+		</div>
+		<div class="div_text_n12" style="top:402px;display:none;" style="display:none"><script language="JavaScript">document.write(_("rememberPin"));</script></div>
+		<div class="div_input" style="top:400px;display:none;" style="display:none">
+			<input type=radio name='rememberPIN' onclick="document.form.rememberSIMPIN.value='1'" checked="checked" >&nbsp;<script language="JavaScript">document.write(_("CSyes"));</script>&nbsp;&nbsp;
+			<input type=radio name='rememberPIN' onclick="document.form.rememberSIMPIN.value='0'">&nbsp;<script language="JavaScript">document.write(_("CSno"));</script>
+		</div>
+		<input type="hidden" name="rememberSIMPIN" value="@@form['rememberSIMPIN']"/>
+	</div>
+	<img class="strip" id="strip2" style="top:400px;" src='/images/strip.png'/>
+	<div class="div_button" style="top:440px;left:156px">
+		<input type="button" id="cancel0" style="width:80px;" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+		<input type="button" name="next0" style="width:80px;" id="next0" value="&nbsp;Next&nbsp;" onMouseUp="if(checkSIM()){setpage(1);document.form.userTextInput.focus();}" onKeyUp="if(checkSIM()){setpage(1);document.form.admpass.focus();}"/>
+	</div>
+</div>
+</div>
+
+<div id="wStep1" style="display:none">
+<div class="div_step">Step 2 of 6</div>
+<div class="div_introduction">
+#if defined V_SKIN_ro
+<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity-ro"));</script></b>
+<br/>
+<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI securityIntroduction1-ro"));</script></p>
+#else
+<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity"));</script></b>
+<br/>
+<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI securityIntroduction1"));</script></p>
+#endif
+</div>
+
+<div class="box" style="top:200px">
+	<div class="div_text_n12" style="top:6px">
+	<script language="JavaScript">document.write(_("GUI desiredUsername"));</script>
+	</div>
+	<div class="div_text_n12" style="top:66px">
+	<script language="JavaScript">document.write(_("GUI desiredPassword"));</script>
+	</div>
+	<div class="div_text_n12" style="top:126px">
+	<script language="JavaScript">document.write(_("GUI retypePassword"));</script>
+	</div>
+
+	<div class="div_input" id="userText" style="top:6px; left:240px; color:#fff">
+	<input type="text" name="userTextInput" size="16" onKeyUp="nameFilter(this);checkenter(event,'document.form.admpass.focus()');" maxlength="32" style="width:125px" value="@@router_user">
+	</div>
+
+	<div class="div_input" style="top:60px; left:240px;">
+		<input type="password" name="admpass" size="16" onKeyUp="nameFilter(this);checkenter(event,'document.form.admpass2.focus()');" maxlength="32" style="width:125px" value="@@form['admpass']">
+	</div>
+	<div class="div_input" style="top:120px; left:240px;">
+		<input type="password" name="admpass2" size="16" onKeyUp="nameFilter(this);checkenter(event,'document.form.next1.focus()');" maxlength="32" style="width:125px" value="@@form['admpass2']">
+	</div>
+	<div class="div_text_n12" style="top:190px;">
+	<script language="JavaScript">document.write(_("GUI rememberNote"));</script>
+	</div>
+</div>
+<div class="warning" id="warning1">
+	<b style="position:absolute; top:12px; left:12px; font-size:18px;color:#FF0000">&#33;</b>
+	<div class="warningText" id="warningPass" style="top:9px">Your username or password is incorrect. Please try again.</div>
+</div>
+<img class="strip" style="top:440px;" src='/images/strip.png'/>
+<div class="div_button" >
+	<input type="button" id="back1" value="&nbsp;Back&nbsp;" onClick="setpage(0);"/>
+	<input type="button" id="cancel1" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+	<input type="button" name="next1" id="next1" value="&nbsp;Next&nbsp;" onMouseUp="if(checkpassword()){setpage(2);document.form.ssid.focus();}" onKeyUp="if(checkpassword()){setpage(2);document.form.ssid.focus();}"/>
+</div>
+</div>
+<div id="wStep2" style="display:none">
+<div class="div_step">Step 3 of 6</div>
+<div class="div_introduction">
+#if defined V_SKIN_ro
+<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity-ro"));</script></b>
+<br/>
+<p style="font-size:12px;"><script language="JavaScript">document.write(_("Msg21-ro"));</script></p>
+#else
+<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity"));</script></b>
+<br/>
+<p style="font-size:12px;"><script language="JavaScript">document.write(_("Msg21"));</script></p>
+#endif
+</div>
+<img class="strip" style="top:215px;" src='/images/strip.png'/>
+<div class="box" style="top:225px">
+	<div class="div_text_n12" style="top:10px">
+		<script language="JavaScript">document.write(_("GUI wirelessWiFi"));</script>
+	</div>
+	<div class="div_text_n12" style="top:70px">
+	<script language="JavaScript">document.write(_("GUI SSIDbroadcast"));</script>
+	</div>
+	<div class="div_text_n12" style="top:120px">
+		<script language="JavaScript">document.write(_("GUI SSIDname")+" "+_("GUI max32"));</script>
+	</div>
+
+	<div class="div_input" style="top:6px;">
+		<input type="radio" name="radioButton" value="0" onKeyUp="RadioStatusChange(0);" onMouseUp="RadioStatusChange(0);" checked>&nbsp;<script language="JavaScript">document.write(_("on"));</script>&nbsp;&nbsp;&nbsp;
+		<input type="radio" name="radioButton" value="1" onKeyUp="RadioStatusChange(1);" onMouseUp="RadioStatusChange(1);">&nbsp;<script language="JavaScript">document.write(_("off"));</script>
+	</div>
+
+	<div class="div_input" style="top:66px;">
+		<input type="radio" name="broadcastssid" value="0" onKeyUp="document.form.wlHide.value='0';" onMouseUp="document.form.wlHide.value='0';" checked>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>
+		&nbsp;&nbsp;<input type="radio" name="broadcastssid" value="1" onKeyUp="document.form.wlHide.value='1'" onMouseUp="document.form.wlHide.value='1'">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</div>
+	<div class="div_input2" style="top:145px;">
+		<input type=text name='ssid' size="28" maxlength=32 onKeyUp="isValidNameEntry(this,event);checkenter(event,'document.form.next2.focus();');" value="@@form['ssid']">
+	</div>
+</div>
+<div id="warning2" class="warning" style="height:64px; display:none">
+	<b style="position:absolute; top:12px; left:12px; font-size:18px;color:#FF0000">&#33;</b>
+	<div class="warningText" id="warningWLANdisable" style="top:12px"></div>
+</div>
+<img class="strip" style="top:430px;" src='/images/strip.png'/>
+<div class="div_button">
+	<input type="button" id="back2" value="&nbsp;Back&nbsp;" onClick="checkpassword();setpage(1);document.form.admpass.focus();"/>
+	<input type="button" id="cancel2" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+	<input type="button" name="next2" id="next2" value="&nbsp;Next&nbsp;" onMouseUp="check_ssid_changes();" onKeyUp="check_ssid_changes();"/>
+</div>
+</div>
+
+<div id="wStep3" style="display:none">
+<div class="div_step">Step 4 of 6</div>
+<div class="div_introduction" style="top:100px">
+#if defined V_SKIN_ro
+	<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity-ro"));</script></b>
+	<br/>
+	<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI wlanIntroduction-ro"));</script></p>
+#else
+	<b><script language="JavaScript">document.write(_("GUI THsmartHubSecurity"));</script></b>
+	<br/>
+	<p style="font-size:12px;"><script language="JavaScript">document.write(_("GUI wlanIntroduction"));</script></p>
+#endif
+</div>
+<img class="strip" style="top:215px;" src='/images/strip.png'/>
+<div class="box" style="top:240px">
+	<div class="div_text_n12" style="top:0px">
+		<script language="JavaScript">document.write(_("networkAuth"));</script>
+	</div>
+	<div class="div_text_n12" style="top:70px">
+		<script language="JavaScript">document.write(_("GUI securityKey")+" "+_("GUI min8"));</script>
+	</div>
+	<div class="div_text_n12" style="top:140px">
+		<script language="JavaScript">document.write(_("WPAencryption")+" :");//wpa algorithms</script>&nbsp;&nbsp;<input type="text" name='encryptionType' value="@@form['encryptionType']" style="border-style:none; background:#000; color:#fff" readonly/>
+	</div>
+	<div class="div_input2" style="top:20px;">
+		<select name="security_mode" id="security_mode" onkeyup="authModeChange(this.value)" onchange="authModeChange(this.value)" size="1"></select>
+	</div>
+	<div class="div_input2" style="top:90px;">
+		<input name="passphrase" id="passphrase" size="28" maxlength="64" value="@@form['passphrase']" onKeyUp="if(checkKey()==0)checkenter(event,'document.form.next3.focus();');">
+	</div>
+</div>
+<div id="warning3" class="warning" style="width:390px; display:none">
+	<b style="position:absolute; top:12px; left:12px; font-size:18px;color:#FF0000">&#33;</b>
+	<div class="warningText" id="warningKeyMin" style="top:12px"></div>
+</div>
+<img class="strip" style="top:440px;" src='/images/strip.png'/>
+<div class="div_button">
+	<input type="button" id="back3" value="&nbsp;Back&nbsp;" onClick="setpage(2);document.form.ssid.focus();"/>
+	<input type="button" id="cancel3" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+	<input type="button" name="next3" id="next3" value="&nbsp;Next&nbsp;" onMouseUp="if( checkF3()) setpage(4);" onKeyUp="if( checkF3()) setpage(4);"/>
+</div>
+<script language='JavaScript'>
+/*function cipherChange(v) {
+	document.form.encrypType_hidden.value=v;
+}*/
+function checkF3() {
+	var f=document.form;
+/*	for(var x=0; x<3; x++) {
+		if(f.cipher[x].checked == true) {
+			break;
+		}
+	}*/
+	if(f.passphrase.value.toString().length < 8) {
+		document.getElementById( "warning3" ).style['display']='';
+		return 0;
+	}
+	if(document.getElementById("passphrase").value!=passphrase_onload || f.encryptionType.value!=encrypType_onload || security_mode_onload!=document.getElementById("security_mode").value) {
+		if(!confirm(_("warningChangeSecurity")))
+			return 0;
+	}
+	return 1;
+}
+
+function copyToSum() {
+var f=document.form;
+/*	for(var x=0; x<3; x++) {
+		if(f.cipher[x].checked == true)
+			break;
+	}*/
+	f.CompleteSum.value=''
+
+	if (document.getElementById("langDisplay").style["display"] != "none") {
+		f.CompleteSum.value=f.CompleteSum.value+_("GUI langPref")+':\n'+setLanguageText(document.getElementById("langSelection").value)+'\n\n'
+	}
+	if(document.getElementById("potsDisplay").style["display"] != "none" ) {
+		f.CompleteSum.value=f.CompleteSum.value+'Telephony Profile:\n'+tel_profiles[f.telephonyProfile.value]+'\n\n';
+	}
+
+	f.CompleteSum.value=f.CompleteSum.value+_("GUI timeZone")+':\n'+zoneinfo[f.time_zone.options.selectedIndex].NAME+'\n\n';
+	if(SIMStatus.indexOf("PIN")!=-1 || SIMStatus.indexOf("locked")!=-1) {
+		f.CompleteSum.value=f.CompleteSum.value+_("pinSettings")+":\n";
+		if(f.rememberSIMPIN.value=='1') {
+			f.CompleteSum.value=f.CompleteSum.value+_("rememberPin")+":   "+_("CSyes")+"\n";
+			var mypin=f.pin.value;
+			f.CompleteSum.value=f.CompleteSum.value+_("wps pin num")+":   "+mypin.substring(0,2)+mypin.substring(2,8).replace(/[0-9]/g, "*")+'\n\n'
+		}
+		else {
+			f.CompleteSum.value=f.CompleteSum.value+_("rememberPin")+":   "+_("CSno")+"\n\n";
+		}
+	}
+
+	var tempPW=''
+	if (f.admpass.value.length > 0)
+		tempPW=f.admpass.value.replace(/./g, '*')
+
+	f.CompleteSum.value=f.CompleteSum.value+_("GUI username")+':\n'+document.form.userTextInput.value+'\n\n'
+	+_("password")+':\n'+tempPW+'\n\n'
+	+_("GUI SSIDname")+':\n'+f.ssid.value+'\n\n'
+	+_("GUI wirelessWiFi")+':\n';
+	if(f.radioButton[0].checked==true)
+		f.CompleteSum.value=f.CompleteSum.value+_("on")+'\n\n';
+	else
+		f.CompleteSum.value=f.CompleteSum.value+_("off")+'\n\n';
+	if(f.broadcastssid[0].checked == true)
+		f.CompleteSum.value=f.CompleteSum.value+_("GUI SSIDbroadcast")+':\n'+_("enabled")+'\n\n';
+	else
+		f.CompleteSum.value=f.CompleteSum.value+_("GUI SSIDbroadcast")+':\n'+_("disabled")+'\n\n';
+	f.CompleteSum.value=f.CompleteSum.value+_("networkAuth")+':\n'+f.security_mode_hidden.value+'\n\n'
+	+_("GUI securityKey")+':\n'+f.passphrase.value+'\n\n'
+	+_("wpa algorithms")+':\n'+f.encryptionType.value+'\n';//cipherText[x]
+
+	f.CompleteSum.value+='\n'+_("mobile broadband")+":\n";
+	if(f.gascEnable.value=='1') {
+		f.CompleteSum.value+=_("enabled")+"\n";
+#if !(defined V_SKIN_ro)
+		if(f.autoapnCK.checked==true)
+			f.CompleteSum.value+='\n'+_("apnMsg1")+":\n"+_("CSyes")+'\n'
+		else
+#endif
+			f.CompleteSum.value+='\n'+"APN:\n"+f.APNName.value+"\n";
+	}
+	else {
+		f.CompleteSum.value+=_("disabled")+":\n";
+	}
+}
+</script>
+</div>
+
+<div id="wStep4" style="display:none">
+<input type="hidden" name="gascEnable" value="@@form['gascEnable']">
+<input type="hidden" name="profilenum" value="@@form['profilenum']">
+<input type="hidden" name="editIndex" value="@@form['editIndex']">
+<input type="hidden" name="autoapn" value="@@form['autoapn']">
+<input type="hidden" name="country" value="@@form['country']">
+<div class="div_step" style="left:50px;top:30px;">Step 5 of 6</div>
+<div class="div_introduction" style="left:50px;">
+<b><script language="JavaScript">document.write(_("mobile broadband mbb"))</script></b>
+<br/>
+<p style="font-size:12px;" id="mbbMsg"><script language="JavaScript">document.write(_("wwan intro"));</script></p>
+</div>
+<img class="strip" style="top:180px;" src='/images/strip.png'/>
+<div class="box" style="top:200px">
+#if defined V_SKIN_ro
+	<table style="display:none">
+#else
+	<table class="t3">
+#endif
+		<tr><td><script language="JavaScript">document.write(_("apnMsg1"));</script></td>
+		<td><input type="checkbox" name="autoapnCK" id="autoapnCK" onclick="ckeckAutoAPN();"></td></tr>
+	</table>
+	<div class="div_text" style="left:50px; top:60px; width:420px"><a class="a1" href="JavaScript:JavaScript:setPass(1);"><script language="JavaScript">document.write(_("apnMsg3"));</script></a></div>
+
+	<div id="hide_for_autoapn">
+		<div class="div_text" style="left:50px;top:39px"><script language="JavaScript">document.write(_("mobile broadband"));</script></div>
+		<div class="div_input" style="top:35px;">
+			<input type=radio name='pppAutoCon' value=1 onClick="document.form.gascEnable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio name='pppAutoCon' value=0 onClick="document.form.gascEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</div>
+
+		<div id="PFreadonly_0">
+			<div class="div_text" style="left:50px;top:88px" id="CustomAPN">Custom APN <font style="font-size:11px">(if required)</font></div>
+			<div class="div_input3" style="top:88px" >
+				<div id="APNname_Div"><input type=text name='APNName' id="wwanAPN" size=20 maxlength=128 value="@@form['APNName']" onkeyup="checkAPNdev();"></div>
+			</div>
+		<%if(_apndropdown=="1"){%>
+			<div class="div_input3" style="top:116px" >
+		<%}else{%>
+			<div style="display:none" >
+		<%}%>
+				<select name="countryList" id="countryList" size=1  onChange="cgCountry(this.value)">
+				</select>
+			</div>
+		</div>
+
+		<div id="PFreadonly_1" style="display:none">
+			<div class="div_text" style="left:50px;top:84px"><script language="JavaScript">document.write(_("profile name")+"</br>( "+_("readOnly")+" )");</script></div>
+			<div class="div_input" style="left:50px;top:79px" ><input type="text" name="profilename" id="profileName" size=20 maxlength=128 value="@@form['profilename']" readonly></div>
+		</div>
+
+		<div class=div_small_text style="left:50px;top:170px" id="GUItext5">
+		Your Access Point Name (APN) is the 3G mobile network name that is used to identify your 3G mobile broadband service provider.
+		</div>
+
+		<div style="position:absolute;left:191px;top:144px;"><ul id="nav2" style="display:none;"></ul></div>
+	</div>
+
+	<div id="apn_pass" style="display:none;">
+		<img src="/images/PopupBox1.gif"/>
+		<div style="position:absolute;top:5px;left:225px;"><a class="a2" href="JavaScript:JavaScript:setPass(0);">&#215;</a></div>
+		<table class="t2">
+			<tr><td><p/> </td></tr>
+			<tr><td><script language="JavaScript">document.write(_("GUI username"));</script></td></tr>
+			<tr><td align="center"><input type=text name='pppuser' maxlength=127 value="@@form['pppuser']"></td></tr>
+			<tr><td><script language="JavaScript">document.write(_("password"));</script></td></tr>
+			<tr><td align="center"><input type=password name='ppppass' maxlength=127 value="@@form['ppppass']"></td></tr>
+			<tr><td align="center" style="padding-top:8px;"><input type=button id='savePass' onClick="submitPass();" value="&nbsp;Save&nbsp;"></td></tr>
+		</table>
+	</div>
+</div>
+<img class="strip" style="top:440px;" src='/images/strip.png'/>
+<div id="BTwStep4" class="div_button">
+	<input type="button" id="back4" value="&nbsp;Back&nbsp;" onClick="setpage(setp4_prev);document.form.security_mode.focus();"/>
+	<input type="button" id="cancel4" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+	<input type="button" id="next4" value="&nbsp;Next&nbsp;" onMouseUp="if( checkF4()) setpage(5);" onKeyUp="if( checkF4()) setpage(5);"/>
+</div>
+
+</div>
+<script language='JavaScript'>
+function checkF4() {
+f=document.form;
+	if(f.autoapnCK.checked==false && f.gascEnable.value=='1' && f.APNName.value == "") {
+		if(!confirm(_("blankAPNwarningMsg"))) // The current APN configuration is blank. Are you sure that you want to continue with the configuration?
+			return 0;
+	}
+	copyToSum();
+	return 1;
+}
+</script>
+
+<div id="wStep5" style="display:none">
+<div class="div_step">Step 6 of 6</div>
+<div class="div_introduction">
+<b id="THinstallationComplete">Installation Complete</b>
+<br/>
+<p style="font-size:12px;" id="completeMsg"></p>
+</div>
+<textarea class="div_input2" style="font-size:8pt;position:absolute;top:154px;width:330px;height:260px;background-color:#333333;color:#FFFFFF" name="CompleteSum" id="CompleteSum" wrap="off" readonly="1">
+</textarea>
+#if defined V_SKIN_ro
+<img class="strip" style="top:440px;" src='/images/strip.png'/>
+#endif
+<div id="BTwStep5" class="div_button">
+	<input type="button" id="back5" value="&nbsp;Back&nbsp;" onClick="setpage(4);"/>
+	<input type="button" id="cancel5" value="&nbsp;Cancel&nbsp;" onClick="window.location.href='/index.html'"/>
+	<input type="button" id="finish" value="Finish" onMouseUp="submitF()" onClick="submitF()"/>
+</div>
+
+<div id="waitingBox" class="box" style="display:none">
+	<div id="waitingMsg" class="div_text_n12" style="top:12px; width:400px; height:30px; left:62px; color:#FFFFFF">
+Saving configuration and finalizing installation... </div>
+	<div style="position:absolute; left:13px; top:20px"><img src="/images/w-ring.gif" width="36" height="36" id="waitingImg"/></div>
+	<div id="waitingCnt" align="center" style="position:absolute; width:30px; color:#FFFFFF; font-size:10px; top:32px; left:15px; display:none"></div>
+</div>
+
+<script language='JavaScript'>
+var wizard_status = <%v=get_single('wizard_status');%>"@@v";
+	if(document.form.passStatus.value!='pass' && wizard_status==5 && document.form.wStep.value.indexOf("saved=")==-1) {
+		window.location="/index.asp";
+	}
+</script>
+</div>
+
+</div>
+</form>
+</body>
+
+</html>

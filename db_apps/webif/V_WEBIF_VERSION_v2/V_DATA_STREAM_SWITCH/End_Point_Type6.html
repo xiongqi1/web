@@ -1,0 +1,119 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type6</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p",varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=validate_number(form['idxEP']);
+	EP_Name=form['nameEP'];
+	// validate input
+	if (string_regex_match(EP_Name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	tryValidateOnOffRadio(form['raw_enable']);
+
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type",'6');
+	setDsmRdb(EP_Name+".raw_mode",form['raw_enable']);
+	set_single_direct("","service.dsm.trigger","1");
+	redirect('/end_points.html?success');
+}
+%>
+
+function submitForm() {
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+	$("#idxEP").val(i);
+	$("#nameEP").val(EP_Name);
+	$("#form").submit();
+}
+
+$(document).ready(function() {
+	$("#rawenable").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.raw_mode');%>");
+	load_value_to_element($("input:radio[name=raw_enable]"), $("#rawenable").val()=="1");
+<%	gps_enabled=get_single('sensors.gps.0.enable');
+	if(gps_enabled!="1") {
+%>
+		validate_alert( "", _("gpsDisabledMsg") );
+<%	}%>
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type6")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<input type="hidden" name="rawenable" id="rawenable" value="@@form['rawenable']">
+				<div class="grey-box" style="display:none">
+					<div class="form-row">
+					<label for="field-1"><script language=Javascript>document.write(_("GPS_rawmode"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div id="raw_enable" class="radio-switch">
+								<input type="radio" id="raw_enable-1" name="raw_enable" class="access" value=1>
+								<label for="raw_enable-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="raw_enable-2" name="raw_enable" class="access" value=0>
+								<label for="raw_enable-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				</div>
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

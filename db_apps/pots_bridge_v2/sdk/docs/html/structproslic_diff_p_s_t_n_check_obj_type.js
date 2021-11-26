@@ -1,0 +1,25 @@
+var structproslic_diff_p_s_t_n_check_obj_type =
+[
+    [ "dcfPreset1", "structproslic_diff_p_s_t_n_check_obj_type.html#a388849a21ffec98f1007866698bddb7a", null ],
+    [ "dcfPreset2", "structproslic_diff_p_s_t_n_check_obj_type.html#a3adb9a12d630930d714357d40ce675c0", null ],
+    [ "enhanceRegSave", "structproslic_diff_p_s_t_n_check_obj_type.html#ac9e41fede5e9cb066442571503760387", null ],
+    [ "entryDCFeedPreset", "structproslic_diff_p_s_t_n_check_obj_type.html#a9e54ac5b07bea2a1a964a6ec5caf031c", null ],
+    [ "femf_enable", "structproslic_diff_p_s_t_n_check_obj_type.html#abe89c0728bb2b8862c5a3882e6f80656", null ],
+    [ "iloop1", "structproslic_diff_p_s_t_n_check_obj_type.html#ae91d28ba7057d9f95c28d16ea5a55dc3", null ],
+    [ "iloop1_avg", "structproslic_diff_p_s_t_n_check_obj_type.html#ace0126f5273e24bfe1d06e7cf219929a", null ],
+    [ "iloop2", "structproslic_diff_p_s_t_n_check_obj_type.html#a6a9bf6e64868ebb4e44e97dba332bff6", null ],
+    [ "iloop2_avg", "structproslic_diff_p_s_t_n_check_obj_type.html#ae8044a6a373c2665b216f38568a9747b", null ],
+    [ "lfstate_entry", "structproslic_diff_p_s_t_n_check_obj_type.html#abb86866b1df7f0efc66276200a948c9d", null ],
+    [ "max_femf_vopen", "structproslic_diff_p_s_t_n_check_obj_type.html#ac763c62e89cf53e4fbb94bff471024df", null ],
+    [ "pState", "structproslic_diff_p_s_t_n_check_obj_type.html#a2c60d71689a6c976961a2637825ab0cf", null ],
+    [ "return_status", "structproslic_diff_p_s_t_n_check_obj_type.html#a90cace7bcc4fe33eb2049b15c5fda8ef", null ],
+    [ "rl1", "structproslic_diff_p_s_t_n_check_obj_type.html#a5539e3cf38ff2e27d786d1c791d76786", null ],
+    [ "rl2", "structproslic_diff_p_s_t_n_check_obj_type.html#a104b769cc205b3529f3673011f721002", null ],
+    [ "rl_ratio", "structproslic_diff_p_s_t_n_check_obj_type.html#a151aea611106b57f11a3375e5cec4c64", null ],
+    [ "samples", "structproslic_diff_p_s_t_n_check_obj_type.html#a7c0babc66304280f25e2f38583549df8", null ],
+    [ "vdiff1", "structproslic_diff_p_s_t_n_check_obj_type.html#a5ff0074bb8bae9bcfb2daaed899df9ed", null ],
+    [ "vdiff1_avg", "structproslic_diff_p_s_t_n_check_obj_type.html#ad8b4eacdf07fc0f5350825d9632fc01d", null ],
+    [ "vdiff2", "structproslic_diff_p_s_t_n_check_obj_type.html#adfac45eec0f9f37f35957a34a2c3e3e3", null ],
+    [ "vdiff2_avg", "structproslic_diff_p_s_t_n_check_obj_type.html#a1dbf584846321bcf4542aac988b7748c", null ],
+    [ "vdiff_open", "structproslic_diff_p_s_t_n_check_obj_type.html#a6b329d62a225245da25c456102f440a4", null ]
+];

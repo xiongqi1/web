@@ -1,0 +1,119 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Login</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript">
+$(document).ready(function() {
+	$.get('/cgi-bin/setdate.cgi?'+getHostDate());
+	document.form.username.focus();
+});
+</script>
+<body onload="initTranslation()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+function initTranslation() {
+	document.form.submit.value = "   "+_("submit")+"   ";
+	document.form.clear.value = "   "+_("clear")+"   ";
+}
+</script>
+<form name="form"  class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>&nbsp;&nbsp;<script language="JavaScript">document.write(_("login"));</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 30% 16px 0;"></div>
+<table width="70%">
+	<tr><th><script language="JavaScript">document.write(_("login"));</script></th></tr>
+	<tr><td>&nbsp;</td></tr>
+</table>
+    
+<table id="ID0"  width="70%" cellspacing="0" style="display:none"> 
+    <tr>
+	<td height="58px" width="12%" > <img align="right" src="/images/error.gif"/></td>
+        <td height="58px"><h4 style="margin-bottom:0px; color:#CC0000"><script language="JavaScript">document.write(_("admin passWarning"));</script></h4></td>
+    </tr>
+</table>
+<table id="ID1" width="70%"  cellspacing=0> 
+    <tr>
+	<td width="30%">
+		<script language="JavaScript">document.write(_("user name"));</script>:
+	</td><td>
+		<input type="text" name="username" maxlength="20" size="20" value="@@form['username']">
+        </td>
+    </tr>
+    <tr>
+        <td>
+		<script language="JavaScript">document.write(_("password"));</script>:
+	</td><td>
+		<input type="password" name="password" maxlength="20" size="20" value="@@form['password']">
+        </td>
+    </tr>
+</table>
+<table width="70%"> 	
+	<tr>
+		<td>
+		<br/><div align=center><INPUT type="submit" name="submit" value="Submit">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<INPUT type="button" name="clear" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''"></div><br/>
+		</td>
+	</tr>
+    <tr><td>&nbsp;</td></tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+<%    
+    if (request['REQUEST_METHOD'] == "POST")
+	{      
+        //check username and password
+        user = form['username'];
+        pass = get_single( 'admin.user.'+user );
+		mypassword = form['password'];
+        if( ( pass != 'N/A' ) && ( mypassword == pass) ) //password ok
+        {
+    		session["sessionid"] = request['SESSION_ID'];
+            session["user"] = user;
+            if( user == 'root')
+            	session["userlevel"] = '0';
+            else
+            	session["userlevel"] = '1';
+          /*  checkme = form['checkMe'];
+            if( checkme==true)
+            {
+                retval=set_single( 'login_remember.'+url+'=1');
+            }
+            else
+            {
+                retval=set_single( 'login_remember.'+url+'=0');
+            }*/
+			set_single('wizard_status=0');
+            redirect('/status.html');
+        }
+        else 
+        {%>
+        	<script language='JavaScript'>
+		document.getElementById( "ID0" ).style['display']='';
+		document.getElementById( "ID1" ).style['display']='none';
+		setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);
+		</script>
+        <%}
+	}
+    else
+    {
+        if(request['QUERY_STRING']=='logoff')
+        {
+        	session["sessionid"] = '';
+        	redirect('/login.html');
+        }
+        else if( request['SESSION_ID']==session["sessionid"] )
+        {
+        	redirect('/status.html');
+        }
+    }
+%>
+</html>

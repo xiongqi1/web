@@ -1,0 +1,320 @@
+<%
+if (form['ajax']) {
+	#include "checkSession.inc"
+	if (form['ajax'] == 'keyUpload') {
+		#if 0
+		// ESP has some issues with testing for the presence of an array index
+		// The loop comes from the documentation example. exit() means it will
+		// pick the first file uploaded. Note that the code in exit() is not
+		// actually passed to the browser. If error checking is required later
+		// it will need to parse stdout of the "rdb setfile" command instead.
+		#endif
+		for (var f in files) {
+			exec_cmd('rdb setfile service.lwm2m.0-sec.0.5-key "' + files[f].FILENAME + '" url');
+			exit(200);
+		}
+	} else if (form['ajax'] == 'keyInfo') {
+		#if 0
+		// Internationalisation must be handled in JS later.
+		#endif
+		if (get_single('service.lwm2m.0-sec.0.5-key')=='') {
+			write("noKey");
+		} else {
+			exec_cmd("rdb getfile service.lwm2m.0-sec.0.5-key - url | openssl pkey -inform der -text -noout 2>&1 | grep '^[^:]*: [^:]\\+$\\|^[^:]*$'");
+		}
+		exit(200);
+	} else if (form['ajax'] == 'keyDel') {
+		set_single_direct('-p', 'service.lwm2m.0-sec.0.5-key', '');
+		exit(200);
+	}
+}
+%><!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>LWM2M</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+#define WRITE(str) <script language=Javascript>document.write(str)</script>
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['listenPort'];
+	retval = set_single( 'service.lwm2m.port='+tempval, '-p' );
+	tempval = form['listenPortS'];
+	retval = set_single( 'service.lwm2m.port_s='+tempval, '-p' );
+	tempval = form['hidden_LWM2Msource'];
+	retval = set_single( 'service.lwm2m.ignoresource='+tempval, '-p' );
+	tempval = form['hidden_LWM2Mreadonly'];
+	retval = set_single( 'service.lwm2m.readonly='+tempval, '-p' );
+	tempval = form['hidden_LWM2Mbootstrap'];
+	retval = set_single( 'service.lwm2m.0-sec.0.1-bs='+tempval, '-p' );
+	tempval = form['secType'];
+	retval = set_single( 'service.lwm2m.0-sec.0.2-mode='+tempval, '-p' );
+	tempval = form['secID'];
+	retval = set_single( 'service.lwm2m.0-sec.0.3-id='+tempval, '-p' );
+	tempval = form['serverAddress'];
+	retval = set_single( 'service.lwm2m.0-sec.0.0-uri='+tempval, '-p' );
+	tempval = form['hidden_LWM2Menable'];
+	retval = set_single( 'service.lwm2m.client.enable='+tempval, '-p' );
+	redirect('/LWM2M.html?success');
+}
+else { /*GET*/
+	form['hidden_LWM2Menable'] = get_single( 'service.lwm2m.client.enable' );
+	form['listenPort'] = get_single( 'service.lwm2m.port' );
+	form['listenPortS'] = get_single( 'service.lwm2m.port_s' );
+	form['hidden_LWM2Msource'] = get_single( 'service.lwm2m.ignoresource' );
+	form['hidden_LWM2Mreadonly'] = get_single( 'service.lwm2m.readonly' );
+	form['serverAddress'] = get_single( 'service.lwm2m.0-sec.0.0-uri' );
+	form['hidden_LWM2Mbootstrap'] = get_single( 'service.lwm2m.0-sec.0.1-bs' );
+	form['secType'] = get_single( 'service.lwm2m.0-sec.0.2-mode' );
+	form['secID'] = get_single( 'service.lwm2m.0-sec.0.3-id' );
+}
+epname = get_single( 'service.lwm2m.endpoint' );
+if (epname == "N/A") {
+	epname = "";
+}
+%>
+<script language="JavaScript">
+// look at current settings and show/hide elements that aren't applicable
+function hideElements() {
+	$("#LWM2M_configuration").toggle($("#LWM2Menable-0").is(':checked'));
+	var secured = $("#serverAddress").val().lastIndexOf("coaps://", 0) === 0;
+	$("#LWM2M_secconf").toggle(secured);	// maybe should toggle ignoresource inversely too?
+	var sectype = $("#secType").val();
+	$("#secID").closest("div.form-row").toggle(sectype == 0);
+	$("#keyUpFile").closest("div.form-row").toggle(sectype != 3);
+	$("#keyShow").toggle(sectype != 0);		// hide for PSK - note the whole row is hidden for NoSec
+}
+
+function submitF() {
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	en=$("input:radio.access[name=LWM2Msource]:checked").val();
+	$("#hidden_LWM2Msource").val(en);
+	en=$("input:radio.access[name=LWM2Menable]:checked").val();
+	$("#hidden_LWM2Menable").val(en);
+	en=$("input:radio.access[name=LWM2Mbootstrap]:checked").val();
+	$("#hidden_LWM2Mbootstrap").val(en);
+	en=$("input:radio.access[name=LWM2Mreadonly]:checked").val();
+	$("#hidden_LWM2Mreadonly").val(en);
+	document.form.submit();
+}
+
+$(document).ready(function() {
+#ifdef V_OMA_DM_LWM2M_package
+	// IPK case may not have the validator in util.js
+	$.validationEngineLanguage.allRules["coapurl"] = {
+		"regex": /^(coaps?):\/\/(((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?(((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|((([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.)+(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.?)(:\d*)?)(\/((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)?$/i,
+		"alertText": "* Invalid URL; example: coap://server.com"
+	}
+#endif
+	load_value_to_element("input:radio.access[name=LWM2Msource]",$("#hidden_LWM2Msource").val()=="1");
+	load_value_to_element("input:radio.access[name=LWM2Menable]",$("#hidden_LWM2Menable").val()=="1");
+	load_value_to_element("input:radio.access[name=LWM2Mbootstrap]",$("#hidden_LWM2Mbootstrap").val()=="1");
+	load_value_to_element("input:radio.access[name=LWM2Mreadonly]",$("#hidden_LWM2Mreadonly").val()=="1");
+	$("#secType").val("@@form['secType']");
+
+	$("[name=LWM2Menable]").click(function() {
+		clear_alert();
+		hideElements();
+	});
+	$("#serverAddress").change(hideElements);
+	$("#secType").change(hideElements);
+	hideElements();
+	$("#keyDelete").click(function() {
+		blockUI_wait(_("GUI pleaseWait"));
+		$.ajax({
+			url: "@@request['SCRIPT_NAME']?ajax=keyDel",
+			type: 'post',
+			data: { csrfToken: "@@session[csrfTokenName]" },
+			success: function(data) {$.unblockUI();}
+			});
+		});
+	$("#keyShow").click(function() {
+		$.ajax({
+			url: "@@request['SCRIPT_NAME']?ajax=keyInfo",
+			type: 'post',
+			data: { csrfToken: "@@session[csrfTokenName]" },
+			success: function(data) {
+				#if 0
+				// Internationalisation requires a fixed string in the _ parameter.
+				// This means that each string will need its own if.
+				// OpenSSL has hundreds. For now we won't translate those.
+				#endif
+				if (data=="noKey") data=_("noKeyUploaded");
+				blockUI_alert("<pre>"+data+"</pre>");
+			}});
+		});
+	$("#keyUpFile").change(function() {
+		var formData = new FormData();
+		formData.append("filedata", document.getElementById("keyUpFile").files[0]);
+		formData.append("csrfToken", "@@session[csrfTokenName]");
+		blockUI_wait(_("GUI pleaseWait"));
+		$.ajax({
+			url: "@@request['SCRIPT_NAME']?ajax=keyUpload",
+			data: formData,
+			processData: false,
+			type: 'post',
+			enctype: 'multipart/form-data',
+			contentType: false,
+			success: function(data) {$.unblockUI();}
+			});
+		});
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+		<div class="grid-9 omega">
+			<form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+			<%appendCsrfToken();%>
+			<div class="right-column white-box">
+				<div class="pad">
+					<h2>WRITE(_("LWM2Mconfiguration"))</h2>
+					<div class="form-row"<% if (epname=='') write(' style="display:none"'); %>>
+						<label>WRITE(_("LWM2Mepname"))</label>
+						<span class="normal-text">@@epname</span>
+					</div>
+					<input type="hidden" name="hidden_LWM2Menable" id="hidden_LWM2Menable" value="@@form['hidden_LWM2Menable']"/>
+					<div class="form-row no-bg-form">
+						<label for="field-0">WRITE(_("enableLWM2M"))</label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="LWM2Menable-0" name="LWM2Menable" class="access" value=1>
+									<label for="LWM2Menable-0" class="on">WRITE(_("on"))</label>
+									<input type="radio" id="LWM2Menable-1" name="LWM2Menable" class="access" value=0>
+									<label for="LWM2Menable-1" class="off">WRITE(_("off"))</label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="LWM2M_configuration" >
+						<div class="form-row">
+							<label for="hostname">WRITE(_("LWM2Mserver"))</label>
+							<div class="field">
+								<input type="text" class="validate[required,custom[coapurl]] required large" name="serverAddress" id="serverAddress" value="@@form['serverAddress']">
+							</div>
+						</div>
+						<div class="form-row">
+							<input type="hidden" name="hidden_LWM2Mbootstrap" id="hidden_LWM2Mbootstrap" value="@@form['hidden_LWM2Mbootstrap']"/>
+							<label for="field-1">Bootstrap</label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="LWM2Mbootstrap-0" name="LWM2Mbootstrap" class="access" value=1>
+										<label for="LWM2Mbootstrap-0" class="on">WRITE(_("on"))</label>
+										<input type="radio" id="LWM2Mbootstrap-1" name="LWM2Mbootstrap" class="access" value=0>
+										<label for="LWM2Mbootstrap-1" class="off">WRITE(_("off"))</label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="grey-box" id="LWM2M_secconf">
+							<div class="form-row">
+								<label for="hostname">WRITE(_("LWM2Msecurity"))</label>
+								<div class="field">
+									<select name="secType" id="secType" style="width:auto;">
+										<option value="0">PSK</option>
+										<option value="1">RPK</option>
+										<option value="3">NoSec</option>
+									</select>
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="hostname">WRITE(_("LWM2Mcid"))</label>
+								<div class="field">
+									<input type="text" class="large" name="secID" id="secID" value="@@form['secID']">
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="hostname">WRITE(_("LWM2Mckey"))</label>
+								<div class="field">
+									<button type="button" id="keyDelete" class="secondary" style="margin-left:0">WRITE(_("delete"))</button>
+									<button type="button" id="keyShow" class="secondary" style="margin-left:0">WRITE(_("show"))</button>
+									<span class="file-wrapper">
+										<input type="file" id="keyUpFile" name="keyUpFile">
+										<span class="secondary button">WRITE(_("upload"))</span>
+									</span>
+								</div>
+							</div>
+						</div>
+						<h2>WRITE(_("adv settings"))</h2>
+						<div class="form-row">
+							<label for="hostname">WRITE(_("LWM2Mport"))</label>
+							<div class="field">
+								<input type="text" class="validate[required,custom[integer]] required large" name="listenPort" id="listenPort" value="@@form['listenPort']">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="hostname">WRITE(_("LWM2Mports"))</label>
+							<div class="field">
+								<input type="text" class="validate[required,custom[integer]] required large" name="listenPortS" id="listenPortS" value="@@form['listenPortS']">
+							</div>
+						</div>
+						<div class="form-row">
+							<input type="hidden" name="hidden_LWM2Msource" id="hidden_LWM2Msource" value="@@form['hidden_LWM2Msource']"/>
+							<label for="field-1">WRITE(_("LWM2MignoreSource"))</label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="LWM2Msource-0" name="LWM2Msource" class="access" value=1>
+										<label for="LWM2Msource-0" class="on">WRITE(_("on"))</label>
+										<input type="radio" id="LWM2Msource-1" name="LWM2Msource" class="access" value=0>
+										<label for="LWM2Msource-1" class="off">WRITE(_("off"))</label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<input type="hidden" name="hidden_LWM2Mreadonly" id="hidden_LWM2Mreadonly" value="@@form['hidden_LWM2Mreadonly']"/>
+							<label for="field-1">WRITE(_("readOnly"))</label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="LWM2Mreadonly-0" name="LWM2Mreadonly" class="access" value=1>
+										<label for="LWM2Mreadonly-0" class="on">WRITE(_("on"))</label>
+										<input type="radio" id="LWM2Mreadonly-1" name="LWM2Mreadonly" class="access" value=0>
+										<label for="LWM2Mreadonly-1" class="off">WRITE(_("off"))</label>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button type="button" onclick="submitF()">WRITE(_("CSsave"))</button>
+					</div>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+<footer class="footer">
+<div class="container">
+	<p class="copy-right">WRITE(_("powered by netComm"))</p>
+</div>
+</footer>
+
+<script language='javascript'>
+							 set_menu("Services", "LWM2M", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+</script>
+</body>
+</html>

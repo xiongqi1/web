@@ -1,0 +1,62 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/GUI-login.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>MyZone Wireless</title>
+<link href="MyZoneStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript">
+Butterlate.setTextDomain("NTC-GUI");
+function initTranslation() {
+	$("#sToAdv").html(_("GUI sToAdv"));
+}
+$(document).ready(function() {
+	init_moveGUI();
+	initTranslation();
+	setInterval(moveGUI, 100);
+
+});
+</script>
+
+</head>
+<body>
+<div id="banner"><img src="images/MyZone-banner.jpg" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+</div>
+<form name="form1" class="content" method='POST' action="@@requst['SCRIPT_NAME']"/>
+<input type="hidden" name='wlKeyBit' value="@@form['wlKeyBit']">
+<input type="hidden"  name='wep_encryption' value="@@form['wep_encryption']"/>
+<div id="myzoneGUI" style="left:558px; top:120px">
+	<div style="position:absolute; font-size:12px; left:34px; top:544px" ><a class="a1" href="JavaScript:toAdvV()" id="sToAdv">Switch to Advanced View</a></div>
+	<img src="images/MyZone-GUI.gif" border="0" usemap="#1"/>
+	
+	<img style="position:absolute; top:0px; left:0px" src="/images/button3.gif" />
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>	
+	<img style="position:absolute; top:100px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wlan"><a style="text-decoration:none; left:4px;" href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:200px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-3gwwan"><a style="text-decoration:none" href="/GUI-3gwwan.html">APN/SIM</a></div> 
+	<img style="position:absolute; top:300px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-acc"><a style="text-decoration:none" href="/GUI-acc.html">Account</a></div>	
+	<img style="position:absolute; top:400px; left:0px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-app"><a style="text-decoration:none;color:#d00010;" href="/GUI-app.html">Applications</a></div>
+	
+	<a class="app_left" style="top:30px;" href="http://www.cellc.co.za" target="_blank"><img src="/images/App04.png"><div class="app_text" style="left:-3px">CELLC.CO.ZA</div></a>
+	<a class="app_left" style="top:150px;" href="http://www.facebook.com" target="_blank"><img src="/images/App03.png"><div class="app_text" style="left:4px">FACEBOOK</div></a>
+	<a class="app_left" style="top:270px;" href="http://www.twitter.com" target="_blank"><img src="/images/App02.png"><div class="app_text">TWITTER</div></a>
+	<a class="app_left" style="top:390px;" href="mailto:" target="_blank"><img src="/images/App06.png"><div class="app_text" style="left:15px">EMAIL</div></a>
+	
+	<a class="app_right" style="top:30px;" href="http://www.google.co.za" target="_blank"><img src="/images/App05.png"><div class="app_text">GOOGLE</div></a>
+	<a class="app_right" style="top:150px;" href="http://www.wikipedia.org" target="_blank"><img src="/images/App07.png"><div class="app_text" style="left:2px">WIKIPEDIA</div></a>
+	<a class="app_right" style="top:270px;" href="http://www.news24.com" target="_blank"><img src="/images/App08.png"><div class="app_text" >NEWS24</div></a>
+	<a class="app_right" style="top:390px;" href="http://41.157.65.50" target="_blank"><img src="/images/App01.png"><div class="app_text" style="width:150px; left:-20px">CELL C SPEEDTEST</div></a>
+	
+</div>
+</form>
+</body>
+</html>

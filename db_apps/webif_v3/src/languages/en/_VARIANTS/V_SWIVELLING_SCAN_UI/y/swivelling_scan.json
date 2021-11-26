@@ -1,0 +1,7 @@
+{
+    "mmWave AutoScan":"mmWave autoscan",
+    "mmWave AutoScan status":"mmWAVE AUTOSCAN STATUS",
+    "moveToHomePosition fail":"Failed to move to home position",
+    "startSwivellingScan fail":"Failed to scan swivelling position",
+    "stopSwivellingScan fail":"Failed to stop swivelling scan"
+}

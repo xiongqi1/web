@@ -1,0 +1,354 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>LAN/WAN Switch</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+
+<!-- server script -->
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+}
+%>
+
+<!-- client script -->
+<script language="JavaScript">
+
+#include "net_util.js"
+
+#if 0
+/* ##template## title - menu */
+#endif
+var menu_main="Internet";
+var menu_sub="ETHWAN";
+var menu_title=_("wan configuration");
+
+$(function(){
+	/* set menu */
+        //set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+	var eth=new cgi("./cgi-bin/eth.cgi", "@@session[csrfTokenName]");
+
+	var page_modified=false;
+	var last_interface;
+
+	$(rdb.get_ctrls(get_cfg(0))).change(function(){
+		if(document.form.hidden_nat_en.value=='1') {
+			$("#nat_on").attr("checked", "checked");
+		}
+		else {
+			$("#nat_off").attr("checked", "checked");
+		}
+		page_modified=true;
+	});
+
+	function enable_elements(en) {
+		$("#main_div,button,input").css("cursor", en?"auto":"wait");;
+
+		var cfg=get_cfg(0);
+		$(rdb.get_ctrls(cfg)).attr("disabled",!en).css("cursor", en?"auto":"wait");
+
+		if(en)
+			page_modified=false;
+	}
+
+	$("#conn_type").change(function(){
+		var conn_type=$(this).val();
+
+		$("#conn_type_static").toggle(conn_type=="static")
+		$("#conn_type_dhcp").toggle(conn_type=="dhcp")
+	});
+
+	$("#save_button").click(function(){
+		var wan=$("#wan_interfaces").val();
+		var conntype=$("#conn_type").val();
+
+		/* validate check */
+		/*
+		validate_group("wan_addr");
+		validate_group("mask");
+		validate_group("gateway");
+		*/
+		clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			return;
+		}
+		$("#form").validationEngine("hide");
+#endif
+		enable_elements(false);
+
+		blockUI_wait(_("GUI pleaseWait"));
+
+		eth.reset();
+		eth.add(wan);
+		// Note The profile was already obtained when the page loaded via
+		// button_load().#wan_interfaces.change() so use the existing profile here.
+		eth.run("get_existing_wan_profile",function(res){
+			var profile=res["profile"];
+			var cfg=get_cfg(profile);
+
+
+			rdb.reset();
+
+			rdb.set_flag("-p");
+
+			rdb.add("link.profile." + profile + ".enable","1");
+			rdb.add("link.profile." + profile + ".delflag","0");
+			rdb.add("link.profile." + profile + ".name",wan);
+			rdb.add("link.profile." + profile + ".dev",wan);
+			rdb.add("link.profile." + profile + ".defaultroute","1");
+			rdb.add("link.profile." + profile + ".reconnect_delay","30");
+			rdb.add("link.profile." + profile + ".snat",$("#hidden_nat_en").val());
+
+			rdb.add_to_mset(cfg);
+
+			if(navigator.userAgent.indexOf('MSIE 8') !== -1) {
+				rdb.add("link.profile." + profile + ".conntype",conntype);
+				rdb.add("link.profile." + profile + ".iplocal",parse_ip_from_fields("wan_addr"));
+				rdb.add("link.profile." + profile + ".mask",parse_ip_from_fields("mask"));
+				rdb.add("link.profile." + profile + ".gw",parse_ip_from_fields("gateway"));
+				rdb.add("link.profile." + profile + ".dns1",parse_ip_from_fields("dns1"));
+				rdb.add("link.profile." + profile + ".dns2",parse_ip_from_fields("dns2"));
+				rdb.add("link.profile." + profile + ".defaultroutemetric",$("#metric").val());
+				rdb.add("link.profile." + profile + ".snat",$("#hidden_nat_en").val());
+				rdb.add("link.profile." + profile + ".trigger","1");
+			}
+
+			rdb.mset(function(res){
+				enable_elements(true);
+				$.unblockUI();
+				success_alert();
+			});
+		});
+	});
+
+	function get_cfg(pf) {
+		var cfg=[
+			// rdb						default value		control name
+			{rdb:"link.profile."+pf+".conntype",		def:"dhcp",		el:"#conn_type"},
+			{rdb:"link.profile."+pf+".iplocal",		def:"0.0.0.0",		el:"wan_addr"},
+			{rdb:"link.profile."+pf+".mask",		def:"255.255.255.255",	el:"mask"},
+			{rdb:"link.profile."+pf+".gw",			def:"0.0.0.0",		el:"gateway"},
+			{rdb:"link.profile."+pf+".dns1",		def:"0.0.0.0",		el:"dns1"},
+			{rdb:"link.profile."+pf+".dns2",		def:"0.0.0.0",		el:"dns2"},
+			{rdb:"link.profile."+pf+".defaultroutemetric",	def:"10",		el:"#metric"},
+			{rdb:"link.profile."+pf+".snat",		def:"1",		el:"#hidden_nat_en"},,
+			{rdb:"link.profile."+pf+".trigger",		def:"1",		el:null},
+		];
+
+		return cfg;
+	}
+
+	$("#wan_interfaces").change(function(){
+		var wan=$("#wan_interfaces").val();
+
+
+		if(page_modified) {
+			if(!confirm(_("discard confirm"))) {
+				$(this).val(last_interface);
+				return;
+			}
+		}
+
+		eth.reset();
+		eth.add(wan);
+		eth.run("get_new_wan_profile",function(res){
+
+			var profile=res["profile"];
+			var cfg=get_cfg(profile);
+
+			rdb.reset();
+			rdb.add_to_mget(cfg);
+			rdb.mget(function(res){
+				rdb.pour_to_ctrl(res,cfg);
+
+				$("#conn_type").trigger("change");
+
+				enable_elements(true);
+			});
+		});
+
+	});
+
+	function button_load() {
+		enable_elements(false);
+
+		eth.reset();
+		eth.run("info_wan",function(res){
+
+			var wan_interfaces="";
+			var wan_configable;
+
+			wan_configable=res["interfaces"].length>0;
+
+			$("#warning_div").toggle(!wan_configable);
+			$("#wan_div").toggle(wan_configable);
+
+			/* bypass if no wan interface found */
+			if(!wan_configable) {
+				enable_elements(true);
+				return;
+			}
+
+			$.each(res["interfaces"],function(n,o){
+				var val=o["hwclass"];
+				var txt=o["hwclass"];
+
+				wan_interfaces+="<option value='"+val+"'>"+txt+"</option>";
+			});
+
+			$("#wan_interfaces").html(wan_interfaces);
+			$("#wan_interfaces").trigger("change");
+		});
+	}
+
+	button_load();
+
+});
+
+</script>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form id="form" name="form" class="validate" novalidate="novalidate">
+		<input type="hidden" name="hidden_nat_en" id="hidden_nat_en" value="@@form['hidden_nat_en']"/>
+		<div id="main_div" class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(menu_title)</script></h2>
+				<div class="grey-box" id="warning_div" style="display:none">
+					<p>
+						<script language=JavaScript>document.write(_("no wan interface is configured"))</script>
+					</p>
+				</div>
+				<div class="grey-box" id="wan_div" style="display:none">
+					<div class="form-row no-bg-form">
+						<fieldset>
+							<label for=""><script language=Javascript>document.write(_("wan ethernet"))</script></label>
+							<div class="field">
+								<select id="wan_interfaces">
+								</select>
+							</div>
+						</fieldset>
+					</div>
+
+					<div class="form-row no-bg-form">
+						<fieldset>
+							<label for=""><script language=Javascript>document.write(_("connection type"))</script></label>
+							<div class="field">
+								<select id="conn_type">
+									<option value="static"><script language=JavaScript>document.write(_("static"))</script></option>
+									<option value="dhcp"><script language=JavaScript>document.write(_("DHCP"))</script></option>
+#if 0
+									<option value="pppoe"><script language=JavaScript>document.write(_("PPPOE"))</script></option>
+#endif
+								</select>
+							</div>
+						</fieldset>
+					</div>
+
+					<div class="form-row">
+						<label><script language=Javascript>document.write(_("NatMasq"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch"  >
+									<input type="radio" id="nat_on" name="nat_en" class="access" value="1" onClick="$('#hidden_nat_en').val('1')">
+									<label for="nat_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="nat_off" name="nat_en" class="access" value="0" onClick="$('#hidden_nat_en').val('0')">
+									<label for="nat_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div id="conn_type_static" style="display:none">
+						<div class="form-row">
+							<label for=""><script language=Javascript>document.write(_("ip address"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("wan_addr");</script>
+						</div>
+						<div class="form-row">
+							<label for="mask"><script language=Javascript>document.write(_("subnet mask"))</script></label>
+							<script language=javascript>htmlGenMaskBlocks("mask");</script>
+						</div>
+
+						<div class="form-row">
+							<label for=""><script language=Javascript>document.write(_("gateway"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("gateway");</script>
+						</div>
+
+						<div class="form-row">
+							<label for=""><script language=Javascript>document.write(_("dns1ip"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired0("dns1");</script>
+						</div>
+
+						<div class="form-row">
+							<label for=""><script language=Javascript>document.write(_("dns2ip"))</script></label>
+							<script language=javascript>htmlGenIpBlocksWithoutRequired0("dns2");</script>
+						</div>
+
+					</div>
+
+					<div id="conn_type_dhcp" style="display:none">
+					</div>
+
+					<div class="form-row">
+						<label for="metric"><script language=Javascript>document.write(_("metric"))</script></label>
+						<div class="field">
+							<input type=text id="metric" class="validate[required,custom[integer],min[0],max[19998]] required metric large" name="metric"  maxlength=5 onkeyup="NumfieldEntry(this);" value="">
+						</div>
+					</div>
+
+					<div class="submit-row">
+						<button id="save_button" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("metric",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("Msg48"));
+#endif
+</script>
+
+</body>
+</html>

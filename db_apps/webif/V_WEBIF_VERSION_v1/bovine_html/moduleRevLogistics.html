@@ -1,0 +1,201 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	retval=set_single( 'wwan.0.module_reset.cmd.command=reset' );
+	esp_sleep(1000);
+	redirect('/status.html');
+}
+%>
+
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Reverse Logistics</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+
+var xmlHttp=0;
+var total_data = new Array();
+
+function ajaxFunction()
+{
+	try
+	{
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e)
+	{  // Internet Explorer
+		try
+		{
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e)
+		{
+			try
+			{
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+
+			}
+			catch (e)
+			{
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	xmlHttp.open("GET","/cgi-bin/ajax.cgi",true);
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function()
+
+	{
+		if(xmlHttp.readyState==4 && xmlHttp.responseText.length > 100 )
+		{
+			try
+			{
+				eval(xmlHttp.responseText);
+			}
+			catch(e)
+			{
+				alert(e.message);
+				return;
+			}
+
+			document.getElementById("mod_MDN_ID").value = module_MDN;
+			document.getElementById("mod_MSID_ID").value = module_MSID;
+			document.getElementById("mod_FirmVer_ID").value = moduleFirmwareVersion;
+			document.getElementById("mod_HardwareVer_ID").value = moduleHardwareVersion;
+			document.getElementById("mod_PRLV_ID").value = module_PRL_Version;
+			document.getElementById("mod_rel_checksum_ID").value = "N/A";
+
+			total_data = total_data_usage.split(",");
+			if(total_data.length == 4) {
+				document.getElementById("mod_lifetime_Rxdata_ID").value = total_data[2]+" byte";
+				document.getElementById("mod_lifetime_Txdata_ID").value = total_data[3]+" byte";
+			}
+			else {
+				document.getElementById("mod_lifetime_Rxdata_ID").value = "N/A";
+				document.getElementById("mod_lifetime_Txdata_ID").value = "N/A";
+			}
+
+			document.getElementById("mod_refurbished_ID").value = "N/A";
+			document.getElementById("mod_imei_ID").value = imei+" ("+parseInt(imei,16) +")";
+			document.getElementById("mod_activation_data_ID").value = "N/A";
+
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	}
+}
+
+function reload_timer()
+{
+	xmlHttp=0;
+	ajaxFunction();
+	setTimeout("reload_timer()", 2000);
+}
+
+function moduleReset()
+{
+	try
+	{
+	  document.form.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+}
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form action="/cgi-bin/ajax.cgi" name="form1">
+
+<h3>&nbsp;&nbsp;Sprint Test > Reverse Logistics</h3>
+
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Reverse&nbsp;Logistics</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td colspan=2 width=22%>Mobile Directory Number</td>
+	<td><input type="text" id="mod_MDN_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Mobile Subscriber ID</td>
+	<td><input type="text" id="mod_MSID_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Firmware Version</td>
+	<td><input type="text" id="mod_FirmVer_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Hardware Version</td>
+	<td><input type="text" id="mod_HardwareVer_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>PRL Version</td>
+	<td><input type="text" id="mod_PRLV_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Program Release Instructions Checksum</td>
+	<td><input type="text" id="mod_rel_checksum_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td rowspan=2>Lifetime Data</td>
+	<td align="center">Rx</td>
+	<td><input type="text" id="mod_lifetime_Rxdata_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td align="center">TX</td>
+	<td><input type="text" id="mod_lifetime_Txdata_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Refurbished Status and Date</td>
+	<td><input type="text" id="mod_refurbished_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Electronic Serial Number(ESN)</td>
+	<td><input type="text" id="mod_imei_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Activation Date</td>
+	<td><input type="text" id="mod_activation_data_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<script language=Javascript>
+setTimeout("reload_timer()", 200);
+</script>
+</table>
+</div>
+</form>
+
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" >
+<div class="line" style="margin: 20px 20% 16px 0;"></div>
+<div align="left" style="margin-left:10% ">
+<input type="Button" value="Module Reset" id="resetButton" onClick="javascript:moduleReset()">
+</div>
+</form>
+
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body></html>
+

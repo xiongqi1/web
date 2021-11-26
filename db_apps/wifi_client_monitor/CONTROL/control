@@ -1,0 +1,8 @@
+Package: wifi-client-monitor
+Priority: optional
+Section: Misc
+Version: 1.0.0
+Architecture: arm
+Maintainer: support@netcommwireless.com
+Depends:wpa_supplicant
+Description: Communicating with wpa_supplicant to retrieve events  and messages related to WiFi client interfaces and update RDB variables

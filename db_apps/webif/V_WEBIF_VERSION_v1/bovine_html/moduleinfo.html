@@ -1,0 +1,197 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Module Information</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+
+var xmlHttp=0;
+
+function ajaxFunction() {
+	try
+	{
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e)
+	{  // Internet Explorer
+		try
+		{
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e)
+		{
+			try
+			{
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+
+			}
+			catch (e)
+			{
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	xmlHttp.open("GET","/cgi-bin/ajax.cgi",true);
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function()
+	{
+		if(xmlHttp.readyState==4 && xmlHttp.responseText.length > 100 )
+		{
+			try
+			{
+				eval(xmlHttp.responseText);
+			}
+			catch(e)
+			{
+				alert(e.message);
+				return;
+			}
+
+			document.getElementById("mod_manufacturer_ID").value = module_manufacturer;
+			document.getElementById("mod_model_ID").value = moduleModel;
+			document.getElementById("mod_imei_ID").value = imei;
+			document.getElementById("mod_FirmVer_ID").value = moduleFirmwareVersion;
+			document.getElementById("mod_PRLV_ID").value = module_PRL_Version;
+			document.getElementById("mod_MDN_ID").value = module_MDN;
+			document.getElementById("mod_MSID_ID").value = module_MSID;
+			document.getElementById("mod_NAI_ID").value = module_NAI;
+			document.getElementById("mod_AvailableDN_ID").value = module_Available_Data_Network;
+			document.getElementById("mod_1xRTT_RSSI_ID").value = module_1xRTT_RSSI;
+			document.getElementById("mod_EVDO_RSSI_ID").value = module_EVDO_RSSI;
+			document.getElementById("mod_Connection_Status_ID").value = module_Connection_Status;
+
+
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	}
+}
+
+function reload_timer()
+{
+	xmlHttp=0;
+	ajaxFunction();
+	setTimeout("reload_timer()", 2000);
+
+}
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+</head>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form action="/cgi-bin/ajax.cgi" name="form1">
+<h3>&nbsp;&nbsp;Sprint Test > Module Information</h3>
+
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Hardware&nbsp;Identification</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td width="22%">Manufacturer</td>
+	<td><input type="text" id="mod_manufacturer_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>Model Number</td>
+	<td><input type="text" id="mod_model_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>Electronic Serial Number (ESN)</td>
+	<td><input type="text" id="mod_imei_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+</table>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Version&nbsp;Information</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td width="22%">Firmware Version</td>
+	<td><input type="text" id="mod_FirmVer_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>PRL Version</td>
+	<td><input type="text" id="mod_PRLV_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+</table>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Subscriber&nbsp;Information</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td width="22%">Mobile Directory Number</td>
+	<td><input type="text" id="mod_MDN_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>Mobile Subscriber ID</td>
+	<td><input type="text" id="mod_MSID_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>Network Access ID</td>
+	<td><input type="text" id="mod_NAI_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+</table>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%">Network&nbsp;Information</th></tr>
+</table>
+
+<table width="92%">
+<tr>
+	<td width="22%" colspan=2>Available Data Networks</td>
+	<td><input type="text" id="mod_AvailableDN_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td width="13%" rowspan=2> RSSI</td>
+	<td>1xRTT</td>
+	<td><input type="text" id="mod_1xRTT_RSSI_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td>EVDO</td>
+	<td><input type="text" id="mod_EVDO_RSSI_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td colspan=2>Connection Status</td>
+	<td><input type="text" id="mod_Connection_Status_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<script language=Javascript>
+setTimeout("reload_timer()", 200);
+</script>
+</table>
+
+</div>
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body></html>
+

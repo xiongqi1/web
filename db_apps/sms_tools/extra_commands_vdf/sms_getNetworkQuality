@@ -1,0 +1,69 @@
+#!/bin/sh
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+	echo ""
+	echo "This shell script is for internal system use only."
+	echo "Please do not run this script manually."
+	echo ""
+	exit 0
+fi
+
+nof=${0##*/}
+source /lib/utils.sh
+
+logNotice "start"
+
+# check whether already running another instance
+RUNNING=$(pidof speed_test.sh)
+if [ -n "$RUNNING" ]; then
+	logErr "Another speed test application is already running"
+	echo " Another speed test application is already running"
+	exit 255
+fi
+
+rdb_set service.speedtest.result
+rdb_set service.speedtest.trigger 1
+
+TIMEOUT=600
+while [ $TIMEOUT -gt 0 ]; do
+	RESULT=$(rdb_get service.speedtest.result)
+	test "$RESULT" = "done" -o "$RESULT" = "error" && break
+	sleep 1
+	TIMEOUT=$((TIMEOUT-1))
+done
+
+# RDB variables updated after speed test
+# ex) service.speedtest.datetime Tue Dec 20 02:14:16 GMT 2016
+#     service.speedtest.download 5.82 Mbit/s
+#     service.speedtest.server AARNet (Sydney) [67.26 km]
+#     service.speedtest.latency 86 ms
+#     service.speedtest.upload 1.03 Mbit/s
+
+if [ "$RESULT" = "done" ]; then
+	DOWN_SPEED=$(rdb_get service.speedtest.download)
+	UP_SPEED=$(rdb_get service.speedtest.upload)
+	LATENCY=$(rdb_get service.speedtest.latency)
+	echo " download $DOWN_SPEED, upload $UP_SPEED, latency $LATENCY"
+else
+	echo " speed test failed"
+fi
+
+MODULE=$(rdb_get wwan.0.module_type)
+NETWORK=$(rdb_get wwan.0.system_network_status.system_mode)
+
+if [ "$MODULE" = "cinterion" ]; then
+	echo ', RSSI ' && rdb_get wwan.0.radio.information.signal_strength
+else
+	if [ "$NETWORK" = "LTE" ]; then
+		echo ', RSRP ' && rdb_get wwan.0.radio.information.signal_strength
+	elif [ "$NETWORK" = "UMTS" ]; then
+		echo ', RSCP ' && rdb_get wwan.0.radio.information.signal_strength
+	else
+		echo ', RSSI ' && rdb_get wwan.0.radio.information.signal_strength
+	fi
+fi
+
+logNotice "done"

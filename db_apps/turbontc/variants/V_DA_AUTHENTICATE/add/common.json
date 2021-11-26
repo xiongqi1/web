@@ -1,0 +1,151 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA-NIT Authenticate API",
+        "description": "OWA-NIT RESTful API",
+        "version": "1.0.0"
+    },
+    "basePath": "/api/v1",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/Hello": {
+            "get": {
+                "summary": "OWA-NIT handshake",
+                "description": "The hello endpoint returns information about the *OWA* products offered at a given location. The response includes the manufactuer, model name, serial number, hardware version, software version, OWA MAC address, and etc\n",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/Hello"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/Activate": {
+            "put": {
+                "summary": "activate/deactivate a service",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "service",
+                        "description": "This is the name of the service to be activated",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "enable",
+                        "description": "Enable or disable the service",
+                        "required": true,
+                        "type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "Hello": {
+            "properties": {
+                "Manufacturer": {
+                    "type": "string",
+                    "description": "OWA manufacturer name"
+                },
+                "ManufacturerOUI": {
+                    "type": "string",
+                    "description": "OWA manufacturer oui"
+                },
+                "ModelName": {
+                    "type": "string",
+                    "description": "OWA model name"
+                },
+                "GenericModel": {
+                    "type": "string",
+                    "description": "OWA generic model name (if any)"
+                },
+                "Description": {
+                    "type": "string",
+                    "description": "OWA description"
+                },
+                "ProductClass": {
+                    "type": "string",
+                    "description": "OWA product class"
+                },
+                "SerialNumber": {
+                    "type": "string",
+                    "description": "OWA serial number"
+                },
+                "HardwareVersion": {
+                    "type": "string",
+                    "description": "OWA hardware version"
+                },
+                "SoftwareVersion": {
+                    "type": "string",
+                    "description": "OWA software version"
+                },
+                "SoftwareVersionBuildDate": {
+                    "type": "string",
+                    "description": "OWA software version build date"
+                },
+                "UpTime": {
+                    "type": "string",
+                    "description": "OWA up time"
+                },
+                "MacAddress": {
+                    "type": "string",
+                    "description": "OWA MAC Address"
+                },
+                "Capabilities": {
+                    "type": "string",
+                    "description": "OWA capabilities"
+                }
+            }
+        },
+        "Error": {
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

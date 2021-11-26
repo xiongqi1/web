@@ -1,0 +1,1696 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA API",
+        "description": "OWA RESTful API",
+        "version": "1.5.0"
+    },
+    "basePath": "/api/v1",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/DeviceInfo": {
+            "get": {
+                "summary": "OWA Device information",
+                "description": "The DeviceInfo endpoint returns information about the *OWA* products offered at a given location. The response includes the manufactuer, model name, serial number, hardware version, software version, Carrier IQ agent version, reset and reboot cause, router PRI version, OWA MAC address, OWA software update pending, OWA temperature and etc\n",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/DeviceInfo"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeviceInfo/MemoryStatus": {
+            "get": {
+                "summary": "OWA memory status",
+                "description": "The Memory endpoint returns information about operating system memory status\n",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Memory status",
+                        "schema": {
+                            "$ref": "#/definitions/MemoryStatus"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeviceInfo/DeviceLog": {
+            "get": {
+                "summary": "OWA device log",
+                "description": "This returns the log messages from the current syslog file (maximum last 32K bytes of logs).",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Syslog tails of last 32Kbytes of messages",
+                        "schema": {
+                            "$ref": "#/definitions/DeviceLog"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeviceInfo/ProcessStatus": {
+            "get": {
+                "summary": "OWA CPU utilization",
+                "description": "The CPU endpoint returns information about CPU status\n",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CPU status",
+                        "schema": {
+                            "$ref": "#/definitions/ProcessStatus"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/Reboot": {
+            "put": {
+                "summary": "Reboot system",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/FactoryReset": {
+            "put": {
+                "summary": "Restore factory settings",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/Activation": {
+            "get": {
+                "summary": "Get Voice Service Status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Voice Service Status",
+                        "schema": {
+                            "$ref": "#/definitions/WLLactivation"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/PDPContextReset": {
+            "put": {
+                "summary": "Reset PDP conntext",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "PDN name",
+                        "description": "This is a name of a PDN to be reset: One of the following strings can be used: \"Data\", \"EMS\", \"Voice\", \"CBRSSAS\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/GPS": {
+            "get": {
+                "summary": "GPS information",
+                "description": "GPS latitude, longitude, altitude and etc\n",
+                "tags": [
+                    "GPS"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GPS information",
+                        "schema": {
+                            "$ref": "#/definitions/GPS"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/USIM": {
+            "get": {
+                "summary": "UE related information",
+                "description": "UE related information: MSISDN, IMEI, IMSI, ICCID\n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UE related information",
+                        "schema": {
+                            "$ref": "#/definitions/USIM"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/ServCell/RF": {
+            "get": {
+                "summary": "Serving cell information",
+                "description": "Serving cell information - MCC, MNC, Cell ID, TAC, E-ARFCN, Physical Cell ID, Frequency Band Indicator, DL Bandwidth, UL Bandwidth, RSRP, RSRQ, RS-SNR, PUSCH TX Power, EUTRAN Global Cell ID (EGCI)\n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Serving cell information",
+                        "schema": {
+                            "$ref": "#/definitions/RF"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/NeighborList/LTECell": {
+            "get": {
+                "summary": "Neighbor cell infomatioin",
+                "description": "An array of structures of neighboring cell measurement with a length of ucNumMeas.\n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "An array of Neightbor cell",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/NeighborListLTECell"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/ServCell/History": {
+            "get": {
+                "summary": "Historical Measurement on the Serving Cell",
+                "description": "All LTE stats in the structure should be measured every 15 minutes, and store each measurement in repeating structure\n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historical Measurement",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/ServCellHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/PDPContext/History": {
+            "get": {
+                "summary": "Default/Dedicated Bearer Activation/Deactivation Per APN",
+                "description": "This structure stores information pertaining to the activation/deactivation activities of each bearer in each APN in the measurement period. \n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/PDPContextHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove specific APN PDPContext",
+                "description": "Given an APN, delete all of its PDPContext history",
+                "tags": [
+                    "WAN"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "APN",
+                        "description": "PDPContext APN to be removed. If not provided, all APN PDPContext history would be deleted",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/PDPContext": {
+            "get": {
+                "summary": "APN IP Layer Status/Configuration Information",
+                "description": "APN IP Layer status information. If there are multiple APN IP connections, each connection is model in a separate (repeating) structure",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/PDPContext"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "enable or disable a \"PDPContext\"",
+                "tags": [
+                    "WAN"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "PDN name",
+                        "description": "This is a name of a PDN to be enabled or disabled: The value can be used  is one of the APN names returned from the \"get: /api/v1/PDPContext\".",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Enable",
+                        "description": "0: disable the PDN connection (i.e. an APN profile). 1: enable the PDN connection (i.e. an APN profile). ",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/WANIPConnection/Stats": {
+            "get": {
+                "summary": "WAN IP Layer performance stats information. If there are multiple WAN IP connections, each connection is model in a separate (repeating) structure.",
+                "description": "",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/WANIPConnectionStats"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/WANIPConnection/HistoricalStats": {
+            "get": {
+                "summary": "WAN IP Layer Usage and Performance Historical Reading",
+                "description": "WAN IP Layer performance stats information. If there are multiple WAN IP connections, each connection is model in a separate (repeating) structure. All stats in the structure should be measured every 15 minutes, and store each measurement in repeating sub-structure. Note: Data APN historical usage data is required. Other APN historical usage data is optional.",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/WANIPConnectionHistoricalStats"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove specific APN WANIPConnection history",
+                "description": "Given an APN, delete all of its WANIPConnection history",
+                "tags": [
+                    "WAN"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "APN",
+                        "description": "PDPContext APN to be removed. If not provided, all APN PDPContext history would be deleted",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/NetworkTime": {
+            "get": {
+                "summary": "Get the network time ",
+                "description": "",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/NetworkTime"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/PLMNList": {
+            "get": {
+                "summary": "",
+                "description": "",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/PLMNID"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/PLMNListStats": {
+            "get": {
+                "summary": "",
+                "description": "It returns the stats for the PLMNList(ref. get /api/v1/PLMNList)including the maximum number of the PLMNIDs in the PLMNList and the number of IDs in the current list.",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/PLMNListStats"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/upgradeFirmware": {
+            "put": {
+                "summary": "It will start the OWA firmware upgrade if there is any firmware upgrade is pending.",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/NotificationServer": {
+            "get": {
+                "summary": "It will return details of the Notification Server.",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/NotificationServerDetails"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/RRC": {
+            "get": {
+                "summary": "RRC session history",
+                "description": "Per RRC Session WAN RLC Layer throughput and radio performance, keep 100 sessions (depending on device storage)\n",
+                "tags": [
+                    "WAN"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "RRC session history",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/RRC"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/AutoUpdateCheck": {
+           "get" : {
+                "summary": "Get the status of OWA firmware update check",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OWA firmware update check status",
+                        "schema": {
+                            "$ref": "#/definitions/OWAFWCheck"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Enable/disable OWA firmware update check",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                   {
+                       "in": "query",
+                       "name": "SecurityKey",
+                       "description": "This parameter must be \"OWA\"",
+                       "required": true,
+                       "type": "string"
+                   },
+                   {
+                       "in": "query",
+                       "name": "AutoUpdateCheck",
+                       "description": "0 = disable the auto OWA firmware update check, 1 = enable the auto OWA firmware update check(default)",
+                       "required": true,
+                       "type": "string"
+                   }
+                ],
+                "responses": {
+                   "200": {
+                       "description": "Successful operation"
+                   },
+                   "400": {
+                       "description": "Bad request"
+                   }
+                }
+            }
+        },
+        "/EMSEnable": {
+            "get": {
+                "summary": "Get the status (enabled/disabled) of EMS APN",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/EmsEnable"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Set the EMS APN to enabled (default) or disabled",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "emsEnable",
+                        "description": "0 = disable EMS APN, 1 = enable EMS APN (default)",
+                        "required": true,
+                        "type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "NeighborListLTECell": {
+            "properties": {
+                "EUTRACarrierARFCN": {
+                    "type": "string",
+                    "description": "The EARFCN of the neighbor cell"
+                },
+                "PhyCellID": {
+                    "type": "string",
+                    "description": "The physical cell ID of the neighbor cell"
+                },
+                "RSRP": {
+                    "type": "string",
+                    "description": "The average RSRP of the neighbor cell over last measurement period"
+                },
+                "RSRQ": {
+                    "type": "string",
+                    "description": "The average RSRQ of the neighbor cell over last measurement period"
+                }
+            }
+        },
+        "ServCellHistory": {
+            "properties": {
+                "StartTime": {
+                    "type": "string",
+                    "description": "Time Stamp of Period Start time"
+                },
+                "CellID": {
+                    "type": "string",
+                    "description": "The cell ID of the serving cell"
+                },
+                "RSRP": {
+                    "type": "string",
+                    "description": "The average RSRP of the serving cell over last measurement period"
+                },
+                "RSRQ": {
+                    "type": "string",
+                    "description": "The average RSRQ of the serving cell over last measurement period"
+                },
+                "RSSINR": {
+                    "type": "string",
+                    "description": "The average serving cell RS-SINR during measurement period"
+                },
+                "HandoverCount": {
+                    "type": "integer",
+                    "description": "The number of serving cell change in the measurement period"
+                },
+                "MACiBLERReceived": {
+                    "type": "number",
+                    "description": "This is the ratio of the total number of NACKs to total number of ACKs and NACKs for the first HARQ transmission in the downlink, i.e., iBLER = Number of NACKs over all first HARQ transmissions / (Number of ACKs over all first HARQ transmissions + Number of NACKs over all first HARQ transmissions)"
+                },
+                "MACiBLERSent": {
+                    "type": "number",
+                    "description": "This is the ratio of the total number of NACKs to total number of ACKs and NACKs for the first HARQ transmission in the uplink, i.e., iBLER = Number of NACKs over all first HARQ transmissions / (Number of ACKs over all first HARQ transmissions + Number of NACKs over all first HARQ transmissions)"
+                },
+                "MACrBLERReceived": {
+                    "type": "number",
+                    "description": "This is the ratio of the total number of NACKs for the last (4th) HARQ transmission to total number of ACKs for any HARQ transmission and NACKs for the last (4th) HARQ transmission in the downlink, i.e. rBLER = Number of NACKs over all the last HARQ retransmissions / (Number of ACKs over all MAC layer transmissions + Number of NACKs over all the last HARQ retransmissions)"
+                },
+                "MACrBLERSent": {
+                    "type": "number",
+                    "description": "This is the ratio of the total number of NACKs for the last (4th) HARQ transmission to total number of ACKs for any HARQ transmission and NACKs for the last (4th) HARQ transmission in the uplink, i.e. rBLER = Number of NACKs over all the last HARQ retransmissions / (Number of ACKs over all MAC layer transmissions + Number of NACKs over all the last HARQ retransmissions)"
+                },
+                "AvgWidebandCQI": {
+                    "type": "integer",
+                    "description": "This is the average wideband channel quality indicator. (Value range 0 - 15)"
+                },
+                "TotalPRBsReceived": {
+                    "type": "integer",
+                    "description": "This is the total number of Physical Resource Blocks allocated on the downlink over all the active TTIs. Each TTI is 1 ms."
+                },
+                "TotalActiveTTIsReceived": {
+                    "type": "integer",
+                    "description": "This is the total number of TTIs during which there is a DL MAC transmission. Each TTI is 1 ms."
+                },
+                "TotalPRBsSent": {
+                    "type": "integer",
+                    "description": "This is the total number of Physical Resource Blocks allocated on the uplink over all the active TTIs. Each TTI is 1 ms."
+                },
+                "TotalActiveTTIsSent": {
+                    "type": "integer",
+                    "description": "This is the total number of TTIs during which there is an UL MAC transmission. Each TTI is 1 ms."
+                },
+                "PMIDistribution": {
+                    "type": "string",
+                    "description": "This field provides the distribution of PMI values over the measurement period. PMI value range is (0,15). The field contains a comma separated list of 15 values. The first value in the list represent the count of PMI with value 0, so on so forth."
+                },
+                "RIDistribution": {
+                    "type": "string",
+                    "description": "This field provides the distribution of RI values over the measurement period. RI value range is (0, 4). The field contains a comma separated list of 4 values. The first value in the list represent the count of RI with value 0, so on so forth."
+                },
+                "ReceivedModulationDistribution": {
+                    "type": "string",
+                    "description": "This field provides the distribution of modulation method used in the downlink direction over the measurement period. The possible modulation methods are, QPSK, 16 QAM or 64 QAM. The field contains a comma separated list of 3 values. The first value in the list represent the count of sample using QPSK modulation. The second, and third values represent count of sample using 16 QAM and 64 QAM respectively."
+                },
+                "SendModulationDistribution": {
+                    "type": "string",
+                    "description": "This field provides the distribution of modulation method used in the uplink direction over the measurement period. The possible modulation methods are, QPSK, 16 QAM or 64 QAM. The field contains a comma separated list of 3 values. The first value in the list represent the count of sample using QPSK modulation. The second, and third values represent count of sample using 16 QAM and 64 QAM respectively."
+                },
+                "PUSCHTransmitPowerDistribution": {
+                    "type": "string",
+                    "description": "Break down of PUSCH Tx Power value distribution in the measurement period. Only need to distinguish whether the Tx Power is at max value or not. The field contains a comma separated list of 2 values. The first value in the list represent the count of sample with max Tx power. The second value represent count of sample with below-max Tx power."
+                },
+                "RLFCount": {
+                    "type": "integer",
+                    "description": "The number of physical radio link failures in the measurement period"
+                },
+                "NumberofRLFFailureCauses": {
+                    "type": "integer",
+                    "description": "Break down count of RLF failures in the measurement period by the corresponding failure cause"
+                },
+                "FailureCause": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/RLFFailures"
+                    }
+                },
+                "NumberofRRCEstabAttempts": {
+                    "type": "integer",
+                    "description": "The number of RRC Establishment Attempted in the measurement period"
+                },
+                "NumberofRRCEstabFailures": {
+                    "type": "integer",
+                    "description": "The number of RRC Establishment Failure in the measurement period"
+                },
+                "RRCEstabLatency": {
+                    "type": "integer",
+                    "description": "The average RRC Establishment Latency in the measurement period"
+                },
+                "NumberofRRCREEstabAttempts": {
+                    "type": "integer",
+                    "description": "The number of RRC Re-establishment Attempted in the measurement period"
+                },
+                "NumberofRRCREEstabFailures": {
+                    "type": "integer",
+                    "description": "The number of RRC Re-establishment Failure in the measurement period"
+                },
+                "RRCREEstabLatency": {
+                    "type": "integer",
+                    "description": "The average RRC Re-establishment Latency in the measurement period"
+                }
+            }
+        },
+        "RLFFailures": {
+            "properties": {
+                "FailureCause": {
+                    "type": "string",
+                    "description": "RLF failure cause - See 3gpp 36.413 (http://www.etsi.org/deliver/etsi_ts/136400_136499/136413/09.06.01_60/ts_136413v090601p.pdf) - page 198"
+                },
+                "Count": {
+                    "type": "integer",
+                    "description": "Break down count of RLF failures in the measurement period by the corresponding failure cause"
+                }
+            }
+        },
+        "PDPContextHistory": {
+            "properties": {
+                "StartTime": {
+                    "type": "string",
+                    "description": "Time Stamp of Period Start time"
+                },
+                "APN": {
+                    "type": "string",
+                    "description": "Name of the APN that the bearer is pertaining to."
+                },
+                "DefaultBearerActAttempts": {
+                    "type": "integer",
+                    "description": "Count of bearer activation attempts"
+                },
+                "DedicatedBearerActAttempts": {
+                    "type": "integer",
+                    "description": "Count of bearer activation attempts"
+                },
+                "DefaultBearerActFailures": {
+                    "type": "integer",
+                    "description": "Count of bearer activation attempts that failed"
+                },
+                "DedicatedBearerActFailures": {
+                    "type": "integer",
+                    "description": "Count of bearer activation attempts that failed"
+                },
+                "DefaultBearerActFailureCauses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/BearerActFailures"
+                    }
+                },
+                "DedicatedBearerActFailureCauses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/BearerActFailures"
+                    }
+                },
+                "DefaultBearerActLatency": {
+                    "type": "integer",
+                    "description": "Average bearer activation latency"
+                },
+                "DedicatedBearerActLatency": {
+                    "type": "integer",
+                    "description": "Average bearer activation latency"
+                },
+                "DefaultBearerDeactAttempts": {
+                    "type": "integer",
+                    "description": "Count of bearer deactivation attempts"
+                },
+                "DedicatedBearerDeactAttempts": {
+                    "type": "integer",
+                    "description": "Count of bearer deactivation attempts"
+                },
+                "DefaultBearerDeactFailures": {
+                    "type": "integer",
+                    "description": "Count of bearer deactivation attempts that failed"
+                },
+                "DedicatedBearerDeactFailures": {
+                    "type": "integer",
+                    "description": "Count of bearer deactivation attempts that failed"
+                },
+                "DefaultAvgBearerDuration": {
+                    "type": "integer",
+                    "description": "Average bearer duration for the bearer from ESM Activate Default Accept timestamp to the ESM Deactivate EPS Bearer Context Accept timestamp on the UE during the measuring period."
+                },
+                "DedicatedAvgBearerDuration": {
+                    "type": "integer",
+                    "description": "Average bearer duration for the bearer from ESM Activate Default Accept timestamp to the ESM Deactivate EPS Bearer Context Accept timestamp on the UE during the measuring period."
+                }
+            }
+        },
+        "BearerActFailures": {
+            "properties": {
+                "FailureCause": {
+                    "type": "string",
+                    "description": "Bearer activation failure cause"
+                },
+                "Count": {
+                    "type": "integer",
+                    "description": "Break down count of Bearer activation failures in the measurement period by the corresponding failure cause"
+                }
+            }
+        },
+        "PDPContext": {
+            "properties": {
+                "APN": {
+                    "type": "string",
+                    "description": ""
+                },
+                "PDN Type": {
+                    "type": "string",
+                    "description": "PDN IP type. Possible values are IPV4 IPv6 or IPv4V6"
+                },
+                "PDN Function": {
+                    "type": "string",
+                    "description": "PDN function in the OWA. Possible values are 'User Data','IMS','EMS' or 'SOS'"
+                },
+                "InterfaceIPv4": {
+                    "type": "string",
+                    "description": "Name of the WAN IPv4-layer interface associated with this APN"
+                },
+                "InterfaceIPv6": {
+                    "type": "string",
+                    "description": "Name of the WAN IPv6-layer interface associated with this APN"
+                },
+                "ConnectionStatus": {
+                    "type": "string",
+                    "description": ""
+                },
+                "ConnectionUptime": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv6Address": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv6Prefix": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv6Dns1": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv6Dns2": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv4Address": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv4Dns1": {
+                    "type": "string",
+                    "description": ""
+                },
+                "IPv4Dns2": {
+                    "type": "string",
+                    "description": ""
+                }
+            }
+        },
+        "WANIPConnectionStats": {
+            "properties": {
+                "APN": {
+                    "type": "string",
+                    "description": ""
+                },
+                "EthernetBytesSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetBytesReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetPacketsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetPacketsReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetErrorsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetErrorsReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetDiscardPacketsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetDiscardPacketsReceived": {
+                    "type": "integer",
+                    "description": ""
+                }
+            }
+        },
+        "WANIPConnectionHistoricalStats": {
+            "properties": {
+                "APN": {
+                    "type": "string",
+                    "description": ""
+                },
+                "EthernetBytesSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetBytesReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetPacketsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetPacketsReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetErrorsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetErrorsReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetDiscardPacketsSent": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "EthernetDiscardPacketsReceived": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "StartTime": {
+                    "type": "string",
+                    "description": "Time Stamp of Period Start time"
+                },
+		"NumberofEntries": {
+		    "type": "integer",
+		    "description": "Entry number of the history"
+		}
+            }
+        },
+        "RRC": {
+            "properties": {
+                "CellID": {
+                    "type": "string",
+                    "description": "The cell identity of the serving cell"
+                },
+                "StartTime": {
+                    "type": "string",
+                    "description": "Start Timestamp of Period Measured"
+                },
+                "RlcUlDuration": {
+                    "type": "integer",
+                    "description": "RLC uplink measurement period to which this metric pertains in milliseconds"
+                },
+                "RlcDlDuration": {
+                    "type": "integer",
+                    "description": "RLC downlink measurement period to which this metric pertains in milliseconds"
+                },
+                "SCellAvgRSRP": {
+                    "type": "string",
+                    "description": "Average measured serving cell RSRP during measurement period"
+                },
+                "SCellAvgRSRQ": {
+                    "type": "string",
+                    "description": "Average measured serving cell RSRQ during measurement period"
+                },
+                "SCellAvgRSSINR": {
+                    "type": "string",
+                    "description": "Average measured serving cell RS-SINR during measurement period"
+                },
+                "SCellWorstRSRP": {
+                    "type": "string",
+                    "description": "Worst measured serving cell RSRP during measurement period"
+                },
+                "SCellWorstRSRQ": {
+                    "type": "string",
+                    "description": "Worst measured serving cell RSRQ during measurement period"
+                },
+                "SCellWorstRSSINR": {
+                    "type": "string",
+                    "description": "Worst measured serving cell RS-SINR during measurement period"
+                },
+                "PDCPBytesReceived": {
+                    "type": "integer",
+                    "description": "Received data bytes during measurement period"
+                },
+                "PDCPBytesSent": {
+                    "type": "integer",
+                    "description": "Transmitted data bytes during measurement period"
+                },
+                "RLCMaxDownThroughput": {
+                    "type": "integer",
+                    "description": "Downlink RLC max throughput during measurement period"
+                },
+                "RLCMaxUpThroughput": {
+                    "type": "integer",
+                    "description": "Uplink RLC max throughput during measurement period"
+                },
+                "RLCAvgDownThroughput": {
+                    "type": "integer",
+                    "description": "Average downlink RLC throughput during measurement period"
+                },
+                "RLCAvgUpThroughput": {
+                    "type": "integer",
+                    "description": "Average uplink RLC throughput during measurement period"
+                },
+                "MaxPUSCHTxPower": {
+                    "type": "number",
+                    "description": "Max UE transmit power for PUSCH transmission (measured in dBm) during measurement period"
+                },
+                "AvgPUSCHTxPower": {
+                    "type": "number",
+                    "description": "Average UE transmit power for PUSCH transmission (measured in dBm) during measurement period"
+                },
+                "MaxPUCCHTxPower": {
+                    "type": "number",
+                    "description": "Max UE transmit power for PUCCH transmission (measured in dBm) during measurement period"
+                },
+                "AvgPUCCHTxPower": {
+                    "type": "number",
+                    "description": "Average UE transmit power for PUCCH transmission (measured in dBm) during measurement period"
+                },
+                "RCLRetransRateReceived": {
+                    "type": "integer",
+                    "description": "Downlink RLC retransmitted packet over total RLC transmitted packet"
+                },
+                "RCLRetransRateSent": {
+                    "type": "integer",
+                    "description": "Uplink RLC retransmitted packet over total RLC transmitted packet"
+                },
+                "AvgCQI": {
+                    "type": "integer",
+                    "description": "Average Channel Quality Indicator (CQI) of downlink during measurement period"
+                },
+                "RRCReleaseCause": {
+                    "type": "string",
+                    "description": "Normal or drop. If drop, indicates whether it is caused by RLF or other."
+                },
+                "PDCPPacketLossRateReceived": {
+                    "type": "integer",
+                    "description": "This KPI measures the downlink packet loss % at PDCP layer due to transmission error and/or congestion. UE uses PDCP sequence numbers from the eNB to detect lost PDCP packets."
+                },
+                "PDCPPacketLossRateSent": {
+                    "type": "integer",
+                    "description": "This KPI measures the average uplink latency between arrival of a PDCP SDU at UE until the acknowledge for last piece of PDCP SDU is received from the eNB at MAC layer."
+                }
+            }
+        },
+        "DeviceInfo": {
+            "properties": {
+                "Manufacturer": {
+                    "type": "string",
+                    "description": "OWA manufacturer name"
+                },
+                "ManufacturerOUI": {
+                    "type": "string",
+                    "description": "OWA manufacturer oui"
+                },
+                "ModelName": {
+                    "type": "string",
+                    "description": "OWA model name"
+                },
+                "Description": {
+                    "type": "string",
+                    "description": "OWA description"
+                },
+                "ProductClass": {
+                    "type": "string",
+                    "description": "OWA product class"
+                },
+                "SerialNumber": {
+                    "type": "string",
+                    "description": "OWA serial number"
+                },
+                "HardwareVersion": {
+                    "type": "string",
+                    "description": "OWA hardware version"
+                },
+                "SoftwareVersion": {
+                    "type": "string",
+                    "description": "OWA software version"
+                },
+                "SoftwareVersionBuildDate": {
+                    "type": "string",
+                    "description": "OWA software version build date"
+                },
+                "AdditionalHardwareVersion": {
+                    "type": "string",
+                    "description": "Module hardware version"
+                },
+                "AdditionalSoftwareVersion": {
+                    "type": "string",
+                    "description": "Module software version"
+                },
+                "UpTime": {
+                    "type": "string",
+                    "description": "OWA up time"
+                },
+                "FirstUseDate": {
+                    "type": "string",
+                    "description": "OWA First Use Date"
+                },
+                "IQAgentVersion": {
+                    "type": "string",
+                    "description": "OWA IQ agent version"
+                },
+                "ResetCause": {
+                    "type": "string",
+                    "description": "OWA reset/reboot cause"
+                },
+                "ResetProcessor": {
+                    "type": "string",
+                    "description": "OWA reset/reboot processor"
+                },
+                "PRIVersion": {
+                    "type": "string",
+                    "description": "OWA PRI Version - This is the version for the Product Release Instructions (PRI), which is a file that contains the settings used to configure wireless products for a particular service provider, customer, or purpose."
+                },
+                "MacAddress": {
+                    "type": "string",
+                    "description": "OWA MAC Address - Per 19542 the link layer for LTE is 0 octets (LTE Packet Data Convergence rotocol sublayer) so  this is primarily for OWA/RG identification."
+                },
+                "SoftwareUpdatePending": {
+                    "type": "string",
+                    "description": "OWA software update pending - In other offerings, user is able to defer updates up to 3 times for eight hours. User is notified by LED or RG GUI. Since there is no LED for this on the RG and the GUI is rarely seen, this may not be seen."
+                },
+                "SoftwareUpdateTime": {
+                    "type": "integer",
+                    "description": "OWA software update pending time"
+                },
+                "Temperature": {
+                    "type": "string",
+                    "description": "OWA temperature"
+                },
+                "TemperatureTime": {
+                    "type": "string",
+                    "description": "OWA temperature time"
+                },
+                "ApiVersion": {
+                    "type": "string",
+                    "description": "OWA RESTful API version information"
+                }
+            }
+        },
+        "MemoryStatus": {
+            "properties": {
+                "Total": {
+                    "type": "integer",
+                    "description": "Total memory"
+                },
+                "Free": {
+                    "type": "integer",
+                    "description": "Free memory"
+                },
+                "Cached": {
+                    "type": "integer",
+                    "description": "System memory used for cache"
+                }
+            }
+        },
+        "DeviceLog": {
+            "properties": {
+                "DeviceLog": {
+                    "type": "string",
+                    "description": "Syslog tails of last 32Kbytes of messages."
+                }
+            }
+        },
+        "ProcessStatus": {
+            "properties": {
+                "CPUUsageUser": {
+                    "type": "integer",
+                    "description": "CPU utilization percentage of user mode applications"
+                },
+                "CPUUsageSystem": {
+                    "type": "integer",
+                    "description": "CPU utilization percentage of system mode applications"
+                },
+                "CPUUsageIdle": {
+                    "type": "integer",
+                    "description": "CPU idle utilization percentage"
+                },
+                "CPUUsagePeak": {
+                    "type": "integer",
+                    "description": "Peak CPU utilization percentage i.e max(CPUUsageAverage)"
+                },
+                "CPUUsageAverage": {
+                    "type": "integer",
+                    "description": "average CPU utilization pergentage i.e (100-CPUUsageIdle)"
+                },
+                "CPULoadAverage": {
+                    "type": "string",
+                    "description": "average CPU load (number of tasks)"
+                }
+            }
+        },
+        "GPS": {
+            "properties": {
+                "ScanStatus": {
+                    "type": "string",
+                    "description": "Success/failure status of GPS location request"
+                },
+                "ValidAltitude": {
+                    "type": "integer",
+                    "description": "1 if locked"
+                },
+                "ValidLocation": {
+                    "type": "integer",
+                    "description": "1 if locked"
+                },
+                "LockedLatitude": {
+                    "type": "string",
+                    "description": "Latitude in microdegrees north format, using WGS84 ellipsoid. I.e -3046412 = 3 degrees 02.78472 minutes SOUTH."
+                },
+                "LockedLongitude": {
+                    "type": "string",
+                    "description": "Longitude in microdegrees east format, using WGS84 ellipsoid. I.e. 101697100 =  101 degrees 41.826 minutes EAST."
+                },
+                "Altitude": {
+                    "type": "string",
+                    "description": "Altitude above sea level in meters* 1000 (millimeters), using WGS84 ellipsoid."
+                },
+                "LastScanTime": {
+                    "type": "string",
+                    "description": "The date and time when the last GPS scan completed."
+                }
+            }
+        },
+        "USIM": {
+            "properties": {
+                "MSISDN": {
+                    "type": "string",
+                    "description": "MSISDN"
+                },
+                "IMEI": {
+                    "type": "string",
+                    "description": "IMEI"
+                },
+                "IMSI": {
+                    "type": "string",
+                    "description": "IMSI"
+                },
+                "ICCID": {
+                    "type": "string",
+                    "description": "ICCID"
+                },
+                "MailBoxNum": {
+                    "type": "string",
+                    "description": "Voice Mail Box number"
+                },
+                "Status": {
+                    "type": "string",
+                    "description": "USIM status on the OWA, which is an enumeration of 'SIM not inserted' (corresponding to TR-069 status None), 'SIM BUSY', 'SIM PIN', 'SIM PUK', 'SIM ERR' (Error), 'SIM BLOCKED' (Blocked), or 'SIM OK' (Valid)."
+                }
+            }
+        },
+        "RF": {
+            "properties": {
+                "MCC": {
+                    "type": "string",
+                    "description": "The MCC of the serving cell"
+                },
+                "MNC": {
+                    "type": "string",
+                    "description": "The MNC of the serving cell"
+                },
+                "CellID": {
+                    "type": "string",
+                    "description": "The cell identity of the serving cell"
+                },
+                "TAC": {
+                    "type": "string",
+                    "description": "The tracking area code of the serving cell"
+                },
+                "EUTRACarrierARFCN": {
+                    "type": "string",
+                    "description": "The EARFCN of the serving cell"
+                },
+                "PhyCellID": {
+                    "type": "string",
+                    "description": "The physical cell ID of the serving cell"
+                },
+                "FreqBandIndicator": {
+                    "type": "string",
+                    "description": "The operating band of the serving cell, see 3GPP TS 36.101/Table 5.5-1. The freqBandIndicator information element is transmitted on BCCH in RRC SystemInformationBlockType1 message"
+                },
+                "DLBandwidth": {
+                    "type": "string",
+                    "description": ""
+                },
+                "ULBandwidth": {
+                    "type": "string",
+                    "description": "The transmission bandwidth configuration of the serving cell on the uplink, see 3GPP TS 36.101/Table 5.6-1. Value n6 corresponds to 6 resource blocks, n15 to 15 resource blocks and so on. If for FDD this parameter is absent, the uplinkiq_ bandwidth is equal to the downlink bandwidth. For TDD this parameter is absent and it is equal to the downlink bandwidth. The ul-Bandwidth information element is optionally transmitted on BCCH in RRC SystemInformationBlockType2 message"
+                },
+                "RSRP": {
+                    "type": "string",
+                    "description": "The average RSRP of the serving cell over last measurement period"
+                },
+                "RSRQ": {
+                    "type": "string",
+                    "description": "The average RSRQ of the serving cell over last measurement period"
+                },
+                "RSSI": {
+                    "type": "number",
+                    "description": "Carrier Received Signal Stregth Indicator, specified in dBm"
+                },
+                "RSSINR": {
+                    "type": "string",
+                    "description": "The average serving cell RS-SINR over last measurement period"
+                },
+                "PUSCHTx": {
+                    "type": "number",
+                    "description": "Total UE transmit power for PUSCH transmission (measured in dBm) averaged over 480 subframes during measurement period."
+                },
+                "EGCI": {
+                    "type": "string",
+                    "description": "EUTRAN Global Cell ID (EGCI) from the OWA."
+                },
+                "AttachAttempts": {
+                    "type": "integer",
+                    "description": "Count of attachment attempts since reboot"
+                },
+                "AttachFailures": {
+                    "type": "integer",
+                    "description": "Count of attachment failures since reboot"
+                },
+                "AttachAvgLatency": {
+                    "type": "integer",
+                    "description": "Average attachment latency for all attachment attempts since reboot"
+                },
+                "LTECellNumberOfEntries": {
+                    "type": "integer",
+                    "description": "The number of E-UTRA neighbor cell measurements included in the current instance of this metric"
+                },
+                "RSTxPower": {
+                    "type": "integer",
+                    "description": "The downlink reference-signal transmit power, specified in dBm. Defined as the linear average over the power contributions (in W) of all resource elements that carry cell-specific reference signals within the operating system bandwidth. Corresponds to parameter referenceSignalPower in SIB4 as a part of PDSCH-Config IE in [Section 6.3.2/3GPP-TS.36.331]"
+                },
+                "NetworkServiceStatus": {
+                    "type": "string",
+                    "description": "OWA WWAN network service status."
+                }
+            }
+        },
+        "Error": {
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "string"
+                }
+            }
+        },
+        "WLLactivation": {
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "description": "If nonzero then the WLL is active and will attempt connection to the network."
+                }
+            }
+        },
+        "FieldTestResult": {
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Field test result JSON string"
+                }
+            }
+        },
+        "ServerEvent": {
+            "properties": {
+                "Type": {
+                    "type": "string",
+                    "description": "Event type: \"Connect\", \"StateChange\" or \"Heartbeat\""
+                },
+                "RebootCause": {
+                    "type": "string",
+                    "description": "The last reboot cause : \"Cold-restart\", \"Warm-restart\", \"Upgrade\" or \"Factory-Reset\""
+                },
+                "State": {
+                    "type": "string",
+                    "description": "The new OWA operational state : \"Rebooting\", \"Upgrading FW\", \"Factory reset applied\", \"Establishing PDN\", \"PDN Established\" Note: \"Rebooting\" state report may not be reliable due to, for example, a sudden power failure or unforeseen OWA issues which could cause an unexpected reboot. So, the notification client should not rely on the \"Rebooting\" state change event for any critical operation."
+                }
+            }
+        },
+        "NotificationServerDetails": {
+            "properties": {
+                "ServerProtocol": {
+                    "type": "string",
+                    "description": "Server protocol to use: \"TCP \",  \"Websocket \" "
+                },
+                "ServerAddress": {
+                    "type": "string",
+                    "description": "IP Address server is running (it could be a URL if the Websocket is the server protocol)"
+                },
+                "ServerPort": {
+                    "type": "integer",
+                    "description": "Port number where the server is listening on."
+                }
+            }
+        },
+        "NetworkTime": {
+            "properties": {
+                "Time": {
+                    "type": "string",
+                    "description": "Network time in format of  ‘YYYY-MM-DDThh:mm:ss’."
+                },
+                "TimeZone": {
+                    "type": "string",
+                    "description": "Offset from the UTC and Daylight saving flag (e.g. +10 DST) "
+                }
+            }
+        },
+        "PLMNID": {
+            "properties": {
+                "PLMNID": {
+                    "type": "string",
+                    "description": "PLMN ID consists of Mobile Country Code (MCC) and Mobile Network Code (MNC) [3GPP-TS.23.003], [3GPP-TS.24.008]."
+                }
+            }
+        },
+        "PLMNListStats": {
+            "properties": {
+                "MaxPLMNListEntries": {
+                    "type": "integer",
+                    "description": "The maximum number of the PLMNs can be in the PLMNID array."
+                },
+                "PLMNListNumberOfEntries": {
+                    "type": "integer",
+                    "description": "The number of PLMNs in the current PLMNID array."
+                }
+            }
+        },
+        "OWAFWCheck": {
+            "properties": {
+                "Enabled": {
+                    "type": "integer",
+                    "description": "0 for disabling, 1 or non-zero for enabling"
+                }
+            }
+        },
+        "EmsEnable": {
+            "properties": {
+                "emsEnable": {
+                    "type": "integer",
+                    "description": "0 for disabling, 1 for enabling"
+                }
+            }
+        }
+    }
+}

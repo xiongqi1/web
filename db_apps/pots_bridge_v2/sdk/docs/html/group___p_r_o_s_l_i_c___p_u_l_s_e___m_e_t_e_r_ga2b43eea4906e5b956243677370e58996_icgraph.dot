@@ -1,0 +1,9 @@
+digraph "ProSLIC_PulseMeterDisable"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir="LR";
+  Node1 [label="ProSLIC_PulseMeterDisable",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 -> Node2 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node2 [label="ProSLIC_PulseMeterStop",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___p_u_l_s_e___m_e_t_e_r.html#ga83226954ddc5485c9a2f0870aa466fb6",tooltip="This function stops the pulse metering tone. "];
+}

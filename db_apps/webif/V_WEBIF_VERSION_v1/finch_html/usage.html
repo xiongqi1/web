@@ -1,0 +1,493 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>wlan data usage</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="wz_jsgraphics.js"></script>
+<script language='javascript'>
+
+function submitForm()
+{
+	if (document.form.pin.value != document.form.confirmPIN.value)
+	{
+		alert("Passwords do not match!");
+		return;
+	}
+	if( document.form.pin.value.toString().length<4 )
+	{
+		alert("Password must at least 4 digits long!");
+		return;
+	}
+	if( parseInt(document.form.unthrottle_speed.value) < parseInt(document.form.throttle_speed.value) )
+	{
+		alert("Maximum Speed must greater then Throttle Speed!");
+		return;
+	}
+	document.form.submit();
+}
+
+var xmlHttp = 0;
+var ajaxerror = 0;
+function ajaxFunction()
+{
+	try
+  	{  
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");   
+   	}
+   	catch (e)
+   	{  // Internet Explorer  
+  		try
+    	{    
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");   
+		}
+  		catch (e)
+    	{    
+			try
+      		{      
+				// Firefox, Opera 8.0+, Safari  
+  				xmlHttp=new XMLHttpRequest();  
+  
+			}
+    		catch (e)
+      		{      
+				alert("Your browser does not support AJAX!");      
+				return false;      
+			}    
+		}  
+	}
+
+	xmlHttp.open("GET","/cgi-bin/wwan_usage.cgi",true);  
+  	xmlHttp.send('a'); 
+  	xmlHttp.onreadystatechange=function()
+    {
+    	if(xmlHttp.readyState==4  && xmlHttp.responseText.length > 200)
+      	{
+			ajaxerror = 0;
+			eval( xmlHttp.responseText );
+		////	chart();
+			xmlHttp.responseText.clear;
+			xmlHttp.close;	 
+			xmlHttp=0;	
+      	}
+    }	 
+}
+
+function reload_timer()
+{
+	xmlHttp=0;	
+	ajaxFunction();	
+	if( ++ajaxerror<=5)
+	{
+		setTimeout("reload_timer()", 10000);
+	}
+	else
+	{
+		location.reload();
+	}
+}	
+
+function dec2hex( s ) { return ( s<15.5 ? '0' : '' ) + Math.round( s ).toString( 16 ); }
+function hex2dec( s ) { return parseInt( s, 16 ); }
+
+function DRAW(shape)
+{
+    if (window.event) event.cancelBubble = true;
+	jg2.setColor("#"+Color);
+    jg2.setStroke(Dotted? Stroke.DOTTED : parseInt(Stroke));
+
+    if (shape=="drawLine")
+        jg2.drawLine(parseInt(dr_x), parseInt(dr_y), parseInt(dr_x+dr_w), parseInt(dr_y+dr_h));
+    else if (shape=="drawRect")
+        jg2.drawRect(parseInt(dr_x), parseInt(dr_y), parseInt(dr_w), parseInt(dr_h));
+    else if(shape=="fillRect")
+        jg2.fillRect(parseInt(dr_x), parseInt(dr_y), parseInt(dr_w), parseInt(dr_h));
+    else if(shape=="drawEllipse")
+        jg2.drawEllipse(parseInt(dr_x), parseInt(dr_y), parseInt(dr_w), parseInt(dr_h));
+    else if(shape=="fillEllipse")
+        jg2.fillEllipse(parseInt(dr_x), parseInt(dr_y), parseInt(dr_w), parseInt(dr_h));
+    else if(shape=="fillArc")
+        jg2.fillArc(parseInt(dr_x), parseInt(dr_y), parseInt(dr_w), parseInt(dr_h), parseFloat( fa_angA.replace(/,/, ".") ), parseFloat( fa_angZ.replace(/,/, ".") ));
+    else if(shape=="fillPolygon")
+    {
+        var pgx = fp_x.split(',');
+        var pgy = fp_y.split(',');
+        if (pgx.length==pgy.length) 
+        {
+            for (var z = 0; z<pgx.length; z++)
+            {
+                if (isNaN(pgx[z] = parseInt(pgx[z])) || isNaN(pgy[z] = parseInt(pgy[z])))
+                {
+                 //   alert('Invalid x or y');
+                    return;
+                }
+            }
+            jg2.fillPolygon(pgx, pgy);
+        }
+		else
+			;//alert('The number of x and y are not equal.');
+    }
+    jg2.paint();
+}
+
+function pie_chart( h, w )
+{
+var	p1 = sent_total/document.form.total_limit.value/10000;
+var	p2 = recv_total/document.form.total_limit.value/10000;
+
+	dr_x = x_offset+200;
+	dr_w = w;
+	dr_h = h;
+	fa_angA = '100';
+	fa_angZ = '100';
+
+	for( dr_y = 6; dr_y >0; dr_y-- )
+	{	
+		Color = chColor(c_send, 0.6);
+		fa_angA = '180';
+		fa_angZ = (180+3.6*p1).toString();
+		DRAW("fillArc");
+		Color = chColor(c_recv, 0.9);
+		fa_angA = fa_angZ;
+		fa_angZ = (180+3.6*(p1+p2)).toString();
+		DRAW("fillArc");
+		if( p1+p2 < 100.0 )
+		{
+			fa_angA = fa_angZ;
+			fa_angZ = '180';
+			Color = chColor(c_remain, 0.7);
+			DRAW("fillArc");
+		}
+	}
+	Color = c_send;
+	fa_angA = '180';
+	fa_angZ = (180+3.6*p1).toString();
+	DRAW("fillArc");
+	Color = chColor(c_recv, 1.1);
+	fa_angA = fa_angZ;
+	fa_angZ = (180+3.6*(p1+p2)).toString();
+	DRAW("fillArc");
+	Color = c_remain;
+	if( p1+p2 < 100.0 )
+	{
+		fa_angA = fa_angZ;
+		fa_angZ = '180';	
+		DRAW("fillArc");
+	}
+	Color = c_send;		
+	dr_x = 40;
+	dr_y = 20;
+	dr_w = 12;
+	dr_h = 10;
+	DRAW("fillRect");
+	dr_y = 60;
+	DRAW("fillRect");			
+	Color = c_recv;
+	dr_y = 40;
+	DRAW("fillRect");
+	dr_x = 65;
+	dr_y = 60;
+	DRAW("fillRect");	
+	drawText( "Total limit: "+parseInt(document.form.total_limit.value)+"MB" , "000000", 58, 0 );
+	var ts = parseInt(sent_total/1000);
+	drawText( "Upload: "+ts/1000+"MB" , "000000", 60, 20 );
+	var tr = parseInt(recv_total/1000);
+	drawText( "Download: "+tr/1000+"MB" , "000000", 60, 40 );
+	var p = (p1+p2).toFixed(1);
+	drawText( "Total data usage: "+((tr+ts)/1000).toFixed(3)+"MB ( " + p +"% )" , "000000", 80, 60 );	
+	drawText( "+", "000000", 55, 60 );
+	drawText( "Usage remaining: "+(parseInt(document.form.total_limit.value)-(ts+tr)/1000 ).toFixed(3)+"MB ( " + (100-p).toFixed(1) +"% )" , "000000", 360, 60 );
+	dr_x = 340;
+	Color = c_remain;
+	DRAW("fillRect");	
+}
+
+function chColor( c, f )
+{
+	var	c1 = hex2dec(c.substr(0,2))*f;
+	var c2 = hex2dec(c.substr(2,2))*f;
+	var c3 = hex2dec(c.substr(4,2))*f
+	return dec2hex( c1>255?255:c1 )+dec2hex( c2>255?255:c2 )+dec2hex( c3>255?255:c3 );
+}
+
+function drawText( s, c, x, y )
+{	
+    jg2.setColor('#'+c);
+	jg2.drawString( s, x, y );
+    jg2.paint();
+}
+
+function block( h, w, d, c )
+{
+	Color = c;
+	dr_w = w;
+	dr_h = h;
+	DRAW("fillRect");
+	Color = chColor(c, 0.9);
+	x1 = (parseInt(dr_x)+parseInt(dr_w)).toString();
+	x2 = (parseInt(x1)+d).toString();
+	x3 = (parseInt(x2)-parseInt(dr_w)).toString();
+	fp_x = dr_x + "," + x1 + "," + x2 + "," + x3;
+	y1 = (parseInt(dr_y)-d).toString();
+	fp_y = dr_y + "," + dr_y + "," + y1 + "," + y1;
+	DRAW("fillPolygon");
+	Color=chColor(Color, 0.9);		
+	fp_x = x1 + "," + x2 + "," + x2 + "," + x1;
+	y2 = (parseInt(y1)+parseInt(dr_h)).toString();
+	y3 = (parseInt(y2)+d-1).toString();
+	fp_y = dr_y + "," + y1 + "," + y2 + "," +y3;
+	DRAW("fillPolygon");
+}
+
+var sent_detail=[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+var recv_detail=[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+var sent_total = 0;
+var recv_total = 0;
+var Color;
+var dr_x;
+var dr_y;
+var dr_w;
+var dr_h;
+
+var fp_x;
+var fp_y;
+
+var fa_angA;
+var fa_angZ;
+
+var Dotted = 0;
+var Stroke = 1;
+var x_offset = 40;
+var y_offset = 100;
+var w_chart = 536;
+var h_chart = 300;
+var chart_center;
+var factor;
+
+var c_recv = "F6BD0F";
+var c_send = "F58026";
+var c_remain = "8BBA00"
+var period = <%val=get_single('statistics.total_hours');%>"@@val";
+if( period>24 ) period = 24;
+var dx = 22*24/period;
+
+function chart()
+{
+var h;
+var max_r = 0;
+var max_s = 0;
+var text_pos = 0;
+var prv_text_pos;
+var r = 0;
+var s = 0;
+
+	for ( var i=0; i<period; i++ )
+	{ 	
+		if( max_r < recv_detail[i] ) { max_r = recv_detail[i]; r = i; }
+		if( max_s < sent_detail[i] ) { max_s = sent_detail[i]; s = i; }
+	}
+	sent_detail[s]++;
+	chart_center = h_chart*sent_detail[s]/(recv_detail[r]+sent_detail[s]+1)+50;
+	factor = 900*h_chart/(recv_detail[r]+sent_detail[s]+1);
+	factor = factor>0.3? 0.3:factor;	
+	jg2.clear();
+	jg2.setFont('verdana,geneva,sans-serif', '8px', Font.NORMAL);	
+	for ( i=0; i<period; i++ ) 
+	{	
+		dr_x = i*dx + x_offset;	
+		h = factor*recv_detail[i]/1000;
+		if ( h < 3 ) h = 3;
+		dr_y = y_offset+chart_center+12;
+		block( h, 10, 14, c_recv );	
+	}
+	prv_text_pos = y_offset+chart_center+40;	//position of the "Download<br>(KB)"
+	for ( i=0; i<period; i++ )
+	{	
+		dr_x = i*dx + x_offset;	
+		h = parseInt(recv_detail[i]/100)/10;
+		len = h.toString().length;
+		text_pos = y_offset+chart_center+parseInt(h*factor)+14;
+		if( Math.abs(text_pos - prv_text_pos) < 10 )
+			text_pos = prv_text_pos + 10;
+		prv_text_pos = text_pos;	
+		drawText( h, "000000", dr_x+5-len*2, text_pos );
+	}
+	dr_x = x_offset-10;
+	dr_y = y_offset+chart_center-1;
+	block( 14, w_chart, 15, "AAAAAA" );	
+	for ( i=0; i<period; i++ ) 
+	{	
+		dr_x = i*dx + x_offset;	
+		h = factor*sent_detail[i]/1000;
+		if ( h < 3 ) h = 3;
+		dr_y = y_offset+chart_center-h;
+		block( h, 10, 14, c_send );	
+		if( i==(period-1))
+			drawText( 'Now', "000000", dr_x-2, chart_center+y_offset )
+		else if( i > 9 )
+			drawText( (-(period-1)+i).toString(), "000000", dr_x, chart_center+y_offset )
+		else
+			drawText( (-(period-1)+i).toString(), "000000", dr_x-5, chart_center+y_offset )
+	}
+	prv_text_pos = y_offset+chart_center-40;  //position of the "Upload<br>(KB)"
+	for ( i=0; i<period; i++ )
+	{	
+		dr_x = i*dx + x_offset;	
+		h = ( parseInt(sent_detail[i]/100)/10).toString();
+		len = h.length;	
+		text_pos = y_offset+chart_center-parseInt(h*factor)-26;
+		if( Math.abs(text_pos - prv_text_pos) < 10 )
+			text_pos = prv_text_pos - 10;
+		prv_text_pos = text_pos;	
+		drawText( h, "000000", dr_x+16-len*2, text_pos );
+	}
+	jg2.setFont('verdana,geneva,sans-serif', '8px', Font.BOLD);
+	drawText( 'Hours:', "000000", x_offset-45, chart_center+y_offset )
+
+	jg2.drawStringRect( "Upload<br>(KB)", x_offset-55, y_offset+chart_center-40, 50, "center" )
+	jg2.drawStringRect( "Download<br>(KB)", x_offset-55, y_offset+chart_center+40, 50, "center" )
+	
+	jg2.setFont('verdana,geneva,sans-serif', '10px', Font.BOLD);
+	pie_chart( 35, 80 );
+	
+	Color = "000000";
+	dr_x = x_offset-20;
+	dr_y = y_offset;
+	dr_h = 0;
+	dr_w = w_chart+40;
+	Dotted = true;
+	DRAW("drawLine");
+	//dr_h = h_chart+40;
+	//DRAW("drawRect");
+	drawText( period+' Hours Data Usage', "000000", x_offset+w_chart/2-80, y_offset+10 )
+}
+
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/wwan_usage.cgi'></script>
+</head>
+<%
+//if( (request['SESSION_ID']==session["sessionid"])&&(session["userlevel"]=='0') ) 
+{ 
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		tempval = form['pin'];
+		retval=set_single( 'hotspot.user.password='+tempval, '-p' );
+        tempval = form['ssid'];
+		retval=set_single( 'wlan.0.ssid='+tempval, '-p' );
+		/*set_single( 'statistics.total_hours='+form['total_hours'], '-p' );
+        set_single( 'statistics.unthrottle_speed='+form['unthrottle_speed'], '-p' );
+        tempval = form['total_limit']+'000000';
+		set_single( 'statistics.total_limit='+tempval, '-p' );
+        tempval = form['throttle_speed'];
+		set_single( 'statistics.throttle_speed='+tempval, '-p' );*/
+	} 
+}
+if (request['REQUEST_METHOD'] == "GET")
+{
+	tempval = get_single( 'statistics.unthrottle_speed' );
+	if( tempval<0|| tempval=="N/A" )
+    {
+    	tempval=1000;
+        set_single( 'statistics.unthrottle_speed='+tempval, '-p' );
+    }
+	form['unthrottle_speed'] = tempval;
+    tempval = get_single( 'statistics.total_hours' );	
+    if( tempval=="N/A" )
+    {
+    	tempval=24;
+        set_single( 'statistics.total_hours='+tempval, '-p' );	
+    }
+	form['total_hours'] = tempval;  
+    tempval = get_single( 'statistics.total_limit' );	
+    if( tempval<1000000 || tempval=="N/A" )
+    {
+    	tempval=50000000;
+        set_single( 'statistics.total_limit='+tempval, '-p' );	
+    }
+	form['total_limit'] = tempval/1000000; 
+	tempval = get_single( 'statistics.throttle_speed' );
+	if( tempval<1|| tempval=="N/A" )
+    {
+    	tempval=256;
+        set_single( 'statistics.throttle_speed='+tempval, '-p' );
+    }
+	form['throttle_speed'] = tempval;
+    tempval = get_single( 'hotspot.user.password' );
+    form['pin'] = tempval;
+    form['confirmPIN'] = tempval;
+    tempval = get_single( 'wlan.0.ssid' );
+    form['ssid'] = tempval;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+
+<h3>WLAN Data Usage</h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+    <tr>
+      <th>Data Usage Configuration</th>
+    </tr>
+</table>
+<table width="90%">
+
+<tr> 
+	<td width="30%">Device PIN&nbsp;&nbsp;
+	  <input type=password name='pin' size=24 maxlength=64 value="@@form['pin']"></td>
+	<td>Confirm PIN&nbsp;&nbsp;<input type=password name='confirmPIN' size=24 maxlength=64 value="@@form['confirmPIN']"></td>
+</tr>
+<tr >
+	<td width="38%">SSID</td>
+    <td><input type=text name='ssid' size=32 maxlength=128 value="@@form['ssid']"></td>
+</tr>
+<tr >
+	<td width="38%">Maximum Speed</td>
+    <td><input type=text name='unthrottle_speed' size=32 maxlength=128 value="@@form['unthrottle_speed']">&nbsp;&nbsp;Kbps</td>
+</tr>
+<tr >
+	<td>Total Hours</td>
+    <td><input type=text name='total_hours' size=32 maxlength=128 value="@@form['total_hours']" >&nbsp;&nbsp;Hours</td>
+</tr>
+<tr >
+	<td width="38%">Total Limit</td>
+    <td><input type=text name='total_limit' size=32 maxlength=128 value="@@form['total_limit']">&nbsp;&nbsp;MB</td>
+</tr>
+<tr >
+	<td>Throttle Speed</td>
+    <td><input type=text name='throttle_speed' size=32 maxlength=128 value="@@form['throttle_speed']">
+    &nbsp;&nbsp;Kbps</td>
+</tr>
+</table>
+<div align="right" style="margin-right:50% ">
+<p></p>
+<INPUT TYPE="button" VALUE="Save" onclick="javascript:submitForm();">&nbsp;&nbsp;
+<p></p>
+</div>
+
+<!--table width="90%">
+    <tr>
+      <th>Data Usage Statistics</th>
+    </tr>
+</table-->
+<!--input type="button" value="Deaw Chart" onClick="chart();"-->
+<p></p>
+<!--div id="dt" style="position:relative;left:0px;top:0px;width:400px;height:490px;z-index:2;overflow:visible;"></div>
+<script language=Javascript>
+var jg2 = new jsGraphics("dt");
+setTimeout("reload_timer()", 1000);
+</script-->  
+</form>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

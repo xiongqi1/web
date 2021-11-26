@@ -1,0 +1,36 @@
+var group___p_r_o_s_l_i_c___d_c_f_e_e_d =
+[
+    [ "ProSLIC_DCfeed_Cfg", "struct_pro_s_l_i_c___d_cfeed___cfg.html", [
+      [ "const_ilim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a3e6b2c23f4c6f350ed8befc16e6d14f8", null ],
+      [ "const_rfeed", "struct_pro_s_l_i_c___d_cfeed___cfg.html#ab2e08829d768d0eeda458f7f56c5bbdc", null ],
+      [ "delta1", "struct_pro_s_l_i_c___d_cfeed___cfg.html#ae9bc0ce865edb5fc8bbf40d5473cd9d6", null ],
+      [ "delta2", "struct_pro_s_l_i_c___d_cfeed___cfg.html#aba2b2134eac07596af0285098f3b0374", null ],
+      [ "i_vlim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#af3dede94d35157aaea105f5e3eb51645", null ],
+      [ "lcrdbi", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a2516e5e57f49eb8f84db11fb74c86f09", null ],
+      [ "lcrmask", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a185efc235834636a93ac98c00bd95bcf", null ],
+      [ "lcrmask_linecap", "struct_pro_s_l_i_c___d_cfeed___cfg.html#aaf265113a44c5a519b42f2e35de6790c", null ],
+      [ "lcrmask_polrev", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a8be58a644ad22f236b7256c1b673d5dd", null ],
+      [ "lcrmask_state", "struct_pro_s_l_i_c___d_cfeed___cfg.html#ab7ef2a0dbdc482b1c56ff497ddfa4c27", null ],
+      [ "lcroffhk", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a42c9190eb2f8c4c9db494065fb9c7936", null ],
+      [ "lcronhk", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a6c3e158067600cad3cf8a919b0a23e5e", null ],
+      [ "longdbi", "struct_pro_s_l_i_c___d_cfeed___cfg.html#aa652b53a95ccb3a2a197a785fb7de285", null ],
+      [ "longhith", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a2f5ac7ed3fc90619eb77da26fb0ac3cd", null ],
+      [ "longloth", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a98fb79741a788f72f2f3045bafbf7dc8", null ],
+      [ "slope_ilim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a93515789cd93ef290e3a3aab57e83426", null ],
+      [ "slope_rfeed", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a98880ee2e5ee768c3f8b939ec6ad2b7d", null ],
+      [ "slope_vlim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a833fc9df95905eb2ce46f75e53b5bc70", null ],
+      [ "v_ilim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a3c136ad4bc2f543871f526a3e043c240", null ],
+      [ "v_rfeed", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a2c3730c82afab0da05560afce1bae77d", null ],
+      [ "v_vlim", "struct_pro_s_l_i_c___d_cfeed___cfg.html#afc831de04a32b9a7667cd2818baaf587", null ],
+      [ "vcm_oh", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a96b0172e1563eb4c5637f2f14111af72", null ],
+      [ "vov_bat", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a2faa5d7ca0508fd70c1c103b68d08c50", null ],
+      [ "vov_gnd", "struct_pro_s_l_i_c___d_cfeed___cfg.html#a151fc9e4bc54537ff6d4c7db6942b84b", null ],
+      [ "PWRSAVE_DISABLE", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#gga61dadd085c1777f559549e05962b2c9ea0dc28d84c8bca5b6168daffa31faa2e4", null ],
+      [ "PWRSAVE_ENABLE", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#gga61dadd085c1777f559549e05962b2c9ea11c9b92c6eb14a1c6c6ade52426f9395", null ]
+    ] ],
+    [ "ProSLIC_dbgSetDCFeedIloop", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga86e3b8bafb8087858f1389fc836ba5aa", null ],
+    [ "ProSLIC_dbgSetDCFeedVopen", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga3fb859e527def27a2ecb68b8df0b154a", null ],
+    [ "ProSLIC_DCFeedSetup", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#gaf4a4ec57445b8d777cff10789d19f195", null ],
+    [ "ProSLIC_DCFeedSetupCfg", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga35bc002f2e716f800a6decba15d7c71d", null ],
+    [ "ProSLIC_SetPowersaveMode", "group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga9283b3779812fbdda45dcc67bcb387a0", null ]
+];

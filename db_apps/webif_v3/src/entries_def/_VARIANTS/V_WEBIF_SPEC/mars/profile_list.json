@@ -1,0 +1,7 @@
+{
+    "id": "WWAN",
+    "title": "Wireless WAN profiles",
+    "url": "/profile_list.html",
+    "path": [ "Networking", "WirelessWAN" ],
+    "position": 20
+}

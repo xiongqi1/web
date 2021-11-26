@@ -1,0 +1,311 @@
+#!/bin/sh -f
+#
+# Connect script for UMTS modules
+#
+# This script is called by connection_mgr as follows:-
+#
+# SUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+BIN=$0
+PROFILE=$1
+INSTANCE=`echo $2 | awk '{print $1%10+1}'`
+WWANID=`echo $2 | awk '{print $1 -$1%10}'`
+ACTION="$3"
+
+DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+TTY=`/usr/bin/rdb_get $DEV.data_if.$INSTANCE`
+V24=`/usr/bin/rdb_get $DEV.V250_if.0`
+APN=`/usr/bin/rdb_get link.profile.$PROFILE.apn`
+DIALSTR=`/usr/bin/rdb_get link.profile.$PROFILE.dialstr`
+USER=`/usr/bin/rdb_get link.profile.$PROFILE.user`
+PASS=`/usr/bin/rdb_get link.profile.$PROFILE.pass`
+DEBUG=`/usr/bin/rdb_get link.profile.$PROFILE.verbose_logging`
+DEFAULTROUTE=`/usr/bin/rdb_get link.profile.$PROFILE.defaultroute`
+DNS=`/usr/bin/rdb_get link.profile.$PROFILE.userpeerdns`
+RETRY=`/usr/bin/rdb_get link.profile.$PROFILE.retry`
+AUTH_TYPE=`/usr/bin/rdb_get link.profile.$PROFILE.auth_type`
+PREFIPEnable=`/usr/bin/rdb_get link.profile.$PROFILE.preferred_ip.enable`
+PREFIPAddr=`/usr/bin/rdb_get link.profile.$PROFILE.preferred_ip.addr`
+
+# do not try Telstra bigpond and extranet in autapn mode
+PLMN_MCC=`rdb_get wwan.$WWANID.imsi.plmn_mcc`
+PLMN_MNC=`rdb_get wwan.$WWANID.imsi.plmn_mnc`
+
+PPPD="pppd"
+
+if [ "$WWANID" = '10' ]; then
+	PPPD="pppd10"
+fi
+
+test -z "$ACTION" && ACTION="start"
+
+# take v24 if tty does not exist
+if [ -z "$TTY" ]; then
+    TTY="$V24"
+fi
+
+log() {
+    logger -t SUMTS "$@"
+}
+
+log << EOF
+PROFILE='$PROFILE'
+INSTANCE='$INSTANCE'
+ACTION='$ACTION'
+TTY='$TTY'
+V24='$V24'
+EOF
+
+pidof_pppd() {
+	# terminate all runontime for disconnection schedule
+	pidof $PPPD | while read pid; do
+
+		stdin_fd=$(readlink -f "/proc/${pid}/fd/0")
+		if [ "$stdin_fd" = "$TTY" ]; then
+			echo $pid
+		fi
+	done
+}
+
+# bypass if stop action
+if [ "$ACTION" = "stop" ]; then
+
+	log "stopping all '$PPPD $TTY'"
+
+	# check data port
+	if [ -z "$TTY" ]; then
+		log "data port is not available"
+		exit 1
+	fi
+
+	# terminate pppd
+	pids=$(pidof $PPPD)
+	if [ -n "$pids" ]; then
+		log "terminate $PPPD $tty - $pids"
+		kill $pids 2> /dev/null
+	fi
+
+	# wait
+	i=0
+	while [ $i -lt 30 ]; do
+		pids=$(pidof $PPPD)
+		if [ -z "$pids" ]; then
+			break
+		fi
+
+		i=$(( $i + 1 ))
+		sleep 1
+		log "waiting $i/10"
+	done
+
+	# force to terminate
+	pids=$(pidof $PPPD)
+	if [ -n "$pids" ]; then
+		log "force to terminate pppds $tty - $pids"
+		kill -9 $pids 2> /dev/null
+	fi
+
+	log "done"
+
+	exit 0
+fi
+
+# clear apn if auto apn selected
+perprofile_auto_apn_enable=0
+global_auto_apn=$(rdb_get "webinterface.autoapn")
+profile_auto_apn=`/usr/bin/rdb_get link.profile.$PROFILE.autoapn`
+
+# source unpw
+UNPW="$BIN-UNPW"
+log "sourcing (fname='$UNPW')"
+source "$UNPW"
+
+if [ "$SIM_AUTOAPN" = "0" ]; then
+	log "non-auto-apn SIM card detected"
+
+	# disable 
+	perprofile_auto_apn_enable=0
+	global_auto_apn=0
+else
+	# decide if we do global auto-APN procedure or per-profile auto-APN
+	if [ -n "$profile_auto_apn" ]; then
+		log "Per-profile auto-APN detected - link.profile.$PROFILE.autoapn"
+
+		if [ "$profile_auto_apn" = "1" ]; then
+			log "auto-apn is enabled in 'link.profile.$PROFILE.autoapn' rdb"
+			APN=""
+		fi
+
+		perprofile_auto_apn_enable=1
+	else
+		log "Global auto-APN detected - link.profile.$PROFILE.autoapn"
+
+		# clear apn if auto apn selected
+		if [ "$global_auto_apn" = "1" ]; then
+			log "auto-apn is enabled in 'webinterface.autoapn' rdb"
+			APN=""
+		fi
+
+		perprofile_auto_apn_enable=0
+	fi
+fi
+
+# do not perform auto-apn if auto-apn is intentionally disabled
+if [ "$global_auto_apn" = "0" ]; then
+	log "auto-apn is disabled"
+elif [ -z "$APN" ]; then
+    while true; do
+        # read wwan.$WWANID.apn.simICCID before wwan_check_apn running which
+        # clears this variable
+        LAST_ICCID=`rdb_get wwan.$WWANID.system_network_status.simICCID`
+        LAST_APN=`rdb_get wwan.$WWANID.apn.${LAST_ICCID}`
+	if [ "$perprofile_auto_apn_enable" = "1" ]; then
+		eval `wwan_check_apn $PROFILE`
+	else
+		eval `wwan_check_apn`
+	fi
+        log "auto APN: '$APN' USER: '$USER' PASS: '$FAKE_PASS' AUTH: '$AUTH'"
+
+        # do not try Telstra bigpond and extranet in auto apn mode
+        # if current ICCID is matching with previous historic ones and
+        # previous connection was extranet or bigpond, allow connection.
+        if [ "$PLMN_MCC" = "505" -a "$PLMN_MNC" = "01" ]; then
+            if [ "$APN" = "telstra.extranet" -o "$APN" = "telstra.bigpond" ];then
+                #log "current ICCID = $LAST_ICCID, LAST_APN = $LAST_APN, APN = $APN"
+                if [ "$LAST_APN" = "" -o "$LAST_APN" != "$APN" ]; then
+                    log "auto APN: '$APN' is ignored in autoapn mode"
+                    continue
+                fi            
+            fi
+        fi
+        break
+    done
+
+	# accept the blank apn
+	if [ -z "$APN" ]; then
+		log "use the blank apn - ignore autoapn"
+	fi
+
+    rdb_set wwan.$WWANID.apn.current "$APN"
+    rdb_set wwan.$WWANID.username.current "$USER"
+    rdb_set wwan.$WWANID.pass.current "$PASS"
+    rdb_set wwan.$WWANID.auth.current "$AUTH"
+    rdb_set wwan.$WWANID.profile.current "$PROFILE"
+    rdb_set wwan.$WWANID.connection.status connecting
+    AUTH_TYPE="$AUTH"
+    # Update profile's current APN
+    rdb_set link.profile.$PROFILE.apn.current "$APN"
+fi
+
+#DEBUG="debug "
+#DEFAULTROUTE="defaultroute "
+#DNS="usepeerdns "
+
+CMD="$PPPD $TTY nodetach noipdefault crtscts noauth ipparam $PROFILE linkname $PROFILE"
+#CMD="$CMD $DEBUG $DEFAULTROUTE $DNS"
+
+if [ "$AUTH_TYPE" = "pap" ]; then
+    CMD="$CMD refuse-chap refuse-mschap-v2 refuse-mschap refuse-eap"
+fi
+
+if [ "$DEBUG" = "1" ]; then
+    CMD="$CMD debug "
+fi
+
+if [ "$DEFAULTROUTE" != "0" ]; then
+    CMD="$CMD defaultroute "
+fi
+
+if [ "$DNS" != "" ]; then
+    CMD="$CMD usepeerdns "
+fi
+
+if [ "$USER" != "" ]; then
+    CMD="$CMD user $USER "
+fi
+
+if [ "$PASS" != "" ]; then
+    CMD="$CMD password $PASS "
+fi
+
+# look up chat binary - its locationis variable from platform to platform
+CHAT="/usr/sbin/chat"
+if [ ! -e "$CHAT" ]; then
+    CHAT="/bin/chat"
+fi
+
+# do the final check
+if [ ! -e "$CHAT" ]; then
+    log "chat script does not exist - check chat script location"
+fi
+
+if [ "$DIALSTR" = "atd*99#" -o "$DIALSTR" = "ATD*99#" ]; then
+	DIALCMD="atd*99***${INSTANCE}#"
+	APNCMD="'AT+CGDCONT=$INSTANCE,\\\"IP\\\",\\\"$APN\\\""
+
+	# Preferred IP is Not applied to AutoAPN
+	if [ "$perprofile_auto_apn_enable" = "1" -a "$profile_auto_apn" = "1" ] || [ "$perprofile_auto_apn_enable" = "0" -a "$global_auto_apn" = "1" ];
+	then
+		APNCMD="${APNCMD},\\\"0.0.0.0\\\""
+	else
+		if [ "$PREFIPEnable" = "1" -a -n "$PREFIPAddr" ]; then
+			APNCMD="${APNCMD},\\\"$PREFIPAddr\\\""
+		else
+			APNCMD="${APNCMD},\\\"0.0.0.0\\\""
+		fi
+	fi
+
+	APNCMD="${APNCMD}'"
+else
+	DIALCMD="$DIALSTR"
+	APNCMD="AT"
+fi
+
+
+case "$ACTION" in
+	'start')
+		CMD="$CMD connect \"$CHAT -v -f /etc/ppp/chatscripts/umts -T $DIALCMD -U $APNCMD\" "
+
+		# if shared
+		if [ "$V24" == "$TTY" ]; then
+		rdb_set wwan.$WWANID.module.lock_result ""
+		rdb_set wwan.$WWANID.module.lock 1
+
+		t=0
+		while [ $t -lt 30 ]; do
+			log "waiting until simple_at_manager gives up the port #$t"
+
+			if [ "`rdb_get wwan.$WWANID.module.lock_result`" == "1" ]; then
+			log "successed"
+			break;
+			fi
+			sleep 1
+
+			t=$(( $t+1 ))
+		done
+		fi;
+
+		# we are changing to pppd rather than launching another process
+		# So, Connection manager can monitor pppd directly rather than this script
+		eval "exec $CMD"
+		;;
+
+	# usage for dod-script : dial
+	'manual_start')
+		log "$CHAT -v -f "/etc/ppp/chatscripts/umts" -T '$DIALCMD' -U '$APNCMD'"
+		$CHAT -v -f "/etc/ppp/chatscripts/umts" -T "$DIALCMD" -U "$APNCMD"
+		;;
+
+	# usage for dod-scriopt : get pppd options
+	'manual_config')
+		echo "$CMD"
+		;;
+
+	*)
+		log "invalid command - $ACTION"
+		;;
+esac

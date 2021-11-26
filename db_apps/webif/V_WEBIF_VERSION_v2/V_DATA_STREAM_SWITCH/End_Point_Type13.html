@@ -1,0 +1,473 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type13 (IP Modem)</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+
+	var l_udp_mode = $("#udpmode-0").is(":checked") ? 1 : 0;
+	var l_exclusive = $("#exclusive-0").is(":checked") ? 1 : 0;
+	var l_keep_alive = $("#keepalive-enable-0").is(":checked") ? 1 : 0;
+	var l_tcp_no_delay = $("#tcp-no-delay-0").is(":checked") ? 1 : 0;
+
+	// set hidden form elements so they can be used by server side script
+	$("#hidden_udp_mode").val(l_udp_mode);
+	$("#hidden_exclusive").val(l_exclusive);
+	$("#hidden_keep_alive").val(l_keep_alive);
+	$("#hidden_tcp_no_delay").val(l_tcp_no_delay);
+	$("#hidden_ep_index").val(i);
+	$("#hidden_ep_name").val(EP_Name);
+
+	// if server or client mode is disabled, set port to 0
+	var l_enabled = $("#clientmode-0").is(":checked") ? 1 : 0;
+	if (!l_enabled) {
+		$("#portremote").val(0);
+	}
+
+	l_enabled = $("#servermode-0").is(":checked") ? 1 : 0;
+	if (!l_enabled) {
+		$("#portlocal").val(0);
+	}
+
+	if (($("#portlocal").val() == 0) && ($("#portremote").val() == 0)) {
+		// Both local and remote port are set to 0 - functionality will be disabled
+		alert(_("Msg132"));
+		return 0;
+	}
+
+	document.form.submit();
+}
+
+$(document).ready(function() {
+<%
+#if 0
+	// WARNING: no validation on this IP Address!
+#endif
+	ipAddr = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.ip_address', '', '--base64');
+	if (ipAddr == "N/A") {
+		ipAddr = "";
+	}
+%>
+
+	// get ip address for client (remote) and server (us) PPP link
+	var v=(Base64.decode("@@ipAddr"));
+	$("#ipaddress").val(v);
+	// set ports
+	var v_port_local="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.port_local');%>";
+	$("#portlocal").val(v_port_local);
+	var v_port_remote="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.port_remote');%>";
+	$("#portremote").val(v_port_remote);
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.exclusive');%>";
+	load_value_to_element($("input:radio[name=exclusive]"), v);
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.no_delay');%>";
+	load_value_to_element($("input:radio[name=tcp-no-delay]"), v);
+<%
+	ident = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.ident', '', '--base64');
+	if (ident == "N/A") {
+		ident = "";
+	}
+%>
+
+	v=Base64.decode("@@ident");
+	$("#idstr").val(v);
+
+	$("#keepcnt").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepcnt');%>");
+	$("#keepidle").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepidle');%>");
+	$("#keepintvl").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepintvl');%>");
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.is_udp');%>";
+	load_value_to_element($("input:radio[name=udpmode]"), v);
+	$("input:radio.access[name=udpmode]").change(function() {
+		dis=$("#udpmode-0").is(":checked");
+		$("#tcp-only-div").css("display",dis?"none":"");
+	});
+	$("input:radio.access[name=udpmode]").trigger("change");
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keep_alive');%>";
+	load_value_to_element($("input:radio[name=keepalive-enable]"), v);
+	$("input:radio.access[name=keepalive-enable]").change(function() {
+		en=$("#keepalive-enable-0").is(":checked");
+		$("#keepalive-div").css("display",en?"":"none");
+	});
+	$("input:radio.access[name=keepalive-enable]").trigger("change");
+
+	load_value_to_element($("input:radio[name=clientmode]"), (v_port_remote == 0) ? 0 : 1);
+	$("input:radio.access[name=clientmode]").change(function() {
+		en=$("#clientmode-0").is(":checked");
+		$("#remote-only-div").css("display",en?"":"none");
+	});
+	$("input:radio.access[name=clientmode]").trigger("change");
+
+	load_value_to_element($("input:radio[name=servermode]"), (v_port_local == 0) ? 0 : 1);
+	$("input:radio.access[name=servermode]").change(function() {
+		en=$("#servermode-0").is(":checked");
+		$("#local-only-div").css("display",en?"":"none");
+	});
+	$("input:radio.access[name=servermode]").trigger("change");
+});
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	var ep_name = form['hidden_ep_name'];
+	var index = validate_number(form['hidden_ep_index']);
+
+	// validate input
+	if (string_regex_match(ep_name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	if (form['portlocal'] != "") {
+		var portNumber = string_to_number(form['portlocal']);
+		if (portNumber < 1 || portNumber > 65535) {
+			onBadRequest();
+		}
+	}
+	if (form['portremote'] != "") {
+		var portNumberRemote = string_to_number(form['portremote']);
+		if (portNumberRemote < 1 || portNumberRemote > 65535) {
+			onBadRequest();
+		}
+	}
+	validateOnOffRadio(form['hidden_udp_mode']);
+	tryValidateOnOffRadio(form['hidden_exclusive']);
+	tryValidateOnOffRadio(form['hidden_tcp_no_delay']);
+	tryValidateOnOffRadio(form['hidden_keep_alive']);
+
+
+	if (form['keepcnt'] != "") {
+		var keepCnt = string_to_number(form['keepcnt']);
+		if (keepCnt < 1 || keepCnt > 50) {
+			onBadRequest();
+		}
+	}
+	if (form['keepidle'] != "") {
+		var keepIdle = string_to_number(form['keepidle']);
+		if (keepIdle < 1 || keepIdle > 10000) {
+			onBadRequest();
+		}
+	}
+	if (form['keepintvl'] != "") {
+		var keepIntvl = string_to_number(form['keepintvl']);
+		if (keepIntvl < 1 || keepIntvl > 1000) {
+			onBadRequest();
+		}
+	}
+
+	set_single_direct("-p", 'service.dsm.ep.conf.' + index + '.name', ep_name);
+	set_single_direct("-p", 'service.dsm.ep.conf.' + index + '.type', '13');
+
+	// Create the list of RDBs and set them.
+	var dsmRoot = "service.dsm.ep.conf." + ep_name + ".";
+	set_single_direct("-p", dsmRoot + "ip_address", form["ipaddress"]);
+	set_single_direct("-p", dsmRoot + "port_local", form["portlocal"]);
+	set_single_direct("-p", dsmRoot + "port_remote", form["portremote"]);
+	set_single_direct("-p", dsmRoot + "ident", form["idstr"]);
+	set_single_direct("-p", dsmRoot + "is_udp", form["hidden_udp_mode"]);
+	set_single_direct("-p", dsmRoot + "exclusive", form["hidden_exclusive"]);
+	set_single_direct("-p", dsmRoot + "no_delay", form["hidden_tcp_no_delay"]);
+	set_single_direct("-p", dsmRoot + "keep_alive", form["hidden_keep_alive"]);
+	set_single_direct("-p", dsmRoot + "keepcnt", form["keepcnt"]);
+	set_single_direct("-p", dsmRoot + "keepidle", form["keepidle"]);
+	set_single_direct("-p", dsmRoot + "keepintvl", form["keepintvl"]);
+
+	// trigger!
+	set_single_direct("-p", 'service.dsm.trigger', '1');
+	redirect('/end_points.html?success');
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<!--hidden elements for propagating required data to server side scripts-->
+			<%appendCsrfToken();%>
+			<input type="hidden" name="hidden_ep_index" id="hidden_ep_index" value="">
+			<input type="hidden" name="hidden_ep_name" id="hidden_ep_name" value="">
+			<input type="hidden" name="hidden_udp_mode" id="hidden_udp_mode" value="">
+			<input type="hidden" name="hidden_exclusive" id="hidden_exclusive" value="">
+			<input type="hidden" name="hidden_keep_alive" id="hidden_keep_alive" value="">
+			<input type="hidden" name="hidden_tcp_no_delay" id="hidden_tcp_no_delay" value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type13")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<div class="grey-box">
+					<div class="form-row no-bg-form">
+					<label for="clientmode"><script language=Javascript>document.write(_("ipModemClientEnabled"))</script></label>
+					<div class="radio-box-group">
+						<div class="radio-box">
+							<input type="radio" class="access" name="clientmode" id="clientmode-0" value=1>
+							<label for="clientmode-0"><div class="radioText"><script language=Javascript>document.write(_("Enable"))</script></div></label>
+						</div>
+						<div class="radio-box">
+							<input type="radio" class="access" name="clientmode" id="clientmode-1" value=0>
+							<label for="clientmode-1"><div class="radioText"><script language=Javascript>document.write(_("Disable"))</script></div></label>
+						</div>
+					</div>
+					</div>
+
+					<div id="remote-only-div">
+						<div class="form-row">
+							<label for="ipaddress"><script language=Javascript>document.write(_("ipModemRemoteServerAddress"))</script></label>
+							<div class="field">
+								<input type="text" name="ipaddress" id="ipaddress" class="large required validate[required]" onkeyup="urlFilter(this);" value="">
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label for="portremote"><script language=Javascript>document.write(_("ipModemPortRemote"))</script></label>
+							<div class="field">
+								<input type="text" name="portremote" id="portremote" class="large required field1and65535 validate[required, funcCall[validate_field1and65535]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-65535"))</script></span>
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label for="idstr"><script language=Javascript>document.write(_("ipModemIdentStr"))</script></label>
+							<div class="field">
+								<input type="text" name="idstr" id="idstr" class="large" maxlength=32 value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("identStartSendHelper"))</script></span>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-row no-bg-form">
+					<label for="servermode"><script language=Javascript>document.write(_("ipModemServerEnabled"))</script></label>
+					<div class="radio-box-group">
+						<div class="radio-box">
+							<input type="radio" class="access" name="servermode" id="servermode-0" value=1>
+							<label for="servermode-0"><div class="radioText"><script language=Javascript>document.write(_("Enable"))</script></div></label>
+						</div>
+						<div class="radio-box">
+							<input type="radio" class="access" name="servermode" id="servermode-1" value=0>
+							<label for="servermode-1"><div class="radioText"><script language=Javascript>document.write(_("Disable"))</script></div></label>
+						</div>
+					</div>
+					</div>
+
+					<div id="local-only-div">
+						<div class="form-row">
+							<label for="portlocal"><script language=Javascript>document.write(_("ipModemPortLocal"))</script></label>
+							<div class="field">
+								<input type="text" name="portlocal" id="portlocal" class="large required field1and65535 validate[required, funcCall[validate_field1and65535]]" onKeyUp='NumfieldEntry(this)' value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-65535"))</script></span>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-row no-bg-form">
+						<label for="udpmode"><script language=Javascript>document.write(_("mode"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name="udpmode" id="udpmode-0" value=1>
+								<label for="udpmode-0"><div class="radioText"><script language=Javascript>document.write(_("UDP"))</script></div></label>
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name="udpmode" id="udpmode-1" value=0>
+								<label for="udpmode-1"><div class="radioText"><script language=Javascript>document.write(_("TCP"))</script></div></label>
+							</div>
+						</div>
+					</div>
+
+					<div id="tcp-only-div">
+						<div class="form-row no-bg-form">
+							<label for="exclusive"><script language=Javascript>document.write(_("ipModemExclusive"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="exclusive-0" name="exclusive" class="access" value=1>
+										<label for="exclusive-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="exclusive-1" name="exclusive" class="access" value=0>
+										<label for="exclusive-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("ipModemTcpConnHelper"))</script></span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-row no-bg-form">
+							<label for="tcp-no-delay"><script language=Javascript>document.write(_("tcpNoDelay"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="tcp-no-delay-0" name="tcp-no-delay" class="access" value=1>
+										<label for="tcp-no-delay-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="tcp-no-delay-1" name="tcp-no-delay" class="access" value=0>
+										<label for="tcp-no-delay-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("ipModemNagleHelper"))</script></span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-row no-bg-form">
+							<label for="keepalive"><script language=Javascript>document.write(_("Keepalive"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="keepalive-enable-0" name="keepalive-enable" class="access" value=1>
+										<label for="keepalive-enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="keepalive-enable-1" name="keepalive-enable" class="access" value=0>
+										<label for="keepalive-enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div id="keepalive-div">
+							<div class="form-row">
+								<label for="keepcnt"><script language=Javascript>document.write(_("Keepalive count"))</script></label>
+								<div class="field">
+									<input type="text" name="keepcnt" id="keepcnt" class="large required field1and50 validate[required, funcCall[validate_field1and50]]" maxLength="2" onKeyUp='NumfieldEntry(this)' value="">
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-50"))</script></span>
+								</div>
+							</div>
+
+							<div class="form-row">
+								<label for="keepidle"><script language=Javascript>document.write(_("Keepalive idle"))</script></label>
+								<div class="field">
+									<input type="text" name="keepidle" id="keepidle" class="large required field1and10000 validate[required,funcCall[validate_field1and10000]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-10000")+"&nbsp;&nbsp;"+_("seconds"))</script></span>
+								</div>
+							</div>
+
+							<div class="form-row">
+								<label for="keepintvl"><script language=Javascript>document.write(_("Keepalive interval"))</script></label>
+								<div class="field">
+									<input type="text" name="keepintvl" id="keepintvl" class="large required field1and1000 validate[required,funcCall[validate_field1and1000]]" maxLength="4" onKeyUp='NumfieldEntry(this)' value="">
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-1000")+"&nbsp;&nbsp;"+_("seconds"))</script></span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("field1and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and65535"));
+
+	$.validator.addMethod("field1and50",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 50 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and50"));
+
+	$.validator.addMethod("field1and1000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 1000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and1000"));
+
+	$.validator.addMethod("field1and10000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 10000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and10000"));
+#else
+function validate_field1and65535(field) {
+	if( field.val() < 1 || field.val() > 65535 ) {
+		return _("field1and65535");
+	}
+}
+function validate_field1and50(field) {
+	if( field.val() < 1 || field.val() > 50 ) {
+		return _("field1and50");
+	}
+}
+function validate_field1and1000(field) {
+	if( field.val() < 1 || field.val() > 1000 ) {
+		return _("field1and1000");
+	}
+}
+function validate_field1and10000(field) {
+	if( field.val() < 1 || field.val() > 10000 ) {
+		return _("field1and10000");
+	}
+}
+#endif
+</script>
+</body>
+</html>

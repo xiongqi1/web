@@ -1,0 +1,386 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type11 (Modem Emulator)</title>
+<% include topinc_v2.inc %>
+</head>
+
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+#include "end_point_types.inc"
+#include "dsm_ser_and_modem_ep.inc"
+
+<script language="JavaScript">
+var dsr_list={"0":_("Always"), "1":_("Registered"), "2":_("Session Established"), "3":_("Never"), "4":_("Mimic DTR")};
+var dtr_list={"0":_("Ignore"), "1":_("Enter Command State"), "2":_("Disconnect")};
+var dcd_list={"0":_("Always"), "1":_("Connect"), "2":_("Never"), "3":_("Session Established")};
+var ri_list={"0":_("Always"), "1":_("Ring"), "2":_("Never")};
+var autoanswer_list={"0":_("0"), "1":_("1"), "2":_("2"), "3":_("3"), "4":_("4"), "5":_("5"), "6":_("6"), "7":_("7"), "8":_("8"), "9":_("9"), "10":_("10"), "11":_("11"), "12":_("12")};
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p",varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=validate_number(form['idxEP']);
+	EP_Name=form['nameEP'];
+	// validate input
+	if (string_regex_match(EP_Name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	if (string_regex_match(form['baud'], "^[0-9]+$") == false) {
+		onBadRequest();
+	}
+	if (string_regex_match(form['databits'], "^[0-9]+$") == false) {
+		onBadRequest();
+	}
+	if (string_regex_match(form['stopbits'], "^[0-9]+$") == false) {
+		onBadRequest();
+	}
+	if (string_regex_match(form['parity'], "^[0-9A-Za-z]+$") == false) {
+		onBadRequest();
+	}
+	tryValidateDecimalNumber(form['hw_fc']);
+	tryValidateDecimalNumber(form['sw_fc']);
+	tryValidateDecimalNumber(form['dsr_opt']);
+	tryValidateDecimalNumber(form['dtr_opt']);
+	tryValidateDecimalNumber(form['dcd_opt']);
+	tryValidateDecimalNumber(form['ri_opt']);
+	tryValidateDecimalNumber(form['cct_autoanswer_opt']);
+	validateOnOffRadio(form['opt_auto_enable']);
+	tryValidateDecimalNumber(form['Opt_1']);
+
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type",form['typeEP']);
+	setDsmRdb(EP_Name+".dev_name",form['devName']);
+	setDsmRdb(EP_Name+".bit_rate",form['baud']);
+	setDsmRdb(EP_Name+".data_bits",form['databits']);
+	setDsmRdb(EP_Name+".stop_bits",form['stopbits']);
+	setDsmRdb(EP_Name+".parity",form['parity']);
+
+	setDsmRdb(EP_Name+".opt_hw_fc",form['hw_fc']);
+	setDsmRdb(EP_Name+".opt_sw_fc",form['sw_fc']);
+	setDsmRdb(EP_Name+".opt_dsr",form['dsr_opt']);
+	setDsmRdb(EP_Name+".opt_dtr",form['dtr_opt']);
+	setDsmRdb(EP_Name+".opt_dcd",form['dcd_opt']);
+	setDsmRdb(EP_Name+".opt_ri",form['ri_opt']);
+	setDsmRdb(EP_Name+".opt_modem_auto_answer",form['cct_autoanswer_opt']);
+	setDsmRdb(EP_Name+".opt_1",form['Opt_1']);
+	setDsmRdb(EP_Name+".opt_auto_answer_enable",form['opt_auto_enable']);
+
+	set_single_direct("","service.dsm.trigger","1");
+	redirect('/end_points.html?success');
+}
+%>
+
+
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+	var host_if;
+	if($("#host_if").val()=="custom") {
+		host_if=$("#custom_if").val();
+	}
+	else {
+		host_if=$("#host_if").val();
+	}
+
+    // opt_1 stores 6 binary properties of end point. Bit definitions as per modem emulator
+	var opt_1 = $("#echo-0").is(":checked") ? 1 : 0;
+	if ($("#quiet-0").is(":checked")) {
+        opt_1 |= (1<<1);
+	}
+	if ($("#ok_on_cr-0").is(":checked")) {
+        opt_1 |= (1<<2);
+	}
+	if ($("#suppress_lf-0").is(":checked")) {
+        opt_1 |= (1<<3);
+	}
+	if ($("#ok_on_unknown-0").is(":checked")) {
+        opt_1 |= (1<<4);
+	}
+	if ($("#verbose-0").is(":checked")) {
+        opt_1 |= (1<<5);
+	}
+
+	var opt_auto_enable = $("#answer-auto-enable-0").is(":checked") ? 1 : 0;
+
+	$("#idxEP").val(i);
+	$("#Opt_1").val(opt_1);
+	$("#opt_auto_enable").val(opt_auto_enable);
+	$("#nameEP").val(EP_Name);
+	$("#typeEP").val(ep_type[0]);
+	$("#devName").val(host_if);
+	$("#form").submit();
+}
+
+function is_bit_set(num,bit){
+    return (num & (1<<bit));
+}
+
+$(document).ready(function() {
+	add_options("baud", baud_rate_list, "");
+	add_options("databits", databits_list, "");
+	add_options("stopbits", stopbits_list, "");
+	add_options("parity", parity_list, "");
+	add_options("hw_fc", hw_flow_ctrl_list, "");
+	add_options("sw_fc", sw_flow_ctrl_list, "");
+	add_options("dsr_opt", dsr_list, "");
+	add_options("dtr_opt", dtr_list, "");
+	add_options("dcd_opt", dcd_list, "");
+	add_options("ri_opt", ri_list, "");
+	add_options("cct_autoanswer_opt", autoanswer_list, "");
+
+<%
+	dev_name=get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.dev_name', '', '--base64');
+	if (dev_name == "" || dev_name == "N/A") {
+%>
+	var host_if="";
+<%
+	} else {
+%>
+	var host_if=Base64.decode("@@dev_name");
+<%	}%>
+	if(host_if_list_length>0) {
+		$.extend(true, host_if_list, {"custom":"custom"});
+		add_sif_options("host_if", host_if_list, host_if);
+	}
+	else {
+		$("#custom_if-div").css("display", "");
+		$("#host_if-div").css("display", "none");
+	}
+
+	$("#host_if").change(function() {
+		if(this.value=="custom") {
+			$("#custom_if-div").css("display", "");
+		}
+		else {
+			$("#custom_if-div").css("display", "none");
+		}
+	});
+	$("#host_if").trigger("change");
+	var v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.bit_rate');%>";
+	$("#baud").val(v==""?"115200":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.data_bits');%>";
+	$("#databits").val(v==""?"8":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.stop_bits');%>";
+	$("#stopbits").val(v==""?"1":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.parity');%>";
+	$("#parity").val(v==""?"none":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_hw_fc');%>";
+	$("#hw_fc").val(v==""?"0":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_sw_fc');%>";
+	$("#sw_fc").val(v==""?"0":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_dsr');%>";
+	$("#dsr_opt").val(v==""?"2":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_dtr');%>";
+	$("#dtr_opt").val(v==""?"2":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_dcd');%>";
+	$("#dcd_opt").val(v==""?"1":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_ri');%>";
+	$("#ri_opt").val(v==""?"2":v);
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_modem_auto_answer');%>";
+	$("#cct_autoanswer_opt").val(v==""?"0":v);
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_auto_answer_enable');%>";
+	load_value_to_element($("input:radio[name=auto_answer_en]"), v);
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.opt_1');%>";
+	// bits must match settings in modem emulator end point
+	if (v=="") {
+		// defaults, new end point
+		load_value_to_element($("input:radio[name=echo]"), true);
+		load_value_to_element($("input:radio[name=quiet]"), false);
+		load_value_to_element($("input:radio[name=ok_on_cr]"), true);
+		load_value_to_element($("input:radio[name=suppress_lf]"), false);
+		load_value_to_element($("input:radio[name=ok_on_unknown]"), false);
+		load_value_to_element($("input:radio[name=verbose]"), true);
+	} else {
+		// load existing end point
+		load_value_to_element($("input:radio[name=echo]"), is_bit_set(v,0));
+		load_value_to_element($("input:radio[name=quiet]"), is_bit_set(v,1));
+		load_value_to_element($("input:radio[name=ok_on_cr]"), is_bit_set(v,2));
+		load_value_to_element($("input:radio[name=suppress_lf]"), is_bit_set(v,3));
+		load_value_to_element($("input:radio[name=ok_on_unknown]"), is_bit_set(v,4));
+		load_value_to_element($("input:radio[name=verbose]"), is_bit_set(v,5));
+	}
+
+	$("#ep_name").html(g_ep_types_list[ep_type[0]]+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")");
+});
+</script>
+
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<input type="hidden" name='typeEP' id='typeEP' value="">
+			<input type="hidden" name='Opt_1' id='Opt_1' value="">
+			<input type="hidden" name='opt_auto_enable' id='opt_auto_enable' value="">
+			<input type="hidden" name='devName' id='devName' value="">
+			<div class="pad" id="setup">
+				<h2 id="ep_name"></h2>
+				<div class="grey-box">
+
+					<div class="form-row" id="host_if-div">
+						<label for="host_if"><script language=Javascript>document.write(_("hostPort"))</script></label>
+						<div class="field">
+							<select id="host_if" name="host_if" style="width:auto"></select>
+						</div>
+					</div>
+
+					<div class="form-row" id="custom_if-div">
+						<label for="custom_if"><script language=Javascript>document.write(_("customHost"))</script></label>
+						<div class="field">
+							<input type="text" name="custom_if" id="custom_if" class="large required validate[required]" value="">
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="baud"><script language=Javascript>document.write(_("baud rate"))</script></label>
+						<div class="field">
+							<select id="baud" name="baud"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="databits"><script language=Javascript>document.write(_("dataBits"))</script></label>
+						<div class="field">
+							<select id="databits" name="databits"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="stopbits"><script language=Javascript>document.write(_("stopBits"))</script></label>
+						<div class="field">
+							<select id="stopbits" name="stopbits"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="parity"><script language=Javascript>document.write(_("parity"))</script></label>
+						<div class="field">
+							<select id="parity" name="parity"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="hw_fc"><script language=Javascript>document.write(_("hwFc"))</script></label>
+						<div class="field">
+							<select id="hw_fc" name="hw_fc"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="sw_fc"><script language=Javascript>document.write(_("swFc"))</script></label>
+						<div class="field">
+							<select id="sw_fc" name="sw_fc"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="dsr_opt"><script language=Javascript>document.write(_("dsr action"))</script></label>
+						<div class="field">
+							<select id="dsr_opt" name="dsr_opt"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="dcd_opt"><script language=Javascript>document.write(_("dcd action"))</script></label>
+						<div class="field">
+							<select id="dcd_opt" name="dcd_opt"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="dtr_opt"><script language=Javascript>document.write(_("dtr action"))</script></label>
+						<div class="field">
+							<select id="dtr_opt" name="dtr_opt"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="ri_opt"><script language=Javascript>document.write(_("ri action"))</script></label>
+						<div class="field">
+							<select id="ri_opt" name="ri_opt"></select>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="answer_auto_enable_rb"><script language=Javascript>document.write(_("answerAutoEnable"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="answer-auto-enable-0" name="auto_answer_en" class="access" value=1>
+									<label for="answer-auto-enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="answer-auto-enable-1" name="auto_answer_en" class="access" value=0>
+									<label for="answer-auto-enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="cct_autoanswer_opt"><script language=Javascript>document.write(_("circuit autoAnswer rings"))</script></label>
+						<div class="field">
+							<select id="cct_autoanswer_opt" name="cct_autoanswer_opt"></select>
+						</div>
+					</div>
+				</div>
+                <!--Advanced properties that are normally hidden from the view-->
+                #include "End_Point_Type11_adv.html"
+
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+</script>
+
+</body>
+</html>

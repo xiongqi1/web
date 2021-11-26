@@ -1,0 +1,175 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>WLAN</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<%
+if (request['REQUEST_METHOD'] == "GET") {
+	form['WdsEnable'] = get_single('wlan.0.wds_mode');
+	form['wds_encryp_key'] = get_single('wlan.0.wds_key');
+	form['wds_maclist'] = get_single('wlan.0.wds_maclist');
+}
+else {
+	mydata="wlan.0.wds_mode="+form['WdsEnable']+
+	"&wlan.0.wds_key="+form['wds_encryp_key']+
+	"&wlan.0.wds_maclist="+form['wds_maclist'];
+	set_list( mydata,'-p');
+
+	// In order to take effect WDS mode setting,
+	// wifi HW should be reset.
+	if (form['WdsEnable'] >= 1) {
+		mydata="wlan.0.wds_trigger="+form['WdsEnable'];
+		set_list( mydata );
+	}
+}
+%>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript">
+Butterlate.setTextDomain("wds");
+
+function frmLoad() {
+	with ( document.forms[0] ) {
+		if(WdsEnable.value=="")
+			WdsEnable.value=0;
+		wds_mode.value=WdsEnable.value;
+		var ray = new Array();
+		ray = wds_maclist.value.split(";");
+		for(i=0; i<4; i++) {
+			if(i<ray.length)
+				document.getElementById("wds_mac_"+i).value=ray[i];
+			else
+				document.getElementById("wds_mac_"+i).value="";
+		}
+		wds_encryp_type.value=<%val=get_single("wlan.0.network_auth");%>"@@val";
+	}
+
+	WdsModeOnChange();
+}
+
+function btnApply() {
+	with ( document.forms[0] ) {
+		if (wds_mode.options.selectedIndex >= 1) {
+			var re = /[A-Fa-f0-9]{2}:[A-Fa-f0-9]{2}:[A-Fa-f0-9]{2}:[A-Fa-f0-9]{2}:[A-Fa-f0-9]{2}:[A-Fa-f0-9]{2}/;
+			wds_maclist.value=""
+			for (i = 0; i < 4; i++) {
+				var testval=document.getElementById("wds_mac_"+i).value;
+				if ( testval == "")
+					continue;
+				if (!re.test( testval)) {
+					alert(_("basic warningMsg5"));//Please fill WDS remote AP MAC Address in correct format! (XX:XX:XX:XX:XX:XX)
+					return 0;
+				}
+				else {
+					wds_maclist.value += wds_maclist.value==""?testval:";"+testval;
+				}
+				
+			}
+			if (wds_maclist.value == "") {
+				alert(_("basic warningMsg6"));//WDS remote AP MAC Address are empty !!!
+				wds_mac_0.focus();
+				wds_mac_0.select(); 
+				return 0;
+			}
+		}
+		return 1;
+	}
+}
+
+function Refresh(place) {
+	var code = 'location="' + place + '"'; 
+	eval(code);
+}
+
+function WdsModeOnChange() {
+	if (document.form.wds_mode.options.selectedIndex >= 1) {
+		document.getElementById("div_wds_details").style.display = "";
+	}
+	else {
+		document.getElementById("div_wds_details").style.display = "none";
+	}
+	document.form.WdsEnable.value=document.form.wds_mode.value;
+}
+
+function submitF1() {
+	if( btnApply() ) {
+		if(confirm(_("warningChangeSecurity"))) {
+			document.form.submitForm.disabled=true;
+			document.form.submit();
+		}
+	}
+}
+
+$(document).ready( function() {frmLoad();} );
+</script>
+
+<form name="form" method='POST' autocomplete="off" action="@@request['SCRIPT_NAME']"/>
+<input type="hidden"  name='WdsEnable' value="@@form['WdsEnable']"/>
+<input type="hidden"  name='wds_maclist' value="@@form['wds_maclist']"/>
+
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("WDS"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+
+<table width="80%">
+<tr> 
+	<th colspan="2"><script language="JavaScript">document.write(_("basic wds title"))</script></th>
+</tr>
+<tr> 
+	<td width='28%'><script language="JavaScript">document.write(_("port filter macaddr"))</script></td>
+	<td><%v=get_single('wlan.0.mac');%>@@v</td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("basic wds mode"))</script></td>
+<td>
+	<select name="wds_mode" size="1" onChange="WdsModeOnChange()">
+		<option value=0 id="basicWDSDisable" selected><script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value=2><script language="JavaScript">document.write(_("bridge mode"))</script></option>
+		<option value=3><script language="JavaScript">document.write(_("basic wireless wds mode repeater"))</script></option>
+	</select>
+</td>
+</tr>
+</table>
+<table width="80%" id="div_wds_details">
+<tr> 
+	<td width='28%'><script language="JavaScript">document.write(_("secure encryp type"))</script></td>
+	<td>
+		<input type='text' name="wds_encryp_type" size="30" class='cdcsAjax' value="@@form['wds_encryp_type']" readonly/>
+		<script language="JavaScript">document.write(_("bridge intro"))</script>
+	</td>
+</tr>
+<tr id="div_wds_encryp_key">
+	<td><script language="JavaScript">document.write(_("encryptKey"))</script></td>
+	<td><input type=text id='wds_encryp_key' name='wds_encryp_key' size=28 maxlength=64 value="@@form['wds_encryp_key']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("basic wds ap macaddr")+"1")</script></td>
+	<td><input type=text name='wds_mac_0' id='wds_mac_0' size=20 maxlength=17 value=""></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("basic wds ap macaddr")+"2")</script></td>
+	<td><input type=text name='wds_mac_1' id='wds_mac_1' size=20 maxlength=17 value=""></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("basic wds ap macaddr")+"3")</script></td>
+	<td><input type=text name='wds_mac_2' id='wds_mac_2' size=20 maxlength=17 value=""></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("basic wds ap macaddr")+"4")</script></td>
+	<td><input type=text name='wds_mac_3' id='wds_mac_3' size=20 maxlength=17 value=""></td>
+</tr>
+</table>
+<div align="center"></p></p><input type="button" name="submitForm" onClick='submitF1();' value="Save" style="width:120px;"></div>
+</form>
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

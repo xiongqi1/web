@@ -1,0 +1,186 @@
+#!/usr/bin/awk -f
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+function event_nofity(result) {
+	exec("elogger 20 \"SMS FOTA/DOTA: " result "\"");
+}
+
+BEGIN {
+	#system( "logger \"&&&---------start sms_download_file-----ARGV[1]="ARGV[1] "-----ARGV[2]=" ARGV[2]"\"");
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "This AWK script is for internal system use only."
+		print "It is used for SMS Download File functionality."
+        print "Please do not run this script manually."
+		exit (0);
+	}
+
+	if( ARGC == 2 ) {
+		link=ARGV[1];
+	}
+	else if( ARGC == 3 ) {
+		link="\""ARGV[1] " " ARGV[2]"\"";
+	}
+	else {
+		print "Parameter ERROR:" ARGC;
+		event_nofity("Parameter ERROR:"ARGC);
+		exit (0);
+	}
+
+	num = split (link, namestr, "/");
+	if(num > 0) {
+		filename="'"namestr[num]"'";
+	}
+	else {
+		print "Error! Invalid filename."
+		event_nofity("Error! Invalid filename.");
+		exit (0);
+	}
+
+	file_ext=exec( "a="filename "&& echo ${a/*./}" );
+
+	sleepTime = 5;
+	timeout = 180;
+
+	# check connection
+	connection=exec("rdb_get wwan.0.connection.status");
+	sleepCounter = 0;
+
+	# find last successful profile number
+	simICCID=exec("rdb_get wwan.0.system_network_status.simICCID");
+	if(simICCID!="") {
+		profile_number=exec("rdb_get wwan.0.profile."simICCID);
+	}
+	if(profile_number=="") { # if not found, use default profile
+		# if default profile not found, use profile 1
+		profile_number="1";
+		for(i=1; i<=6; i++) {
+			def_route=exec("rdb_get link.profile."i".defaultroute" );
+			if(def_route=="1") {
+				profile_number=i;
+				break;
+			}
+		}
+		system("rdb_set link.profile."profile_number".defaultroute 1");
+		system("rdb_set link.profile."profile_number".enable 1");
+	}
+
+	while(connection!="up") {
+		if(connection!="connecting") {
+			#enable profile and exit.
+			exec("rdb_set link.profile." profile_number ".enable 1");
+			exec("rdb_set wwan.0.connection.status connecting");
+			dod_en=exec("rdb_get dialondemand.enable");
+			if(dod_en=="1") {
+				system( "diald-ctrl.sh up" );
+			}
+			#print "Enabling MBB connection. Device is connecting, please wait a few minutes and try again."
+		}
+		system ( "sleep "sleepTime );
+		sleepCounter+=sleepTime;
+		if(sleepCounter>timeout) {
+			print "Connection timeout; please try again later."
+			event_nofity("Connection timeout; please try again later.");
+			exit (0);
+		}
+		connection=exec("rdb_get wwan.0.connection.status");
+	}
+	gsub(/'/g, "", link);
+	gsub(/\"/g, "", link);
+	gsub(/%20/g, " ", link);
+	system("rdb_set filedowload.source '"link"'");
+	system("rdb_set filedowload.start 1");
+
+	sleepCounter = 0;
+	downloadStatus="1";
+
+	# get [smstools.conf.download.timeout] as timeout
+	timeout=exec("rdb_get smstools.conf.download.timeout")
+	if(timeout=="")
+		timeout=600; #download time is up to 10 min.
+	else
+		timeout=timeout*60
+	system( "logger -t 'sms_download_file' 'download timeout [smstools.conf.download.timeout] rdb is " timeout "'")
+
+	# default download timeout 10 minutes may not be long enough for big files such as .cdi image files so
+	# give 5 minutes more for big files.
+	num = split (link, namestr, "/");
+	if(num > 0) {
+		filename="'"namestr[num]"'";
+		file_ext=exec( "a="filename "&& echo ${a/*./}" );
+		if (file_ext=="cdi"||file_ext=="cwe"||file_ext=="spk") {
+			timeout+=(5*60)
+			system( "logger -t 'sms_download_file' 'new download timeout for big size file is " timeout "'")
+		}
+	}
+
+	while(downloadStatus=="1") {
+		system ( "sleep "sleepTime );
+		sleepCounter+=sleepTime;
+		if(sleepCounter>timeout) {
+			print "Download timeout, Please try again later."
+			event_nofity("Download timeout, Please try again later.");
+			# kill all background download processors
+			exec("rdb_set filedowload.timeout 1");
+			exec("rdb_set filedowload.start 0 &>/dev/null");
+			exec("rdb_set filedowload.source &>/dev/null");
+			exec("killall file_download.template &>/dev/null");
+			exec("killall download_install_file &>/dev/null");
+			exec("killall install_file &>/dev/null");
+			exec("killall curl &>/dev/null");
+			exit (0);
+		}
+		downloadStatus=exec("rdb_get filedowload.start");
+	}
+
+	sleepCounter = 0;
+	sleepTime=1;
+
+	# get [smstools.conf.install.timeout] as timeout
+	timeout=exec("rdb_get smstools.conf.install.timeout")
+	if(timeout=="")
+		timeout=180; #Installation time is up to 3 min.
+	else
+		timeout=timeout*60
+
+	system( "logger -t 'sms_download_file' 'install timeout [smstools.conf.install.timeout] rdb is " timeout "'")
+
+	msg=""
+	while(msg=="") {
+		system ( "sleep "sleepTime );
+		sleepCounter+=sleepTime;
+		if(sleepCounter>timeout) {
+			print "Installation timeout, Please try again later."
+			event_nofity("Installation timeout, Please try again later.");
+			exit (0);
+		}
+		msg=exec("rdb_get filedowload.message");
+		# check whether flashtool returns error message for unknown image name
+		# in order to return immediately when fails before installation timeout.
+		errmsg=exec("grep \"Unknown image name\" /tmp/flashtoolMsg.txt 2>/dev/null")
+		if(errmsg!="")
+				msg=exec("cat /tmp/flashtoolMsg.txt 2>/dev/null")
+	}
+
+	gsub(/'/g, "", msg);
+	gsub(/\"/g, "", msg);
+	print msg
+	system("rm /tmp/flashtoolMsg.txt");
+
+	#clear filedowload.message
+	system("rdb_set filedowload.message ");
+
+	eventnoti_enabled=exec("rdb_get service.eventnoti.conf.enable")
+	if(file_ext=="cdi" && eventnoti_enabled=="1") {
+		event_nofity("upgrading firmware successful");
+	}
+
+	exit (0);
+}

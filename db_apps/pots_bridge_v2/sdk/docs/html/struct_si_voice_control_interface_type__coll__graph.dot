@@ -1,0 +1,6 @@
+digraph "SiVoiceControlInterfaceType"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{SiVoiceControlInterfaceType\n|+ hCtrl\l+ Reset_fptr\l+ WriteRegister_fptr\l+ ReadRegister_fptr\l+ WriteRAM_fptr\l+ ReadRAM_fptr\l+ Semaphore_fptr\l+ hTimer\l+ Delay_fptr\l+ timeElapsed_fptr\l+ getTime_fptr\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

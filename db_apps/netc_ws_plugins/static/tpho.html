@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset=utf-8 http-equiv="Content-Language" content="en"/>
+ <script src="jquery-3.2.1.min.js"></script>
+ <script src="RGraph.common.core.js" ></script>
+ <script src="RGraph.common.dynamic.js" ></script>
+ <script src="RGraph.common.effects.js" ></script>
+ <script src="RGraph.gauge.js" ></script>
+ <script src="RGraph.line.js" ></script>
+
+ <title>Broadband Speed Test</title>
+<style type="text/css">
+  html,
+  body {
+      margin: 0;
+      padding: 0;
+      border: none;
+      text-align: center;
+      font-family: 'Open Sans';
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+      font-family: 'Roboto', sans-serif;
+      // font-weight: 700;
+  }
+
+  .graphic {
+      // height: 2000px;
+      width: 900px;
+  }
+
+  .graphic-bg {
+      position: fixed;
+      height: 2000px;
+      width: 800px;
+      background: url('graphic.jpg') no-repeat center center fixed; 
+      background-size: contain;
+  }
+
+  div#testAll {
+      display: block;
+      width: 100vw;
+      height:100vh;
+  }
+  div#testLeft {
+      display: block;
+      position: relative;
+      float: left;
+      width: 70vw;
+  top: 50%;
+  -webkit-transform: translateY(-50%);
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+  }
+  div#testRight {
+      display: block;
+      position: relative;
+      float: right;
+      width: 30vw;
+  }
+
+  div.meter {
+      display: inline-block;
+      height: 300px;
+      width: 400px;
+      text-align: center;
+      font-size: 6vw;
+  }
+
+  div#testArea {
+      display: flex;
+      justify-content: center;
+      flex-flow: row wrap;
+  }
+
+  div#showRDB {         
+    display:none;    
+    position: relative;
+    float: left;
+    width: 100vw;
+    height:100vh;
+  }
+
+  div#select {
+      display: block;
+      float: left;
+      justify-content: center;
+      flex-flow: row wrap;
+  }
+
+  a {
+      text-decoration: none;
+  }
+
+  .button {
+      display: inline-block;
+      margin: 10px 5px 0 2px;
+      padding: 16px 40px;
+      border-radius: 5px;
+      font-size: 18px;
+      border: none;
+      background: #34aadc;
+      color: white;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-family: 'Roboto';
+  }
+  .disabled {
+      color: #999;
+  }
+  .dl {
+      display: inline-block;
+      margin: 10px 5px 0 2px;
+      padding: 16px 40px;
+      border-radius: 5px;
+      font-size: 18px;
+      border: none;
+      background: #339933;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: 'Roboto';
+  }
+  .ul {
+      display: inline-block;
+      margin: 10px 5px 0 2px;
+      padding: 16px 40px;
+      border-radius: 5px;
+      font-size: 18px;
+      border: none;
+      background: #993333;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: 'Roboto';
+  }
+  .ag {
+      display: inline-block;
+      margin: 10px 5px 0 2px;
+      padding: 16px 40px;
+      border-radius: 5px;
+      font-size: 48px;
+      border: none;
+      background: #999999;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: 'Roboto';
+  }
+  #ip {
+      margin: 1em 0;
+      font-size: 1.2em;
+  }
+
+  #chart1Area,
+  #chart2Area {
+      width: 100%;
+      /* max-width: 30em; */
+      height: 30em;
+      display: block;
+      margin: 0 auto;
+      float: left;
+  }
+
+  table, th, td {
+    text-align:left;
+     margin:10px 0;
+     // border:solid 1px #333;
+     padding:2px 4px;
+     font:15px Verdana;
+  }
+  table tr td:nth-child(1) {
+    text-align:right;
+  }
+  th {
+     font-weight:bold;
+  }
+
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1; /* Sit on top */
+    padding-top: 100px; /* Location of the box */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content */
+.modal-content {
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+}
+
+#modal-result {
+    color: #844;
+}
+
+/* The Close Button */
+.modal-close {
+    color: #aaaaaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.modal-close:hover,
+.modal-close:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.accordion {
+    background-color: #fcc;
+    color: #444;
+    cursor: pointer;
+    padding: 18px;
+    font-size: 24px;
+    width: 100%;
+    text-align: center;
+    border: none;
+    outline: none;
+    transition: 0.4s;
+}
+
+/* Style the accordion panel. Note: hidden by default */
+.panel {
+    padding: 0 18px;
+    background-color: white;
+    display: none;
+    overflow: hidden;
+}
+
+#connected_dl, #connected_ul, #connected_dut {
+    color: darkgreen;
+    display: none;
+    font-size: 24px;
+}
+
+#interfaced_dl, #interfaced_ul {
+    color: darkgreen;
+    display: none;
+    font-size: 24px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="testAll">
+  <div id="testRight">
+    <div id="imageShow">
+      <img src="graphic.jpg" class="graphic" alt="Graphic" />
+    </div>
+  </div>
+
+  <div id="testLeft">
+     <img src="logo.png" alt="Home" />
+     <h1>Fixed Wireless Band 42 3CA</h1>
+     <div id="testArea">
+       <div class="meter" id="div_ggul">
+         <canvas id="ggul" width="250" height="250" style="background-color: black; border-radius: 125px; box-shadow: 0 0 25px gray; border: 5px solid #ddd">[No canvas support]</canvas>
+       </div>
+    
+      <div class="meter" id="div_ggag">
+         <span id="ag_text" class="ag">Aggregate</span>
+      </div>
+    
+      <div class="meter" id="div_ggdl">
+        <canvas id="ggdl" width="250" height="250" style="background-color: black; border-radius: 125px; box-shadow: 0 0 25px gray; border: 5px solid #ddd">[No canvas support]</canvas>
+      </div>
+    </div>
+    
+    <div id="chart1Areaxx">
+      <canvas id="chart1AreaCanvas" width="1000" height="400">
+        [No canvas support]
+      </canvas>
+    </div>
+  
+    <div id="ul_dl_text_blocks" style="display:none">
+      <span id="ul_text" class="ul"></span>
+      <span id="dl_text" class="dl"></span>
+    </div>
+  
+    <div id="ws_status" style="display:none">
+    </div>
+  
+    <div id="show">
+      <p> </p>
+    </div>
+  </div>
+</div>
+
+<div id="connectModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close">&times;</span>
+    <span id="modal-text">
+    <p></p>
+    </span>
+    <span id="modal-result">
+    <p>No response yet</p>
+    </span>
+  </div>
+</div>
+  
+<div id="showRDB">
+   <!-- RDB Table will go here -->
+</div>
+  
+<div id="select">
+  <h2>Settings</h2>
+  <button id="select_ul" class="accordion">Upload (Local)</button>
+  <div class="panel">
+    <table id="config_ul">
+      <tr>
+        <th> <span id="connected_ul" >&check; </span> </th>
+        <th colspan="2">Step 1: Configure Host and Connect</th>
+      </tr>
+      <tr>
+        <th>Host</th>
+        <td>
+          <input class="useLocal useLocal_ul" id="hostUpload" size="40" type="text" name="website" value="" required/>
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>
+          <button id="connectBtn_ul">Connect</button>
+        </td> 
+        <td></td>
+      </tr>
+      <tr><td>&nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th> <span id="interfaced_ul" >&check; </span> </th>
+        <th colspan="2">Step 2: Select the Interface</th>
+      <tr>
+        <th>Interface</th>
+        <td>
+         <select id="dropDownDest_ul"></select>
+        </td>
+        <td></td>
+      </tr>
+      <tr><td>&nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td></td>
+        <th colspan="2">Step 3: Generate Traffic</th>
+      <tr>
+      <tr><th>Action</th><td>
+       <select name="action_ul">
+        <option value="status">Status</option>
+        <option value="start">Start</option>
+        <option value="stop">Stop</option>
+        <option value="restart">Restart</option>
+       </select>
+      </td></td></tr>
+      <tr><th>Bandwidth</th><td>
+       <input type="text" id="bandw_ul" name="bandw_ul" size=12></td><td>Bits/S</td></tr>
+      <tr><th>Test Type </th><td>
+        <input type="radio" name="ttype_ul" value="iperfserver" checked> Iperf Server<br>
+        <input type="radio" name="ttype_ul" value="iperfclient"> Iperf Client<br>
+        <input type="radio" name="ttype_ul" value="pktgen"> Pkt Gen (H/S) </td><td></td></tr>
+       <tr><td></td><td>
+        <button id="traffic_ul">Send</button>
+       </td><td></tr>
+
+     </table>
+    <div id="text_ul"> </div>
+
+  </div>
+
+  <button id="select_dl" class="accordion">Download (Remote)</button>
+  <div class="panel">
+    <table id="config_dl">
+      <tr>
+        <th> <span id="connected_dl" >&check; </span> </th>
+        <th colspan="2">Step 1: Configure Host and Connect</th>
+      </tr>
+      <tr>
+        <th>Host</th>
+        <td>
+          <input class="useLocal useLocal_dl" id="hostDownload" size="40" type="text" name="website" value="" required/>
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>
+          <button id="connectBtn_dl">Connect</button>
+        </td> 
+        <td></td>
+      </tr>
+      <tr><td>&nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th> <span id="interfaced_dl" >&check; </span> </th>
+        <th colspan="2">Step 2: Select the Interface</th>
+      <tr>
+        <th>Interface</th>
+        <td>
+         <select id="dropDownDest_dl"></select>
+        </td>
+        <td></td>
+      </tr>
+      <tr><td>&nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td></td>
+        <th colspan="2">Step 3: Generate Traffic</th>
+      <tr>
+      <tr><th>Action</th><td>
+       <select name="action_dl">
+        <option value="status">Status</option>
+        <option value="start">Start</option>
+        <option value="stop">Stop</option>
+        <option value="restart">Restart</option>
+       </select>
+      </td></td></tr>
+      <tr><th>Bandwidth</th><td>
+       <input type="text" id="bandw_dl" name="bandw_dl" size=12></td><td>Bits/S</td></tr>
+      <tr><th>Test Type </th><td>
+        <input type="radio" name="ttype_dl" value="iperfserver" checked> Iperf Server<br>
+        <input type="radio" name="ttype_dl" value="iperfclient"> Iperf Client<br>
+        <input type="radio" name="ttype_dl" value="pktgen"> Pkt Gen (H/S) </td><td></td></tr>
+       <tr><td></td><td>
+        <button id="traffic_dl">Send</button>
+       </td><td></tr>
+
+     </table>
+    <div id="text_dl"> </div>
+  </div>
+
+  <button id="select_dut" class="accordion">Device Under Test (RDB)</button>
+  <div class="panel">
+    <table id="config_dut">
+      <tr>
+        <th> <span id="connected_dut" >&check; </span> </th>
+        <th colspan="2">Configure Host and Connect</th>
+      </tr>
+      <tr>
+        <th>Host</th>
+        <td>
+          <input class="useLocal useLocal_dut" id="hostDut" size="40" type="text" name="website" value="" required/>
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>
+          <button id="connectBtn_dut">Connect</button>
+        </td> 
+        <td></td>
+      </tr>
+     </table>
+    <div id="text_dut"> </div>
+  </div>
+
+</div>
+
+<script nonce="lwscaro">
+
+var headers = [ "Name", "Value" ];
+var rdbvals = [
+  [ "wwan.0.system_network_status." , [
+    [ "attached",          "UE Attached" ],
+    [ "registered",        "UE Registered" ],
+    [ "reg_stat",          "UE Registration Status" ],
+    [ "current_band",      "Current Band" ],
+    [ "eNB_ID",            "EnodeB Id" ],
+    [ "network",           "Network" ] ]
+  ],
+  [ "wwan.0.servcell_info." , [
+    [ "rsrp",              "Receive Power (RSRP)" ],
+    [ "rsrq",              "Receive Quality (RSRQ)" ],
+    [ "rssinr",            "Signal to Interference Noise Ratio (SINR)" ],
+    [ "rssnr",             "RSS NR" ],
+    [ "mac_i_bler_received",  "I RX Bit Loss Error Rate" ],
+    [ "mac_i_bler_sent",      "I TX Bit Loss Error Rate" ],
+    [ "mac_r_bler_received",  "R RX Bit Loss Error Rate" ],
+    [ "mac_r_bler_sent",      "R TX Bit Loss Error Rate" ] ]
+  ], 
+  [ "wwan.0.signal." , [
+    [ "rssinr",            "RSS INR" ] ]
+  ]
+];
+
+function rdbqs(t) {
+ var qs = "RDB "
+ for (var i = 0; i < t.length; i++) {
+   r = t[i]
+   if (r && r[0] && r[1]) {
+     if (i > 0) {
+       qs += "&"
+     } 
+     qs += r[0]
+  }
+ }
+ return qs
+}
+
+function buildTable(h,t,d) {
+ var table = document.createElement("table")
+ var tr = table.insertRow(-1)
+ for (var i = 0; i < h.length; i++) {
+   var th = document.createElement("th")
+   th.innerHTML = h[i];
+   tr.appendChild(th);
+ }
+ for (var i = 0; i < t.length; i++) {
+   var r = t[i]
+   if (r && r[0] && r[1]) {
+     var nv = r[1]
+     for (var j = 0; j < nv.length; j++) {
+       var nvl = nv[j]
+       var q = "" + r[0] + nvl[0]
+       tr = table.insertRow(-1)
+       var tc = tr.insertCell(-1)
+       tc.innerHTML = nvl[1]
+       tc = tr.insertCell(-1)
+       if (q in d) {
+         tc.innerHTML = d[q]
+       }
+     }
+   }
+ }
+ return table
+}
+
+/* UL COLOR: rgb(51, 153, 51) or #339933
+   DL COLOR: rgb(153, 51, 51) or #993333
+*/
+
+function to_curscale(v) {
+  return Math.round(v/125000.0)
+}
+
+var CUR_SCALE_TEXT='MBit/S'
+
+var graphobj = null
+/*
+ 1.1G expressed as Mbits/s = 1100
+     maxValue: 11,
+*/
+
+// Number of points shown on the chart
+var points = 60
+            
+// Number of points shown on the chart
+var data = [new Array(points), new Array(points)]
+            
+function makeChart() {
+  data[0][0] = 100
+  data[1][0] = 100
+  graphobj = new RGraph.Line({
+    id: 'chart1AreaCanvas',
+    data: data,
+    options: {
+        titleXaxis: 'Bandwidth ' + CUR_SCALE_TEXT,
+        yaxispos: 'right',
+        backgroundGridAutofitNumvlines: 11,
+        numxticks: 11,
+        tickmarks: null,
+        linewidth: 1,
+        shadow: null,
+        axis: {
+            color: '#666'
+        },
+        text: {
+            color: '#666'
+        },
+        colors: ['#993333', '#339933'],
+        noxaxis: true,
+        filled: true,
+        fillstyle: ['Gradient(white:#993333)', 'Gradient(white:#339933)'],
+        gutterLeft: 35,
+        textAccessible: true,
+        textSize: 14
+    }
+  })
+}
+
+function makexxxxxChart() {
+  chart1 = new SmoothieChart({
+     minValue: 0,
+     labels:{disabled:true},
+     grid: {
+       strokeStyle: '#999999',
+       fillStyle: '#101010',
+       lineWidth: 1,
+       millisPerLine: 1000,
+       verticalSections: 6
+     }
+  });
+
+}
+
+var ggdl
+var ggul
+
+/* Hack for testing */
+function hackGauge(gauge)
+{
+  gauge.canvas.onclick = function (e) {
+    var ca  = e.target;
+    var obj = ca.__object__;
+
+    var value = Math.round(obj.getValue(e))
+    updateGauge(obj, value)
+  }
+}
+
+function gaugeOptions(override)
+{
+var std = {
+    anglesStart: RGraph.PI - (RGraph.PI / 8),
+    anglesEnd: RGraph.TWOPI + (RGraph.PI / 8),
+    shadow: false,
+    textColor: 'white',
+    textSize: 10,
+    tickmarksBigColor: 'white',
+    tickmarksMediumColor: 'white',
+    tickmarksSmallColor: 'white',
+    colorsRanges: [],
+    backgroundColor: 'black',
+    borderInner: 'black',
+    borderOuter: '#993333',
+    borderOutline: 'black',
+    needleColors: ['red'],
+    needleType: 'line',
+    needleTail: true,
+    needleWidth: 7,
+    centerpinRadius: 0.1,
+    titleTop: 'UL',
+    titleTopColor: 'white',
+    titleBottom: '\n50\n'+CUR_SCALE_TEXT,
+    titleBottomColor: 'white',
+    labelsCentered: true,
+    labelsOffset: 20,
+    textAccessible: true
+  }
+  return $.extend(std, override)
+}
+
+function gaugeCentre(obj)
+{
+  /* This circle becomes the border of the centerpin */
+  RGraph.path2(obj.context, ['b','a',obj.centerx, obj.centery, 10, 0, RGraph.TWOPI, false,'f','#aaa']);
+}
+
+function makeGauges() {
+  ggul = new RGraph.Gauge({
+      id: 'ggul',
+      min: 0,
+      max: 300,
+      value: 7,
+      options : gaugeOptions({
+        borderOuter: '#993333',
+        titleTop: 'UL',
+        titleBottom: '\n50\n' + CUR_SCALE_TEXT,
+      })
+  }).on('draw', gaugeCentre).draw()
+
+  ggdl = new RGraph.Gauge({
+   id: 'ggdl',
+      min: 0,
+      max: 1100,
+      value: 7,
+      options : gaugeOptions({
+        borderOuter: '#339933',
+        titleTop: 'DL',
+        titleBottom: '\n1000\n' + CUR_SCALE_TEXT,
+      })
+  }).on('draw', gaugeCentre).draw()
+  hackGauge(ggul);
+  hackGauge(ggdl);
+}
+
+function commaNumber(v)
+{
+  return ("                " + v.toLocaleString()).slice(-11)
+}
+
+function updateGauge(gauge, value) {
+  // use next power of 2 as maximum
+  if (Number(value) > 0) {
+    var curmax = gauge.max
+// gauge.get('max')
+    curmax = Number(curmax)
+    var newmax = Math.pow(2, Math.ceil(Math.log2(value)))
+    if (curmax !== newmax) {
+     // RGraph.clear(gauge.canvas);
+     // gauge.set({max: newmax})
+      gauge.max = newmax
+      RGraph.redrawCanvas(gauge.canvas)
+    }
+    gauge.set({titleBottom: '\n' + commaNumber(value) + '\n'+CUR_SCALE_TEXT})
+    gauge.value = Number(value)
+    gauge.grow()
+  }
+}
+
+function outputSeriesValue(id, t, v) {
+  v = to_curscale(v)
+  $(id).html(t + ' ' + commaNumber(v) + ' ' + CUR_SCALE_TEXT+' ')
+}
+
+var last_ul = 0
+var last_dl = 0
+var last_ul_tv = 0
+var last_dl_tv = 0
+
+var es_d = 0
+var es_u = 0
+
+function prepareGraphUpdate() {
+  RGraph.clear(graphobj.canvas);
+}
+
+function finishGraphUpdate() {
+  graphobj.draw();
+}
+
+/* Alpha for exponentional average */
+var ALPHA = 0.1
+
+function updateUlTimeSeries(tv, ul) {
+  if (last_ul_tv !== tv) {
+    var t = Date.now() // new Date().getTime()
+    var u = (ul-last_ul) / (tv - last_ul_tv)
+    graphobj.original_data[0].shift();
+    graphobj.original_data[0].push(to_curscale(u));
+    es_u = ALPHA * u + (1.0 - ALPHA) * es_u
+    outputSeriesValue('#ul_text', 'UL', es_u)
+    updateGauge(ggul, to_curscale(es_u))
+  }
+  last_ul = ul
+  last_ul_tv = tv
+}
+
+function updateDlTimeSeries(tv, dl) {
+  if (last_dl_tv !== tv) {
+    var t = Date.now() // new Date().getTime()
+    var d = (dl-last_dl) / (tv - last_dl_tv)
+    graphobj.original_data[1].shift();
+    graphobj.original_data[1].push(to_curscale(d));
+    es_d = ALPHA * d + (1.0 - ALPHA) * es_d
+    outputSeriesValue('#dl_text', 'DL', es_d)
+    updateGauge(ggdl, to_curscale(es_d))
+  }
+  last_dl = dl
+  last_dl_tv = tv
+}
+
+function updateAggregate() {
+    outputSeriesValue('#ag_text', 'AGGREGATE<br/>', es_d+es_u)
+}
+
+var required_interface
+
+var ifaces;
+//  = [ "enp10s0", "enp10s0.100", "enp10s0.200", "enp10s0.2250", "enp10s0.300", "enp10s0.400", "enp11s0", "enp4s0f0", "enp4s0f1", "enp5s0", "enp9s0", "lo" ]
+
+function get_base_ws_url()
+{
+  var pcol;
+  var u = document.URL;
+
+  /*
+   * We open the websocket encrypted if this page came on an
+   * https:// url itself, otherwise unencrypted
+   */
+
+  if (u.substring(0, 5) == "https") {
+    pcol = "wss://";
+    u = u.substr(8);
+  } else {
+    pcol = "ws://";
+    if (u.substring(0, 4) == "http")
+      u = u.substr(7);
+  }
+
+  u = u.split('/');
+
+  /* + "/xxx" bit is for IE10 workaround */
+
+  return pcol + u[0];
+}
+
+function send(sckt, cmd){
+  if (!sckt) return;
+  try{
+      sckt.send(cmd);
+      $('#ws_status').html('<p><b>websocket cmd '+cmd+'</b></p>')
+  } catch(exception){
+    $('#ws_status').html('<p><b>websocket send failed '+cmd+'</b></p>')
+  }
+}
+
+function do_chart(data, direction) {
+  if (('relative_timestamp' in data) && ('tx_bytes' in data) && ('rx_bytes' in data)) {
+    prepareGraphUpdate()
+    if (direction === 'B' || direction === 'U')
+      updateUlTimeSeries(data.relative_timestamp, data.rx_bytes)
+    if (direction === 'B')
+      updateDlTimeSeries(data.relative_timestamp, data.tx_bytes)
+    if (direction === 'D')
+      updateDlTimeSeries(data.relative_timestamp, data.rx_bytes)
+    finishGraphUpdate()
+    updateAggregate()
+  }
+}
+
+function insert_table(data) {
+  var tbl=$("<table></table>").attr("id","mytable");
+  $.each(data, function(key, val) {
+    var tr=$('<tr></tr>')
+    $('<td>'+key+'</td>').appendTo(tr)
+    $('<td>'+val+'</td>').appendTo(tr)
+    tr.appendTo(tbl)
+  });
+  $("#show").empty()
+  $("#show").append(tbl)
+}
+
+function buildRDBTable(svr_item, d) {
+  var divContainer = document.getElementById("showRDB")
+  var t = buildTable(headers, rdbvals, d)
+  divContainer.innerHTML = ""
+  divContainer.appendChild(t)
+}
+
+function showRdbDiv(yes) {
+  var div = $("#showRDB")
+  if (yes) {
+    div.css("display", "block")
+  } else {
+    div.css("display", "none")
+  }
+}
+
+var svr = {
+  ul:  { id : "ul",
+    drop_loaded: false,
+    state: "closed",
+    sckt: false,
+    active: false,
+    timer_id: false,
+    input_id: "hostUpload",
+    direction: "U",
+    host: '' },
+  dl:  { id : "dl",
+    drop_loaded: false,
+    state: "closed",
+    sckt: false,
+    active: false,
+    timer_id: false,
+    input_id: "hostDownload",
+    direction: "D",
+    host: '' },
+  dut: { id : "dut",
+    drop_loaded: false,
+    state: "closed",
+    sckt: false,
+    active: false,
+    timer_id: false,
+    input_id: "hostDut",
+    direction: "RDB",
+    host: '' },
+};
+
+function showTextResults(svr_item, html) {
+  var divname = "#text_" + svr_item.id
+  $(divname).html(html)
+}
+
+function got_packet(svr_item, msg) {
+  if (msg.data) {
+    var data = JSON.parse(msg.data)
+    if (data.IFACE) {
+      if (!svr_item["iface"]) {
+        svr_item["iface"] = true
+        selbgcolor(svr_item, true)
+        $("#interfaced_" + svr_item.id).show()
+      }
+      do_chart(data.IFACE, svr_item.direction)
+    }
+    if (data.LIST) {
+      populate_selection(svr_item, data.LIST)
+    }
+    if (data.RDB) {
+      if (!svr_item["iface"]) {
+        svr_item["iface"] = true
+        selbgcolor(svr_item, true)
+        showRdbDiv(true)
+        $("#connected_" + svr_item.id).show()
+      }
+      buildRDBTable(svr_item, data.RDB)
+    }
+    if (data.LLPING) {
+      //showTextResults(svr_item, data.LLPING)
+      modal_text(data.LLPING, "modal-result")
+    }
+    if (data.TRAFFIC) {
+      showTextResults(svr_item, data.TRAFFIC)
+    }
+  }
+}
+
+function modal_text(txt, id) {
+  if (!id) id = "modal-text"
+  var container = document.getElementById(id)
+  container.innerHTML = ""
+  var t = document.createElement("pre")
+  t.innerHTML = txt
+  container.appendChild(t)
+}
+
+function issue_ping(svr_item) {
+  svr_up = svr["ul"]
+  if (svr_up.sckt) {
+    var host = svr_item.host
+    var not_sent = true
+    if (host && host.length > 0) {
+      host = host.split(":")
+      if (host[0] && host[0].length > 0) {
+        send(svr_up.sckt, "LLPING " +host[0])
+        not_sent = false
+      }
+    }
+    if (not_sent) {
+      modal_text(
+       ["A PING will not be issued.",
+        "The Host name was not defined correctly to send a PING",
+       ].join('\n'), "modal-result")
+    } else {
+       modal_text("Sending PING Request to local web socket server", "modal-result")
+    }
+  } else {
+    modal_text(
+     ["A PING will not be issued.",
+      "The Local (Upload) web socket server is not available"
+     ].join('\n'), "modal-result")
+  }
+}
+
+function connect_failed(svr_item) {
+  var modal = document.getElementById('connectModal');
+  var span = document.getElementsByClassName("modal-close")[0];
+  modal_text("A PING will not be issued.", "modal-result")
+  if (svr_item.id === 'ul') {
+    modal_text(
+   ["A connect request to the (Local) Upload Websocket server has failed.",
+    "This is unusual as this is usually the same server that supplies this page.",
+    "Check the value you have given in the 'Host' field.",
+    "If that is incorrect, change it and try 'Connect' again.",
+    "If it is correct and the websocket server has failed, it might be neccessary to restart it.",
+    "Try refreshing this page (E.g. function key F5).",
+    "If that fails and you do not have access to the command line,", 
+    "you may have to retart the machine if that is how the server and this web page",
+    "are started."].join('\n'));
+  } else {
+    modal_text(
+   ["A connect request to a remote Websocket server has failed.",
+    "Check the value you have given in the 'Host' field.",
+    "If that is incorrect, change it and try 'Connect' again.",
+    "In order to determine if there is a network connection to the remote system,",
+    "a PING test will be run. The results will be shown below.",
+    "If the ping is successful, then there is no remote Websocket server that",
+    "can reply or see the request, or it is not running...",
+    "If the ping is unsuccessful, the remote machine is not visible to the upload websocket machine.",
+    "There could be many reasons for this basic network connectivity failure,",
+    "but often the reason is as simple as the device is not plugged in."].join('\n'));
+  }
+  modal.style.display = "block";
+  span.onclick = function() {
+      modal.style.display = "none";
+  }
+  if (svr_item.id !== 'ul') {
+    issue_ping(svr_item)
+  }
+}
+
+function no_interface(svr_item) {
+  var name = "#dropDownDest_" + svr_item.id
+  $(name).empty()
+  svr_item["iface"] = false
+  selbgcolor(svr_item, true)
+  $("#interfaced_" + svr_item.id).hide()
+}
+
+function no_socket(svr_item) {
+  $("#connected_" + svr_item.id).hide()
+  no_interface(svr_item)
+}
+
+function got_close(svr_item, sckt, evt) {
+  $('#ws_status').html('<p><b>websocket closed</b></p>')
+  if (Object.is(svr_item.sckt, sckt)) {
+    no_socket(svr_item)
+    svr_item.sckt = false
+    if (evt.code === 1006) {
+      connect_failed(svr_item)
+    }
+  }
+}
+
+
+function ws_define(svr_item, initial_cmd) {
+  var host = svr_item.host
+  var url = "ws://" + host
+  var sckt = new WebSocket(url, "netc_netstat")
+  svr_item.sckt = sckt
+  try {
+    sckt.onopen = function() {
+      $('#ws_status').html('<p><b>websocket connection opened direction '+svr_item.direction+'</b></p>')
+      send(sckt, initial_cmd)
+    }
+
+    sckt.onmessage = function(msg) { got_packet(svr_item, msg); }
+
+    sckt.onclose = function(evt){ got_close(svr_item, sckt, evt); }
+
+  } catch(exception) {
+    alert('<p>Error' + exception);
+  }
+}
+
+function selbgcolor(svr_item, active) {
+  var colors = [ 
+    "#fdd",
+    "#ecc",
+    "#dfd",
+    "#cec"
+   ];
+  var idx = 0
+  if (active) idx += 1;
+  if (svr_item["iface"]) idx += 2;
+  $("#select_" + svr_item.id).css("background-color", colors[idx]);
+}
+
+function sel_hover_in(svr_item) {
+  selbgcolor(svr_item, true)
+}
+  
+function sel_hover_out(svr_item) {
+  selbgcolor(svr_item, svr_item["active"])
+}
+
+function svr_click(eo) {
+  var svr_item = eo.data
+  var panel = $("#select_" + svr_item.id).next()
+  if (svr_item["active"]) {
+    svr_item["active"] = false
+    panel.css("display", "none")
+  } else {
+    svr_item["active"] = true
+    panel.css("display", "block")
+    showTextResults(svr_item, "<p></p>")
+  }
+}
+    
+function svr_conn_button(svr_item, enable) {
+  var name = "#connectBtn_" + svr_item.id
+  if (enable) {
+    $(name).prop('disabled',false).removeClass('disabled');
+  } else {
+    $(name).prop('disabled',true).addClass('disabled');
+  }
+  svr_item["iface"] = false
+  selbgcolor(svr_item, true)
+  $("#interfaced_" + svr_item.id).hide()
+}
+
+function svr_host_keyup(eo) {
+    var svr_item = eo.data
+    clearTimeout(svr_item.timer_id)
+    svr_item.drop_loaded = false
+    if (svr_item.sckt) {
+       svr_item.sckt.close()
+    }
+    svr_conn_button(svr_item, true)
+    var key = svr_item.input_id
+    var value = $('#' + key).val()
+    svr_item.host = value.trim()
+    svr_item.timer_id = setTimeout(function () {
+        localStorage.setItem(key, value)
+    }, 2000);
+}
+
+function svr_bandw_keyup(eo) {
+    var svr_item = eo.data
+    clearTimeout(svr_item.timer_id)
+    var key = 'bandw_' + svr_item.id
+    var value = $('#' + key).val()
+    svr_item.timer_id = setTimeout(function () {
+        localStorage.setItem(key, value)
+    }, 2000);
+}
+
+function svr_connect_clicked(eo) {
+/* Upload URL could be different to Download URL */
+    var svr_item = eo.data
+    if (svr_item.sckt) {
+       var sckt = svr_item.sckt
+       svr_item.sckt = false
+       sckt.close()
+    }
+    var cmd = 'LIST '
+    if (svr_item.host && svr_item.host.length > 0) {
+      if (svr_item.id === 'dut') {
+        // $('#imageShow').hide()
+        buildRDBTable(svr_item, {})
+        cmd = 'RDB ' + rdbqs(rdbvals)
+      }
+      ws_define(svr_item, cmd)
+    }
+}
+
+function svr_drop_list(svr_item, enable) {
+  var name = "#dropDownDest_" + svr_item.id
+  if (enable) {
+    $(name).prop('disabled',false).removeClass('disabled');
+  } else {
+    $(name).prop('disabled',true).addClass('disabled');
+  }
+  svr_item["iface"] = false
+  selbgcolor(svr_item, true)
+  $("#interfaced_" + svr_item.id).hide()
+}
+
+function populate_selection(svr_item, data) {
+  $("#connected_" + svr_item.id).show()
+  var name = "#dropDownDest_" + svr_item.id
+  $(name).empty()
+  $(name).append($('<option></option>').val('not_selected').html('Interface...'));
+  $.each(data,function(i, v){
+    $(name).append($('<option></option>').val(v).html(v));
+  });
+  svr_drop_list(svr_item, true)
+}
+
+function svr_interface_change(eo) {
+  var svr_item = eo.data
+  var name = '#dropDownDest_' + svr_item.id
+  if (svr_item.sckt) {
+    var iface = $(name).val();
+    if (iface !== '' && iface !== 'not_selected') {
+      send(svr_item.sckt, 'IFACE ' + iface)
+    }
+   }
+}
+
+function svr_traffic_clicked(eo) {
+  var svr_item = eo.data
+  var q = { }
+  q["bandw"]  = $("input[name='bandw_" + svr_item.id+ "']").val()
+  q["action"] = $("select[name='action_"+ svr_item.id+ "']").val()
+  q["ttype"]  = $("input[name='ttype_" + svr_item.id+ "']:checked").val()
+  var qs = 'TRAFFIC ' + $.param(q)
+  send(svr_item.sckt, qs)
+}
+
+function svr_host_initial(svr_item) {
+    var key = svr_item.input_id
+    if (localStorage.getItem(key)) {
+      var value = localStorage.getItem(key)
+      svr_item.host = value.trim()
+      $('#' + key).val(value)
+      svr_conn_button(svr_item, true)
+    } else {
+      svr_conn_button(svr_item, false)
+    }
+}
+
+function svr_bandw_initial(svr_item) {
+    var key = 'bandw_' + svr_item.id
+    if (localStorage.getItem(key)) {
+      var value = localStorage.getItem(key)
+      $('#' + key).val(value)
+    }
+}
+
+function svr_init(svr_item) {
+  var name = "#select_" + svr_item.id
+  $(name).hover(
+    function() { sel_hover_in(svr_item); },
+    function() { sel_hover_out(svr_item); });
+  $(name).click(svr_item, svr_click)
+  selbgcolor(svr_item, false)
+  $('#' + svr_item.input_id).keyup(svr_item, svr_host_keyup)
+  $('#bandw_' + svr_item.id).keyup(svr_item, svr_bandw_keyup)
+  $("#connectBtn_" + svr_item.id).click(svr_item, svr_connect_clicked)
+  svr_host_initial(svr_item)
+  svr_bandw_initial(svr_item)
+  svr_drop_list(svr_item, false)
+  $("#dropDownDest_" + svr_item.id).change(svr_item, svr_interface_change)
+  $("#traffic_" + svr_item.id).click(svr_item, svr_traffic_clicked)
+}
+
+
+function readyFn(jQuery) {
+  // $('#ws_status').show()
+  var svname
+  for (svname in svr) { svr_init(svr[svname]) }
+  makeGauges()
+  makeChart()
+  finishGraphUpdate()
+}
+
+$( document ).ready(readyFn)
+
+</script>
+
+</body>
+</html>

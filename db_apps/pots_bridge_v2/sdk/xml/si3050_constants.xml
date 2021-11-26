@@ -1,0 +1,42 @@
+<?xml version="1.0" ?>
+<PROJECT Generator="ProSLIC_API_Config_Tool" ToolVersion="4.2.1" XML_VERSION="15">
+    <PROSLIC_GENERAL_PARAMETERS />
+    <VDAA_GENERAL_PARAMETERS>
+        <Si3050 inte="0" intp="0" rcald="0" hssm="0" foh="1" lvfd="0" cvs="0" cvp="1" gce="0" iire="0" full="0" full2="0" filt="1" rg1="0" pwmm="0" pwme="0" spim="0" />
+    </VDAA_GENERAL_PARAMETERS>
+    <DEFAULTS />
+    <Ringing />
+    <DC_Feed />
+    <Tone />
+    <Impedance />
+    <FSK />
+    <PCM />
+    <Pulse_Metering />
+    <Vdaa_Country>
+        <COU_USA custom_enabled="0" country_select="69" />
+        <COU_GERMANY custom_enabled="0" country_select="20" />
+        <COU_CHINA custom_enabled="0" country_select="9" />
+        <COU_AUSTRALIA custom_enabled="0" country_select="1" />
+    </Vdaa_Country>
+    <Vdaa_Audio_Gain>
+        <AUDIO_GAIN_0DB mute="0" xga2="0" xga3="0" cpEn="0" coarseGainSelect="0" fineGainSelect="0" aoutGainSelect="64" />
+        <AUDIO_ATTEN_4DB mute="0" xga2="1" xga3="0" cpEn="0" coarseGainSelect="4" fineGainSelect="0" aoutGainSelect="64" />
+        <AUDIO_ATTEN_6DB mute="0" xga2="1" xga3="0" cpEn="0" coarseGainSelect="6" fineGainSelect="0" aoutGainSelect="64" />
+        <AUDIO_ATTEN_11DB mute="0" xga2="1" xga3="0" cpEn="0" coarseGainSelect="11" fineGainSelect="0" aoutGainSelect="64" />
+    </Vdaa_Audio_Gain>
+    <Vdaa_Ring_Validation>
+        <RING_DET_NOVAL_LOWV fMin="16" fMax="65" tOn="1000" tOff="1500" rdly="2" rpol="0" rngv="0" rdi="1" rt1_2="0" rfwe="0" />
+        <RING_DET_VAL_HIGHV fMin="16" fMax="65" tOn="1000" tOff="1500" rdly="2" rpol="0" rngv="1" rdi="1" rt1_2="2" rfwe="0" />
+    </Vdaa_Ring_Validation>
+    <Vdaa_PCM>
+        <PCM_8ULAW pcmf="1" phcf="0" pcmtri="0" />
+        <PCM_8ALAW pcmf="0" phcf="0" pcmtri="0" />
+        <PCM_16LIN pcmf="2" phcf="0" pcmtri="0" />
+    </Vdaa_PCM>
+    <Vdaa_Hybrid>
+        <HYB_600_0_0_500FT_24AWG acim="0" r1_line="600" r2_line="0" c_line="0" custom_sel="1" eian="10" length="500" gauge_sel="1" units_sel="0" />
+        <HYB_270_750_150_500FT_24AWG acim="0" r1_line="270" r2_line="750" c_line="150" custom_sel="1" eian="10" length="500" gauge_sel="1" units_sel="0" />
+        <HYB_200_680_100_500FT_24AWG acim="0" r1_line="200" r2_line="680" c_line="100" custom_sel="1" eian="10" length="500" gauge_sel="1" units_sel="0" />
+        <HYB_220_820_120_500FT_24AWG acim="0" r1_line="220" r2_line="820" c_line="120" custom_sel="1" eian="10" length="500" gauge_sel="1" units_sel="0" />
+    </Vdaa_Hybrid>
+</PROJECT>

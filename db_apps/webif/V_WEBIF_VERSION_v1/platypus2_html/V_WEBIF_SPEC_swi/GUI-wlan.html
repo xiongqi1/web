@@ -1,0 +1,425 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/GUI-login.html'); exit(403); } 
+_m=get_single('mhs.operationmode'); if(_m!="poweruser") redirect('/index.html');%>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Basic Wireless</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	i=0;//form['wlSsidIdx'];
+	mydata1="wlan."+i+".network_auth="+form['wlAuthMode']+
+	"&wlan."+i+".wpa_pre_shared_key="+form['wlWpaPsk']+
+	"&wlan."+i+".wpa_group_rekey_interval="+form['wlWpaGtkRekey']+
+	"&wlan."+i+".wpa_encryption="+form['wlWpa']+
+	"&wlan.0.ssid="+form['wlSsid']+
+	"&wlan.ssididx="+i;
+	if(form['wlAuthMode']=="hotspot")
+		mydata2="&hotspot.user.password="+form['hotpass1'];
+	else
+		mydata2="";
+	set_list( mydata1+mydata2 );
+}
+else {/*GET*/
+	hotpass=get_single( 'hotspot.user.password' );
+	form['hotpass1']=hotpass;
+	form['hotpass2']=hotpass;
+}
+i = 0;
+session["mode"] = get_single('wlan.'+i+'.network_auth');
+tmpval = get_single('wlan.'+i+'.encryption_strength');
+if(tmpval==128)
+	session["bit"] = '0';
+else
+	session["bit"] = '1';
+session["wpaPskKey"] = get_single('wlan.'+i+'.wpa_pre_shared_key');
+session["wpaGTKRekey"] = get_single('wlan.'+i+'.wpa_group_rekey_interval');
+session["wlwpa"] = get_single('wlan.'+i+'.wpa_encryption');
+session["wlwep"] = get_single('wlan.'+i+'.wep_encryption');
+//rdb_unlock();
+%>
+<script language="JavaScript">
+Butterlate.setTextDomain("GUI-wlan");
+function initTranslation() {
+	$("#ssidNameIntroduction").html(_("GUI GUIssidNameIntroduction"));
+	$("#netAuth").html(_("netAuth"));
+	$("#wlanMsg1").html("("+_("GUI GUIwlanTypeIntroduction")+_("GUI forMoreInfo")+"&nbsp;<a href='javascript:help_window()' class='a2' style='color:#107010'>"+_("CSclickHere")+"</a>)");
+	$("#WPApreSharedKey").html(_("wifiPassword")+"<BR/>\u202a( "+authModeText+" )");
+	$("#CSconfirmKey").html(_("confirmPassword"));
+	$("#CSconfirmKey2").html(_("CSconfirmKey"));
+	$("#GUItext1").html("("+_("GUItext1")+"&nbsp;<a href='javascript:displayKey_window()' class='a2' style='color:#107010'>"+_("clickHereToDisplay")+"</a>)");
+	$("#GUItext2").html("("+_("GUItext2")+"&nbsp;<a href='javascript:displayKey_window()' class='a2' style='color:#107010'>"+_("clickHereToDisplay")+"</a>)");
+	$("#hotspotKey").html(_("hotspotKey"));
+	$("#WPAencryption").html(_("WPAencryption"));
+	$("#GUItext3").html(_("GUItext3"));
+	$("#CSsave").val("    "+ _("CSsave")+"    ");
+}
+
+/*********** setup **********/
+var ssid = <%val=get_single('wlan.0.ssid');%>"@@val";
+var country = <%val=get_single('localisation.region');%>"@@val";
+var band= <%val=get_single('wlan.0.conf.band');%>"@@val";
+var ssidIdx = <%i=session["ssidIdx"];%>"@@i";
+if( ssidIdx!='0' && ssidIdx!='1')
+	ssidIdx = '0';
+var radiusServerIP = <%val=session["radiusServerIP"];%>"@@val";
+var mode = <%val=session["mode"];%>"@@val";
+if ( mode == '' ||  mode == 'N/A' )
+	mode = 'WPA2PSK';
+var bit = <%val=session["bit"];%>"@@val";
+var keyIdx = <%val=get_single('wlan.0.network_key');%>"@@val";
+if( keyIdx == "N/A") keyIdx = 1;
+var wpaPskKey = <%val=session["wpaPskKey"];%>"@@val";
+if(wpaPskKey == 'N/A')
+	wpaPskKey='';
+var wpaGTKRekey = <%val=session["wpaGTKRekey"];%>"@@val";
+if(wpaGTKRekey=='N/A')
+	wpaGTKRekey=0;
+var radiusPort = <%val=session["radiusPort"];%>"@@val";
+var radiusKey = <%val=session["radiusKey"];%>"@@val";
+var wpa = <%val=session["wlwpa"];%>"@@val";
+var wep = <%val=session["wlwep"];%>"@@val";
+var wlCorerev = '9';
+var authModeText;
+
+function authModeChange(OnPageLoad) {
+	with ( document.forms[0] ) {
+		var authMode = getSelect(wlAuthMode);
+		var i, algos;
+
+		hideAllElements();
+		switch ( authMode ) {
+		case 'OPEN':
+			showhide("wlWepD", 1);
+			if(wep=="enabled") {
+				$("#wlWepD").html(_("WEPtext1")+"<br/>"+_("WEPtext2")+"<br/>"+_("WEPtext3"));
+			}
+			else {
+				$("#wlWepD").html(insert_br(_("wifiOpenMsg1")));
+			}
+			authModeText=_("CSopen");
+			break;
+		case 'hotspot':
+			showhide("wlWepD", 0);
+			showhide("hotspotpass", 1);
+			authModeText="HotSpot";
+			break;
+		case 'WPAPSK':
+			authModeText="WPA-PSK";
+			showhide("wlWepD", 0);
+			showhide("wpaPreShareKey", 1);
+			break;
+		case 'WPA2PSK':
+			authModeText="WPA2-PSK";
+			showhide("wlWepD", 0);
+			showhide("wpaPreShareKey", 1);
+			break;
+		}
+
+		if(authMode == "WPAPSK")
+			wlWpa.value="TKIP";
+		else if( authMode == "WPA2PSK" || authMode == "WPAPSKWPA2PSK")
+			wlWpa.value="AES";
+		wpa=wlWpa.value.toLowerCase();
+	}
+}
+
+function isValidWPAPskKey(val) {
+	var ret = false;
+	var len = val.length;
+	var maxSize = 64;
+	var minSize = 8;
+
+	if ( len >= minSize && len < maxSize )
+		ret = true;
+	else if ( len == maxSize ) {
+		for ( i = 0; i < maxSize; i++ )
+			if ( isHexaDigit(val.charAt(i)) == false )
+			break;
+		if ( i == maxSize )
+			ret = true;
+	} else
+		ret = false;
+	return ret;
+}
+
+function hideAllElements() {
+	showhide("wlWpaD", 0);
+	showhide("wpaPreShareKey", 0);
+	showhide("wpaGTKRekey", 0);
+	showhide("wlWepD", 0);
+	showhide("hotspotpass", 0);
+}
+function displayKey_window() {
+var key_window = window.open("", "", "toolbar=no,width=400,height=100");
+var authMode = getSelect(document.form.wlAuthMode);
+	if(Butterlate.getLang()=="ar")
+		key_window.document.write("<style>body { direction:rtl; }</style>");
+	switch ( authMode ) {
+	case 'hotspot':
+			key_window.document.write(_("WEPtext5")+"<b>&nbsp;&nbsp;"+document.form.hotpass1.value+"</b>");
+		break;
+	case 'WPAPSK':
+	case 'WPA2PSK':
+		key_window.document.write(_("WEPtext4")+"<b>&nbsp;&nbsp;"+wpaPskKey+"</b>");
+		break;
+	default:
+		key_window.document.write("Network Key is not applicable for the <b>"+authMode.toUpperCase()+"</b>network authentication mode");
+		break;
+	} 
+	key_window.document.close();
+}
+function help_window() {
+var help_window = window.open("", "", "toolbar=no,width=720,height=640" );
+var h=help_window.document;
+	if(Butterlate.getLang()=="ar")
+		h.write("<style>body { direction:rtl; }</style>");
+	h.write("<table style=\"font-size:14px;\"><tr>");
+	h.write("<td width='15%'><b>"+_("netAuth")+"</b></td><td width='15%'><b>"+_("encryption")+"</b></td><td width='70%' align='center'><b>"+_("treeapp security")+"&nbsp;&nbsp;&nbsp;&nbsp;</b></td></tr>");
+	h.write("<tr><td colspan='3'>------------------------------------------------------\
+-----------------------------------------------------------------------------------</td></tr>");
+	h.write("<tr><td>"+_("CSopen")+"</td><td>"+_("none")+"</td>");
+	h.write("<td>"+_("noSecurity")+"</td></tr>");
+//The network is wide open. Everyone can join, watch the traffic, etc.
+	h.write("<tr><td></td><td></td><td>"+_("Msg10")+"</td></tr>");
+	//This is like a \"welcome, free internet\" sign. Strangers will use your network.
+	h.write("<tr><td colspan='3'></td></tr>");
+	
+	h.write("<tr><td>"+_("CSopen")+"</td><td>WEP</td>");
+	h.write("<td>"+_("wepExplanation")+"</td></tr>");
+//WEP is a historic encryption scheme that has been shown to be insecure.
+	h.write("<tr><td></td><td></td><td>"+_("doNottrespass")+"</td></tr>");
+//This is like a \"Do not trespas\" sign. It conveys the intention but won't stop anyone who wants to trespas.
+	h.write("<tr><td></td><td></td><td>"+_("restrictAccess")+"</td></tr>");
+//Only use it if you have old devices that don't support WPA2.
+	h.write("<tr><td colspan='3'></td></tr>");
+	
+	h.write("<tr><td>Hotspot</td><td></td>");
+	h.write("<td>"+_("Msg5")+"</td></tr>");
+//This authentication scheme is equivalent to Open, but uses a password protected portal to access the Internet.
+	h.write("<tr><td></td><td></td><td>"+_("inoInternetAccess")+"</td></tr>");
+//Everyone can join the network, but without entering the correct password, the user won't be able to access the Internet.
+	h.write("<tr><td></td><td></td><td>"+_("access1")+"</td></tr>");
+//After entering the correct password, the used has full access until the unit is rebooted.
+	h.write("<tr><td></td><td></td><td>"+_("Msg9")+"</td></tr>");
+//This is like a theatre - everyone is encuraged to enter the foyer, but only ticket holders are allowed in the show.
+	h.write("<tr><td colspan='3'></td></tr>");
+	
+	h.write("<tr><td>WPA-PSK</td><td>TKIP</td>");
+	h.write("<td>"+_("TKIPExplanantion")+"</td></tr>");
+//TKIP is a WPA encryption scheme designed to work with old WiFi hardware.
+	h.write("<tr><td></td><td></td><td>"+_("Msg57")+"</td></tr>");
+//This makes it vulnerable to a recently discovered attack. This attack is sophisticated and requires special hardware and software.
+	h.write("<tr><td></td><td></td><td>"+_("")+"</td></tr>");
+//Only use TKIP if you have devices that don't support other encryption schemes.
+	h.write("<tr><td></td><td></td><td>"+_("Msg8")+"</td></tr>");
+//his is like a locked door. Only people with the key and criminals with special tools can enter.
+	h.write("<tr><td colspan='3'></td></tr>");
+
+	/*h.write("<tr><td>WPA2-PSK</td><td>TKIP/AES</td>");
+	h.write("<td>TKIP/AES is an improvement over TKIP in that only uses TKIP at the beginning of a connection and then switches to secure AES.</td></tr>");
+	h.write("<tr><td></td><td></td><td>This scheme too is a compromise to allow old hardware to be used.</td></tr>");
+	h.write("<tr><td></td><td></td><td>This is like a locked door that is only accessible occasionally. It makes it more difficult for criminals, but not impossible.</td></tr>");*/
+	
+	h.write("<tr><td>WPA2-PSK</td><td>AES</td>");
+	h.write("<td>"+_("AESSecure")+"</td></tr>");
+//AES is considered a secure authentication and encryption scheme.
+	h.write("<tr><td></td><td></td><td>"+_("Msg59")+"</td></tr>");
+//There is currently no known way to break into such a network, short of guessing the password. Whenever possible, use this scheme.
+	h.write("<tr><td></td><td></td><td>"+_("Msg6")+"</td></tr>");
+//This is like a bank safe. Only people who know the combination get in.
+	h.write("</table>");
+	h.close();
+}
+
+function btnApply() {
+	with ( document.forms[0] ) {
+		var authMode = getSelect(wlAuthMode);
+		var value;
+		wlWpa.value=wlWpa.value.toLowerCase();
+		var swpa = wlWpa.value;
+
+		if (authMode.indexOf("WPAPSK")!= -1) {
+			value = wlWpaPsk.value;
+			if ( isValidWPAPskKey(value) == false ) {
+				alert(_("wlan warningMsg1"));//WPA Pre-Shared Key should be between 8 and 63 ASCII characters or 64 hexadecimal digits.
+				return 0;
+			}
+			if(document.form.wlWpaPsk.value!=document.form.ConfirmwlWpaPsk.value)
+			{
+				alert(_("wlan warningMsg2"));//WPA Pre-Shared Keys do not match!
+				return 0;
+			}
+		}
+		if (authMode.indexOf("WPA")!= -1 || authMode.indexOf("PSK")!= -1) {
+			//check GTK interval
+			value = parseInt(wlWpaGtkRekey.value);
+			if (  isNaN(value) == true || value < 0 || value > 0xffffffff ) {
+				alert(_("wlan warningMsg3"));
+		//alert('WPA Group Rekey Interval "' + wlWpaGtkRekey.value + '" should be between 0 and 4294967295.');
+				return 0;
+			}
+		}
+		if (authMode.indexOf("WPA")!= -1 || authMode == 'RADIUS') {
+			if ( isValidIpAddress(wlRadiusIPAddr.value) == false ) {
+				alert(_("wlan warningMsg9"));
+		//alert('RADIUS Server IP Address "' + wlRadiusIPAddr.value + '" is invalid IP address.');
+				return 0;
+			}
+		}
+		return 1;
+	}
+}
+
+function btnApply1() {
+	var str = new String();
+	str = document.form.wlSsid.value;
+
+	if ( str == '' )
+	{
+		alert(_("wlan warningMsg4"));//SSID should not be empty.
+		return 0;
+	}
+	if ( str.length > 32 )
+	{
+		alert(_("wlan warningMsg5"));
+		//alert('SSID "' + str + '" should not be longer than 32 characters.');
+		document.form.wlSsid.value = "";
+		return 0;
+	}
+	return 1;
+}
+function submitF1() {
+	<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	alert(_("accessDenied"));//Access denied! Please Login first.
+	window.location.href="/GUI-login.html"
+	<%}else{%>
+	if(document.form.wlAuthMode.value=="hotspot") {
+		if (document.form.hotpass1.value != document.form.hotpass2.value) {
+			alert(_("wlan warningMsg6"));//Hotspot Passwords do not match!
+			return;
+		}
+		if( document.form.hotpass1.value.toString().length<4 ) {
+			alert(_("wlan warningMsg7"));//Password must at least 4 digits long!
+			return;
+		}
+	}
+	if( btnApply() && btnApply1() ) {
+		if(confirm(_("warningChangeSecurity"))) {
+			document.form.wlSsid.disabled = 0;
+			document.form.submit();
+		}
+	}
+	else {
+		document.location.reload();
+	}	
+	<%}%>
+}
+$(document).ready(function() {
+	with ( document.forms[0] ) {
+		ssidIdx = 0;
+		setSelect(wlAuthMode, mode);
+		wlWpaPsk.value = wpaPskKey;
+		ConfirmwlWpaPsk.value = wpaPskKey;
+		wlWpaGtkRekey.value = wpaGTKRekey;
+		document.form.wlSsid.value = ssid; 
+	}
+	authModeChange(1);
+	initTranslation();
+	document.form.wlSsid.focus();
+});
+</script>
+
+</head>
+<body>
+<form name="form" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<input type="hidden" name='wlKeyBit' value="@@form['wlKeyBit']">
+<input type="hidden"  name='wep_encryption' value="@@form['wep_encryption']"/>
+<% include GUI-extra.html %>
+<div id="basicGUI">
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+	<img style="position:absolute; top:0px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+<%_m=get_single('mhs.operationmode'); if(_m=='poweruser') {%>
+	<img style="position:absolute; top:121px; left:-5px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-wlan" style="left:4px;"><a href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:242px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wan"><a href="/GUI-wan.html">LAN 1 / WAN</a></div>
+<%}%>
+	<img style="position:absolute; top:160px; left:44px" src="/images/strip.png" />
+    <img style="position:absolute; top:380px; left:44px" src="/images/strip.png" />
+	<div class="div_text" style="top:50px"><script language="JavaScript">document.write(_("wifiNetworkName")+"\u202a")</script><br/>( SSID )</div>
+	<div class="div_input" style="top:50px" >
+		<input type="text" name="wlSsid" value="@@form['wlSsid']" onkeyup="isValidNameEntry(this,event);"/>
+	</div>
+	<div class=div_small_text style="top:102px;" id="ssidNameIntroduction">
+	(This is the name of your personal wireless network and will appear when you search for wireless networks to connect to.)
+	</div>
+	<div style="display:none">
+		<div class="div_text" style="top:123px" id="netAuth">Network Authentication</div>
+		<div class="div_input" style="top:121px" >
+			<select name='wlAuthMode' size="1" onchange='authModeChange(0)'>
+			<option value="OPEN"><script language="JavaScript">document.write(_("CSopen"))</script></option>
+			<option value="hotspot">HotSpot</option>
+			<option value="WPAPSK">WPA-PSK</option>
+			<option value="WPA2PSK">WPA2-PSK</option>                                               
+			</select>
+		</div>
+		<div class=div_small_text style="top:160px" id="wlanMsg1">
+		(This is the type of security you are using on your personal wireless network. For more information
+		<a href="javascript:help_window()" class='a2' style="color:#107010">click here.</a>)
+		</div>
+	</div>	
+	<div id="wpaPreShareKey">  
+		<div class="div_text" style="top:208px" id="WPApreSharedKey">WPA Pre-Shared Key</div>
+		<div class="div_text" style="top:274px" id="CSconfirmKey"></div>
+		<div class="div_input" style="top:208px" >
+			<input type='password' name='wlWpaPsk' size='20' maxlength='64' value="@@form['wlWpaPsk']"/>
+		</div>
+		<div class="div_input" style="top:270px" >
+			<input type='password' name='ConfirmwlWpaPsk' size='20' maxlength='64' value=""/>
+		</div>
+		<div class=div_small_text style="top:330px" id="GUItext1">
+			This is the password to connect to the internet.
+			<a href="javascript:displayKey_window()" style="color:#107010">Click here to display.</a>
+		</div>      
+	</div>
+	<div id="hotspotpass">
+		<div class="div_text" id="hotspotKey" style="top:210px" >HotSpot Key</div>
+		<div class="div_text" style="top:268px" id="CSconfirmKey2">Confirm Key</div>
+		<div class="div_input" style="top:208px" >
+			<input type='password' name='hotpass1' size='20' maxlength='10' value="@@form['hotpass1']"/>
+		</div>
+		<div class="div_input" style="top:265px" >
+			<input type='password' name='hotpass2' size='20' maxlength='10' value="@@form['hotpass2']"/>
+		</div>
+		<div class=div_small_text style="top:320px">
+			<p id="GUItext2">This is the password to connect to your personal wireless network
+			<a href="javascript:displayKey_window()" class='a2'>click here to display.</a></p>
+		</div>
+	</div> 
+	<div id="wpaGTKRekey">
+		<input type='text' name='wlWpaGtkRekey' size='20' maxlength='10' value="@@form['wlWpaGtkRekey']"/>
+	</div>
+	<div id="wlWpaD" style="display:none">
+		<div class="div_text" style="top:364px" id="WPAencryption">WPA Encryption</div>
+		<div class="div_input" style="top:364px" >
+			<input type='text' name='wlWpa' value="@@form['wlWpa']" style="background:transparent; color:#FFFFFF; border-style:none; font-weight:bold" readonly/>
+		</div>
+	</div>	
+	<div class="div_text" id="wlWepD" style="top:210px;display:none"></div>
+
+	<div class=div_small_text style="top:410px" id="GUItext3">
+	If you have made changes to any of the above settings you will need to click Save below to apply them
+	</div>
+	<div class="div_button" style="top:455px">
+	<input type="button" name="submitForm" onClick='submitF1();' id="CSsave" value="Save">
+	</div>
+</div>
+</form>
+</body>
+</html>

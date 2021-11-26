@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Start the turbontc.lua web server for authenticate OWA-NIT
+#
+# Copyright (C) 2019 NetComm Wireless Limited.
+
+source $(test -n "$1" && dirname "$1" || echo .)/common
+TEMPLATE_BIN=$(test -n "$1" && basename "$1" || basename "$0")
+
+# add utils.sh
+nof=${0##*/}	# Name of file/script.
+nof=${nof%-*}	# Remove mangled suffix
+source "/lib/utils.sh"
+
+#!<service.authenticate.trigger>; This is the only trigger
+
+logDebug "started"
+
+SERVER=$(rdb_get "service.authenticate.server")
+PORT=$(rdb_get "service.authenticate.port")
+KEY=$(rdb_get "service.authenticate.serverkeyfile")
+CERT=$(rdb_get "service.authenticate.servercrtfile")
+CA=$(rdb_get "service.authenticate.cafile")
+DIR="/usr/share/authenticate"
+MAX_BODY_SIZE=$(rdb_get "service.authenticate.max_body_size")
+MAX_NON_FILE_SIZE=$(rdb_get "service.authenticate.max_non_file_size")
+[ -z "$MAX_BODY_SIZE" ] && MAX_BODY_SIZE=209715200
+[ -z "$MAX_NON_FILE_SIZE" ] && MAX_NON_FILE_SIZE=524288
+
+logDebug "[server] $SERVER:$PORT"
+logDebug "[certs] $KEY $CERT $CA"
+logDebug "[max_body_size] $MAX_BODY_SIZE, [max_non_file_size] $MAX_NON_FILE_SIZE"
+
+term_daemon da_authenticate 5
+
+start_daemon da_authenticate /usr/bin/turbontc.lua -s "$SERVER" -p "$PORT" -k "$KEY" -c "$CERT" -a "$CA" -d "$DIR" -b "$MAX_BODY_SIZE" -n "$MAX_NON_FILE_SIZE" -i
+
+logDebug "done"

@@ -1,0 +1,156 @@
+﻿<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Administration</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/cgi-bin/lang_list.cgi"></script>
+<body onload="initValue();">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+function setLanguageOptions() {
+var lang_element = document.getElementById("langSelection");
+	lang_element.options.length = 0;
+	if (lang_en == 1)
+	{
+		lang_element.options[lang_element.length] = new Option(_("english"), 'en');//'English'
+	}
+	if (lang_zhtw == 1)
+	{
+		document.getElementById("langDisplay").style["display"]="";
+		lang_element.options[lang_element.length] = new Option(_("man language twChinese"), 'zhtw');//'Traditional Chinese'
+	}
+	if (lang_zhcn == 1)
+	{
+		document.getElementById("langDisplay").style["display"]="";
+		lang_element.options[lang_element.length] = new Option(_("man language simple Chinese"), 'zhcn');//'Simple Chinese'
+	}
+	if (lang_fr == 1)
+	{
+		document.getElementById("langDisplay").style["display"]="";
+		lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr');//'French'
+	}
+	if (lang_ar == 1)
+	{
+		document.getElementById("langDisplay").style["display"]="";
+		lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar');//'Arabic'
+	}
+}
+
+function initTranslation() {
+	document.getElementById("manLangApply").value = "   "+_("apply")+"   ";
+	document.getElementById("manLangCancel").value = "   "+_("cancel")+"   ";
+	document.getElementById("bottomButton").value = "   "+_("CSsave")+"   ";
+}
+
+function initValue() {
+	setLanguageOptions();
+	if(parseInt(document.form.remoteadmin.value)==1 )   
+		document.form.remAdmin[0].checked=true;
+	else
+		document.form.remAdmin[1].checked=true;
+	document.form.incomingPort.focus();
+	initTranslation();
+}
+
+function submitLang() {
+	var lang=document.getElementById("langSelection").value;
+	setLanguage(lang);
+}
+
+</script>
+
+<%
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		if(form['adminPass']==form['adminPassConf'])
+		{          
+			mydata1="admin.remote.enable="+form['remoteadmin']+
+			"&admin.remote.port="+form['incomingPort'];
+			set_list( mydata1 );  
+
+			tempval = form['adminPass'];
+			retval = set_single( 'admin.user.'+session['user']+'='+tempval );
+		}
+		else
+		{
+			form['remoteadmin'] = get_single( 'admin.remote.enable' ); 
+			form['incomingPort'] = get_single( 'admin.remote.port' ); 
+			form['adminPass'] = get_single( 'admin.user.'+session['user'] ); 
+		}
+	} 
+	else /*GET*/
+	{
+		form['remoteadmin'] = get_single( 'admin.remote.enable' ); 
+		form['incomingPort'] = get_single( 'admin.remote.port' ); 
+		form['adminPass'] = get_single( 'admin.user.'+session['user'] ); 
+		form['adminPassConf'] = get_single( 'admin.user.'+session['user'] );
+	}
+%>
+
+<h3>&nbsp;&nbsp;<script language="JavaScript">document.write(_("system")+" > "+_("administration"));</script></h3>
+<p></p>
+<table width="80%">
+    <tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("administration"));</script></th>
+    </tr>
+</table>
+
+<form name="formlan" id="langDisplay" style="display:none" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%">
+  <tr>
+    <td width="30%" id="manLangSet"><script language="JavaScript">document.write(_("man language setting"));</script></td>
+    <td>
+      <select name="langSelection" id="langSelection">
+        <!-- added by initValue -->
+      </select>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+	<div align="right" style="margin-right:12% ">
+	<input type=button value="Apply" id="manLangApply" onClick="submitLang();"> &nbsp; &nbsp;
+	<input type=button  value="Cancel" id="manLangCancel" onClick="window.location.reload()">
+	</div>
+    </td>
+  </tr>
+</table>
+</form>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="remoteadmin" value="@@form['remoteadmin']"/>
+<table width="80%">
+<tr> 
+    <td width="30%"><script language="JavaScript">document.write(_("remoteAdministration"));</script></td>
+    <td> <input type=radio onClick="javascript:document.form.remoteadmin.value='1';ungreyOutPortField()" name='remAdmin'>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+    	 <input type=radio onClick="javascript:document.form.remoteadmin.value='0';greyOutPortField()" name='remAdmin'>&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr>
+    <td><script language="JavaScript">document.write(_("remoteAdministrationPort"));</script></td>
+    <td><input type="text" name="incomingPort" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['incomingPort']"> &nbsp;(1 - 65534)</td>
+</tr>
+
+<tr> 
+    <td><script language="JavaScript">document.write(_("adminPassword"));</script></td>
+    <td><input type=password name='adminPass' size=32 maxlength=32 value="@@form['adminPass']"></td>
+</tr>
+
+<tr> 
+    <td><script language="JavaScript">document.write(_("confirmPassword"));</script></td>
+    <td><input type=password name='adminPassConf' size=32 maxlength=32 value="@@form['adminPassConf']"></td>
+</tr>
+</table>
+
+<div align="right" style="margin-right:15% ">
+<p></p>
+<INPUT TYPE="submit" VALUE="Save" name="ok" id="bottomButton" onClick="javascript:submitF()">&nbsp;&nbsp;
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

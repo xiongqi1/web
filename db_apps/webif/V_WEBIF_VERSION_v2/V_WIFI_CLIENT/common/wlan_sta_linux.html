@@ -1,0 +1,540 @@
+#define WRITE(str) <script language=Javascript>document.write(str)</script>
+
+<!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>WLAN</title>
+</head>
+
+<%include topinc_v2.inc%>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<!-- Include the server side ESP script  -->
+<%
+#include "wlan_sta_linux_esp.inc"
+%>
+
+<!-- Only put code here that needs RDB expansion on the server.
+     All other script should go in: wlan_sta_linux.js -->
+<script language="JavaScript">
+
+// Expand the RDBs values from other modules used in the .js file
+var apRadio        = <%val=get_single('wlan.0.radio'        );%>"@@val";
+var apChannel      = <%val=get_single('wlan.0.conf.channel' );%>"@@val";
+#if defined(V_WIFI_FOLLOW_STA)
+var apFollow       = <%val=get_single('wlan.0.follow_sta'   );%>"@@val";
+#else
+var apFollow       = 0;
+#endif
+
+// Load the form input element values from the RDB values for this module.
+// Note: the form elements contain all the required RDB settings.
+function setFormElementsFromRdb() {
+
+  // Note this is the same order as in defconfig
+  $("#id_radio"                      ).val(<%val=get_single('wlan_sta.0.radio'                                   );%>"@@val");
+  if (apFollow == 1) {
+    $("#id_wds_sta_enable").val(0);
+  } else {
+    $("#id_wds_sta_enable").val(<%val=get_single('wlan_sta.0.wds_sta_enable');%>"@@val");
+  }
+  $("#id_auto_roam_enable"           ).val(<%val=get_single('wlan_sta.0.auto_roam_enable'                        );%>"@@val");
+  $("#id_short_scan_interval"        ).val(<%val=get_single('wlan_sta.0.short_scan_interval'                     );%>"@@val");
+  $("#id_signal_strength_threshold"  ).val(<%val=get_single('wlan_sta.0.signal_strength_threshold'               );%>"@@val");
+  $("#id_long_scan_interval"         ).val(<%val=get_single('wlan_sta.0.long_scan_interval'                      );%>"@@val");
+  $("#id_ssid"                       ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.ssid', "", "--base64");%>"@@val"));
+  $("#id_bssid"                      ).val(<%val=get_single('wlan_sta.0.ap.0.bssid'                              );%>"@@val");
+  $("#id_network_auth"               ).val(<%val=get_single('wlan_sta.0.ap.0.network_auth'                       );%>"@@val");
+  $("#id_network_key_id"             ).val(<%val=get_single('wlan_sta.0.ap.0.network_key_id'                     );%>"@@val");
+  $("#id_network_key1"               ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.network_key1', "", "--base64");%>"@@val"));
+  $("#id_network_key2"               ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.network_key2', "", "--base64");%>"@@val"));
+  $("#id_network_key3"               ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.network_key3', "", "--base64");%>"@@val"));
+  $("#id_network_key4"               ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.network_key4', "", "--base64");%>"@@val"));
+  $("#id_wpa_pre_shared_key"         ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.wpa_pre_shared_key', "", "--base64");%>"@@val"));
+  $("#id_wpa_pki_client_identity"    ).val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.wpa_pki_client_identity', "", "--base64");%>"@@val"));
+  $("#id_wpa_pki_client_key_password").val(Base64.decode(<%val=get_single('wlan_sta.0.ap.0.wpa_pki_client_private_key_password', "", "--base64");%>"@@val"));
+  $("#id_default_route_metric"       ).val(<%val=get_single('wlan_sta.0.ap.0.default_route_metric'               );%>"@@val");
+
+  // Note "encryption_type" is used by 2 form elements
+  var encryptionType = <%val=get_single('wlan_sta.0.ap.0.encryption_type');%>"@@val";
+  if (encryptionType == "WEP") {
+    $("#id_wep_encryption").val("enabled");
+    $("#id_wpa_encryption").val("NONE");
+  }
+  else {
+    $("#id_wep_encryption").val("disabled");
+    $("#id_wpa_encryption").val(encryptionType);
+  }
+}
+
+// Include this so the internationalisation strings are created (rather than srcing it).
+#include "wlan_sta_linux.js"
+</script>
+
+  <div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+  <div id="content" class="site-content">
+  <div class="container">
+  <aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+  <div class="grid-9 omega">
+    <form><!--place holder for validation--></form>
+    <div class="right-column white-box">
+
+      <!-- form id should be always 'form' for embedded validation engine -->
+      <form name="wlan"
+            id="form"
+            method="POST"
+            action="@@request['SCRIPT_NAME']"
+            class="validate"
+            novalidate="novalidate"
+            autocomplete="off">
+      <%appendCsrfToken();%>
+      <div class="pad" id="wlan_block">
+        <h2>WRITE(_("wirelessClientConfiguration"))</h2>
+
+        <!-- wlan_setup -->
+        <div id="wlan_setup">
+
+          <!-- radio on/off -->
+          <input type="hidden" name="id_radio" id="id_radio" value="@@form['id_radio']"/>
+          <div class="form-row no-bg-form">
+            <label>WRITE(_("clientRadio"))</label>
+            <div class="field">
+              <div class="location-settings">
+                <div class="radio-switch">
+                  <input type="radio" class="access" name="radioButton" id="radioButton_0">
+                  <label for="radioButton_0" class="on" >WRITE(_("on"))</label>
+                  <input type="radio" class="access" name="radioButton" id="radioButton_1">
+                  <label for="radioButton_1" class="off">WRITE(_("off"))</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status -->
+#ifdef V_WIFI_CLIENT_backports
+          <div class="form-row no-bg-form" style="margin-bottom:0px">
+#else
+          <div class="form-row no-bg-form">
+#endif
+            <label>WRITE(_("status"))</label>
+            <span id="statusText" class="status-text"></span>
+          </div>
+#ifdef V_WIFI_CLIENT_backports
+          <div class="field-des" style="margin-bottom:4px">
+            <span id="extraStatusText">&nbsp;</span>
+          </div>
+#endif
+
+#if defined(V_WIFI_WDS)
+          <!-- WDS Setting -->
+          <input type="hidden" name="id_wds_sta_enable" id="id_wds_sta_enable" value="@@form['id_wds_sta_enable']"/>
+          <div id="wds_sta_on_off" class="form-row no-bg-form">
+            <label>WRITE(_("wdsStaEnable"))</label>
+            <div class="field">
+              <div class="location-settings">
+                <div class="radio-switch">
+                  <input type="radio" class="access" name="wdsSta" id="wdsSta-0">
+                  <label for="wdsSta-0" class="on">WRITE(_("on"))</label>
+                  <input type="radio" class="access" name="wdsSta" id="wdsSta-1">
+                  <label for="wdsSta-1" class="off">WRITE(_("off"))</label>
+                </div>
+              </div>
+            </div>
+          </div>
+#endif
+
+          <!-- Auto Roaming Setting -->
+          <input type="hidden" name="id_auto_roam_enable" id="id_auto_roam_enable" value="@@form['id_auto_roam_enable']"/>
+          <div id="autoRoam_radio_on_off" class="form-row no-bg-form">
+            <label>WRITE(_("autoRoaming"))</label>
+            <div class="field">
+              <div class="location-settings">
+                <div class="radio-switch">
+                  <input type="radio" class="access" name="autoRoaming" id="autoRoaming-0">
+                  <label for="autoRoaming-0" class="on">WRITE(_("on"))</label>
+                  <input type="radio" class="access" name="autoRoaming" id="autoRoaming-1">
+                  <label for="autoRoaming-1" class="off">WRITE(_("off"))</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        <div class="form-row" id="autoRoamParams">
+        <div class="form-row">
+          <label for="id_short_scan_interval">WRITE(_("shortScanInterval"))</label>
+            <div class="field" >
+              <input type="text" name="id_short_scan_interval" id="id_short_scan_interval" class="large" maxlength=5 value="@@form['id_short_scan_interval']">
+            </div>
+            <div>
+                <span class="normal-text">&nbsp;&nbsp;(seconds)</span>
+                <a id="info" style="background-color:transparent;" title="Is effective if signal level is below threshold"><i id="net-info" style="padding-top:6px"></i></a>
+            </div>
+        </div>
+        <div class="form-row">
+          <label for="id_signal_strength_threshold">WRITE(_("signalStrengthThreshold"))</label>
+            <div class="field" >
+              <input type="text" name="id_signal_strength_threshold" id="id_signal_strength_threshold" class="large" maxlength=5 value="@@form['id_signal_strength_threshold']">
+            </div>
+            <div>
+                <span class="normal-text">&nbsp;&nbsp;(dBm)</span>
+            </div>
+        </div>
+        <div class="form-row">
+          <label for="id_long_scan_interval">WRITE(_("longScanInterval"))</label>
+            <div class="field" >
+              <input type="text" name="id_long_scan_interval" id="id_long_scan_interval" class="large" maxlength=5 value="@@form['id_long_scan_interval']">
+            </div>
+            <div>
+                <span class="normal-text">&nbsp;&nbsp;(seconds)</span>
+                <a id="info" style="background-color:transparent;" title="Is effective if signal level is above threshold"><i id="net-info" style="padding-top:6px"></i></a>
+            </div>
+        </div>
+        </div>
+
+          <!-- Route Metric -->
+          <div class="form-row">
+            <label for="id_default_route_metric">WRITE(_("metric"))</label>
+            <div class="field" >
+              <input type="text" name="id_default_route_metric" id="id_default_route_metric" class="validate[required, funcCall[validateMetric]] required large id_default_route_metric" maxlength=5 value="@@form['id_default_route_metric']">
+#ifdef V_WEBIF_SPEC_vdf
+            </div>
+            <div>
+#endif
+              <span class="normal-text">&nbsp;&nbsp;(0-65535)</span>
+            </div>
+          </div>
+
+          <!-- SSID -->
+          <div class="form-row no-bg-form">
+            <label for="id_ssid">WRITE(_("ap ssid"))</label>
+            <div class="field">
+              <input type="text" name="id_ssid" id="id_ssid" class="validate[required, funcCall[validateSsid]] required large" maxlength=32 onKeyUp="ssidFilter(this);">
+               <button type="button" class="secondary" id="scan_button" style="margin-left:8px">WRITE(_("scan"))</button>
+            </div>
+          </div>
+
+          <!--
+          If you have a remembered username and password for a site, the current version of Chrome will autofill username into the empty field
+          that happens to precede any "type=password" field.
+          It does not care what the field is called - just assumes the field before password is the username.
+          This is plain stupid, of course, but the alternative is users losing their Wifi passwords.
+          So, the BSSID is just the unfortunate field to be the last edit box before the password tagged field.
+          Refer: http://stackoverflow.com/questions/15738259/disabling-chrome-autofill
+          So, the next two lines avoid this Chrome issue by making it do its guessing on hidden fake fields.
+          -->
+          <!--
+          fakeusername/password is not working anymore for Chrome,
+          because recent version of Chrome(Version 50.0.2661.102 for me) ignores <input type="password"> tag if it is set to "display:none",
+          and it automatically fills stored-password into another displayed password input tag.
+          For this, Chrome implemented new attribute 'autocomplete="new-password"' to avoid autofill.
+          Refer: https://bugs.chromium.org/p/chromium/issues/detail?id=370363#c7
+                 https://html.spec.whatwg.org/#attr-fe-autocomplete-new-password
+          However, fakeusername/password still works for firefox and old version of chrome. (IE does not support autofill function)
+          -->
+          <input style="display:none" type="text" name="fakeusernameremembered"/>
+          <input style="display:none" type="password" name="fakepasswordremembered"/>
+
+          <!-- BSSID -->
+          <div class="form-row">
+            <label for="id_bssid">WRITE(_("apBssid"))</label>
+            <div class="field">
+              <input type="text" name="id_bssid" id="id_bssid" class="validate[funcCall[validateBssid]] id_bssid large" maxlength=32>
+            </div>
+          </div>
+
+          <!-- Network Authentication -->
+          <div class="form-row no-bg-form">
+            <label>WRITE(_("netAuth"))</label>
+            <div class="field">
+              <select name="id_network_auth" id="id_network_auth">
+                <option value="OPEN"      >WRITE(_("CSopen")    )</option>
+                <option value="SHARED"    >WRITE(_("shared")    )</option>
+                <option value="WPAPSK"    >WRITE(_("wpaPsk")    )</option>
+                <option value="WPAEAPTLS" >WRITE(_("WPA") )</option>
+                <option value="WPA2PSK"   >WRITE(_("wpa2Psk")   )</option>
+                <option value="WPA2EAPTLS">WRITE(_("WPA2"))</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- WPA Pre-shared key input -->
+          <div id="pre_shared_key_ip" class="form-row no-bg-form">
+            <label>WRITE(_("WPApreSharedKey"))</label>
+            <div class="field">
+              <input type="password" name="id_wpa_pre_shared_key" class="large" id="id_wpa_pre_shared_key"
+                     size="20" maxlength="64" autocomplete="new-password">
+              &nbsp;&nbsp;
+              <a id="display_psk" class="clickMsg">WRITE(_("clickHereToDisplay"))</a>
+            </div>
+          </div>
+
+          <!-- WPA Encryption Type -->
+          <div id="encryption_type_ip" class="form-row no-bg-form">
+            <label>WRITE(_("WPAencryption"))</label>
+            <div class="field">
+              <select name="id_wpa_encryption" id="id_wpa_encryption" value="@@form['id_wpa_encryption']">
+                <option                  value="NONE">WRITE(_("none"))</option>
+                <option id="id_wpa_tkip" value="TKIP">WRITE(_("tkip"))</option>
+                <option id="id_wpa_aes"  value="AES" >WRITE(_("aes") )</option>
+#ifdef V_WIFI_CLIENT_qca_soc_lsdk
+                <option id="id_wpa_tkip_aes"  value="TKIPAES" >WRITE(_("tkipAes") )</option>
+#endif
+              </select>
+            </div>
+          </div>
+
+          <!-- WEP Encryption enable/disable -->
+          <div id="wep_encryption_ip" class="form-row no-bg-form">
+            <label>WRITE(_("WEPencryption"))</label>
+            <div class="field">
+              <select name="id_wep_encryption" id="id_wep_encryption" value="@@form['id_wep_encryption']">
+                <option value="disabled">WRITE(_("disabled"))</option>
+                <option value="enabled" >WRITE(_("enabled") )</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- WEP static keys -->
+          <div id="network_key_ip" class="form-row no-bg-form">
+
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("currentNetworkKey"))</label>
+              <div class="field">
+                <select name="id_network_key_id" id="id_network_key_id" size="1">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+              </div>
+            </div>
+            <!-- Enter 10 hexadecimal digits for 64-bit encryption keys or 26 hexadecimal digits for 128-bit encryption keys. -->
+            <div class="form-row no-bg-form">WRITE(_("Msg60"))</div>
+
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("networkKey")+" 1")</label>
+              <div class="field">
+                <input type="text" name="id_network_key1" id="id_network_key1" size="30" maxlength="26">
+                <label class="field-right-desc" id="TEXT1"></label>
+              </div>
+            </div>
+
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("networkKey")+" 2")</label>
+              <div class="field">
+                <input type="text" name="id_network_key2" id="id_network_key2" size="30" maxlength="26">
+                <label class="field-right-desc" id="TEXT2"></label>
+              </div>
+            </div>
+
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("networkKey")+" 3")</label>
+              <div class="field">
+                <input type="text" name="id_network_key3" id="id_network_key3" size="30" maxlength="26">
+                <label class="field-right-desc" id="TEXT3"></label>
+              </div>
+            </div>
+
+            <div  class="form-row no-bg-form">
+              <label>WRITE(_("networkKey")+" 4")</label>
+              <div class="field">
+                <input type="text" name="id_network_key4" id="id_network_key4" size="30" maxlength="26">
+                <label class="field-right-desc" id="TEXT4"></label>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- WPA EAP-TLS client configs -->
+          <div id="eap_tls_configs_ip" class="form-row no-bg-form">
+
+            <!--  WPA EAP-TLS client identity -->
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("addprof identity"))</label>
+              <div class="field">
+                <input type="text" name="id_wpa_pki_client_identity" id="id_wpa_pki_client_identity"
+                       class="validate[required, funcCall[validatePkiIdentity]]" maxlength=32>
+              </div>
+            </div>
+
+            <!--  WPA EAP-TLS client private key password -->
+            <div class="form-row no-bg-form">
+              <label>WRITE(_("privateKeyPassphrase"))</label>
+              <div class="field">
+                <input type="password" name="id_wpa_pki_client_key_password" id="id_wpa_pki_client_key_password"
+                       size="20" maxlength="64">
+                &nbsp;&nbsp;
+                <a id="display_pki_key" class="clickMsg">WRITE(_("clickHereToDisplay"))</a>
+              </div>
+            </div>
+          </div>
+          <div class="submit-row">
+            <button type="button" name="submit_form" id="submit_form">WRITE(_("CSsave"))</button>
+          </div>
+
+        </div>  <!-- div id="wlan_setup" -->
+      </div>    <!-- div class="pad" id="wlan_block" -->
+      </form>   <!-- name="wlan" -->
+
+      <!-- WPA EAP-TLS file upload buttons -->
+      <div id="eap_tls_uploads_ip" class="form-row no-bg-form">
+        <br/><br/>
+
+        <label>WRITE(_("local private key"))</label>
+        <button type="button" id="delKeyFile" class="secondary" style="margin-left:0">WRITE(_("delete"))</button>
+        <button type="button" id="showKeyFile" class="secondary" style="margin-left:0">WRITE(_("show"))</button>
+        <form>
+          <span class="file-wrapper">
+            <input type="file" name="KeyFile" id="uploadKeyFile">
+            <span class="button secondary">WRITE(_("upload"))</span>
+            <span id="keyFileInfo"></span>
+          </span>
+        </form>
+
+        <label>WRITE(_("addprof client cert"))</label>
+        <button type="button" id="delClientCertificate" class="secondary" style="margin-left:0">WRITE(_("delete"))</button>
+        <button type="button" id="showClientCertificate" class="secondary" style="margin-left:0">WRITE(_("show"))</button>
+        <form>
+          <span class="file-wrapper">
+            <input type="file" name="ClientCertificate" id="uploadClientCertificate">
+            <span class="button secondary">WRITE(_("upload"))</span>
+            <span id="clientCertificateInfo"></span>
+          </span>
+        </form>
+
+        <label>WRITE(_("addprof ca cert"))</label>
+        <button type="button" id="delCaCertificate" class="secondary" style="margin-left:0">WRITE(_("delete"))</button>
+        <button type="button" id="showCaCertificate" class="secondary" style="margin-left:0">WRITE(_("show"))</button>
+        <form>
+          <span class="file-wrapper">
+            <input type="file" name="CaCertificate" id="uploadCaCertificate">
+            <span class="button secondary">WRITE(_("upload"))</span>
+            <span id="caCertificateInfo"></span>
+          </span>
+        </form>
+      </div>  <!-- div id="eap_tls_uploads_ip" -->
+
+      <div class="pad hide" id="aplist_block">
+        <br/>
+        <h2>WRITE(_("accessPointList"))</h2>
+        <table width="80%" style="text-align:left;" class="no-border">
+          <thead>
+            <tr>
+              <th width="04%">WRITE(_("mapping no")     )</th>
+              <th width="20%">WRITE(_("ssid")           )</th>
+              <th width="15%">WRITE(_("bssid")          )</th>
+              <th width="10%">WRITE(_("authentication") )</th>
+              <th width="10%">WRITE(_("encryption")     )</th>
+              <th width="05%">WRITE(_("chan")           )</th>
+              <th width="05%">WRITE(_("signal strength"))</th>
+              <th width="10%"></th>
+            </tr>
+          </thead>
+
+          <tbody id="tbody_aplist"></tbody>
+        </table>
+
+        <div class="submit-row">
+          <button type="button" id="scan_refresh" class="secondary">WRITE(_("refresh"))</button>
+          <button type="button" id="scan_close"   class="secondary">WRITE(_("close")  )</button>
+          <span id="scan_status"></span>
+        </div>
+
+      </div>    <!-- div class="pad" id="aplist_block" -->
+
+    </div>  <!-- div class="right-column white-box" -->
+  </div>    <!-- div class="grid-9 omega" -->
+  </div>    <!-- div class="container" -->
+  </div>    <!-- div id="content" -->
+
+  <footer class="footer">
+    <div class="container">
+      <p class="copy-right">WRITE(_("powered by netComm"))</p>
+    </div>
+  </footer>
+
+<script language='javascript'>
+// This must go after the content
+set_menu("Internet", "Client_conf", <%_val = session["user"];%>"@@_val");
+
+#ifdef V_WIFI_CLIENT_qca_soc_lsdk
+var submit_interval;
+function ajaxFunction()
+{
+    $.ajax({
+        url:"./cgi-bin/wlan_sta_linux_status.cgi",
+        dataType: 'json',
+        data: {radio:clientRadioInstance},
+        success:
+        function(rspData, status) {
+            if (status == "success") {
+
+                if ($("#id_radio").val() != '1' || ($("#id_radio").val() == '1' && rspData.state.length > 0)) { // WIFI Module is ready.
+                    clearInterval(submit_interval);
+                    $.unblockUI();
+                    window.location = "/wlan_sta_linux.html?success";
+                }
+            }
+        },
+        timeout: 3000 * 2
+    });
+}
+
+<%if(request['QUERY_STRING']=="processing") {%>
+	blockUI_wait(_("saveSettings"));
+	submit_interval = setInterval(ajaxFunction, 3000);
+<%}%>
+#endif
+
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("", "");
+<%}%>
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["id_default_route_metric"]=_("Msg48");
+	$.validator.addMethod("id_default_route_metric",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.id_default_route_metric);
+
+	VALIDATOR.config.errors["id_bssid"]=_("warningMsg11");	// You've entered the MAC address incorrectly. Please try again in the correct format (XX:XX:XX:XX:XX:XX).
+	$.validator.addMethod("id_bssid",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				c = $(a).closest(".field");
+				c.removeClass("error").siblings(".warning-med, .bubble").remove();
+				return true;
+			}
+			if( !isValidMacAddress(c) ) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.id_bssid);
+#else
+/********* NTC ValidationEngine **********/
+function validate_metric(field) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("Msg48");
+	}
+}
+function validate_validateBssid(field) {
+	if(!isValidMacAddress(field.val())) {
+		return _("warningMsg11");			// You've entered the MAC address incorrectly. Please try again in the correct format (XX:XX:XX:XX:XX:XX).
+	}
+}
+#endif
+</script>
+
+</body>
+</html>

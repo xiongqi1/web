@@ -1,0 +1,7 @@
+{
+    "id": "LogFile",
+    "title": "System log",
+    "url": "/logfile.html",
+    "path": [ "System", "Log" ],
+    "position": 10
+}

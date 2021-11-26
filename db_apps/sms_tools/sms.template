@@ -1,0 +1,52 @@
+#!/bin/sh
+# SMS tools templete for SMS rx handling
+# "?<wwan.0.sms.received_message.status2>;"
+# "?<wwan.0.sms.received_message.status>;"
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is for internal system use only."
+	echo "It is used for processing incoming SMS messages."
+    echo "Please do not run this script manually."
+    echo ""
+	exit 0
+fi
+
+RX_BLOCKED=`rdb_get wwan.0.sms.received_message.blocked`
+RX_PENDING=`rdb_get wwan.0.sms.received_message.pending`
+atmgr_ready=`rdb_get atmgr.status`
+
+sms_log()
+{
+	logger "smstools-`basename ${0}`: ${1}"
+}
+
+MSG_ST_VAR="wwan.0.sms.received_message.status"
+MSG_CNT=`rdb_get $MSG_ST_VAR | awk '/unread:/ {print $3}' | sed 's/unread://'`
+NEW_MSG_RX="0"
+if [ "$MSG_CNT" != "0" ] && [ "$MSG_CNT" != "" ]; then
+	NEW_MSG_RX="1"
+fi
+
+sms_log "msgcnt $MSG_CNT, newmsg_rx $NEW_MSG_RX, blked $RX_BLOCKED, pend $RX_PENDING"
+
+if [ "$NEW_MSG_RX" = "1" ]; then
+	if [ "$RX_BLOCKED" = "1" ];then
+		sms_log "Currently processing previously received SMS, setting current message pending until it is finished."
+		rdb_set wwan.0.sms.received_message.pending 1
+	else
+		if [ "$RX_PENDING" = "1" ];then
+			sms_log "Processing pending received SMS."
+			rdb_set wwan.0.sms.received_message.pending 0
+		else
+			sms_log "Doing immediate processing of received SMS."
+		fi
+		rdb_set wwan.0.sms.received_message.blocked 1
+		/usr/bin/sms_rx_sub.sh &
+	fi
+fi
+
+exit 0

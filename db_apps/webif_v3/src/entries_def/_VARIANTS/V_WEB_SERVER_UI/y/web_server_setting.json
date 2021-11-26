@@ -1,0 +1,7 @@
+{
+    "id": "WebServerSetting",
+    "title": "Web server setting",
+    "url": "/web_server_setting.html",
+    "path": [ "System", "SystemConfig" ],
+    "position": 110
+}

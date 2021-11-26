@@ -1,0 +1,696 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SNMP</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript">
+if(is_edge_browser()) {
+	$("head").append("<style type='text/css'>#snmpSecurityLevel{width: 220px;}</style>");
+}
+else {
+	$("head").append("<style type='text/css'>#snmpSecurityLevel{width: auto;}</style>");
+}
+
+function check_file(filename) {
+	$.get("/cgi-bin/check_file.cgi?"+filename, function(v){
+		eval(v);
+		if(result=="") {
+			validate_alert("",_("ipsecLogEmpty"));
+		}
+		else {
+			location.href = "/cgi-bin/logfile.cgi?action=downloadMib";
+		}
+	});
+}
+
+function validate_group() {
+	v=0;
+	$.each($('.trap_group'), function() {
+		if($(this).val().length>0) {
+			v++;
+		}
+	});
+
+	if(v) {
+		$(".trap_group").addClass("required");
+	}
+	else {
+		$(".trap_group").removeClass("required");
+		$(".trap_group").valid();
+	}
+}
+
+function submitF() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	$("button").attr("disabled",true);
+	document.form.submit();
+}
+
+
+$(document).ready(function() {
+	var f = document.form;
+
+	if (f.snmpenable.value =='1') {
+		$('#radio-1').attr("checked","checked");
+	} else {
+		$('#radio-2').attr("checked","checked");
+	}
+
+	/* If the feature is disabled, hide the configuration */
+	if ($('#radio-2').attr("checked") != "undefined" && $('#radio-2').attr("checked") == "checked") {
+		$('#box_2144_pin').hide();
+	}
+
+	$("#message_box_ok").click(function() {$.unblockUI();});
+
+	$("#send_heart_beat").click(function() {
+		clear_alert();
+
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+	$("#snmpTrapDestination").addClass("required");
+	if(!$("#snmpTrapDestination").valid()) {
+		$("#snmpTrapDestination").removeClass("required");
+		return;
+	}
+	$("#snmpTrapDestination").removeClass("required");
+#else
+	if(!$("#form").validationEngine("validate")) {
+		return;
+	}
+	$("#snmpTrapDestination").addClass("validate[required]");
+	if($("#snmpTrapDestination").validationEngine("validate")) {
+		$("#snmpTrapDestination").removeClass("validate[required]");
+		return;
+	}
+	$("#snmpTrapDestination").removeClass("validate[required]");
+#endif
+		$.getJSON(
+			"/cgi-bin/heartbeat.cgi",
+				{dest:$("#snmpTrapDestination").val()},
+			function(res) {
+				if(res.cgiresult==0) {
+					$.blockUI( {
+					message: "<div>"+_("heartbeat sent ok")+"\
+						<div class='button-raw med'>\
+						<button class='secondary med' onClick='$.unblockUI();'>"+_("CSok")+"</button>\
+						</div></div>", css: { width: '300px' } });
+				}
+				else {
+					$.blockUI( {
+					message: "<div>"+_("heartbeat sending failure")+"\
+						<div class='button-raw med'>\
+						<button class='secondary med' onClick='$.unblockUI();'>"+_("CSok")+"</button>\
+						</div></div>", css: { width: '300px' } });
+				}
+			}
+		);
+	});
+});
+</script>
+<%
+// supported SNMP versions
+snmpVersionOptValues = new Array("v1v2c", "v3");
+// supported security level
+snmpSecurityLevelOptValues = new Array("noAuthNoPriv", "authNoPriv", "authPriv");
+// supported authentication algorithm
+snmpAuthProtOptValues = new Array("md5", "sha");
+// supported privacy algorithm
+snmpPrivProtOptValues = new Array("des", "aes");
+// valid ranges and pattern
+minEngineIdSuffixLength = 1;
+maxEngineIdSuffixLength = 27;
+validUserNamePattern = "^[a-zA-Z0-9]{1,31}$";
+minPassphraseLength = 8;
+maxPassphraseLength = 128;
+%>
+<script language="JavaScript">
+var snmpVersionOptsText = {
+	v1v2c:_("snmpVersionV1V2c"),
+	v3:_("snmpVersionV3")
+};
+var snmpSecurityLevelOptsText = {
+	noAuthNoPriv:_("snmpSecurityLevelNoAuthNoPriv"),
+	authNoPriv:_("snmpSecurityLevelAuthNoPriv"),
+	authPriv:_("snmpSecurityLevelAuthPriv")
+};
+var snmpAuthProtOptsText = {
+	md5:_("snmpAuthProtMd5"),
+	sha:_("snmpAuthProtSha")
+};
+var snmpPrivProtOptsText = {
+	des:_("snmpPrivProtDes"),
+	aes:_("snmpPrivProtAes")
+};
+</script>
+
+<%
+
+// validation function for each field
+function validateSnmpVersion() {
+	if (isElementOfArray(form['snmpVersion'], snmpVersionOptValues) == false) {
+		onBadRequest();
+	}
+}
+function validateSnmpEngineIdSuffix() {
+	// - If Engine ID is not empty, it must be in valid range.
+	if (form['snmpEngineIdSuffix'] != "") {
+		var engineIdSuffixLength = string_length(form['snmpEngineIdSuffix']);
+		if (engineIdSuffixLength < minEngineIdSuffixLength || engineIdSuffixLength > maxEngineIdSuffixLength) {
+			onBadRequest();
+		}
+	}
+}
+function validateSnmpUserName() {
+	// - If version is 3, User Name must not be empty. If User Name is not empty, it must be in valid range.
+	if (form['snmpVersion'] == "v3" || form['snmpUserName'] != "") {
+		var userNameLength = string_length(form['snmpUserName']);
+		if (string_regex_match(form['snmpUserName'], validUserNamePattern) == false) {
+			onBadRequest();
+		}
+	}
+}
+function validateSnmpSecurityLevel() {
+	if (isElementOfArray(form['snmpSecurityLevel'], snmpSecurityLevelOptValues) == false) {
+		onBadRequest();
+	}
+}
+function validateSnmpAuthProt() {
+	if (isElementOfArray(form['snmpAuthProt'], snmpAuthProtOptValues) == false) {
+		onBadRequest();
+	}
+}
+function validateSnmpAuthPassphrase() {
+	// - If version is 3 and Security Level is not noAuthNoPriv, Authentication Passphrase must not be empty. If Authentication Passphrase is not empty, it must be in valid range.
+	if ((form['snmpVersion'] == "v3" && form['snmpSecurityLevel'] != "noAuthNoPriv") || form['snmpAuthPassphrase'] != "") {
+		var authPassphraseLength = string_length(form['snmpAuthPassphrase']);
+		if (authPassphraseLength < minPassphraseLength || authPassphraseLength > maxPassphraseLength) {
+			onBadRequest();
+		}
+	}
+}
+function validateSnmpPrivProt() {
+	if (isElementOfArray(form['snmpPrivProt'], snmpPrivProtOptValues) == false) {
+		onBadRequest();
+	}
+}
+function validateSnmpPrivPassphrase() {
+	// - If version is 3 and Security Level is authPriv, Privacy Passphrase must not be empty. If Privacy Passphrase is not empty, it must be in valid range.
+	if ((form['snmpVersion'] == "v3" && form['snmpSecurityLevel'] == "authPriv") || form['snmpPrivPassphrase'] != "") {
+		var privPassphraseLength = string_length(form['snmpPrivPassphrase']);
+		if (privPassphraseLength < minPassphraseLength || privPassphraseLength > maxPassphraseLength) {
+			onBadRequest();
+		}
+	}
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	// input validation
+	validateSnmpVersion();
+	validateSnmpEngineIdSuffix();
+	validateSnmpUserName();
+	tempval = form['snmpSecurityLevel'];
+	if(tempval == "noAuthNoPriv"){
+	}else if( tempval == "authNoPriv"){
+		validateSnmpAuthProt();
+		validateSnmpAuthPassphrase();
+	}else if( tempval == "authPriv"){
+		validateSnmpAuthProt();
+		validateSnmpAuthPassphrase();
+		validateSnmpPrivProt();
+		validateSnmpPrivPassphrase();
+	}else{
+		onBadRequest();
+	}
+	tempval = form['snmpSecurityLevel'];
+	retval = set_single( 'service.snmp.security_level='+tempval );
+	if(tempval == "noAuthNoPriv"){
+	}else if( tempval == "authNoPriv"){
+		tempval = form['snmpAuthProt'];
+		retval = set_single( 'service.snmp.auth_prot='+tempval );
+		tempval = form['snmpAuthPassphrase'];
+		retval = set_single( 'service.snmp.auth_passphrase='+tempval );
+	}else if( tempval == "authPriv"){
+		tempval = form['snmpAuthProt'];
+		retval = set_single( 'service.snmp.auth_prot='+tempval );
+		tempval = form['snmpAuthPassphrase'];
+		retval = set_single( 'service.snmp.auth_passphrase='+tempval );
+		tempval = form['snmpPrivProt'];
+		retval = set_single( 'service.snmp.priv_prot='+tempval );
+		tempval = form['snmpPrivPassphrase'];
+		retval = set_single( 'service.snmp.priv_passphrase='+tempval );
+	}
+	tempval = form['snmpPort'];
+	retval = set_single( 'service.snmp.port.new='+tempval );
+
+	tempval = form['snmpVersion'];
+	retval = set_single( 'service.snmp.version='+tempval );
+
+	tempval = form['snmpEngineIdSuffix'];
+	retval = set_single( 'service.snmp.engine_id_suffix='+tempval );
+	tempval = form['snmpUserName'];
+	retval = set_single( 'service.snmp.username='+tempval );
+	tempval = form['snmpROCommunityName'];
+	retval = set_single( 'service.snmp.name.readonly='+tempval );
+	tempval = form['snmpRWCommunityName'];
+	retval = set_single( 'service.snmp.name.readwrite='+tempval );
+	tempval = form['snmpTrapDestination'];
+	retval = set_single('service.snmp.snmp_trap_dest='+tempval);
+#if defined V_CUSTOM_FEATURE_PACK_Santos
+	tempval = form['snmpTrapDestination0'];
+	retval = set_single('service.snmp.snmp_trap_dest.0='+tempval);
+	tempval = form['snmpTrapDestination1'];
+	retval = set_single('service.snmp.snmp_trap_dest.1='+tempval);
+	tempval = form['snmpTrapDestination2'];
+	retval = set_single('service.snmp.snmp_trap_dest.2='+tempval);
+#endif
+	tempval = form['snmpHeartbeatInterval'];
+	retval = set_single('service.snmp.heartbeat_interval='+tempval);
+	tempval = form['snmpTrapPersistence'];
+	retval = set_single('service.snmp.trap_persist='+tempval);
+	tempval = form['snmpTrapRetransmission'];
+	retval = set_single('service.snmp.trap_resend='+tempval);
+	tempval = form['snmpenable'];
+	retval = set_single( 'service.snmp.enable='+tempval );
+	redirect('/snmp.html?success');
+}
+else { /*GET*/
+	temp = get_single( 'service.snmp.enable' );
+	form['snmpenable'] = temp;
+	temp = get_single( 'service.snmp.port.new' );
+	form['snmpPort'] = temp;
+
+	temp = get_single( 'service.snmp.version' );
+	form['snmpVersion'] = temp;
+	temp = get_single( 'service.snmp.engine_id_suffix' );
+	form['snmpEngineIdSuffix'] = base64_encode(temp);
+	temp = get_single( 'service.snmp.username' );
+	form['snmpUserName'] = temp;
+	temp = get_single( 'service.snmp.security_level' );
+	form['snmpSecurityLevel'] = temp;
+
+	temp = get_single( 'service.snmp.auth_prot' );
+	form['snmpAuthProt'] = temp;
+	temp = get_single( 'service.snmp.auth_passphrase' );
+	form['snmpAuthPassphrase'] = base64_encode(temp);
+
+	temp = get_single( 'service.snmp.priv_prot' );
+	form['snmpPrivProt'] = temp;
+	temp = get_single( 'service.snmp.priv_passphrase' );
+	form['snmpPrivPassphrase'] = base64_encode(temp);
+
+	temp = get_single( 'service.snmp.name.readonly' );
+	form['snmpROCommunityName'] = temp;
+	temp = get_single( 'service.snmp.name.readwrite' );
+	form['snmpRWCommunityName'] = temp;
+	temp = get_single('service.snmp.snmp_trap_dest');
+	form['snmpTrapDestination'] = temp;
+#if defined V_CUSTOM_FEATURE_PACK_Santos
+	temp = get_single('service.snmp.snmp_trap_dest.0');
+	form['snmpTrapDestination0'] = temp;
+	temp = get_single('service.snmp.snmp_trap_dest.1');
+	form['snmpTrapDestination1'] = temp;
+	temp = get_single('service.snmp.snmp_trap_dest.2');
+	form['snmpTrapDestination2'] = temp;
+#endif
+	temp = get_single('service.snmp.heartbeat_interval');
+	form['snmpHeartbeatInterval'] = temp;
+	temp = get_single('service.snmp.trap_persist');
+	form['snmpTrapPersistence'] = temp;
+	temp = get_single('service.snmp.trap_resend');
+	form['snmpTrapRetransmission'] = temp;
+}
+%>
+
+<script language="javascript">
+function switchVersion(version, showAlert) {
+	if (version == "v1v2c") {
+#ifdef V_NON_SECURE_WARNING_y
+		if (showAlert == true) {
+			blockUI_alert(_("snmpWarningOnV1v2"));
+		}
+#endif
+		$('#v1V2cConfig').css("display", "");
+		$('#v3Config').css("display", "none");
+	}
+	else if (version == "v3") {
+		$('#v1V2cConfig').css("display", "none");
+		$('#v3Config').css("display", "");
+	}
+}
+
+$(document).ready(function() {
+<%
+	fillSelectOptions("snmpVersion", snmpVersionOptValues, "snmpVersionOptsText");
+	fillSelectOptions("snmpSecurityLevel", snmpSecurityLevelOptValues, "snmpSecurityLevelOptsText");
+	fillSelectOptions("snmpAuthProt", snmpAuthProtOptValues, "snmpAuthProtOptsText");
+	fillSelectOptions("snmpPrivProt", snmpPrivProtOptValues, "snmpPrivProtOptsText");
+%>
+	switchVersion($("#snmpVersion").val());
+	$("#snmpEngineIdSuffix").val(Base64.decode("@@form['snmpEngineIdSuffix']"));
+	$("#snmpAuthPassphrase").val(Base64.decode("@@form['snmpAuthPassphrase']"));
+	$("#snmpPrivPassphrase").val(Base64.decode("@@form['snmpPrivPassphrase']"));
+	snmpSecurityLevelChanged();
+});
+
+function snmpSecurityLevelChanged() {
+	var selectBox = document.getElementById("snmpSecurityLevel");
+	var selectedValue = selectBox.options[selectBox.selectedIndex].value;
+	if (selectedValue == "noAuthNoPriv") {
+		$("#snmpAuthProt").prop('disabled', true);
+		$("#snmpAuthPassphrase").prop('disabled', true);
+		$("#snmpPrivProt").prop('disabled', true);
+		$("#snmpPrivPassphrase").prop('disabled', true);
+	}else if (selectedValue == "authNoPriv") {
+		$("#snmpAuthProt").prop('disabled', false);
+		$("#snmpAuthPassphrase").prop('disabled', false);
+		$("#snmpPrivProt").prop('disabled', true);
+		$("#snmpPrivPassphrase").prop('disabled', true);
+	}else if (selectedValue == "authPriv") {
+		$("#snmpAuthProt").prop('disabled', false);
+		$("#snmpAuthPassphrase").prop('disabled', false);
+		$("#snmpPrivProt").prop('disabled', false);
+		$("#snmpPrivPassphrase").prop('disabled', false);
+	}
+}
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" nonvalidate="novalidate">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("snmp configuration"))</script></h2>
+				<input type="hidden" name="snmpenable" value="@@form['snmpenable']">
+				<div class="form-row no-bg-form">
+					<label for="field-0"><script language=Javascript>document.write(_("SNMP"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_2144_pin" data-toggle-disabled="btn_2144_change">
+								<input type="radio" id="radio-1" name="radio-1" class="access" onClick="javascript:document.form.snmpenable.value=1">
+								<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="radio-2" name="radio-1" class="access" onClick="javascript:document.form.snmpenable.value=0">
+								<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="box_2144_pin">
+					<div>
+						<div class="form-row">
+							<label for="snmpPort"><script language=Javascript>document.write(_("SNMP Port"))</script></label>
+							<div class="field">
+								<input type="text" name="snmpPort" id="snmpPort" class="validate[required,funcCall[validate_port]] required port sml" maxLength="5" value="@@form['snmpPort']" onKeyUp="NumfieldEntry(this);">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpVersion"><script language=Javascript>document.write(_("snmpVersion"))</script></label>
+							<div class="field">
+								<select name="snmpVersion" id="snmpVersion" onchange="switchVersion(this.value, true)"></select>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="v3Config" style="display:none">
+						<div class="form-row">
+							<label for="snmpEngineIdSuffix"><script language=Javascript>document.write(_("snmpEngineIdSuffix"))</script></label>
+							<div class="field">
+								<input type="text" class="validate[funcCall[validate_snmpEngineIdSuffix]] snmpEngineIdSuffix large" name="snmpEngineIdSuffix" id="snmpEngineIdSuffix">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpUserName"><script language=Javascript>document.write(_("snmpUserName"))</script></label>
+							<div class="field">
+								<input type="text" class="validate[funcCall[validate_snmpUserName]] snmpUserName large" name="snmpUserName" id="snmpUserName" value="@@form['snmpUserName']">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpSecurityLevel"><script language=Javascript>document.write(_("snmpSecurityLevel"))</script></label>
+							<div class="field">
+								<select name="snmpSecurityLevel" id="snmpSecurityLevel" onchange="snmpSecurityLevelChanged();" ></select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpAuthProt"><script language=Javascript>document.write(_("snmpAuthProt"))</script></label>
+							<div class="field">
+								<select name="snmpAuthProt" id="snmpAuthProt"></select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpAuthPassphrase"><script language=Javascript>document.write(_("snmpAuthPassphrase"))</script></label>
+							<div class="field">
+								<input type="text" class="validate[funcCall[validate_snmpAuthPassphrase]] snmpAuthPassphrase large" name="snmpAuthPassphrase" id="snmpAuthPassphrase">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpPrivProt"><script language=Javascript>document.write(_("snmpPrivProt"))</script></label>
+							<div class="field">
+								<select name="snmpPrivProt" id="snmpPrivProt"></select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpPrivPassphrase"><script language=Javascript>document.write(_("snmpPrivPassphrase"))</script></label>
+							<div class="field">
+								<input type="text" class="validate[funcCall[validate_snmpPrivPassphrase]] snmpPrivPassphrase large" name="snmpPrivPassphrase" id="snmpPrivPassphrase">
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="v1V2cConfig" style="display:none">
+						<div class="form-row">
+							<label for="snmpROCommunityName"><script language=Javascript>document.write(_("readonly community name"))</script></label>
+							<div class="field">
+								<input type="text" class="large" name="snmpROCommunityName" id="snmpROCommunityName" value="@@form['snmpROCommunityName']">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="snmpRWCommunityName"><script language=Javascript>document.write(_("rw community name"))</script></label>
+							<div class="field">
+								<input type="text" class="large" name="snmpRWCommunityName" id="snmpRWCommunityName" value="@@form['snmpRWCommunityName']">
+							</div>
+						</div>
+					</div>
+					<div class="grey-box">
+						<div class="form-row">
+							<label for="download"><script language=Javascript>document.write(_("download mib"))</script></label>
+							<div class="submit-row" style="padding:0; clear:none">
+								<button type="button" id="download" class="secondary" onClick="check_file('/www/snmp.mib')" style="margin-left:0"><script language=Javascript>document.write(_("download"))</script></button>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("snmp mib info"))</script>)</span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<h2><script language=Javascript>document.write(_("snmp traps"))</script></h2>
+				<div class="form-row">
+					<label for="snmpTrapDestination"><script language=Javascript>document.write(_("trap destination"))</script></label>
+					<div class="field">
+						<input type="text" class="large trap_group" name="snmpTrapDestination" id="snmpTrapDestination" maxlength=64 value="@@form['snmpTrapDestination']" onfocus="clear_alert();" onKeyUp="hostNameFilter(this);validate_group()">
+					</div>
+				</div>
+#if defined V_CUSTOM_FEATURE_PACK_Santos
+				<div class="form-row">
+					<label for="snmpTrapDestination0"></label>
+					<div class="field">
+						<input type="text" class="large trap_group" name="snmpTrapDestination0" id="snmpTrapDestination0" maxlength=64 value="@@form['snmpTrapDestination0']" onfocus="clear_alert();" onKeyUp="hostNameFilter(this);validate_group()">
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="snmpTrapDestination1"></label>
+					<div class="field">
+						<input type="text" class="large trap_group" name="snmpTrapDestination1" id="snmpTrapDestination1" maxlength=64 value="@@form['snmpTrapDestination1']" onfocus="clear_alert();" onKeyUp="hostNameFilter(this);validate_group()">
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="snmpTrapDestination2"></label>
+					<div class="field">
+						<input type="text" class="large trap_group" name="snmpTrapDestination2" id="snmpTrapDestination2" maxlength=64 value="@@form['snmpTrapDestination2']" onfocus="clear_alert();" onKeyUp="hostNameFilter(this);validate_group()">
+					</div>
+				</div>
+#endif
+				<div class="form-row">
+					<label for="snmpHeartbeatInterval"><script language=Javascript>document.write(_("heartbeat interval"))</script></label>
+					<div class="field">
+						<input type="text" class="large trap_group validate[condRequired[snmpTrapDestination,snmpTrapPersistence,snmpTrapRetransmission]]" maxLength="9" name="snmpHeartbeatInterval" id="snmpHeartbeatInterval" value="@@form['snmpHeartbeatInterval']" onKeyUp="NumfieldEntry(this);validate_group()">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("seconds"))</script>)</span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="snmpTrapPersistence"><script language=Javascript>document.write(_("trap persistence time"))</script></label>
+					<div class="field">
+						<input type="text" class="large trap_group validate[condRequired[snmpTrapDestination,snmpHeartbeatInterval,snmpTrapRetransmission]]" maxLength="9" name="snmpTrapPersistence" id="snmpTrapPersistence"  value="@@form['snmpTrapPersistence']" onKeyUp="NumfieldEntry(this);validate_group()">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("seconds"))</script>)</span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="snmpTrapRetransmission"><script language=Javascript>document.write(_("trap retransmission time"))</script></label>
+					<div class="field">
+						<input type="text" class="large trap_group validate[condRequired[snmpTrapDestination,snmpHeartbeatInterval,snmpTrapPersistence]]" maxLength="9" name="snmpTrapRetransmission" id="snmpTrapRetransmission" value="@@form['snmpTrapRetransmission']" onKeyUp="NumfieldEntry(this);validate_group()">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("seconds"))</script>)</span>
+					</div>
+				</div>
+				<div class="form-row form-pad-left">
+					<button type="button" id="send_heart_beat" class="secondary sml" style="margin-left:0"><script language=Javascript>document.write(_("send heartbeat now"))</script></button>
+				</div>
+				<div class="submit-row">
+					<button type="button" onclick="javascript:submitF();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	function validEngineIdSuffix(value) {
+		if (value) {
+			var len = getUtf8StringLengthInBytes(value);
+			return ( len >= <% write(minEngineIdSuffixLength); %> && len <= <% write(maxEngineIdSuffixLength); %> );
+		}
+		else {
+			return true;
+		}
+	}
+
+	function validUserName(value) {
+		if ($("#snmpVersion").val() == "v3") {
+			return /<% write(validUserNamePattern); %>/.test(value);
+		}
+		else {
+			return true;
+		}
+	}
+
+	function validAuthPassphrase(value) {
+		if (($("#snmpVersion").val() == "v3" && $("#snmpSecurityLevel").val() != "noAuthNoPriv") || value) {
+			var len = getUtf8StringLengthInBytes(value);
+			return ( len >= <% write(minPassphraseLength); %> && len <= <% write(maxPassphraseLength); %> );
+		}
+		else {
+			return true;
+		}
+	}
+
+	function validPrivPassphrase(value) {
+		if (($("#snmpVersion").val() == "v3" && $("#snmpSecurityLevel").val() == "authPriv") || value) {
+			var len = getUtf8StringLengthInBytes(value);
+			return ( len >= <% write(minPassphraseLength); %> && len <= <% write(maxPassphraseLength); %> );
+		}
+		else {
+			return true;
+		}
+	}
+
+        set_menu("Services", "SNMP", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('snmpSubmitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	$.validator.addMethod("trap_group",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				b=$(a).closest(".field");
+				if($(b).hasClass("error")) {
+					b.removeClass("error");
+					b.siblings(".warning-med").css("display", "none");
+				}
+				return true;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and65535"));
+
+	$.validator.addMethod("port",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("Msg126")); //Port number must have a value between 1 and 65535.
+
+	$.validator.addMethod("snmpEngineIdSuffix",function(value, element) {
+		return validEngineIdSuffix(value);
+	},_("snmpEngineIdSuffixValidation"));
+
+	$.validator.addMethod("snmpUserName",function(value, element) {
+		return validUserName(value);
+	},_("snmpUserNameValidation"));
+
+	$.validator.addMethod("snmpAuthPassphrase",function(value, element) {
+		return validAuthPassphrase(value);
+	},_("snmpAuthPassphraseValidation"));
+
+	$.validator.addMethod("snmpPrivPassphrase",function(value, element) {
+		return validPrivPassphrase(value);
+	},_("snmpPrivPassphraseValidation"));
+#else
+/********* for NTC ValidationEngine **********/
+	function validate_port(field, rules, i, options) {
+		if( field.val() < 1 || field.val() > 65535 ) {
+			return _("Msg126");
+		}
+	}
+	function validate_snmpEngineIdSuffix(field) {
+		if (!validEngineIdSuffix(field.val())) {
+			return _("snmpEngineIdSuffixValidation");
+		}
+	}
+	function validate_snmpUserName(field) {
+		if (!validUserName(field.val())) {
+			return _("snmpUserNameValidation");
+		}
+	}
+	function validate_snmpAuthPassphrase(field) {
+		if (!validAuthPassphrase(field.val())) {
+			return _("snmpAuthPassphraseValidation");
+		}
+	}
+	function validate_snmpPrivPassphrase(field) {
+		if (!validPrivPassphrase(field.val())) {
+			return _("snmpPrivPassphraseValidation");
+		}
+	}
+#endif
+</script>
+</body>
+</html>

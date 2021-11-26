@@ -1,0 +1,427 @@
+<!doctype html>
+<!-- Copyright (C) 2018 NetComm Wireless Limited. -->
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="referrer" content="no-referrer">
+<title>Save/Load Settings</title>
+<% include topinc_v2.inc %>
+#ifdef V_CUSTOM_FEATURE_PACK_bellca	// Special WEBUI for Bell Canada
+#define CHECK_ADMIN_USER	// Instruct redirectOnSessionTimeout.inc to also check user is admin.
+#else
+#define CHECK_ROOT_USER		// Instruct redirectOnSessionTimeout.inc to also check user is root.
+#endif
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/cgi-bin/default_details.cgi"></script>
+<script language="javascript" type="text/javascript">
+var user_agent = '@@headers['USER_AGENT']';
+
+var redirect_ip=<%_v=get_single('link.profile.0.address');%>"@@_v";
+
+function submitF2() {
+	var wfmess=_("system warningMsg01");
+	var f = document.restoreSettingsForm;
+	if(f.uploadFile.value.length == 0) {
+		blockUI_alert(_("system warningMsg02"));
+		return;
+	}
+	var passCheck = 0;
+	var f1=f.uploadFile.value;
+	var end1=f1.indexOf(".cfg");
+	var end2=f1.indexOf(".tar.gz");
+
+	if(end2 > 0)
+		f.fileType.value ="tar.gz";
+	if( end1 >=0 || end2 >= 0) {
+		passCheck =1;
+	}
+	if(passCheck == 1) {
+		try {
+			f.password.value ="";
+			f.submit();
+		}
+		catch(e) {
+			alert(e.message);
+		}
+	}
+	else {
+		blockUI_alert(wfmess);
+		return;
+	}
+}
+
+var ipvar = location.href.substring( 0, location.href.indexOf( "SaveLoadSettings.html" )-1 );
+
+function callRestore( filename ) {
+hideItem("restoreSettingsFormwait",1);
+document.getElementById( "restoreSettingsFormwait2" ).style['display']='none';
+
+	function blockUI_alert_thenReload(msg) {
+		function reloadPage() {location.href=ipvar+'/SaveLoadSettings.html';}
+		blockUI_alert( msg, reloadPage );
+	}
+
+	var http_request = $.ajax( {
+		url: "/cgi-bin/SaveSettings.cgi?<%appendCsrfTokenToQueryString();%>form2&"+filename+"&"+document.restoreSettingsForm.password.value,
+		success: function() {
+			eval( http_request.responseText );
+			if( retval == '0' ) {
+				blockUI_alert(_("system warningMsg03"));
+				if( newip != "" ) {
+					redirect_ip = newip; // Make sure we do a redirect
+					blockUI_alert(_("system warningMsg04")+newip );
+				}
+				document.getElementById("main-content").style['display']='none';
+				document.getElementById("rebootFm").style['display']='';
+				start_reload_checker();
+				return;
+			}
+			else if( retval == "255" ) {
+				blockUI_alert_thenReload(_("system warningMsg05")+"\n"+_("log Error")+": "+msg );
+				return;
+			}
+			else if( retval == "254" ) {
+				if( document.restoreSettingsForm.password.value != "" ) {
+					blockUI_alert(_("system warningMsg06"));
+				}
+				//alert(_("system warningMsg06")+"\n"+_("log Error")+": "+msg);
+				document.getElementById( "restoreSettingsFormwait0" ).style['display']='none';
+				document.getElementById( "restoreSettingsFormwait1" ).style['display']='none';
+				document.getElementById( "restoreSettingsFormwait2" ).style['display']='';
+				return;
+			}
+			else if( retval == "253" )
+				blockUI_alert_thenReload(_("system warningMsg07")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "252" )
+				blockUI_alert_thenReload(_("system warningMsg08")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "251" )
+				blockUI_alert_thenReload(_("system warningMsg09")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "250" )
+				blockUI_alert_thenReload(_("Msg108"));//VPN settings can not be decrypted!
+			else
+				blockUI_alert_thenReload(_("system warningMsg10")+"\n"+msg);
+			reloadPage();
+		}
+	});
+}
+
+function submitF3() {
+	if (document.saveSettingsForm.pin.value != document.saveSettingsForm.confirmPIN.value) {
+		blockUI_alert(_("wwan warningMsg2"));
+		return;
+	}
+	function cb() {
+		var http_request = $.ajax( {
+			url: "/cgi-bin/SaveSettings.cgi?<%appendCsrfTokenToQueryString();%>form3&"+'@@request["SESSION_ID"]'+".cfg&"+document.saveSettingsForm.pin.value,
+			success: function() {
+				hideItem("saveSettingsFormwait",0);
+				eval( http_request.responseText.substring( http_request.responseText.indexOf("filename") ) );
+				location.href=ipvar+'/'+filename;
+			}
+		});
+	}
+	blockUI_alert(_("system warningMsg11"), cb);//Please do not change the file extension!
+}
+
+#if (0)
+// smart redirect logic
+// if newLocalHttp & newLocalHttps are 0 that means keep current protocol; http or https
+// new page redirected is determined by below logic
+//	-----------------------------------------------------------
+//	curr_page   default setting             redirect page
+//	-----------------------------------------------------------
+//	on http     default http 0, https 0     http
+//	on http     default http 0, https 1     https *
+//	on http     default http 1, https 0     http
+//	on http     default http 1, https 1     http
+//	-----------------------------------------------------------
+//	on https    default http 0, https 0     https
+//	on https    default http 0, https 1     https
+//	on https    default http 1, https 0     http *
+//	on https    default http 1, https 1     https
+//	-----------------------------------------------------------
+// * redirect with different protocol
+#endif
+var currLocalHttps = (ipvar.search("https") != -1)? 1:0;
+var newLocalHttp = 0;
+var newLocalHttps = 0;
+var redirectProtocol = 'http';
+
+function redirectToHttps()
+{
+	if (currLocalHttps == 0)
+		return (newLocalHttp == 0 && newLocalHttps == 1);
+	else
+		return !(newLocalHttp == 1 && newLocalHttps == 0);
+}
+
+function doRedirect()
+{
+	document.cookie="language=en; path=/";
+	setTimeout("window.location='"+redirectProtocol+"://" + redirect_ip + "/index.html'", 3000);
+}
+
+var percentage=0;
+var timer;
+function check_reload()
+{
+	if( percentage++ < 100 ) {
+		document.getElementById( "rebootMsg" ).innerHTML=_("setman rebooting");
+		document.getElementById( "rebootCt" ).innerHTML=percentage+" %"
+	}
+	else {
+		document.getElementById( "rebootCt" ).innerHTML="100 %"
+		if( percentage>120 ) {
+			if(redirect_ip!=<%_v=get_single('link.profile.0.address');%>"@@_v") {
+				document.getElementById( "rebootMsg" ).innerHTML=_("redirectStatus");//Redirecting to the Status page
+			}
+			else {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg6");//"The reboot seems to be taking too long, you may need to manually power cycle the device";
+			}
+			clearInterval(timer);
+			doRedirect();
+		}
+	}
+
+	if(percentage>80 && (percentage%5)==0 ) {
+		$.get(redirectProtocol+"://" + redirect_ip +"/cgi-bin/ajax.cgi",
+			function () {
+				clearInterval(timer);
+				document.getElementById( "rebootCt" ).innerHTML="100 %"
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg7");//"Reboot is successful, now redirecting to the Status page...";
+				doRedirect();
+			});
+	}
+}
+
+function start_reload_checker() {
+	var estTime=90;
+	var lastBootDuration="<%get_single_direct('system.startup_duration');%>";
+
+	if (redirectToHttps())
+		redirectProtocol = 'https'
+	else
+		redirectProtocol = 'http'
+
+#ifdef PLATFORM_Serpent
+	if (lastBootDuration == "" ) {
+		lastBootDuration = 30;
+	}
+#endif
+	if (lastBootDuration != "" ) {
+		var duration = parseInt(lastBootDuration);
+#ifndef V_FACTORY_RESET_TRIGGER_TYPE_none
+		if ( (duration >= 15) && (duration<=600) ) // Sanity check duration
+			estTime = duration + 30; // The 30 is for the cfg restore and shutdown
+#else
+		if ( (duration >= 30) && (duration<=600) ) // Sanity check duration
+			estTime = duration + 10; // The 10 is for the cfg restore and shutdown
+#endif
+	}
+	timer=setInterval(check_reload, (1000*estTime)/100);
+}
+
+function doConfirm() {
+var idx;
+	if(default_ip=="") {
+		blockUI_alert(_("Msg109"));//Error! Missing default configuration file.
+		return;
+	}
+	while( (idx=default_ip.indexOf("%2E"))!=-1) {
+		default_ip=default_ip.substring(0,idx)+"."+default_ip.substring(idx+3,default_ip.length);
+	}
+	msg =
+		_("system warningMsg13") + "<br/>" +
+		_("ip modified to") + default_ip + "<br/>" +
+#ifdef V_REQUIRE_FACTORY_PASSWORD_CHANGE_y
+		_("password_to_revert_to_factory") + "<br/>" +
+#elif defined(CHECK_ROOT_USER)
+		_("please use default") + default_root_pass + " " +
+		_("nor admin manager") + default_admin_pass + ".<br/>"
+#else
+		_("please use default admin") + default_admin_pass + ".<br/>" +
+#endif
+		_("system warningMsg16");
+	function default_func() {
+		var http_request = $.ajax( {
+		url: "/cgi-bin/SaveSettings.cgi?<%appendCsrfTokenToQueryString();%>formS&-f",
+		success: function() {
+			var ar = http_request.responseText.replace(/\"/g, "").split("\n");
+			newLocalHttp = ar[0].substr(ar[0].lastIndexOf("=")+1, 1);
+			newLocalHttps = ar[1].substr(ar[1].lastIndexOf("=")+1, 1);
+			blockUI_alert(_("Msg110"));//The default configuration is successfully applied. The router will now reboot
+			document.getElementById("main-content").style['display']='none';
+			document.getElementById("rebootFm").style['display']='';
+			redirect_ip = default_ip; // Make sure we do a redirect
+			start_reload_checker();
+		}
+		});
+	}
+	blockUI_confirm_l(msg, default_func);
+}
+
+function hideItem( itemID, action ) {
+	if( action==1 ) {
+		document.getElementById( itemID+"0" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='';
+	}
+	else {
+		document.getElementById( itemID+"1" ).style['display']='none';
+		document.getElementById( itemID+"0" ).style['display']='';
+	}
+}
+
+var SITE = SITE || {};
+SITE.fileInputs = function() {
+	clear_alert();
+	var $this = $(this),
+	$val = $this.val(),
+	valArray = $val.split('\\'),
+	newVal = valArray[valArray.length-1],
+	$button = $this.siblings('.button'),
+	$fakeFile = $this.siblings('.file-holder');
+	if(newVal !== '') {
+		$button.text(_("fileChosen"));
+		if($fakeFile.length === 0) {
+			$button.after("<span class='file-holder'>"+newVal+"</span>");
+		}
+		else {
+			$fakeFile.text(newVal);
+		}
+	}
+};
+
+$(document).ready(function() {
+	$(".file-wrapper input[type=file]").bind("change focus click", SITE.fileInputs);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div id="main-content">
+			<div class="right-column white-box">
+				<div class="pad">
+#if !defined V_SYSTEM_CONFIG_SETTINGS_BACKUP_RESTORE_WEBUI_none && !defined V_CUSTOM_FEATURE_PACK_bellca	// Special WEBUI for Bell Canada
+				<form class="validate" name="saveSettingsForm" novalidate="novalidate">
+					<input type="hidden" size="20" name="fileName">
+					<h2><script language=Javascript>document.write(_("saveCurrentSettings"))</script></h2>
+					<div id="saveSettingsFormwait0">
+						<div class="form-row">
+							<label for="pin"><script language=Javascript>document.write(_("password"))</script></label>
+							<div class="field">
+								<input type="password" class="large" name="pin" id="pin" value="@@form['pin']">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="confirmPIN"><script language=Javascript>document.write(_("confirmPassword"))</script></label>
+							<div class="field">
+								<input type="password" class="large" name="confirmPIN" id="confirmPIN" value="@@form['confirmPIN']">
+							</div>
+						</div>
+						<div class="submit-row">
+							<button type="button" id="save_button" onClick="javascript:submitF3()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						</div>
+					</div>
+					<div class="hr"></div>
+					<table id="saveSettingsFormwait1" style="display:none">
+						<tr>
+							<td width="100%"><div align=center><img src="/img/loading_spinner-20x20px.gif"/></div></td>
+						</tr>
+					</table>
+				</form>
+				<br/>
+				<form name="restoreSettingsForm" method="POST" action="@@request['SCRIPT_NAME']?restoreSettingsForm" encType="multipart/form-data">
+					<input type="hidden" name="cmndUpgrade" value="@@form['cmndUpgrade']">
+					<input type="hidden" name="fileType" value="@@form['fileType']">
+					<%appendCsrfToken();%>
+					<h2><script language=Javascript>document.write(_("restoreSavedSettings"))</script></h2>
+					<div id="restoreSettingsFormwait0">
+						<div class="form-row">
+							<label for="uploadFile"><script language=Javascript>document.write(_("browse"))</script></label>
+							<span class="file-wrapper">
+								<input type="file" name="uploadFile">
+								<span class="button secondary"><script language=Javascript>document.write(_("chooseFile"))</script></span>
+							</span>
+						</div>
+						<div class="submit-row">
+							<button type="button" id="restore_button" onClick="javascript:submitF2()"><script language=Javascript>document.write(_("Restore"))</script></button>
+						</div>
+					</div>
+
+					<table id="restoreSettingsFormwait1" style="display:none">
+						<tr>
+							<td width="100%"><div align=center><img src="/img/loading_spinner-20x20px.gif"/></div></td>
+						</tr>
+					</table>
+					<div id="restoreSettingsFormwait2" style="display:none">
+						<div class="form-row">
+							<label for="password" style="color:#FF0000"><script language=Javascript>document.write(_("passwd req"))</script></label>
+							<div class="field">
+								<input type="text" size=24 maxlength=64 name="password" value=""
+								onkeydown = "if (event.keyCode == 13) { callRestore( filename ); return false; }" >
+							</div>
+						</div>
+						<div class="submit-row">
+							<button type="button" onClick="callRestore( filename )"><script language=Javascript>document.write(_("submit"))</script></button>
+						</div>
+					</div>
+					<div class="hr"></div>
+				</form>
+				<br/>
+#endif	// V_CUSTOM_FEATURE_PACK_bellca
+				<form class="validate" name="formS" novalidate="novalidate">
+					<h2><script language=Javascript>document.write(_("restorefactoryDefaults"))</script></h2>
+					<div class="submit-row">
+						<button type="button" style="width:auto" id="default_button" onClick="doConfirm()"><script language=Javascript>document.write(_("restore defaults"))</script></button>
+					</div>
+					<div class="hr"></div>
+				</form>
+				</div>
+			</div>
+		</div>
+		<div id="rebootFm" class="white-box" style="display:none">
+			<div id="rebootMsg" align="center" style="font-size:16px; font-weight:bold; padding-top:20px;">
+				<script language=Javascript>document.write(_("GUI rebooting"))</script>
+			</div>
+			<div align="center" style="padding-top:10px;">
+				<img width="60px" height="60px" src="/img/spinner_250.gif">
+				<b id="rebootCt" style="position:relative;top:-25px; left:30px">0 %</b>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script type="text/javascript">
+	set_menu("System", "SETTINGS", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+	if(form['fileType'] == "tar.gz")
+		session['filename']= "restore.cfg.tar.gz"
+	else
+		session['filename']= "restore.cfg";
+	for (f in files) {
+		//set_single( 'xxx=' + "asd"+files[f].FILENAME);
+		var filename = files[f].FILENAME;
+		retval=set_single( 'upload.local_filename=' + filename );
+		target = '/opt/cdcs/upload/' + session["filename"];
+		rename(files['uploadFile'].FILENAME, target);
+	}
+	if( request["QUERY_STRING"]=='restoreSettingsForm') {
+	%>
+	<script language=Javascript>hideItem("restoreSettingsFormwait",1);var filename='@@session["filename"]';setTimeout("callRestore(filename)", 2100);</script>
+	<%}
+}
+%>
+</html>

@@ -1,0 +1,89 @@
+#!/bin/sh
+
+usage() {
+	cat <<EOM
+
+Usage: dbcfg_default [-f] [-r] [-d]
+
+	Resets system to factory defaults and (optionally) reboots it.
+
+	-f = Force operation. Won't do anything without this option.
+	-r = Reboot after factory reset.
+	-d = Do not kill rdb manager.
+
+EOM
+	exit 1
+}
+
+log() {
+	logger -t "dbcfg_default_platypus2" -- "$@"
+}
+
+run() {
+	log "cmd - '$@'"
+	"$@" 2>&1 | log
+}
+
+
+FORCE=''
+REBOOT=''
+KEEPRDB=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+	'-f') FORCE=1; ;;
+	'-r') REBOOT=1; ;;
+	'-d') KEEPRDB=1; ;;
+	*) usage; ;;
+	esac
+	shift
+done
+
+if [ -z "$FORCE" ]; then usage; fi
+
+getRDB() {
+	ps | grep "rdb_manager" | grep -- "-c" | awk '{print $1}'
+}
+
+stopRDB() {
+	PID=`getRDB`
+	test -n "$PID" && kill -9 $PID
+}
+
+log "Factory reset (running on Platypus2)..."
+
+if [ -z "$KEEPRDB" ]; then stopRDB; fi
+
+log "erasing wwan statistics..."
+run mtd_statistics -e
+
+# reset log file save mode to default
+rdb_set service.syslog.option.logtofile 0
+
+log "erasing telnet passwords..."
+run rm -f /tmp/etc_rw/passwd /tmp/etc_rw/shadow
+
+restore_factory_rdb_cfg() {
+	if ! cp /usr/local/cdcs/conf/default.conf /usr/local/cdcs/conf/override.conf.bak; then
+		echo "failed to copy - cp /usr/local/cdcs/conf/default.conf /usr/local/cdcs/conf/override.conf.bak"
+		return 1
+	fi
+
+	if ! mv /usr/local/cdcs/conf/override.conf.bak /usr/local/cdcs/conf/override.conf; then
+		echo "failed to move - mv /usr/local/cdcs/conf/override.conf.bak /usr/local/cdcs/conf/override.conf"
+		return 1
+	fi
+
+	return 0
+}
+
+log "restoring rdb default configration..."
+run restore_factory_rdb_cfg
+
+sync
+
+if [ -n "$REBOOT" ]; then
+	log "rebooting..."
+	reboot
+fi
+
+log "done."

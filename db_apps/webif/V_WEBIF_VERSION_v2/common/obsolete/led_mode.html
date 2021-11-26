@@ -1,0 +1,145 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>LED Mode</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript">
+
+#include "net_util.js"
+
+function formF() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["summary"]=_("errorsSummary");//Please correct the following error(s):
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	if ($("#led_control").val()=="0") {
+		$("#ledPowerOffTimerHidden").val(0);
+	}
+	else {
+		$("#ledPowerOffTimerHidden").val($("#ledPowerOffTimer").val());
+	}
+	document.form.submit();
+}
+
+function led_control_change(val) {
+	if(val=="0") {
+		$("#led_control").val(0);
+		$("#ledPowerOffTimer_div").css("display", "none");
+	}
+	else {
+		$("#led_control").val(1);
+		if( $("#ledPowerOffTimer").val()==0 ) {
+			$("#ledPowerOffTimer").val(10);
+		}
+		$("#ledPowerOffTimer_div").css("display", "");
+	}
+}
+
+$(document).ready(function() {
+	$("#ledPowerOffTimer").val($("#ledPowerOffTimerHidden").val())
+	led_control_change($("#ledPowerOffTimerHidden").val());
+});
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	set_single( 'system.led_off_timer='+form['ledPowerOffTimerHidden'], '-p' );
+	redirect('/led_mode.html?success');
+}
+else { /*GET*/
+	var temp=get_single( 'system.led_off_timer' );
+	if(temp=="" || temp=="N/A")
+		temp=0;
+	form['ledPowerOffTimerHidden']=temp;
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="ledPowerOffTimerHidden" id="ledPowerOffTimerHidden" value="@@form['ledPowerOffTimerHidden']"/>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("led operation mode"))</script></h2>
+				<div class="form-row">
+					<div class="form-row">
+						<fieldset>
+							<label for="led_control"><script language=Javascript>document.write(_("mode"))</script></label>
+							<div class="field">
+								<select id="led_control" name="led_control" onChange="led_control_change(this.value)">
+									<option value="0"><script>document.write(_("alwayson"))</script></option>
+									<option value="1"><script>document.write(_("turnOffAfterTimeout"))</script></option>
+								</select>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row" id="ledPowerOffTimer_div">
+						<label for="ledPowerOffTimer"><script language=Javascript>document.write(_("led power off timer"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required,funcCall[validate_ledOffTimer] required med ledPowerOffTimer" name="ledPowerOffTimer" id="ledPowerOffTimer" value="@@form['ledPowerOffTimer']" onkeyup="NumfieldEntry(this)">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("led power off range"))</script></span>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button name="saveButton" type="button" onClick="javascript:formF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script type="text/javascript">
+        set_menu("System", "LED", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_("ledModeSubmitSuccess"));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["ledPowerOffTimer"]=_("led warningMsg1");
+	$.validator.addMethod("ledPowerOffTimer",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.ledPowerOffTimer);
+#else
+/********* NTC ValidationEngine **********/
+function validate_ledOffTimer(field) {
+	if( field.val() < 1 || field.val() > 65535 ) {
+		return _("led warningMsg1");
+	}
+}
+#endif
+</script>
+</body>
+</html>

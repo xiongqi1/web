@@ -1,0 +1,151 @@
+#!/bin/sh -f
+#
+# Connect script for CDMA modules
+#
+# This script is called by connection_mgr as follows:-
+#
+# SCDMA <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+PROFILE=$1
+INSTANCE=$(( $2 + 1 ))
+
+DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+TTY=`/usr/bin/rdb_get $DEV.data_if.$INSTANCE`
+V24=`/usr/bin/rdb_get $DEV.V250_if.$INSTANCE`
+APN=`/usr/bin/rdb_get link.profile.$PROFILE.apn`
+DIALSTR=`/usr/bin/rdb_get link.profile.$PROFILE.dialstr`
+USER=`/usr/bin/rdb_get link.profile.$PROFILE.user`
+PASS=`/usr/bin/rdb_get link.profile.$PROFILE.pass`
+DEBUG=`/usr/bin/rdb_get link.profile.$PROFILE.verbose_logging`
+DEFAULTROUTE=`/usr/bin/rdb_get link.profile.$PROFILE.defaultroute`
+DNS=`/usr/bin/rdb_get link.profile.$PROFILE.userpeerdns`
+RETRY=`/usr/bin/rdb_get link.profile.$PROFILE.retry`
+AUTH_TYPE=`/usr/bin/rdb_get link.profile.$PROFILE.auth_type`
+
+# do not try Telstra bigpond and extranet in autapn mode
+PLMN_MCC=`rdb_get wwan.0.imsi.plmn_mcc`
+PLMN_MNC=`rdb_get wwan.0.imsi.plmn_mnc`
+
+# take v24 if tty does not exist
+if [ -z "$TTY" ]; then
+    TTY="$V24"
+fi
+
+log() {
+    logger -t SCDMA "$@"
+}
+
+# clear apn if auto apn selected
+auto_apn=$(rdb_get "webinterface.autoapn")
+if [ "$auto_apn" = "1" ]; then
+    log "auto-apn is enabled in 'webinterface.autoapn' rdb"
+    APN=""
+fi
+
+if [ -z "$APN" ]; then
+    while true; do
+        # read wwan.0.apn.simICCID before wwan_check_apn running which
+        # clears this variable
+        LAST_ICCID=`rdb_get wwan.0.system_network_status.simICCID`
+        LAST_APN=`rdb_get wwan.0.apn.${LAST_ICCID}`
+        eval `wwan_check_apn`
+        log "auto APN: '$APN' USER: '$USER' PASS: '$FAKE_PASS' AUTH: '$AUTH'"
+
+        # do not try Telstra bigpond and extranet in auto apn mode
+        # if current ICCID is matching with previous historic ones and
+        # previous connection was extranet or bigpond, allow connection.
+        if [ "$PLMN_MCC" = "505" -a "$PLMN_MNC" = "01" ]; then
+            if [ "$APN" = "telstra.extranet" -o "$APN" = "telstra.bigpond" ];then
+                #slog "current ICCID = $LAST_ICCID, LAST_APN = $LAST_APN, APN = $APN"
+                if [ "$LAST_APN" = "" -o "$LAST_APN" != "$APN" ]; then
+                    log "auto APN: '$APN' is ignored in autoapn mode"
+                    continue
+                fi            
+            fi
+        fi
+        break
+    done
+
+# TODO: auto-apn not implemented - MCC & MNC do not exist
+##########################################################################################
+#   if [ -z "$APN" ]; then
+#       log "Can't autodetect APN. SIM not ready?"
+#       exit 1
+#   else
+        rdb_set wwan.0.apn.current "$APN"
+        rdb_set wwan.0.username.current "$USER"
+        rdb_set wwan.0.pass.current "$PASS"
+        rdb_set wwan.0.auth.current "$AUTH"
+        rdb_set wwan.0.profile.current "$PROFILE"
+        rdb_set wwan.0.connection.status connecting
+        # Update profile's current APN
+        rdb_set link.profile.$PROFILE.apn.current "$APN"
+#   fi
+
+    AUTH_TYPE="$AUTH"
+fi
+
+#DEBUG="debug "
+#DEFAULTROUTE="defaultroute "
+#DNS="usepeerdns "
+
+CMD="pppd $TTY nodetach noipdefault crtscts noauth ipparam $PROFILE linkname $PROFILE"
+#CMD="$CMD $DEBUG $DEFAULTROUTE $DNS"
+
+if [ "$AUTH_TYPE" = "pap" ]; then
+    CMD="$CMD refuse-chap refuse-mschap-v2 refuse-mschap refuse-eap"
+fi
+
+if [ "$DEBUG" = "1" ]; then
+    CMD="$CMD debug "
+fi
+
+if [ "$DEFAULTROUTE" != "" ]; then
+    CMD="$CMD defaultroute "
+fi
+
+if [ "$DNS" != "" ]; then
+    CMD="$CMD usepeerdns "
+fi
+
+if [ "$USER" != "" ]; then
+    CMD="$CMD user $USER "
+fi
+
+if [ "$PASS" != "" ]; then
+    CMD="$CMD password $PASS "
+fi
+
+if [ "$DIALSTR" == "atd*99#" ]; then
+    DIALCMD="atdt#777"
+    APNCMD="AT"
+else
+    DIALCMD="$DIALSTR"
+    APNCMD="AT"
+fi
+
+CMD="$CMD connect \"/usr/sbin/chat -v -f /etc/ppp/chatscripts/umts -T $DIALCMD -U $APNCMD\" "
+
+# if shared
+if [ "$V24" == "$TTY" ]; then
+    rdb_set wwan.0.module.lock_result ""
+    rdb_set wwan.0.module.lock 1
+
+    for t in 1 2 3 4 5; do
+        log "waiting until simple_at_manager gives up the port #$t"
+
+        if [ "`rdb_get wwan.0.module.lock_result`" == "1" ]; then
+            log "successed"
+            break;
+        fi
+        sleep 1
+    done
+fi;
+
+# we are changing to pppd rather than launching another process
+# So, Connection manager can monitor pppd directly rather than this script
+eval "exec $CMD"

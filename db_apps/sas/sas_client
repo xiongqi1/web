@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# This script starts/stops/restarts SAS client
+# Copyright (C) 2019 NetComm Wireless Limited.
+#
+
+PROG_NAME="sas_client_launcher"
+PIDFILE="/var/run/$PROG_NAME.pid"
+
+# new SAS CA certs and CBSD key/cert can be added during factory production.
+# the location of these key/certs are not in same partition as the FW, thus must check in run-time.
+check_key_certs() {
+	# create links for built-in SAS certs in sas.config.cadir if not already done.
+	# note: factory can prevent a built-in cert to be used by create a dummy corresponding ".0" file in cadir.
+	local DEST=$(rdb_get sas.config.cadir)
+	local SRC="/etc/ssl/certs"
+	if [ "$DEST" != "$SRC" ]; then
+		[ ! -z "$DEST" ] && mkdir -p $DEST
+		if [ -d "$DEST" ]; then
+			for i in $SRC/*.0; do
+				local name=$(basename $i)
+				[ ! -e "$DEST/$name" ] && cp -sf $i $DEST/.
+			done
+		fi
+	fi
+
+	# for cbsd cert & key file, only link in the builtins if not exist
+	CBSD_CERT=$(rdb_get sas.config.certfile)
+	[ ! -f "$CBSD_CERT" ] && ln -s "/etc/ssl/netcomm.com.cert.pem" "$CBSD_CERT"
+
+	CBSD_KEY=$(rdb_get sas.config.keyfile)
+	[ ! -f "$CBSD_KEY" ] && ln -s "/etc/ssl/netcomm.com.key.pem" "$CBSD_KEY"
+}
+
+start() {
+	if pidof "$PROG_NAME" > /dev/null 2>&1; then
+		echo "$PROG_NAME is already running"
+	else
+		echo "sas_client: start $PROG_NAME"
+		check_key_certs
+		start-stop-daemon -S -b -m -p $PIDFILE -x "/usr/bin/$PROG_NAME"
+		echo "started."
+	fi
+}
+
+get_monotonic_msec() {
+	awk '/^now/ {print substr($3, 1, length($3) - 6); exit}' /proc/timer_list
+}
+
+stop() {
+	# stop daemon
+	echo "sas_client: stop $PROG_NAME"
+	local PID=$(cat $PIDFILE 2>/dev/null)
+	start-stop-daemon -K -q -p $PIDFILE 2> /dev/null
+
+	start=$(get_monotonic_msec)
+	while pgrep -P $PID >&/dev/null; do
+		sleep 0.1
+
+		cur=$(get_monotonic_msec)
+		runtime=$((cur-start))
+		if [ $runtime -gt 5 ]; then
+			break;
+		fi
+	done
+
+	if pgrep -P $PID >&/dev/null; then
+		start-stop-daemon -K -q -p $PIDFILE -s SIGKILL 2> /dev/null
+	fi
+
+	rm -f $PIDFILE
+
+	echo "stopped."
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
+
+exit $?

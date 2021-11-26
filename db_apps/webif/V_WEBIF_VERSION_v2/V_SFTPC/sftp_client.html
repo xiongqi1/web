@@ -1,0 +1,103 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Remote SFTP Server</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+
+function toInt( str ) {
+	return str-0;
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	/* Avoid triggering any variables if the value has not changed */
+	var currval = get_single( 'service.powersave.pbv_conf_user' );
+	tempval = form['sftpuser'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'service.powersave.pbv_conf_user', tempval);
+	}
+
+	currval = get_single( 'service.powersave.pbv_conf_pass' );
+	tempval = form['sftppass'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'service.powersave.pbv_conf_pass', tempval);
+	}
+
+	redirect(request['SCRIPT_NAME'] + "?success");
+}
+else { /*GET*/
+	form['sftpuser'] = get_single( 'service.powersave.pbv_conf_user');
+	form['sftppass'] = get_single( 'service.powersave.pbv_conf_pass');
+}
+%>
+
+<script language="JavaScript">
+function submitForm() {
+	clear_alert();
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+
+	document.form.submit();
+}
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+	<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST">
+	<%appendCsrfToken();%>
+		<div class="right-column white-box" id="sFTPClient_setup">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("sftpSettings"))</script></h2>
+				<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+					<div class="form-row" id="sftpUsername-div">
+						<label for="sftpuser"><script language=Javascript>document.write(_("sftpUsername"))</script></label>
+						<div class="field">
+							<input type=input size="30" name="sftpuser" id="sftpuser" value="@@form['sftpuser']">
+						</div>
+					</div>
+				</div>
+				<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+					<div class="form-row" id="sftpPassword-div">
+						<label for="sftppass"><script language=Javascript>document.write(_("sftpPassword"))</script></label>
+						<div class="field">
+							<input type='password' size="30" name="sftppass" id="sftppass" value="@@form['sftppass']">
+						</div>
+					</div>
+				</div>
+
+				<div class="submit-row" style="margin-left:252px;">
+					<button type="button" onClick="submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div></div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("System", "SFTPSettings", <%_val = session["user"];%>"@@_val");
+
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("",_('submitSuccess'));
+<%}%>
+</script>
+
+</body>
+</html>

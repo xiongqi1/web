@@ -1,0 +1,636 @@
+/* 
+ * 
+ * Copyright 1997-2013 NComm, Inc.  All rights reserved.
+ * 
+ * 
+ *                     *** Important Notice ***
+ *            This notice may not be removed from this file.
+ * 
+ * The ETHERNET OAM software contained in this file may only be used within a
+ * 
+ * valid license agreement between your company and NComm, Inc. The license 
+ * agreement includes the definition of a PROJECT.
+ * 
+ * The ETHERNET OAM software is licensed only for the ETHERNET OAM application
+ * 
+ * and within the project definition in the license. Any use beyond this 
+ * scope is prohibited without executing an additional agreement with 
+ * NComm, Inc. Please refer to your license agreement for the definition of 
+ * the PROJECT.
+ * 
+ * This software may be modified for use within the above scope. All 
+ * modifications must be clearly marked as non-NComm changes.
+ * 
+ * If you are in doubt of any of these terms, please contact NComm, Inc. 
+ * at sales@ncomm.com. Verification of your company's license agreement 
+ * and copies of that agreement also may be obtained from:
+ *  
+ * NComm, Inc.
+ * 130 Route 111  
+ * Suite 201
+ * Hampstead, NH 03841
+ * 603-329-5221 
+ * sales@ncomm.com
+ * 
+ */
+
+
+
+/*
+ * This file is #included in the TMS Translation Processor.  It is common
+ * to both sides of the translation layer code, so it is included in both
+ * the User-side compilation, and the Kernel-side compilation.
+ */
+
+
+
+/*--------------------------------------------------------------------------*/
+/* These are complex data-types, and if the sub-package is not included
+ * in the build, then just define them to simple data-types.  This keeps
+ * the table itself clean, simple, easier to understand, and without
+ * a bunch of ifdefs around the entries.
+ */
+#ifndef NCI_ETH1AG
+	#define ETH1AG_MDACONFIG	int
+	#define ETH1AG_LMPCONFIG	int
+	#define ETH1AG_RMPCONFIG	int
+	#define ETH1AG_TLV		int
+	#define ETH1AG_LTMREPLY		int
+#endif
+
+#ifndef NCI_Y1731
+	#define Y1731_MISCPKT		int
+	#define PDURESULT		int
+#endif
+
+#ifndef NCI_ETH3AH
+	#define ETH3AH_CONFIG		int
+	#define ETH3AH_EVENTCFG		int
+#endif
+
+#ifndef NCI_SYNCE
+	#define SYNCE_CONFIG		int
+#endif
+
+#if (defined NCI_Y1731)
+	#define MAX_ETHCLBK_DATA	sizeof(Y1731_MISCPKT)
+#elif (defined NCI_ETH3AH)
+	#define MAX_ETHCLBK_DATA	sizeof(ETH3AH_RXEVENTNOTIFY)
+#else
+	#define MAX_ETHCLBK_DATA	sizeof(MACADR)
+#endif
+
+
+/*--------------------------------------------------------------------------*/
+#ifdef NCI_ETH1AG
+
+static _UI32_ eth1AGsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+
+	switch (recPtr->fcode) {
+
+	case ETHLCTRL_1AGCMD:
+		switch ((int)apiGetSrcVal(recPtr, P1)) {
+		case LBM_ENABLE:
+			if ((apiPtr->param == P5) &&
+			    (apiPtr->paramType == PCOPY) &&
+			     apiGetSrcVal(recPtr, P5)) {
+				return(sizeof(MACADR));
+			}
+			break;
+
+		case LTM_ENABLE:
+			if ((apiPtr->param == P4) &&
+			    (apiPtr->paramType == PPOLL)) {
+				return(sizeof(void **));
+			}
+
+			if ((apiPtr->param == P5) &&
+			    (apiPtr->paramType == PCOPY) &&
+			     apiGetSrcVal(recPtr, P5)) {
+				return(sizeof(MACADR));
+			}
+			break;
+#ifdef NCI_Y1731
+		case MCC_SEND:
+		case EXM_SEND:
+		case EXR_SEND:
+		case VSM_SEND:
+		case VSR_SEND:
+			if ((apiPtr->param == P4) &&
+			    (apiPtr->paramType == PCOPY)) {
+				return(sizeof(Y1731_MISCPKT));
+			}
+
+			if ((apiPtr->param == P5) &&
+			    (apiPtr->paramType == PCOPY) &&
+			     apiGetSrcVal(recPtr, P5)) {
+				return(sizeof(MACADR));
+			}
+			break;
+
+		case PDU_SETUP:
+			if (apiPtr->param == P3) {
+				return(sizeof(PDUSETUP));
+			}
+			break;
+#endif
+		default:
+			break;
+		}
+		break;
+
+	case ETHLCTRL_1AGVAL:
+		switch((int)apiGetSrcVal(recPtr, P2)) {
+#ifdef NCI_Y1731
+		case LMP_AISUNICASTMAC:
+		case LMP_LCKUNICASTMAC:
+		case LMP_CSFUNICASTMAC:
+			if (apiGetSrcVal(recPtr, P3)) {
+				return(sizeof(MACADR));
+			}
+			break;
+
+		case RMP_LM2THRESH:
+			return(sizeof(LOSSVALUE));
+		case RMP_LM2RESULT:
+			return(sizeof(LOSSRESULT));
+		case RMP_DM1THRESH:
+			return(sizeof(OAMTSTAMP));
+		case RMP_DM1RESULT:
+			return(sizeof(DLYRESULT));
+#endif
+		default:
+			break;
+		}
+		break;
+
+	case ETHLPOLL_1AGLTM:
+		if ((int)apiGetSrcVal(recPtr, P3) == LTM_REPLYMAC) {
+			if ((apiPtr->param == P4) &&
+			     apiGetSrcVal(recPtr, P4)) {
+				return(sizeof(MACADR));
+			}
+		}
+		break;
+
+	case ETHLCLBK_1AGEVENT:
+		switch ((int)apiGetSrcVal(recPtr, P1)) {
+
+		case CCM_NEWRMP:
+			if (apiPtr->param == P4)
+				return(sizeof(MACADR));
+			break;
+#ifdef NCI_Y1731
+		case MCC_RECV:
+		case EXM_RECV:
+		case EXR_RECV:
+		case VSM_RECV:
+		case VSR_RECV:
+		case TST_RECV:
+			if (apiPtr->param == P4)
+				return(sizeof(Y1731_MISCPKT));
+			break;
+
+		case DMM_THRESH:
+		case DM1_THRESH:
+			if (apiPtr->param == P4)
+				return(sizeof(OAMTSTAMP));
+			break;
+#endif
+		default:
+			break;
+		}
+		break;
+
+	case ETHLPOLL_1AGVAL:
+		switch((int)apiGetSrcVal(recPtr, P2)) {
+		case MDA_DATA:
+			return(sizeof(ETH1AG_MDADATA));
+		case MDA_CONFIG:
+			return(sizeof(ETH1AG_MDACONFIG));
+		case MDA_ERRORCCMLASTFAILURE:
+		case MDA_XCONNCCMLASTFAILURE:
+			return(CCMLASTFAILSIZE);
+		case LMP_DATA:
+			return(sizeof(ETH1AG_LMPDATA));
+		case LMP_CONFIG:
+			return(sizeof(ETH1AG_LMPCONFIG));
+#ifdef NCI_Y1731
+		case LMP_AISUNICASTMAC:
+		case LMP_LCKUNICASTMAC:
+		case LMP_CSFUNICASTMAC:
+			return(sizeof(MACADR));
+
+		case RMP_LM2RESULT:
+		case RMP_DM1RESULT:
+			return(sizeof(PDURESULT));
+
+		case RMP_LM2THRESH:
+			return(sizeof(LOSSVALUE));
+		case RMP_DM1THRESH:
+			return(sizeof(OAMTSTAMP));
+#endif
+		case RMP_DATA:
+			return(sizeof(ETH1AG_RMPDATA));
+		case RMP_CONFIG:
+			return(sizeof(ETH1AG_RMPCONFIG));
+		case RMP_MACADDRESS:
+			return(sizeof(MACADR));
+		default:
+			break;
+		}
+
+		return(sizeof(_UI32_));
+
+	default:
+		break;
+	}
+
+	return(0);
+}
+#else
+static _UI32_ eth1AGsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+	return(0);
+}
+#endif	/* NCI_ETH1AG */
+
+
+/*--------------------------------------------------------------------------*/
+#ifdef NCI_ETH3AH
+
+static _UI32_ eth3AHsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+int value;
+_UI32_ payload;
+
+	switch (recPtr->fcode) {
+
+	case ETHLCTRL_3AHCMD:
+	case ETHLCLBK_3AHEVENT:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = (_UI32_)apiGetSrcVal(recPtr, P3);
+		break;
+
+	case ETHLCTRL_3AHVAL:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = 0;
+		break;
+
+	case ETHLPOLL_3AHVAL:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = sizeof(_UI32_);
+		break;
+
+	default:
+		return(0);
+	}
+
+	switch (value) {
+	case OAM_ERRSYMBOL_EVT:
+	case OAM_ERRFRAME_EVT:
+	case OAM_ERRPERIOD_EVT:
+	case OAM_ERRSECONDS_EVT:
+	case OAM_ORGSPEC_EVT:
+		return(sizeof(ETH3AH_RXEVENTNOTIFY));
+	case OAM_EVENTNOTIFY_TX:
+		return(sizeof(ETH3AH_TXEVENTNOTIFY));
+	case OAM_STRUCTREQUEST_TX:
+	case OAM_STRUCTREQUEST_RX:
+		return(sizeof(ETH3AH_VARREQUEST));
+	case OAM_STRUCTRESPONSE_TX:
+	case OAM_STRUCTRESPONSE_RX:
+		return(sizeof(ETH3AH_VARRESPONSE));
+
+	case OAM_PAYLOADREQUEST_TX:
+	case OAM_PAYLOADRESPONSE_TX:
+	case OAM_PAYLOADREQUEST_RX:
+	case OAM_PAYLOADRESPONSE_RX:
+	case OAM_ORGSPECPDU_TX:
+	case OAM_ORGSPECPDU_RX:
+	case OAM_DISCOVERY:
+		return(payload);
+
+	case OAM_DATA:
+		return(sizeof(ETH3AH_DATA));
+	case OAM_CONFIG:
+		return(sizeof(ETH3AH_CONFIG));
+	case OAM_LINKPARAM:
+		return(sizeof(ETH3AH_LINKPARAM));
+	case OAM_LOCMACADR:
+		return(sizeof(MACADR));
+	case OAM_ORGSPECINFOTLV:
+		return(sizeof(ORGSPECINFO_TLV));
+
+	case OAM_LOCFEATURES:	/* these are all simple data */
+	case OAM_LOCLOOPBACK:
+	case OAM_REMLOOPBACK:
+	case OAM_PDURATE:
+	case OAM_PDUTIMEOUT:
+	case OAM_PDUMAX:
+	case OAM_AUTOEVENT:
+		break;
+
+	case OAM_OAMID:
+	case OAM_OAMADMINSTATE:
+	case OAM_OAMMODE:
+	case OAM_OAMDISCSTATE:
+		break;
+
+	case OAM_REMMACADR:
+		return(sizeof(MACADR));
+
+	case OAM_LOCCONFIG:
+	case OAM_REMCONFIG:
+	case OAM_LOCPDUCONFIG:
+	case OAM_REMPDUCONFIG:
+	case OAM_LOCFLAGS:
+	case OAM_REMFLAGS:
+	case OAM_LOCREVISION:
+	case OAM_REMREVISION:
+	case OAM_LOCSTATE:
+	case OAM_REMSTATE:
+	case OAM_REMVENDOROUI:
+	case OAM_REMVENDORSPI:
+	case OAM_UNSUPCODESTx:
+	case OAM_UNSUPCODESRx:
+	case OAM_INFORMATIONTX:
+	case OAM_INFORMATIONRX:
+	case OAM_UNIQUEEVENTTX:
+	case OAM_DUPLICATEEVENTTX:
+	case OAM_UNIQUEEVENTRX:
+	case OAM_DUPLICATEEVENTRX:
+	case OAM_LOOPBACKCTRLTX:
+	case OAM_LOOPBACKCTRLRX:
+	case OAM_VARREQUESTTX:
+	case OAM_VARREQUESTRX:
+	case OAM_VARRESPONSETX:
+	case OAM_VARRESPONSERX:
+	case OAM_ORGSPECTX:
+	case OAM_ORGSPECRX:
+		break;
+
+	case OAM_LOCERRSYMBOLCFG:
+		return(sizeof(struct _errSymbolCfg));
+	case OAM_LOCERRFRAMECFG:
+		return(sizeof(struct _errFrameCfg));
+	case OAM_LOCERRPERIODCFG:
+		return(sizeof(struct _errPeriodCfg));
+	case OAM_LOCERRSECONDSCFG:
+		return(sizeof(struct _errSecondsCfg));
+
+	case OAM_LOCERRSYMBOLEVT:
+	case OAM_REMERRSYMBOLEVT:
+		return(sizeof(ERRSYMBOLEVNT_TLV));
+	case OAM_LOCERRFRAMEEVT:
+	case OAM_REMERRFRAMEEVT:
+		return(sizeof(ERRFRAMEEVNT_TLV));
+	case OAM_LOCERRPERIODEVT:
+	case OAM_REMERRPERIODEVT:
+		return(sizeof(ERRPERIODEVNT_TLV));
+	case OAM_LOCERRSECONDSEVT:
+	case OAM_REMERRSECONDSEVT:
+		return(sizeof(ERRSECONDSEVNT_TLV));
+
+	case OAM_FRAMESLOSTOAMERROR:
+	default:
+		break;
+	}
+
+	return(0);
+}
+#else
+static _UI32_ eth3AHsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+	return(0);
+}
+#endif	/* NCI_ETH3AH */
+
+
+
+/*--------------------------------------------------------------------------*/
+#ifdef NCI_SYNCE
+
+static _UI32_ ethSYNCEsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+int value;
+_UI32_ payload;
+
+	switch (recPtr->fcode) {
+
+	case ETHLCLBK_SYNCEEVENT:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = (_UI32_)apiGetSrcVal(recPtr, P3);
+		break;
+
+	case ETHLCTRL_SYNCEVAL:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = 0;
+		break;
+
+	case ETHLPOLL_SYNCEVAL:
+		value   = (int)apiGetSrcVal(recPtr, P1);
+		payload = sizeof(_UI32_);
+		break;
+
+	default:
+		return(0);
+	}
+
+	switch (value) {
+	case SYNCE_NEWRXQL:
+		return(payload);
+
+	case SYNCE_ALL:
+		return(sizeof(SYNCE_DATA));
+	case SYNCE_CFG:
+		return(sizeof(SYNCE_CONFIG));
+
+	case SYNCE_TXENABLED:		/* these are all simple data */
+	case SYNCE_TXQLVALUE:
+	case SYNCE_TXRATE:
+	case SYNCE_RXENABLED:
+	case SYNCE_RXALMSTATE:
+	case SYNCE_RXALMDELAY:
+	case SYNCE_RXQLVALUE:
+	case SYNCE_NEWRXALM:
+		break;
+
+	case SYNCE_RXMAC:
+	case SYNCE_RXFILTER:
+		return(sizeof(MACADR));
+
+	default:
+		break;
+	}
+
+	return(0);
+}
+#else
+static _UI32_ ethSYNCEsize(TMS_IO_RECORD *recPtr, TMS_API_TABLE *apiPtr)
+{
+	return(0);
+}
+#endif	/* NCI_SYNCE */
+
+
+
+/*--------------------------------------------------------------------------*/
+static TMS_API_TABLE ethAPICustTable[] = {
+
+{1, ETHLCTRL_NCISTART,		0,  0,     0,     0,		apiStart},
+
+{2, ETHLCTRL_NCIUNSTART,	0,  0,     0,     0,		apiUNStart},
+
+{3, ETHLCTRL_REGAPI,		P1, 0,     0,     0,		apiReg},
+
+{2, ETHLCTRL_UNREGAPI,		0,  0,     0,     0,		apiUNReg},
+
+{3, ETHLCTRL_REREGAPI,		P1, 0,     0,     0,		apiREReg},
+
+{2, ETHLCTRL_DESTROY,		0,  0,     0,     0,		apiDestroy},
+
+};
+
+
+/*--------------------------------------------------------------------------*/
+static TMS_API_TABLE ethAPITable[] = {
+/*
+ * prepost   fcode          param paramType sizeType size       fooPtr
+ */
+
+/*------------------- CTRL fcodes -------------------------------*/
+{1, ETHLCTRL_RESET,		P3, PCOPY, SZTBL, sizeof(ETH_CONFIG)},
+
+{3, ETHLCTRL_NEWCONTEXT,	P4, PPOLL, SZTBL, sizeof(void **)},
+
+{1, ETHLCTRL_RERESET,		P1, PCOPY, SZTBL, sizeof(ETH_CONFIG)},
+
+{1, ETHLCTRL_REREGAPI,		P4, PCOPY, SZTBL, sizeof(ETH_CONFIG)},
+
+{1, ETHLCTRL_1AGREG,		P1, PCOPY, SZTBL, sizeof(ETH1AG_MDACONFIG)},
+
+{1, ETHLCTRL_1AGNEWLMP,		P1, PCOPY, SZTBL, sizeof(ETH1AG_LMPCONFIG)},
+
+{1, ETHLCTRL_1AGNEWRMP,		P1, PCOPY, SZTBL, sizeof(ETH1AG_RMPCONFIG)},
+
+{1, ETHLCTRL_1AGCMD,		P3, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCTRL_1AGCMD,		P4, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCTRL_1AGCMD,		P5, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{3, ETHLCTRL_1AGCMD,		P4, PPOLL, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCTRL_1AGVAL,		P3, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCTRL_1AGTLV,		P3, PCOPY, SZTBL, sizeof(ETH1AG_TLV)},
+
+{1, ETHLCTRL_3AHREG,		P1, PCOPY, SZTBL, sizeof(ETH3AH_CONFIG)},
+
+{1, ETHLCTRL_3AHCMD,		P4, PCOPY, SZFOO, (UNITYPE)eth3AHsize},
+
+{1, ETHLCTRL_3AHVAL,		P2, PCOPY, SZFOO, (UNITYPE)eth3AHsize},
+
+{1, ETHLCTRL_3AHEVTCFG,		P2, PCOPY, SZTBL, sizeof(ETH3AH_EVENTCFG)},
+
+{1, ETHLCTRL_SYNCEREG,		P1, PCOPY, SZTBL, sizeof(SYNCE_CONFIG)},
+
+{1, ETHLCTRL_SYNCEVAL,		P2, PCOPY, SZFOO, (UNITYPE)ethSYNCEsize},
+
+
+/*------------------- POLL fcodes -----------------------------------------*/
+{1, ETHLPOLL_DRVHANDLE,		P1, PCOPY, SZSTR, P1},
+
+{3, ETHLPOLL_DRVHANDLE,		P2, PPOLL, SZTBL, sizeof(void **)},
+
+{3, ETHLPOLL_DRVHANDLE,		P3, PPOLL, SZTBL, sizeof(void **)},
+
+{3, ETHLPOLL_CONTEXT,		P1, PPOLL, SZTBL, sizeof(void **)},
+
+{3, ETHLPOLL_CONFIG,		P1, PPOLL, SZTBL, sizeof(ETH_CONFIG)},
+
+{3, ETHLPOLL_1AGVAL,		P3, PPOLL, SZFOO, (UNITYPE)eth1AGsize},
+
+{3, ETHLPOLL_1AGTLV,		P3, PPOLL, SZTBL, sizeof(ETH1AG_TLV)},
+
+{1, ETHLPOLL_1AGLTM,		P4, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{3, ETHLPOLL_1AGLTM,		P5, PPOLL, SZTBL, sizeof(ETH1AG_LTMREPLY)},
+
+{3, ETHLPOLL_1AGPDU,		P4, PPOLL, SZTBL, sizeof(PDURESULT)},
+
+{3, ETHLPOLL_3AHVAL,		P2, PPOLL, SZFOO, (UNITYPE)eth3AHsize},
+
+{3, ETHLPOLL_3AHEVTCFG,		P2, PPOLL, SZTBL, sizeof(ETH3AH_EVENTCFG)},
+
+{3, ETHLPOLL_SYNCEVAL,		P2, PPOLL, SZFOO, (UNITYPE)ethSYNCEsize},
+
+
+/*------------------- CLBK fcodes -----------------------------------------*/
+/* Callbacks never have postproc actions.
+ */
+{1, ETHLCLBK_1AGEVENT,		P3, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCLBK_1AGEVENT,		P4, PCOPY, SZFOO, (UNITYPE)eth1AGsize},
+
+{1, ETHLCLBK_3AHEVENT,		P4, PCOPY, SZFOO, (UNITYPE)eth3AHsize},
+
+{1, ETHLCLBK_SYNCEEVENT,	P4, PCOPY, SZFOO, (UNITYPE)ethSYNCEsize},
+
+};
+
+
+/*--------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+#ifdef __KERNEL__
+
+static int _ethXlateCLBK(_UI32_ line, ETHLCLBK_FC fcode, ...)
+{
+int retval;
+UNITYPE param[MAX_IO_PARAMS];
+va_list alist;
+
+
+	TMS_CLBK_PARAMS(fcode, param);
+
+	/* These fcodes don't go up the stack in this environment.
+	 */
+	switch(fcode) {
+	case ETHLCLBK_HOOKINTERRUPT:
+		retval = ethEnableInterrupt(line,
+				(void *)param[0], param[1], param[2]);
+		return(retval);
+		break;
+
+	case ETHLCLBK_UNHOOKINTERRUPT:
+		retval = ethDisableInterrupt(line, param[0]);
+		return(retval);
+		break;
+
+	default:
+		break;
+	}
+
+	retval = tmsAPIclbk(TMS_ETHLCLBK, line, fcode, 0, 0, param);
+
+	return(retval);
+}
+#else
+	#define _ethXlateCLBK	NULL
+#endif
+
+
+static TMS_API_PACKAGE ethAPIPackage =
+	{0, "XETH",
+	ethAPITable, (sizeof(ethAPITable)/sizeof(TMS_API_TABLE)),
+	ethAPICustTable, (sizeof(ethAPICustTable)/sizeof(TMS_API_TABLE)),
+	MAX_ETHCLBK_DATA, TMS_ETHLCLBK, _ethXlateCLBK, NULL};
+
+
+#undef  ETH_API_PACKAGE
+#define ETH_API_PACKAGE		&ethAPIPackage
+
+

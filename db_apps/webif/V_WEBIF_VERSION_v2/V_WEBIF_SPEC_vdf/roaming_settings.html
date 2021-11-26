@@ -1,0 +1,661 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Roaming settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src='/js/virtualpaginate.js'></script>
+<style>
+.logfile td {font-size:10px; padding:6px 12px 6px 12px;}
+</style>
+
+<script language="JavaScript">
+
+var logdata = new Array();
+var conn_type="<%if(rdb_exists('wwan.0.conn_type')) get_single_direct('wwan.0.conn_type'); %>";
+
+function loglines(allLines, level) {
+	var lineCnt;
+	var ostr = "";
+	var splitStr = new RegExp(" +");
+	var levelmap = {
+		emerg: 8,
+		emergency: 8,
+		alert: 7,
+		crit: 6,
+		critical: 6,
+		err: 5,
+		error: 5,
+		warn: 4,
+		warning: 4,
+		note: 3,
+		notice: 3,
+		info: 2,
+		debug: 1,
+		all: 0
+	};
+
+	var levelNumber = 0;
+	var allIndex;
+	var lastIgnore = 0;
+	if (level && level.length && levelmap.hasOwnProperty(level))
+		levelNumber = levelmap[level];
+	lineCnt = 0;
+	for (allIndex = allLines.length - 1; allIndex > 0; allIndex--) {
+		var line = allLines[allIndex];
+		var ray = new Array();
+		ray = line.split(": ");
+		var details = new Array();
+
+		details = ray.shift().split(splitStr);
+		/* 0 month, 1 day number, 2 time, 3 machine, 4 facility.level */
+		/* determine if level should be set */
+		if (details.length < 5) {
+			if (lastIgnore)
+				continue;
+		}
+		else if (levelNumber > 0) {
+			var lvsplit = details[4].indexOf(".");
+			if (lvsplit) {
+				lvsplit = details[4].substring(lvsplit+1);
+				lvsplit.toLowerCase();
+				if (!levelmap.hasOwnProperty(lvsplit) || levelmap[lvsplit] < levelNumber) {
+				lastIgnore = 1;
+				continue;
+				}
+			}
+			else {
+				if (lastIgnore)
+				continue;
+			}
+		}
+
+		lastIgnore = 0;
+		var firstColumn = details.shift();
+		details[0] = firstColumn + " " + details[0];
+
+		if (!lineCnt) {
+			ostr += "<table class='logfile'>"+
+			"<tr><th width='15%' class='align10'>"+_("date")+"  &  "+_("time")+"</td>"+
+			"<th width='10%' class='align10'>"+_("machine")+"</th>"+
+			"<th width='8%' class='align10'>"+_("level")+"</th>"+
+			"<th width='10%' class='align10'>"+_("process")+"</th>"+
+			"<th class='align10'>"+_("message")+"</th></tr>";
+		}
+
+		ostr += "<tr><td>";
+		td10 = "</td><td>";
+
+		ostr += details[0]+"  "+details[1]+td10+details[2]+td10+details[3]+td10+details[4]+td10+ray.join(": ")+"</td></tr>"
+		lineCnt++;
+		if (lineCnt > 22) {
+			lineCnt = 0;
+			ostr += "</table>";
+		}
+	}
+	if (lineCnt) {
+		ostr += "</tr></table>";
+	}
+	return ostr;
+}
+
+var newscriptsalt;
+function displayLogData(level) {
+	if ($.type(logdata.messages)=="undefined") {
+		h="<table><tr><th style='text-align:center'>"+_("roamingLogEmpty")+"</th></tr></table>";
+		$("#roaming-log-div").css("display", "none");
+		$("#logdata").html(h);
+		return;
+	}
+
+	var res = loglines(logdata.messages, level);
+	$("#logdata").html(res);
+	newscriptsalt=new virtualpaginate("logfile", 1, "table");
+	newscriptsalt.buildpagination("scriptspaginatealt");
+
+	if(isNaN(newscriptsalt.pagecount) || newscriptsalt.pagecount<2 ) {
+		$("#selectPage-div").css("display", "none");
+	}
+	else {
+		$("#selectPage-div").css("display", "");
+	}
+}
+
+function setLogLevel() {
+	var i = document.formS.Level.value;
+	displayLogData(i);;
+}
+
+function ClearAllLog() {
+	function clearlog_func() {
+		$.get('/cgi-bin/clearlog.cgi', function(){location.href='/roaming_settings.html';})
+	}
+	blockUI_confirm(_("confirm cleanLog"), clearlog_func);
+}
+
+function downloadLog() {
+	location.href = '/cgi-bin/logfile.cgi?action=downloadlog';
+}
+document.write('<style type="text/css">\n.logfile{display: none;}\n</style>')
+
+/************************************************************************/
+
+var counter=0;
+var estTime=80;
+var rebootok=0;
+
+function check_reload() {
+	counter++;
+	percentage=parseInt(50*counter/estTime);
+	if( percentage<100 ) {
+		document.getElementById( "rebootMsg" ).innerHTML=_("setman rebooting");
+		document.getElementById( "rebootCt" ).innerHTML=percentage+" %"
+	}
+	else {
+		document.getElementById( "rebootCt" ).innerHTML="100 %"
+		document.getElementById( "rebootMsg" ).innerHTML=_("redirectStatus");//Redirecting to the Status page
+		setTimeout("window.location=/index.html", 3000);
+	}
+	if(percentage>80 && (counter%10)==0 ) {
+		$.get("/cgi-bin/ajax.cgi", function (){ rebootok++; });
+	}
+	if(rebootok) {
+		document.getElementById( "rebootCt" ).innerHTML="100 %"
+		document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg7");//"Reboot is successful, now redirecting to the Status page...";
+		setTimeout("window.location='/index.html'", 5000);
+	}
+}
+
+function submitForm() {
+	clear_alert();
+	/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+	roamen=$("#roaming_enable_0").is(":checked")?"1":"0";
+	validatePDPen=$("#validatePDP_enable_0").is(":checked")?"1":"0";
+	retry_time=$("#networkRetry").val();
+
+	old_roamen="<%get_single_direct("manualroam.enable");%>";
+	old_validatePDPen="<%get_single_direct("manualroam.pdp_validation_check");%>";
+	old_retry_time="<%get_single_direct("manualroam.best_network_retry_time");%>";
+
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>manualroam.enable="+roamen+" -p&manualroam.pdp_validation_check="+validatePDPen+" -p&manualroam.best_network_retry_time="+$("#networkRetry").val()+" -p";
+
+	if ( roamen != old_roamen || validatePDPen != old_validatePDPen || retry_time != old_retry_time ) {
+		$.get(rdbCmd, function() {window.location.href="/roaming_settings.html?success"});
+	}
+}
+
+function submitFormAdv() {
+	clear_alert();
+	if(!$("#form").valid()) {
+		return;
+	}
+
+	new_minus_rssi=$("#rssiThreshold").val();
+	minus_rssi=(-1)*new_minus_rssi;
+
+	old_minus_rssi="<%get_single_direct("manualroam.rssi_user_threshold");%>";
+	rssi_changed="<%get_single_direct("manualroam.rssi_user_threshold.changed");%>";
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>&manualroam.rssi_user_threshold=-p -- "+minus_rssi+"";
+
+	new_minus_rscp=$("#rscpThreshold").val();
+	minus_rscp=(-1)*new_minus_rscp;
+
+	old_minus_rscp="<%get_single_direct("manualroam.rscp_user_threshold");%>";
+	rscp_changed="<%get_single_direct("manualroam.rscp_user_threshold.changed");%>";
+	rdbCmd=rdbCmd+"&manualroam.rscp_user_threshold=-p -- "+minus_rscp+"";
+
+	if (conn_type == 'lte') {
+		new_minus_rsrp=$("#rsrpThreshold").val();
+		minus_rsrp=(-1)*new_minus_rsrp;
+
+		old_minus_rsrp="<%get_single_direct("manualroam.rsrp_user_threshold");%>";
+		rsrp_changed="<%get_single_direct("manualroam.rsrp_user_threshold.changed");%>";
+		rdbCmd=rdbCmd+"&manualroam.rsrp_user_threshold=-p -- "+minus_rsrp+"";
+	}
+	else {
+		minus_rsrp=old_minus_rsrp="<%get_single_direct("manualroam.rsrp_user_threshold");%>";
+		rsrp_changed=1;
+		new_minus_rsrp=(-1)*old_minus_rsrp;
+	}
+
+	/* mark rssi threshold was changed from default value */
+	if ( minus_rssi != old_minus_rssi || minus_rscp != old_minus_rscp || minus_rsrp != old_minus_rsrp ) {
+		$("#rssiThreshold").val((-1)*old_minus_rssi);
+		$("#rscpThreshold").val((-1)*old_minus_rscp);
+		$("#rsrpThreshold").val((-1)*old_minus_rsrp);
+
+		do_confirm(_("signalstrengthThreshold disclaimer"), function(){
+			$("#rssiThreshold").val(new_minus_rssi);
+			$("#rscpThreshold").val(new_minus_rscp);
+			$("#rsrpThreshold").val(new_minus_rsrp);
+			if( rssi_changed != 1 ) {
+				rdbCmd+="&manualroam.rssi_user_threshold.changed=1 -p";
+			}
+			if( rscp_changed != 1 ) {
+				rdbCmd+="&manualroam.rscp_user_threshold.changed=1 -p";
+			}
+			if( rsrp_changed != 1 ) {
+				rdbCmd+="&manualroam.rsrp_user_threshold.changed=1 -p";
+			}
+			$.get(rdbCmd, function() {success_alert("", _("submitSuccess"))});
+		});
+
+	}
+}
+
+function deleteFile( filename,range,version )
+{
+	function del_func() {
+		$.getJSON( "./cgi-bin/roaminglist.cgi",{cmd:"deletelist",opt1:filename},
+		function(res,stat,req) {
+			window.location.href="/roaming_settings.html?success"
+		}
+		);
+	}
+	if (version.length == 0)
+		version=_("na");
+
+	blockUI_confirm(_("deleteConfirm")+_("imsi range")+"["+range+"], "+_("prl version")+"["+version+"]?", del_func);
+}
+
+
+function getFileList()
+{
+	$.getJSON( "./cgi-bin/roaminglist.cgi",{cmd:"getlist"},
+		function(res,stat,req) {
+			roaminglist=res.roaminglist;
+			var h="";
+			if (roaminglist.length == 0) {
+				return;
+			}
+			h="<table>";
+			for (var i=0; i<roaminglist.length;i++) {
+				if($.type(roaminglist[i].range)!="undefined" || $.type(roaminglist[i].version)!="undefined" || $.type(roaminglist[i].filename)!="undefined")
+				{
+					if (roaminglist[i].inuse == "1")
+						h+="<tr> <td style='text-align:center'><span class=\"icon tick-sml\"></span></td>";
+					else
+						h+="<tr> <td style='text-align:center'></td>";
+
+					h+="<td style='text-align:center'>"+roaminglist[i].range+"</td>";
+
+					if (roaminglist[i].version.length == 0)
+						h+="<td style='text-align:center'>"+ _("na") +"</td>";
+					else
+						h+="<td style='text-align:center'>"+roaminglist[i].version+"</td>";
+
+					if ($.type(roaminglist[i].isfactory)!="undefined" && roaminglist[i].isfactory == "0")
+						h+="<td style='text-align:center'><a class=\"upload\" href=\"javascript:deleteFile('" + roaminglist[i].filename + "','" +roaminglist[i].range+ "','"+roaminglist[i].version+ "')\">" + _("delete") + "</a></td>";
+					else
+						h+="<td style='text-align:center;color:#999'>" + _("default") + "</td>";
+					h+="</tr>";
+				}
+			}
+
+			h+="</table>";
+			$("#TBlist").html(h);
+		}
+	);
+}
+
+function check_ok_button(checked)
+{
+	if(checked)
+	{
+		$('#b1').removeAttr("disabled", "disabled");
+	}
+	else
+	{
+		$('#b1').attr('disabled', 'disabled')
+	}
+}
+
+function do_confirm(msg, func)
+{
+	myfunc=func;
+	msg0=_('uppercase warning');
+	msg2=_('rssiRiskWarning');
+	$.blockUI( {message: "<div style='text-align:center;color:RED'>"+msg0+"</div></br><div style='text-align:left;'>"+msg+"</br></div>\
+		<div class='form-row'><label for='checkbox' style='width:AUTO;text-align:left;'>"+msg2+"</label>\
+		<div class='check-box'>\
+			<input type='checkbox' class='access' name='c2' id='c2' onClick='check_ok_button(this.checked);'><label for='c2' style='background-color:#fff'>&nbsp;</label>\
+		</div></div></br>\
+		<div class='button-double'>\
+		<button class='secondary med' id='b1' onClick='$.unblockUI();myfunc();' disabled>"+_("CSok")+"</button><button class='secondary med' onClick='$.unblockUI();'>"+_("cancel")+"</button>\
+		</div>", css: {width:'490px', padding:'20px 20px'}
+	});
+}
+
+$(document).ready( function() {
+	en="<%get_single_direct("manualroam.enable");%>"!="0";
+	load_value_to_element("input:radio.access[name=roaming_enable]", !en);
+	load_value_to_element("input:radio.access[name=validatePDP_enable]","<%get_single_direct("manualroam.pdp_validation_check");%>"!="1");
+	var tmp="<%get_single_direct('manualroam.best_network_retry_time');%>";
+	var rssi_threshold="<%get_single_direct('manualroam.rssi_user_threshold');%>";
+	if (rssi_threshold < 0)
+		rssi_threshold=(-1)*rssi_threshold
+	if (tmp=="") tmp="0";
+	$("#networkRetry").val(tmp);
+	$("#rssiThreshold").val(rssi_threshold);
+
+	var rscp_threshold="<%get_single_direct('manualroam.rscp_user_threshold');%>";
+	if (rscp_threshold < 0)
+		rscp_threshold=(-1)*rscp_threshold
+	$("#rscpThreshold").val(rscp_threshold);
+
+	var rsrp_threshold="<%get_single_direct('manualroam.rsrp_user_threshold');%>";
+	if (rsrp_threshold < 0)
+		rsrp_threshold=(-1)*rsrp_threshold;
+	else
+		rsrp_threshold=120;
+
+	$("#rsrpThreshold").val(rsrp_threshold);
+
+	if (conn_type == 'lte') {
+		$("#lteThreshold").show();
+	}
+	else {
+		$("#lteThreshold").hide();
+	}
+
+	var range="<%get_single_direct('manualroam.current_PRL_imsi_range');%>";
+	var version="<%get_single_direct('manualroam.current_PRL_version');%>";
+	if (version == "")
+		version = _("na");
+	var versionInUse = _("imsi range") +" [" + range + "], " + _("prl version") + " [" +  version + "]"
+
+	if ( range.length == 0 || en == false )
+		$("#prlInUse").css("display","none");
+
+	$("#prlVersionInUse").text(versionInUse);
+	rssi_changed="<%get_single_direct("manualroam.rssi_user_threshold.changed");%>";
+
+	if(rssi_changed != 1)
+	rssi_changed="<%get_single_direct("manualroam.rscp_user_threshold.changed");%>";
+
+	if(conn_type == 'lte') {
+		if(rssi_changed != 1)
+			rssi_changed="<%get_single_direct("manualroam.rsrp_user_threshold.changed");%>";
+	}
+
+	$("#showAdvancedSettings").prop('checked', (rssi_changed == 1));
+	$('#advSettings').css('display', (rssi_changed == 1)?'':'none');
+
+	getFileList();
+
+	$("input:radio.access[name=roaming_enable]").change(function() {
+		$(".roaming-div").css("display", $("#roaming_enable_0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=roaming_enable]").trigger("change");
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div id="main-content">
+			<form class="validate" name="form" id ="form" novalidate="novalidate">
+			<div class="right-column  white-box">
+				<div class="pad">
+					<h2><script language=Javascript>document.write(_("roamingsettings"))</script></h2>
+					<div id="roaming_enable" class="form-row no-bg-form">
+						<label for="field-0"><script language=Javascript>document.write(_("advancedNetworkSelection"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="roaming_enable_0" name="roaming_enable" class="access" value="0">
+									<label for="roaming_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="roaming_enable_1" name="roaming_enable" class="access" value="1">
+									<label for="roaming_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="grey-box roaming-div">
+						<div id="validatePDP_enable" class="form-row no-bg-form">
+							<label for="field-0"><script language=Javascript>document.write(_("validatePDPcontext"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="validatePDP_enable_0" name="validatePDP_enable" class="access" value="0">
+										<label for="validatePDP_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="validatePDP_enable_1" name="validatePDP_enable" class="access" value="1">
+										<label for="validatePDP_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="networkRetry"><script language=Javascript>document.write(_("networkRetryPeriod"))</script></label>
+							<div class="field">
+								<input type="text" class="large networkRetry required" name="networkRetry" id="networkRetry" onKeyUp="NumfieldEntry(this);" value="">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("tenTo2880"))</script></span>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button type="button" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+
+<%if(session["user"]=="root"){%>
+			<div  class="roaming-div" style="padding: 15px 10px;">
+				<div class="form-row">
+					<label for="checkbox"><script language=Javascript>document.write(_("showAdvancedSettings"))</script></label>
+					<div class="check-box">
+						<input type="checkbox" class="access" name="showAdvancedSettings" id="showAdvancedSettings" onClick="$('#advSettings').css('display', this.checked?'':'none');"><label for='showAdvancedSettings'>&nbsp;</label>
+					</div>
+				</div>
+<%}else{%>
+			<div style="display:none">
+<%}%>
+				<div class="right-column white-box" id="advSettings">
+					<div class="grey-box" id="roaming-div">
+						<div class="form-row">
+							<label for="rssiThreshold"><script language=Javascript>document.write(_("rssiThreshold"))</script></label>
+							<div class="field">
+								<input type="text" class="large required rssiThreshold" name="rssiThreshold" id="rssiThreshold" maxLength='3' onKeyUp="NumfieldEntry(this);$('#rssiThreshold').valid()" value="">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("minus105Tominus95"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="rscpThreshold"><script language=Javascript>document.write(_("rscpThreshold"))</script></label>
+							<div class="field">
+								<input type="text" class="large required rscpThreshold" name="rscpThreshold" id="rscpThreshold" maxLength='3' onKeyUp="NumfieldEntry(this);$('#rscpThreshold').valid()" value="">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("minus105Tominus95"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<div id="lteThreshold">
+								<label for="rsrpThreshold"><script language=Javascript>document.write(_("rsrpThreshold"))</script></label>
+								<div class="field">
+									<input type="text" class="large required rsrpThreshold" name="rsrpThreshold" id="rsrpThreshold" maxLength='3' onKeyUp="NumfieldEntry(this);$('#rsrpThreshold').valid()" value="">
+								</div>
+								<div>
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("minus120Tominus110"))</script></span>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<div class="field-des message">
+								<script language=Javascript>document.write(_("negativeWarning"))</script>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button type="button" onClick="javascript:submitFormAdv()"><script language=Javascript>document.write(_("apply"))</script></button>
+					</div>
+				</div>
+				</form>
+			</div>
+
+			<form class="validate" novalidate="novalidate">
+				<div class="right-column white-box" style="margin:30px 10px;">
+					<div class="pad">
+						<h2><script language=Javascript>document.write(_("prl list"))</script></h2>
+						<div id="prlInUse" class="form-row no-bg-form">
+							<label for="field-0"><script language=Javascript>document.write(_("prlInUse"))</script></label>
+							<div class="field">
+								<span class="normal-text" id="prlVersionInUse", name="prlVersionInUse"></span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<table>
+					<colgroup>
+						<col width="10%">
+						<col width="35%">
+						<col width="35%">
+						<col width="20%">
+					</colgroup>
+					<thead id="title-head">
+						<tr>
+							<th style='text-align:center' width="10%"><script language=Javascript>document.write(_("in use"))</script></th>
+							<th style='text-align:center' width="35%"><script language=Javascript>document.write(_("imsi range"))</script></th>
+							<th style='text-align:center' width="35%"><script language=Javascript>document.write(_("prl version"))</script></th>
+							<th style='text-align:center' width="20%"><script language=Javascript>document.write(_("action"))</script></th>
+						</tr>
+						<tbody id="TBlist"></tbody>
+					</thead>
+				</table>
+			</form>
+
+			<form class="validate" name="formS" novalidate="novalidate" method="POST">
+			<div class="right-column white-box" style="margin:30px 10px;">
+				<h2><script language=Javascript>document.write(_("roamingFilteredLog"))</script></h2>
+				<div class="p-des-full-width">
+					<p><script language=Javascript>document.write(_("roamingFilteredIntroduction"))</script></p>
+				</div>
+				<div id="roaming-log-div">
+					<div class="form-row" id="selectPage-div">
+						<label for="Level"><script language=Javascript>document.write(_("select page"))</script></label>
+						<span id="scriptspaginatealt" class="paginationstyle">
+							<a href="#" rel="previous" class="secondary sml">
+								<i class="arrow-l" style="padding:8px 3px 3px 3px;"></i>
+							</a>
+							<select style="width:130px; margin-top:-1px;"></select>
+							<a href="#" rel="next" class="secondary sml" style="margin-left:10px;">
+								<i class="arrow-r" style="padding:8px 3px 3px 3px;"></i>
+							</a>
+						</span>
+					</div>
+					<br/>
+					<div class="submit-row" style="padding:0 0 40px 0;">
+						<button type="button" class="secondary" onClick="javascript:downloadLog();"><script language=Javascript>document.write(_("download"))</script></button>
+						<button type="button" class="secondary" name="clear" onClick="javascript:ClearAllLog();"><script language=Javascript>document.write(_("clear"))</script></button>
+					</div>
+				</div>
+				<script language='javascript'>
+                                        set_menu("Internet", "ROAMINGSETTING", <%_val = session["user"];%>"@@_val");
+				</script>
+				<span id="logdata"></span>
+				<script language="JavaScript">
+				<%exec_cmd("/usr/bin/logfile -r");%>
+				</script>
+			</div>
+			</form>
+		</div>
+		<div id="rebootFm" class="white-box" style="display:none">
+			<div id="rebootMsg" align="center" style="font-size:16px; font-weight:bold; padding-top:20px;">
+				<script language=Javascript>document.write(_("GUI rebooting"))</script>
+			</div>
+			<div align="center" style="padding-top:10px;">
+				<img width="60px" height="60px" src="/img/spinner_250.gif">
+				<b id="rebootCt" style="position:relative;top:-25px; left:30px">0 %</b>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+		blockUI_confirm_l(_("telephony profile warningMsg"), function(){window.location.href="/roaming_settings.html?reboot"});
+		getFileList();
+<%	}
+	else if(request['QUERY_STRING']=="reboot") {%>
+		$("#main-content").css("display","none");
+		$("#rebootFm").css("display","");
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>service.system.reset=1", function(){setInterval(check_reload, 500);});
+<%	}%>
+
+/********* vdf validator**********/
+	VALIDATOR.config.errors["networkRetry"]=_("networkRetryPeriodMsg");
+	$.validator.addMethod("networkRetry",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c!=0 && c < 10) || (c > 2880) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.networkRetry);
+
+	VALIDATOR.config.errors["rssiThreshold"]=_("rssiThresholdMsg");
+	$.validator.addMethod("rssiThreshold",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c < 95) || (c > 105) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.rssiThreshold);
+
+	VALIDATOR.config.errors["rscpThreshold"]=_("rscpThresholdMsg");
+	$.validator.addMethod("rscpThreshold",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c < 95) || (c > 105) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.rscpThreshold);
+
+	VALIDATOR.config.errors["rsrpThreshold"]=_("rsrpThresholdMsg");
+	$.validator.addMethod("rsrpThreshold",function(c,a) {
+		if (conn_type != 'lte') {
+			return true;
+		}
+		else if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c < 110) || (c > 120) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.rsrpThreshold);
+</script>
+</body>
+</html>

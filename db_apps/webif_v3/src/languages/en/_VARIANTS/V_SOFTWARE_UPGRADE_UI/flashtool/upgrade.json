@@ -1,0 +1,7 @@
+{
+    "upgradeInProgress": "Upgrade is in progress",
+    "invalidFirmware": "Firmware is invalid",
+    "firmwareUploaded": "Firmware has been uploaded to the device successfully",
+    "firmwareUpgraded": "The device firmware has been upgraded successfully",
+    "checkConnection": "Please check the connection to the device"
+}

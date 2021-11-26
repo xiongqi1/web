@@ -1,0 +1,243 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Log</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/js/virtualpaginate.js"></script>
+<%
+useSession();
+if (request['REQUEST_METHOD'] == "GET") {
+	// nothing to do
+}
+%>
+
+<style>
+.logfile td {font-size:10px; padding:6px 0 6px 12px;}
+</style>
+
+<script language="JavaScript">
+
+var g_display_level = "<%get_single_direct('service.syslog.displaylevel');%>";
+
+var logdata = new Array();
+
+function loglines(allLines, level) {
+	var lineCnt;
+	var ostr = "";
+	var splitStr = new RegExp(" +");
+	var levelmap = {
+		emerg: 8,
+		emergency: 8,
+		alert: 7,
+		crit: 6,
+		critical: 6,
+		err: 5,
+		error: 5,
+		warn: 4,
+		warning: 4,
+		note: 3,
+		notice: 3,
+		info: 2,
+		debug: 1,
+		all: 0
+	};
+
+	var levelNumber = 0;
+	var allIndex;
+	var lastIgnore = 0;
+	if (level && level.length && levelmap.hasOwnProperty(level))
+		levelNumber = levelmap[level];
+	lineCnt = 0;
+
+	for (allIndex = allLines.length; allIndex > 0; allIndex--) {
+		var line = allLines[allIndex - 1];
+		var ray = new Array();
+		ray = line.split(": ");
+		var details = new Array();
+
+		details = ray.shift().split(splitStr);
+		/* 0 month, 1 day number, 2 time, 3 machine, 4 facility.level */
+		/* determine if level should be set */
+		if (details.length < 5) {
+			if (lastIgnore)
+				continue;
+		}
+		else if (levelNumber > 0) {
+			var lvsplit = details[4].indexOf(".");
+			if (lvsplit) {
+				lvsplit = details[4].substring(lvsplit+1);
+				lvsplit.toLowerCase();
+				if (!levelmap.hasOwnProperty(lvsplit) || levelmap[lvsplit] < levelNumber) {
+				lastIgnore = 1;
+				continue;
+				}
+			}
+			else {
+				if (lastIgnore)
+				continue;
+			}
+		}
+
+		lastIgnore = 0;
+		var firstColumn = details.shift();
+		details[0] = firstColumn + " " + details[0];
+
+		if (!lineCnt) {
+			ostr += "<table class='logfile'>"+
+			"<colgroup>\
+				<col width='15%'>\
+				<col width='10%'>\
+				<col width='8%'>\
+				<col width='10%'>\
+				<col width='auto'>\
+			</colgroup><thead>"+
+			"<tr><th class='align10'>"+_("date")+"  &  "+_("time")+"</td>"+
+			"<th class='align10'>"+_("machine")+"</th>"+
+			"<th class='align10'>"+_("level")+"</th>"+
+			"<th class='align10'>"+_("process")+"</th>"+
+			"<th class='align10'>"+_("message")+"</th></tr>";
+		}
+
+		ostr += "<tr><td>";
+		td10 = "</td><td>";
+		td20 = "</td><td>";
+		ostr += details[0]+"  "+details[1]+td10+details[2]+td10+details[3]+td10+breakWord(details[4],15)+td20+breakWord(ray.join(": "),44)+"</td></tr>"
+		lineCnt++;
+		if (lineCnt > 22) {
+			lineCnt = 0;
+			ostr += "</thead></table>";
+		}
+	}
+	if (lineCnt) {
+		ostr += "</tr></thead></table>";
+	}
+	return ostr;
+}
+
+function setSpanIdHTML(field, value) {
+	document.getElementById(field).innerHTML = value;
+}
+
+var newscriptsalt;
+function displayLogData(level) {
+var res = loglines(logdata.messages, level);
+	setSpanIdHTML('logdata', res);
+	newscriptsalt=new virtualpaginate("logfile", 1, "table");
+	newscriptsalt.buildpagination("scriptspaginatealt");
+
+	if(isNaN(newscriptsalt.pagecount) || newscriptsalt.pagecount<2 ) {
+		$("#selectPage-div").css("display", "none");
+	}
+	else {
+		$("#selectPage-div").css("display", "");
+	}
+}
+
+function setLogLevel() {
+	var l_level = document.formS.Level.value;
+	displayLogData(l_level);
+	// save this to non-persistent RDB variable so next the time page is displayed at the
+	// same display level as last viewed
+	$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>service.syslog.displaylevel="+l_level);
+}
+
+function ClearAllLog() {
+	function clearlog_func() {
+		$.get('/cgi-bin/clearlog.cgi', function(){location.href='/logfile.html';})
+	}
+	blockUI_confirm(_("confirm cleanLog"), clearlog_func);
+}
+
+function downloadLog() {
+	location.href = '/cgi-bin/logfile.cgi?action=downloadlog';
+}
+document.write('<style type="text/css">\n.logfile{display: none;}\n</style>')
+
+$(document).ready( function() {
+	if (g_display_level == "") {
+		$("#SetLevel").val("notice"); // set display level to "notice" by default
+		displayLogData("notice");
+	} else {
+		$("#SetLevel").val(g_display_level); // set display level to last displayed level
+		displayLogData(g_display_level);
+	}
+	if (logdata.messages.length >= 4600) {
+		$("#truncated-warn-div").css("display", "");
+	} else {
+		$("#truncated-warn-div").css("display", "none");
+	}
+});
+
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form class="validate" name="formS" novalidate="novalidate" method="POST">
+		<div class="right-column white-box">
+
+			<h2><script language=Javascript>document.write(_("logFile"))</script></h2>
+
+			<!-- logging display level selection -->
+			<label for="Level"><script language=Javascript>document.write(_("displayLevel"))</script></label>
+			<div class="field" style="padding-bottom:10px;">
+				<select name="Level" id="SetLevel" onchange="setLogLevel()" style="width:180px">
+					<option value="debug"><script language="JavaScript">document.write(_("log debug"))</script></option>
+					<option value="info"><script language="JavaScript">document.write(_("log info"))</script></option>
+					<option value="notice"><script language="JavaScript">document.write(_("log notice"))</script></option>
+					<option value="warning"><script language="JavaScript">document.write(_("log warning"))</script></option>
+					<option value="err"><script language="JavaScript">document.write(_("log Error"))</script></option>
+				</select>
+			</div>
+
+			<!-- Page number selection -->
+			<div class="form-row" id="selectPage-div">
+				<label for="Level"><script language=Javascript>document.write(_("select page"))</script></label>
+				<span id="scriptspaginatealt" class="paginationstyle">
+					<a href="#" rel="previous" class="secondary sml">
+						<i class="arrow-l" style="padding:8px 3px 3px 3px;"></i>
+					</a>
+					<select style="width:130px; margin-top:1px;"></select>
+					<a href="#" rel="next" class="secondary sml" style="margin-left:10px;">
+						<i class="arrow-r" style="padding:8px 3px 3px 3px;"></i>
+					</a>
+				</span>
+			</div>
+			<br/>
+			<div class="submit-row" style="padding:0 0 40px 0;">
+				<button type="button" class="secondary" onClick="javascript:downloadLog();"><script language=Javascript>document.write(_("download"))</script></button>
+				<button type="button" class="secondary" name="clear" onClick="javascript:ClearAllLog();"><script language=Javascript>document.write(_("clear"))</script></button>
+			</div>
+			<div class="status-text" id="truncated-warn-div" style="display: none">
+				<p id="truncated_log_warn_desc"><script>document.write(_("truncatedLogWarnMsg"))</script></p>
+			</div>
+			<script language='javascript'>
+				set_menu("System", "LOG", <%_val = session["user"];%>"@@_val");
+			</script>
+			<div id="logdata"></div>
+			<script language="JavaScript">
+			<%exec_cmd("/usr/bin/logfile -q");%>
+			</script>
+
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"></p>
+	</div>
+</footer>
+<script language='javascript'>
+	$(".copy-right").html(_("powered by netComm"));
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_("submitSuccess"));
+<%	}%>
+</script>
+</body>
+</html>

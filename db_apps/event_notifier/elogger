@@ -1,0 +1,228 @@
+#!/bin/sh
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is sending a event notification to"
+	echo "dedicated event notification daemon and logger as well."
+    echo ""
+	exit 0
+fi
+
+. /etc/variant.sh
+
+log()
+{
+	logger "event `basename ${0}`: $$ :${1}"
+}
+
+# Some applications call elogger without checking enabled or not so
+# it is better to check here again.
+EVTNOTI_EN=$(rdb_get service.eventnoti.conf.enable)
+test "$EVTNOTI_EN" = "1" || exit 0
+
+log "event type : $1, event text : $2"
+NOTI_TYPE_IDX=$1
+NOTI_TEXT=$2
+
+#---------------------------------------------------------------------------
+# manage elogger pid list file to allow reentrance
+MY_PID=$$
+#log "my_pid=$MY_PID"
+PID_FILE="/var/lock/elogger.pid"
+test -e $PID_FILE || touch $PID_FILE
+
+CONT_PREFIX="service.eventnoti.conf"
+TYPE_PREFIX="service.eventnoti.conf.type"
+DEST_PREFIX="service.eventnoti.conf.dest"
+EVENT_PREFIX="service.eventnoti.event"
+PREFIX_TEXT=`rdb_get service.eventnoti.conf.prefix_text` 2>/dev/null
+test -n "$PREFIX_TEXT" && PREFIX_TEXT="$PREFIX_TEXT : "
+
+kill_daemon()
+{
+	killall $1 &>/dev/null
+	let "TIMEOUT=10"
+	while pidof $1 &>/dev/null; do
+		sleep 1
+		let "TIMEOUT-=1"
+		test $TIMEOUT -lt 0 && break
+	done
+	killall -q $1 &>/dev/null
+	rm -f /var/lock/subsys/$1 &>/dev/null
+}
+
+# tricky manipulation to reduce rebooting time
+#	1) force retry count to 1 for rebooting notification to reduce rebooting time
+#	2) kill event_monitor to prevent further event notification from now
+#	3) kill all notifier subfunctions such as sendsms, sendmail, send_email.sh, nc, socat
+#	4) move event_buffer read index to last index
+#	5) save write index of reboot event notification to be checked in rc.STOP
+#	6) restart event_notifier to send rebooting event immediately
+process_reboot_event()
+{
+	log "===================================================================="
+	log "      REBOOTING EVENT DETECTED"
+	log "===================================================================="
+	kill_daemon event_monitor
+	kill_daemon event_notifier
+	kill_daemon enotifier
+	kill_daemon ethdevno_monitor
+	kill_daemon sendsms
+	kill_daemon sendmail
+	kill_daemon send_email.sh
+	kill_daemon nc
+	kill_daemon socat
+	rdb_set service.eventnoti.conf.rd_idx $EVTNOTI_WR_IDX
+	rdb_set service.eventnoti.info.reboot_wr_idx $EVTNOTI_WR_IDX
+	EVT_NOTI_DEBUG=`rdb_get service.eventnoti.conf.debug`
+	test "$EVT_NOTI_DEBUG" = "1" && EVT_NOTI_OPTION=" -v"
+	EVT_NOTI_OPTION="$EVT_NOTI_OPTION -i"
+	/usr/bin/event_notifier $EVT_NOTI_OPTION&
+}
+
+# Control function to clear event log file
+clearlog()
+{
+	SAVE_FILE="$(rdb_get $CONT_PREFIX.log_file)"
+	if [ -f "$SAVE_FILE" ]; then
+		> "$SAVE_FILE"
+	fi
+	rdb_set $CONT_PREFIX.noti_cnt 0
+}
+
+process_new_event()
+{
+	echo -n "$MY_PID " > $PID_FILE
+	#log "now it's my turn, begin event noti logging..."
+
+	# Control event
+	if [ "$NOTI_TYPE_IDX" = "0" ]; then
+		case "$NOTI_TEXT" in
+			'clearlog') clearlog ;;
+			*) log "Invalid control type: [$NOTI_TEXT]" ;;
+		esac
+
+		return
+	fi
+
+	# get destination index, if empty destination, ignore this event
+	DEST_IDX=`rdb_get $TYPE_PREFIX.$NOTI_TYPE_IDX.dest_idx`
+	test -z "$DEST_IDX" && log "$TYPE_PREFIX.$NOTI_TYPE_IDX.dest_idx is empty, ignore this event" && return
+
+	let "EVTNOTI_MAX=100"
+	let "EVTNOTI_WR_IDX=0"
+	let "EVTNOTI_CNT=0"
+	EVTNOTI_MAX=`rdb_get $CONT_PREFIX.max_size`
+	if [ "$EVTNOTI_MAX" = "" ]; then
+		let "EVTNOTI_MAX=100"
+		rdb_set $CONT_PREFIX.max_size $EVTNOTI_MAX
+	fi
+	EVTNOTI_WR_IDX=`rdb get $CONT_PREFIX.wr_idx`
+	if [ "$EVTNOTI_WR_IDX" = "" ]; then
+		let "EVTNOTI_WR_IDX=0"
+		rdb_set $CONT_PREFIX.wr_idx $EVTNOTI_WR_IDX
+	fi
+
+	EVTNOTI_CNT=`rdb get $CONT_PREFIX.noti_cnt`
+	if [ "$EVTNOTI_CNT" = "" ]; then
+		let "EVTNOTI_CNT=0"
+		rdb_set $CONT_PREFIX.noti_cnt $EVTNOTI_CNT
+	fi
+	let "EVTNOTI_CNT+=1"
+	rdb_set $CONT_PREFIX.noti_cnt $EVTNOTI_CNT
+
+	log "EVTNOTI_MAX = $EVTNOTI_MAX, EVTNOTI_WR_IDX = $EVTNOTI_WR_IDX, EVTNOTI_CNT = $EVTNOTI_CNT"
+	EVTNOTI_TEXT="[EVENT#$NOTI_TYPE_IDX] `date +%F" "%T` $PREFIX_TEXT$NOTI_TEXT"
+
+	# save different event notification text for syslog format notification message
+	#	default priority : 1 - user-level messages
+	#	default severity : 5 - notice: normal but significant condition
+	if [ "$V_RFC5424_FORMAT_EVENT_NOTIFY" = "y" ]; then
+		# convert to RFC5424 format
+		# PRI VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
+		# <priority*8+severity> <ver> <yyyy-mm-ddThh:mm:ss.nnnn(+/-)TZ <hostname> <message>
+		#	version : 1
+		#	timezone field is not necessary because date command outputs currnet local time
+		#	APP-NAME, PROCID, MSGID, STRUCTURED-DATA can be NIL value.
+		EVTNOTI_LOG_TEXT="<13> 1 `date +"%FT%T.%N"` `rdb_get system.product.model` [EVENT#$NOTI_TYPE_IDX] $PREFIX_TEXT$NOTI_TEXT"
+	else
+		# convert to RFC3164 format
+		# PRI TIMESTAMP HOSTNAME MSG
+		# <priority*8+severity> <month date hh:mm:ss> <hostname> <message>
+		EVTNOTI_LOG_TEXT="<13> `date +"%b %d %T"` `rdb_get system.product.model` [EVENT#$NOTI_TYPE_IDX] $PREFIX_TEXT$NOTI_TEXT"
+	fi
+	#log "EVTNOTI_LOG_TEXT = \"$EVTNOTI_LOG_TEXT\""
+
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.type "$NOTI_TYPE_IDX"
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.text "$EVTNOTI_TEXT"
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.logtext "$EVTNOTI_LOG_TEXT"
+
+	EVTNOTI_MAX_RETRY=`rdb get $CONT_PREFIX.max_retry`
+	# give 5 more chances for power-up notification to compensate booting time
+	test "$NOTI_TYPE_IDX" = "1" && let "EVTNOTI_MAX_RETRY+=5"
+
+	# force retry count to 1 for rebooting notification to reduce rebooting time
+	if [ "$NOTI_TYPE_IDX" = "2" ]; then
+		let "EVTNOTI_MAX_RETRY=1"
+	fi
+
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.retry_cnt "$EVTNOTI_MAX_RETRY"
+
+	EVTNOTI_CLIENTS=`rdb_get $TYPE_PREFIX.$NOTI_TYPE_IDX.enabled_clients`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.clients "$EVTNOTI_CLIENTS"
+
+	EVTNOTI_NAME=`rdb_get $DEST_PREFIX.$DEST_IDX.name`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.name "$EVTNOTI_NAME"
+	EVTNOTI_SMS_DESTS=`rdb_get $DEST_PREFIX.$DEST_IDX.sms_addr`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.sms_dests "$EVTNOTI_SMS_DESTS"
+	EVTNOTI_EMAIL_DESTS=`rdb_get $DEST_PREFIX.$DEST_IDX.email_addr`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.email_dests "$EVTNOTI_EMAIL_DESTS"
+	EVTNOTI_TCP_DESTS=`rdb_get $DEST_PREFIX.$DEST_IDX.tcp_addr`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.tcp_dests "$EVTNOTI_TCP_DESTS"
+	EVTNOTI_TCP_PORT=`rdb_get $DEST_PREFIX.$DEST_IDX.tcp_port`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.tcp_port "$EVTNOTI_TCP_PORT"
+	EVTNOTI_UDP_DESTS=`rdb_get $DEST_PREFIX.$DEST_IDX.udp_addr`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.udp_dests "$EVTNOTI_UDP_DESTS"
+	EVTNOTI_UDP_PORT=`rdb_get $DEST_PREFIX.$DEST_IDX.udp_port`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.udp_port "$EVTNOTI_UDP_PORT"
+	EVTNOTI_CMD=`rdb_get $DEST_PREFIX.$DEST_IDX.cmd`
+	rdb_set $EVENT_PREFIX.$EVTNOTI_WR_IDX.cmd "$EVTNOTI_CMD"
+
+	# special process for rebooting event
+	if [ "$NOTI_TYPE_IDX" = "2" ]; then
+		process_reboot_event
+	fi
+
+	# save to log file
+	SAVE_OPTION=`rdb_get $CONT_PREFIX.save_to_file`
+	if [ "$SAVE_OPTION" = "1" ]; then
+		SAVE_FILE=`rdb_get $CONT_PREFIX.log_file`
+		test -e "$SAVE_FILE" || touch "$SAVE_FILE"
+		echo "[$EVTNOTI_WR_IDX]-$EVTNOTI_TEXT" >> "$SAVE_FILE"
+	fi
+
+	let "EVTNOTI_WR_IDX+=1"
+	if [ $EVTNOTI_WR_IDX -ge $EVTNOTI_MAX ]; then
+		let "EVTNOTI_WR_IDX=0"
+		log "reset EVTNOTI_WR_IDX to 0"
+	fi
+	log "new EVTNOTI_WR_IDX = $EVTNOTI_WR_IDX "
+	rdb_set $CONT_PREFIX.wr_idx $EVTNOTI_WR_IDX
+
+	#log "my turn is over, finish event noti logging..."
+}
+
+# protect variables change with flock if possible
+if [ -e "/usr/bin/flock" ]; then
+	(
+	flock 200
+	process_new_event
+	)200<$PID_FILE
+else
+	process_new_event
+fi
+
+exit 0

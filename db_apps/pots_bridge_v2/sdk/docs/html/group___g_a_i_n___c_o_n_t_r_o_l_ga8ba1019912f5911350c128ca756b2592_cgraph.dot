@@ -1,0 +1,17 @@
+digraph "ProSLIC_AudioGainSetup"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir="LR";
+  Node1 [label="ProSLIC_AudioGainSetup",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 -> Node2 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node2 [label="ProSLIC_dbgSetRXGain",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___g_a_i_n___c_o_n_t_r_o_l.html#gaf3c5785b910d31af3864d6022fd23977",tooltip="This function calculates the preset values for the RX audio (toward the telephone) - it does NOT set ..."];
+  Node1 -> Node3 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node3 [label="ProSLIC_dbgSetTXGain",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___g_a_i_n___c_o_n_t_r_o_l.html#gacdfa5e4cbf6473148323f6069d61bba6",tooltip="This function calculates the preset values for the TX audio (toward the network) - it does NOT set th..."];
+  Node3 -> Node4 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node4 [label="ProSLIC_LineMonitor",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___d_i_a_g_n_o_s_t_i_c_s.html#gaff35c3a11de982ce429771fc2d3a24ce",tooltip="This function allows one to monitor the instantaneous voltage and loop current values seen on tip/rin..."];
+  Node1 -> Node5 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node5 [label="ProSLIC_RXAudioGainSetup",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___g_a_i_n___c_o_n_t_r_o_l.html#gae2a6ceb66cf911e401089ed8af657cd7",tooltip="Configures the RX audio gain (toward the telephone). This function DOES NOT actually calculate the va..."];
+  Node1 -> Node6 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node6 [label="ProSLIC_TXAudioGainSetup",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___g_a_i_n___c_o_n_t_r_o_l.html#ga49591834dff6c9b5fa1fa229bdc28481",tooltip="Sets the TX audio gain (toward the network). This funcion DOES NOT actually calculate the values for ..."];
+}

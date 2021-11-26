@@ -1,0 +1,6 @@
+digraph "Si3228x_General_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3228x_General_Cfg\n|+ device_key\l+ bomOpt\l+ batType\l+ bat_hyst\l+ vbatr_expect\l+ vbath_expect\l+ pwrsave_timer\l+ offhook_thresh\l+ vbat_track_min\l+ vbat_track_min_rng\land 51 more...\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

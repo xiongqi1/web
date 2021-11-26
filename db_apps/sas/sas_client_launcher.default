@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# launch SAS client
+#
+# Copyright (C) 2019 NetComm Wireless Limited.
+#
+
+log() {
+	logger -t "sas_client_launcher" "$*"
+}
+
+clean_up_child() {
+	pkill -9 -P $$
+	wait
+	exit
+}
+
+trap clean_up_child SIGTERM
+
+pid="$$"
+log "remove launcher from OOM (pid=$pid)"
+echo "-17" > "/proc/$pid/oom_adj"
+
+is_enabled="$(rdb_get service.sas_client.enable)"
+if [ "$is_enabled" != "1" ]; then
+    log "sas client not enabled, exiting..."
+    exit
+fi
+
+while true; do
+	log "starting sas_client"
+	lua /usr/bin/sas_client_start.lua 2>&1 | logger -p 6 -t "sas_client_launcher" 2> /dev/null > /dev/null &
+	wait
+
+	log "sleep for 60 seconds"
+	sleep 60
+done
+

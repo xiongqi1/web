@@ -1,0 +1,84 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>MEP Unlock</title>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	mycode = form['mepCode'];
+	set_single('meplock.code='+mycode);
+	esp_sleep(5000);
+} 
+tempval = get_single('meplock.result');
+form['result'] = tempval;
+tempval = get_single('meplock.status');
+form['MEPStatus'] = tempval;
+set_single('meplock.result=');
+%>
+<body onload="init()">
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("internet");
+function init() {
+	initTranslation();
+	if(document.form.result.value.indexOf("error")!=-1){
+		alert(_("mep warningMsg4"));//Error: You have entered an invalid network unlock code. Please try again.
+	}
+}
+
+function submitF() {
+	try
+	{
+		document.form.saveButton.disabled = true; 
+		document.form.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+}
+function initTranslation() {
+	document.form.saveButton.value = "   "+_("CSsave")+"   ";
+	if(document.form.MEPStatus.value=="unlocked")
+		document.form.MEPStatus.value=_("unlocked");
+	else
+		document.form.MEPStatus.value=_("locked");
+/*document.getElementById("").innerHTML = _("");
+<script language="JavaScript">document.write(_(""))</script*/
+}
+</script>
+
+<form name="form" method="POST" action="@@requst['SCRIPT_NAME']" >
+<input type="hidden" name="result" value="@@form['result']"/>
+<h3><script language="JavaScript">document.write(_("networkUnlock"))</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+		
+<table width="75%">
+    <tr><th><script language="JavaScript">document.write(_("networkUnlock"))</script></th></tr>
+</table>
+
+<table width="75%">	
+<tr>
+    <td width="38%"><script language="JavaScript">document.write(_("mepLockingStatus"))</script></td>
+    <td><input type="text" name="MEPStatus" size="40" style="border-style:none; background:#F0EFEB" value="@@form['MEPStatus']"/></td>
+</tr>
+
+<tr id="mepcode" > 
+	<td width="38%"><script language="JavaScript">document.write(_("networkUnlockCode"))</script></td>
+	<td><input type=text name="mepCode" size=8 maxlength=10 >&nbsp;</td>
+</tr>
+</table>
+
+<div align="right" style="margin-right:25% ">
+<p></p>
+<INPUT TYPE="Button" VALUE="Save"  name="saveButton" onClick="javascript:submitF()" >
+</div>
+</form>
+</div>
+</body>
+</html>

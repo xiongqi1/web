@@ -1,0 +1,176 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>TCP Keepalive</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+
+function toInt( str ) {
+	return str-0;
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	/* Avoid triggering any variables if the value has not changed */
+	var currval = get_single( 'system.config.tcp_keepalive_enable' );
+	var tempval = form['tcp_keepalive_enable'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'system.config.tcp_keepalive_enable', tempval);
+	}
+
+	currval = get_single( 'system.config.tcp_keepalive_time' );
+	tempval = form['keepaliveTime'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'system.config.tcp_keepalive_time', tempval);
+	}
+
+	currval = get_single( 'system.config.tcp_keepalive_intvl' );
+	tempval = form['intvl'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'system.config.tcp_keepalive_intvl', tempval);
+	}
+
+	tempval = form['probes'];
+	if (currval != tempval) {
+		set_single_direct("-p", 'system.config.tcp_keepalive_probes', tempval);
+	}
+
+	redirect(request['SCRIPT_NAME'] + "?success");
+}
+else { /*GET*/
+	form['tcp_keepalive_enable'] = get_single( 'system.config.tcp_keepalive_enable' );
+	if (form['tcp_keepalive_enable'] == "N/A") {
+		form['tcp_keepalive_enable'] = 1;
+	}
+
+	form['keepaliveTime'] = get_single('system.config.tcp_keepalive_time');
+	form['intvl'] = get_single('system.config.tcp_keepalive_intvl');
+	form['probes'] = get_single('system.config.tcp_keepalive_probes');
+}
+%>
+
+<script language="JavaScript">
+function submitForm() {
+	clear_alert();
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+
+	document.form.submit();
+}
+
+$(document).ready( function() {
+ load_value_to_element("input:radio.access[name=tcp_keepalive_enable]","@@form['tcp_keepalive_enable']"=="1");
+	$("input:radio.access[name=tcp_keepalive_enable]").change(function() {
+		$("#tcp-keepalive-toggle-div").css("display", $("#tcp_keepalive_enable-0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=tcp_keepalive_enable]").trigger("change");
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+	<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST">
+	<%appendCsrfToken();%>
+		<div class="right-column white-box" id="tcpKeepalive_setup">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("keepalive settings"))</script></h2>
+				<div style="padding:15px 0 60px 20px; width:660px;">
+					<label for="field-1"><script language=Javascript>document.write(_("enabled"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div id="tcp_keepalive_enable-div" class="radio-switch">
+								<input type="radio" id="tcp_keepalive_enable-0" name="tcp_keepalive_enable" class="access" value="1">
+								<label for="tcp_keepalive_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+
+								<input type="radio" id="tcp_keepalive_enable-1" name="tcp_keepalive_enable" class="access" value="0">
+								<label for="tcp_keepalive_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="tcp-keepalive-toggle-div">
+
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row" id="keepaliveTime-div">
+							<label for="keepaliveTime"><script language=Javascript>document.write(_("keepalive time"))</script></label>
+							<div class="field">
+								<input type="text" name="keepaliveTime" id="keepaliveTime" class="validate[required,funcCall[validate_keepalive_time]] large" value="@@form['keepaliveTime']" onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("sec60"))</script></span>
+							</div>
+						</div>
+					</div>
+
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row" id="intvl-div">
+							<label for="intvl"><script language=Javascript>document.write(_("keepalive interval"))</script></label>
+							<div class="field">
+								<input type="text" name="intvl" id="intvl" class="validate[required,funcCall[validate_keepalive_interval]] large" value="@@form['intvl']" onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("sec10"))</script></span>
+							</div>
+						</div>
+					</div>
+
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row" id="probes-div">
+							<label for="probes"><script language=Javascript>document.write(_("keepalive probes"))</script></label>
+							<div class="field">
+								<input type="text" name="probes" id="probes" class="validate[required,funcCall[validate_keepalive_probes]] large" value="@@form['probes']" onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("times1000"))</script></span>
+							</div>
+						</div>
+					</div>
+
+				</div>
+				<div class="submit-row" style="margin-left:252px;">
+					<button type="button" onClick="submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div></div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("System", "TCPKeepalive", <%_val = session["user"];%>"@@_val");
+
+function validate_keepalive_time(field) {
+	if( field.val() < 60 || field.val() > 65535 ) {
+		return _("Msg114");
+	}
+}
+
+function validate_keepalive_interval(field) {
+	if( field.val() < 10 || field.val() > 28800 ) {
+		return _("Msg115");
+	}
+}
+
+function validate_keepalive_probes(field) {
+	if( field.val() < 1 || field.val() > 1000 ) {
+		return _("Msg116");
+	}
+}
+
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("",_('submitSuccess'));
+<%}%>
+</script>
+
+</body>
+</html>

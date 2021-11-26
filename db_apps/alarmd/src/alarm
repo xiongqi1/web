@@ -1,0 +1,64 @@
+#!/usr/bin/env lua
+
+require('alarmclient')
+
+ac = alarmclient.new()
+
+function doIt(argc, argv)
+	if argv[1] == 'raise' and argc == 3 then
+		local id = ac:raise(argv[2], argv[3])
+		print(id)
+	elseif argv[1] == 'clear' and argc >= 2 then
+		for i = 2, argc do
+			local alarm = ac:getById(argv[i])
+			local ret = alarm:clear()
+			print(ret)
+		end
+	elseif argv[1] == 'delete' and argc >= 2 then
+		for i = 2, argc do
+			local alarm = ac:getById(argv[i])
+			local ret = alarm:delete()
+			print(ret)
+		end
+	elseif argv[1] == 'list' and argc == 1 then
+		alarms = ac:getAll()
+		for _, alarm in ipairs(alarms) do
+			print(alarm.id, tostring(alarm.raised) .. ':' .. tostring(alarm.cleared), alarm.subsys, alarm.message)
+		end
+	elseif argv[1] == 'subsys' and argc == 2 then
+		alarms = ac:getBySubsystem(argv[2])
+		for _, alarm in ipairs(alarms) do
+			print(alarm.id, tostring(alarm.raised) .. ':' .. tostring(alarm.cleared), alarm.subsys, alarm.message)
+		end
+	elseif argv[1] == 'flush' and argc == 1 then
+		ac:flush()
+	else
+		usage()
+	end
+end
+
+function usage()
+	print('Usage: alarm <action> [args]')
+	print()
+	print('   Actions:')
+	print()
+	print('      list')
+	print('      subsys <subsystem>')
+	print('      raise  <subsystem> <message>')
+	print('      clear  <alarm-id>+')
+	print('      delete <alarm-id>+')
+	print()
+	print('Exit value is 0 on success, 1 on usage error and 255/-1 on failure.')
+	print('List format is: <id> <raised>:(<closed>)? <subsystem> <message>.')
+	os.exit(1)
+end
+
+local argc = #arg
+if argc < 1 then usage() end
+
+ret, err = pcall(doIt, argc, arg)
+--ret, err = xpcall(function() doIt(argc, arg) end, debug.traceback)
+if not ret then
+	print('Error: ' .. err)
+	os.exit(-1)
+end

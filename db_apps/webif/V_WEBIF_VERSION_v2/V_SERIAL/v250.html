@@ -1,0 +1,474 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Modem Emulator</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?serialList"></script>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	set_single( 'confv250.enable='+form['hidden_enable'] );
+	set_single( 'confv250.Baud_rate='+form['v250baud'] );
+	set_single( 'confv250.Inter_Character_Timeout='+form['v250icto'] );
+	set_single( 'confv250.Ident='+form['v250id'] );
+	set_single( 'confv250.ignoreStr='+form['v250ignoreStr'] );
+
+	set_single( 'confv250.dialPort='+form['dialPort'] );
+	set_single( 'confv250.opt_dtr='+form['v250dtr'] );
+	set_single( 'confv250.opt_dcd='+form['v250dcd'] );
+	set_single( 'confv250.opt_fc='+form['v250fc'] );
+	set_single( 'confv250.opt_ri='+form['v250ri'] );
+	set_single( 'confv250.modemAutoAnswer='+form['modemAutoAnswer'] );
+	set_single( 'confv250.autoDialNumber='+form['autoDialNumber'] );
+
+	i = form['profilenum'];
+	set_single( 'link.profile.profilenum='+i, '-p' );
+	set_single( 'link.profile.'+i+'.pad_host='+form['ppprhost'], '-p');
+	set_single( 'link.profile.'+i+'.pad_mode='+form['ppppadmode'], '-p');
+	set_single( 'link.profile.'+i+'.pad_encode='+form['pppport'], '-p');
+	set_single( 'link.profile.'+i+'.pad_o='+form['pad_o'], '-p');
+	set_single( 'admin.remote.pad_encode='+form['fw_pad_port'], '-p');
+	set_single( 'link.profile.modememulator_update=1', '-p');
+	esp_sleep(2000);
+	redirect('/v250.html?success');
+}
+else { /*GET*/
+	temp = get_single( 'confv250.Inter_Character_Timeout' );
+	if(temp=="" || temp=="N/A") {
+		temp=0;
+	}
+	form['v250icto'] = temp;
+	form['v250id'] = get_single( 'confv250.Ident' );
+	form['v250ignoreStr'] = get_single( 'confv250.ignoreStr' );
+	form['autoDialNumber'] = get_single( 'confv250.autoDialNumber' );
+	form['profilenum']=get_single( 'link.profile.profilenum' );
+
+	_dialPort=get_single('confv250.dialPort');
+	_v250dtr=get_single('confv250.opt_dtr');
+	_v250fc=get_single('confv250.opt_fc');
+	_v250dcd=get_single('confv250.opt_dcd');
+	_v250ri=get_single('confv250.opt_ri');
+	_modemAutoAnswer=get_single('confv250.modemAutoAnswer');
+	_v250baud=get_single('confv250.Baud_rate');
+
+	_confv250_enable=get_single( 'confv250.enable' );
+	_confv250_padd_enable=get_single( 'confv250.padd_enable' );
+}
+%>
+<script language="JavaScript">
+var _v250dtr = "@@_v250dtr";
+function showSelectv250dtr() {
+	document.write(""+
+	"<select name=\"v250dtr\">"+
+	"    <option value=\"0\">"+_("ignore")+"</option>"+
+	"    <option value=\"1\">"+_("command")+"</option>"+
+	"    <option value=\"2\">"+_("disconnect")+"</option>"+
+	"    <option value=\"4\">"+_("highAutoDial")+"</option>"+
+	"    <option value=\"5\">"+_("lowAutoDial")+"</option>"+
+	"    <option value=\"6\">"+_("lowPass")+"</option>"+
+	"</select>");
+}
+
+var _v250fc = "@@_v250fc";
+function showSelectv250fc() {
+	document.write(""+
+	"<select name=\"v250fc\" class='med'>"+
+	"    <option value=\"0\">"+_("Off")+"</option>"+
+	"    <option value=\"34\">"+_("hardware")+"</option>"+
+	"</select>");
+}
+
+var _v250dcd = "@@_v250dcd";
+function showSelectv250dcd() {
+	document.write(""+
+	"<select name=\"v250dcd\" class='med'>"+
+	"    <option value=\"0\">"+_("always on")+"</option>"+
+	"    <option value=\"1\">"+_("connect on")+"</option>"+
+	"    <option value=\"2\">"+_("always off")+"</option>"+
+	"    <option value=\"3\">"+_("ppp on")+"</option>"+
+	"</select>");
+}
+
+var _dialPort = "@@_dialPort";
+function showSelectdialPort() {
+	document.write(""+
+	"<select name=\"dialPort\" class='med'>"+
+	"    <option value=\"0\">"+_("dialString")+"</option>"+
+	"    <option value=\"1\">"+_("profile")+"</option>"+
+	"    <option value=\"2\">"+_("circuit")+"</option>"+
+	"    <option value=\"3\">"+_("packet")+"</option>"+
+	"</select>");
+}
+
+var _v250ri = "@@_v250ri";
+function showSelectv250ri() {
+	document.write(""+
+	"<select name=\"v250ri\" class='med'>"+
+	"    <option value=\"1\">"+_("incoming ring")+"</option>"+
+	"    <option value=\"0\">"+_("always on")+"</option>"+
+	"    <option value=\"2\">"+_("always off")+"</option>"+
+	"</select>");
+}
+
+var _modemAutoAnswer = "@@_modemAutoAnswer";
+function showSelectmodemAutoAnswer() {
+	document.write(""+
+	"<select name=\"modemAutoAnswer\" class='med'>"+
+	"    <option value=\"0\">"+_("Off")+"</option>"+
+	"    <option value=\"1\">1</option>"+
+	"    <option value=\"2\">2</option>"+
+	"    <option value=\"3\">3</option>"+
+	"    <option value=\"4\">4</option>"+
+	"    <option value=\"5\">5</option>"+
+	"    <option value=\"6\">6</option>"+
+	"    <option value=\"7\">7</option>"+
+	"    <option value=\"8\">8</option>"+
+	"    <option value=\"9\">9</option>"+
+	"    <option value=\"10\">10</option>"+
+	"    <option value=\"11\">11</option>"+
+	"    <option value=\"12\">12</option>"+
+	"</select>");
+}
+
+function showProfiles() {
+	document.write("<select name=\"profiles\" id=\"profiles\">");
+	for( i=0; i<stpf.length; i++ ) {
+		document.write("<option value=\""+(i+1)+"\">"+stpf[i].name+"</option>");
+	}
+	document.write("</select>");
+	$("#profiles").val($("#profilenum").val());
+}
+
+function setPad_o() {
+	document.form.pad_o.value = 0;
+	if(document.form.serprot[0].checked==true) {
+		document.form.pad_o.value = 16;
+	}
+	if(document.form.pppauto[0].checked==true) {
+		document.form.pad_o.value |= 128;
+	}
+}
+
+function submitF() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	$("#hidden_enable").val($("input:radio[name=emulator-enable]:checked").val());
+	blockUI_wait(_("saveSettings"));
+	document.form.submit();
+}
+var _v250baud = "@@_v250baud";
+$(document).ready( function() {
+	with ( document.forms[0] ) {
+		setSelect( v250baud, _v250baud);
+		setSelect( v250dtr, _v250dtr);
+		setSelect( v250fc, _v250fc);
+		setSelect( v250dcd, _v250dcd);
+		setSelect( dialPort, _dialPort);
+		setSelect( v250ri, _v250ri);
+		setSelect( modemAutoAnswer, _modemAutoAnswer);
+	}
+	load_value_to_element($("input:radio[name=emulator-enable]"), "@@_confv250_enable"=="1");
+	$("input:radio.access[name=emulator-enable]").change(function() {
+		en=$("#emulator-enable-0").is(":checked");
+		$("#settings-div").css("display",en?"":"none");
+	});
+	if(typeof(host_if_list)!="undefined") {
+		$.each( host_if_list, function(val,attr) {
+			if(attr=="platform") {
+				if(val.indexOf("dev/")!=-1) {
+					$("#serialPortName").html(val);
+				}
+				else {
+					$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+val, function(x) {
+						$("#serialPortName").html(x.substring(x.indexOf("=")+1).replace(/\"|\;/g,''));
+					});
+				}
+				return true;
+			}
+		});
+	}
+
+	if( "@@_confv250_padd_enable" == "0" ) {
+		$("#serialPortStatus").css("color", "GREEN");
+		$("#serialPortStatus").html(_("noConflicts"));
+	}
+	else {
+		$("#serialPortStatus").css("color", "RED");
+		$("#serialPortStatus").html(_("conflicts"));
+	}
+
+	$("#profiles").change(function() {
+		i=parseInt($("#profiles").val()-1);
+		$("#profilenum").val($("#profiles").val());
+		document.form.ppprhost.value = stpf[i].host;
+		document.form.pppport.value = stpf[i].port;
+		if(stpf[i].padmode<1) {
+			stpf[i].padmode = 1;
+		}
+		document.form.ppppadmode.options.selectedIndex = stpf[i].padmode-1;
+		if ( 1*stpf[i].pad_o &128) {
+			document.form.pppauto[0].checked = true;
+		}
+		else {
+			document.form.pppauto[1].checked = true;
+		}
+		if ( 1*stpf[i].pad_o &16) {
+			document.form.serprot[0].checked = true;
+		}
+		else {
+			document.form.serprot[1].checked = true;
+		}
+		setPad_o();
+	});
+	$("#profiles").trigger("change");
+	$("input:radio.access[name=emulator-enable]").trigger("change");
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+		<%appendCsrfToken();%>
+		<input type="hidden" name="hidden_enable" id="hidden_enable" value="@@form['hidden_enable']">
+		<div class="right-column white-box">
+			<h2><script language=Javascript>document.write(_("modemEmulator"))</script></h2>
+			<div class="form-row no-bg-form">
+				<label for="emulator-enable"><script language=Javascript>document.write(_("station active"))</script></label>
+				<div class="field">
+					<div class="location-settings">
+						<div class="radio-switch">
+							<input type="radio" id="emulator-enable-0" name="emulator-enable" class="access" value=1>
+							<label for="emulator-enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+							<input type="radio" id="emulator-enable-1" name="emulator-enable" class="access" value=0>
+							<label for="emulator-enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="form-row">
+				<label for="serialPortName"><script language=Javascript>document.write(_("serialPortName"))</script></label>
+				<div class="field" style="margin:6px 0 0 3px;">
+					<span id=serialPortName></span>
+				</div>
+			</div>
+			<div class="form-row">
+				<label for="serialPortStatus"><script language=Javascript>document.write(_("serialPortStatus"))</script></label>
+				<div class="field" style="margin:6px 0 0 3px;">
+					<span id="serialPortStatus"></span>
+				</div>
+			</div>
+			<div id="settings-div">
+				<h2><script language=Javascript>document.write(_("modem settings"))</script></h2>
+				<div class="form-row">
+					<label for="v250baud"><script language=Javascript>document.write(_("baud rate"))</script></label>
+					<div class="field">
+						<select name="v250baud" class="med" size=1 >
+							<option value=300>300</option>
+							<option value=1200>1200</option>
+							<option value=2400>2400</option>
+							<option value=4800>4800</option>
+							<option value=9600>9600</option>
+							<option value=19200>19200</option>
+							<option value=38400>38400</option>
+							<option value=57600>57600</option>
+							<option value=115200>115200</option>
+						</select>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="v250icto"><script language=Javascript>document.write(_("inter character timeout"))</script></label>
+					<div class="field">
+						<input type=text name="v250icto" id="v250icto" class="large required validate[required,funcCall[validate_icto]]" maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['v250icto']">
+						<span class="normal-text">&nbsp;(0-65535) <script language=Javascript>document.write( _("miliseconds"))</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="v250id"><script language=Javascript>document.write(_("id"))</script></label>
+					<div class="field">
+						<input type=text name="v250id" class="large" maxLength=64 onkeyup="urlFilter(this);" value="@@form['v250id']">
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="v250ignoreStr"><script language=Javascript>document.write(_("ignore string"))</script></label>
+					<div class="field">
+						<input type=text name="v250ignoreStr" class="large" maxLength=128 onkeyup="urlFilter(this);" value="@@form['v250ignoreStr']">
+					</div>
+				</div>
+				<br/>
+				<h2><script language=Javascript>document.write(_("connection settings"))</script></h2>
+				<div class="form-row">
+					<label for="dialPort"><script language=Javascript>document.write(_("connect to"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectdialPort();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="Selectv250dtr"><script language=Javascript>document.write(_("dtr action"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectv250dtr();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="Selectv250dcd"><script language=Javascript>document.write(_("dcd action"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectv250dcd();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="Selectv250fc"><script language=Javascript>document.write(_("flow control"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectv250fc();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="Selectv250ri"><script language=Javascript>document.write(_("ri action"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectv250ri();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="SelectmodemAutoAnswer"><script language=Javascript>document.write(_("circuit autoAnswer rings"))</script></label>
+					<div class="field">
+						<script language=Javascript>showSelectmodemAutoAnswer();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="autoDialNumber"><script language=Javascript>document.write(_("auto dial number"))</script></label>
+					<div class="field">
+						<input type=text name="autoDialNumber" class="large" maxLength=64 onkeyup="urlFilter(this);" value="@@form['autoDialNumber']">
+					</div>
+				</div>
+				<br/>
+				<input type="hidden" name="pad_o" id="pad_o" value="@@form['pad_o']">
+				<input type="hidden" name="profilenum" id="profilenum" value="@@form['profilenum']">
+				<h2><script language=Javascript>document.write(_("profileSpecificSettings"))</script></h2>
+				<div class="form-row">
+					<label for="SelectmodemAutoAnswer"><script language=Javascript>document.write(_("profile"))</script></label>
+					<div class="field">
+						<script language=Javascript>showProfiles();</script>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="ppprhost"><script language="JavaScript">document.write(_("remoteHost"));</script></label>
+					<td><input type=text name="ppprhost" class="large" size=32 maxlength=128 onkeyup="urlFilter(this);"></td>
+				</div>
+				<div class="form-row">
+					<label for="pppport"><script language="JavaScript">document.write(_("port"));</script></label>
+					<div class="field">
+						<input type=text name="pppport" id="pppport" class="large required validate[required,funcCall[validate_pppPort]]" size=8 maxLength=5 onkeyup=NumfieldEntry(this);> &nbsp;( 1-65535 )
+					</div>
+				</div>
+				<div class="form-row no-bg-form">
+					<label for="serprot"><script language="JavaScript">document.write(_("localEncoding"));</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="serprot-0" name="serprot" class="access" value="16" onclick="setPad_o()">
+								<label for="serprot-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="serprot-1" name="serprot" class="access" value="0" onclick="setPad_o()">
+								<label for="serprot-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="ppppadmode"><script language="JavaScript">document.write(_("mode"));</script></label>
+					<div class="field">
+						<select name="ppppadmode" class="large"><option value=1>TCP</option><option value=2>UDP</option></select>
+					</div>
+				</div>
+				<div class="form-row no-bg-form">
+					<label for="pppauto"><script language="JavaScript">document.write(_("autoAnswer"));</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="pppauto-0" name="pppauto" class="access" value="128" onclick="setPad_o()">
+								<label for="pppauto-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="pppauto-1" name="pppauto" class="access" value="0" onclick="setPad_o()">
+								<label for="pppauto-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="submit-row">
+				<button type="button" id="saveBtn" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+			</div>
+<!-- 			<p style="padding-left:150px;"><script language=Javascript>document.write(_("Msg123"))</script></p> -->
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "EMU", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["v250icto"]=_("field0and65535");
+	$.validator.addMethod("v250icto",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.v250icto);
+
+	VALIDATOR.config.errors["pppPort"]=_("field1and65535");
+	$.validator.addMethod("v250icto",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.pppPort);
+#else
+/********* NTC ValidationEngine **********/
+function validate_icto(field) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("field0and65535");
+	}
+}
+function validate_pppPort(field) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("field0and65535");
+	}
+}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+</script>
+</body>
+</html>

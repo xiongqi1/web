@@ -1,0 +1,321 @@
+<!doctype html>
+<!--
+Mobile Station Based Assisted GPS (MSB A-GPS)  User Interface
+Copyright (C) 2018 NetComm Wireless Limited.
+-->
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>GPS</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tmp = form['gps_enable'];
+	tmp2 = get_single('sensors.gps.0.enable');
+	if (tmp != tmp2 && (tmp == '0' || tmp == '1')) {
+		retval = set_single( 'sensors.gps.0.enable='+tmp );
+	}
+	tmp = form['agps_int'];
+	tmp2 = get_single('sensors.gps.0.assisted.updateinterval');
+	if (tmp != tmp2) {
+		if (tmp >= 60 && tmp < 65535) {
+			retval = set_single( 'sensors.gps.0.assisted.updateinterval='+tmp );
+		}
+		else {
+			form['agps_int'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+		}
+	}
+	redirect('/gps.html?success');
+}
+else { /*GET*/
+	form['gps_enable'] = get_single( 'sensors.gps.0.enable' );
+	form['agps_int'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+}
+%>
+<!-- ================================================================================================ -->
+<style>:lang(jp) #msb_update {width:auto}</style>
+<script language="JavaScript">
+
+$(document).ready(function() {
+var gps_enable="<%get_single_direct('sensors.gps.0.enable');%>";
+#ifdef V_ODOMETER_y
+#ifndef V_WEBIF_SPEC_vdf
+	$("#odometer_form").validationEngine();
+#endif
+#endif
+	if ( gps_enable != '1') {
+		h="<table><tr><th style='text-align:center'>"+_("gpswarning1")+"</th></tr></table>";
+		$("#warning-messages").html(h);
+		$("#msb-div").css("display", "none");
+		return;
+	}
+
+	/* handler - msb_enable */
+	$("input:radio.access[name=msb_enable]").change(function(){
+		var msb_enable=$("input:radio.access[name=msb_enable][value=1]").is(":checked");
+		$("#msb_update").toggle(msb_enable);
+	});
+
+	/* disable or enable gps one */
+	function toggle_gpsone(enable) {
+		$("#div_gps_msb,#div_gps_msb *").css("cursor", enable?"auto":"wait");
+		$("#div_gps_msb :input").attr("disabled",!enable);
+	}
+
+	/* handler - save button */
+	$("#msb_save").click(function() {
+		var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+		rdb.add("sensors.gps.0.gpsone.enable",$("input:radio.access[name=msb_enable][value=1]").is(":checked")?"1":"0");
+		rdb.add("sensors.gps.0.gpsone.auto_update.max_retry_count",$("#msb_max_retry").val());
+		rdb.add("sensors.gps.0.gpsone.auto_update.retry_delay",$("#msb_retry_delay").val()*60);
+		rdb.add("sensors.gps.0.gpsone.auto_update.update_period",$("#msb_update_period").val()*24*60);
+
+#ifdef V_MODULE_EC21
+		/* In order to trigger simple_at_manager to response, set the command appropriately */
+		if ($("input:radio.access[name=msb_enable][value=1]").is(":checked")) {
+		    rdb.add("sensors.gps.0.cmd.command","gpsone_enable");
+		} else {
+		    rdb.add("sensors.gps.0.cmd.command","gpsone_disable");
+		}
+#endif
+
+		toggle_gpsone(false);
+		rdb.mset(function(res){
+			window.location="/msb.html?success";
+		});
+	});
+
+	/* update last xtra updated time */
+	function update_last_xtra_updated_time(updated_time,valid_time,gnss_time) {
+		/* since the Epoch, 1970-01-01 00:00:00 +0000 (UTC) */
+		var rdb_updated_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.updated_time');%>";
+		var rdb_valid_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.info.valid_time');%>";
+		var rdb_gnss_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.info.gnss_time');%>";
+
+		/* use rdb variables */
+		if($.type(updated_time)=="undefined") {
+			updated_time=rdb_updated_time;
+			valid_time=rdb_valid_time;
+			gnss_time=rdb_gnss_time;
+		}
+
+		var epoch1970=new Date(Date.UTC(1970,0,1,0,0,0,0));
+
+		var valid_time_date=new Date();
+		valid_time_date.setTime(epoch1970.getTime() + valid_time*1000);
+
+		var gnss_time_date=new Date();
+		gnss_time_date.setTime(epoch1970.getTime() + gnss_time*1000);
+
+		var updated_date=new Date();
+		updated_date.setTime(epoch1970.getTime() + updated_time*1000);
+
+		/* set updated time */
+		$("#msb_last_updated_time").html(updated_date.toString());
+		$("#msb_valid_time").html(valid_time_date.toString());
+		$("#msb_gnss_time").html(gnss_time_date.toString());
+	}
+
+	/* handler - update xtra */
+	$("#msb_update").click(function() {
+		var rdb=new rdb_tool("@@session[csrfTokenName]");
+		clear_alert();
+
+		rdb.add("sensors.gps.0.gpsone.update_now","1");
+		rdb.add("sensors.gps.0.gpsone.updated","");
+
+#ifdef V_MODULE_EC21
+		/* In order to trigger simple_at_manager to response, set the command appropriately */
+		rdb.add("sensors.gps.0.cmd.command","gpsone_update");
+#endif
+
+		/* submit */
+		toggle_gpsone(false);
+		rdb.mset(function(res){
+		});
+
+		/* wait for 30 seconds */
+		rdb.wait_for_rdb_result("sensors.gps.0.gpsone.updated",120*1000,function(res) {
+			var rdb=new rdb_tool("@@session[csrfTokenName]");
+			/* get updated time */
+			rdb.add("sensors.gps.0.gpsone.xtra.updated_time");
+			rdb.add("sensors.gps.0.gpsone.xtra.info.valid_time");
+			rdb.add("sensors.gps.0.gpsone.xtra.info.gnss_time");
+
+			rdb.mget(function(res2){
+				update_last_xtra_updated_time(
+					res2["sensors.gps.0.gpsone.xtra.updated_time"],
+					res2["sensors.gps.0.gpsone.xtra.info.valid_time"],
+					res2["sensors.gps.0.gpsone.xtra.info.gnss_time"]
+				);
+
+				toggle_gpsone(true);
+
+				/* bypass if update failed  */
+				if(res=="") {
+					alert(_("msb update timeout"));
+				}
+				else if(res=="0") {
+					alert(_("msg update unknown failure"));
+				}
+			});
+		});
+	});
+
+	/* load gps msb configuraiton */
+	load_values_to_elements( {
+		"input:radio.access[name=msb_enable]":"<%get_single_direct('sensors.gps.0.gpsone.enable');%>"==1,
+		"#msb_max_retry":"<%get_single_direct('sensors.gps.0.gpsone.auto_update.max_retry_count');%>",
+		"#msb_retry_delay":Math.round((parseInt("<%get_single_direct('sensors.gps.0.gpsone.auto_update.retry_delay');%>")||(60*5))/60),
+		"#msb_update_period":Math.round((parseInt("<%get_single_direct('sensors.gps.0.gpsone.auto_update.update_period');%>")||5*24*60)/(24*60)),
+	});
+
+	/* triggers */
+	$("input:radio.access[name=msb_enable]").trigger("change");
+
+	/* update xtra information */
+	update_last_xtra_updated_time();
+})
+
+</script>
+<!-- ================================================================================================ -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<div class="pad" id="div_gps_msb">
+				<h2><script language=Javascript>document.write(_("gps msb"))</script></h2>
+				<table id="warning-messages" class="border-top"></table>
+				<div id="msb-div">
+					<div class="form-row">
+						<label><script language=Javascript>document.write(_("gps msb enable"))</script></label>
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="div_gps_msb2">
+								<input type="radio" id="msb_enable_0" name="msb_enable" class="access" value="1">
+								<label for="msb_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="msb_enable_1" name="msb_enable" class="access" value="0">
+								<label for="msb_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+					<div id="div_gps_msb2">
+						<!-- max retry -->
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("gps msb max retry"))</script></label>
+							<div class="location-settings">
+								<select name="msb_max_retry" id="msb_max_retry">
+									<option value="3">3</option>
+									<option value="5">5</option>
+									<option value="10">10</option>
+								</select>
+							</div>
+						</div>
+
+						<!-- retry delay -->
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("gps msb retry delay"))</script></label>
+							<div class="location-settings">
+								<select name="msb_retry_delay" id="msb_retry_delay">
+									<option value="3">3</option>
+									<option value="5">5</option>
+									<option value="10">10</option>
+									<option value="15">15</option>
+									<option value="30">30</option>
+								</select>
+							</div>
+						</div>
+
+						<!-- update period  -->
+						<div class="form-row" id="div_msb_update_period">
+							<label><script language=Javascript>document.write(_("gps msb update period"))</script></label>
+							<div class="location-settings">
+								<select name="msb_update_period" id="msb_update_period">
+									<option value="0"><script language="JavaScript">document.write(_("manual"))</script></option>
+									<option value="1">1</option>
+									<option value="2">2</option>
+									<option value="3">3</option>
+									<option value="4">4</option>
+									<option value="5">5</option>
+									<option value="6">6</option>
+									<option value="7">7</option>
+								</select>
+							</div>
+						</div>
+						<!-- xtra bin information -->
+						<div class="form-row" id="div_msb_gnss_time">
+							<label><script language=Javascript>document.write(_("gps msb gnss time"))</script></label>
+							<div class="location-settings">
+								<span class="normal-text" id="msb_gnss_time"></span>
+							</div>
+						</div>
+						<!-- valid time -->
+						<div class="form-row" id="div_msb_valid_time">
+							<label><script language=Javascript>document.write(_("gps msb valid time"))</script></label>
+							<div class="location-settings">
+								<span class="normal-text" id="msb_valid_time"></span>
+							</div>
+						</div>
+						<!-- last update time -->
+						<div class="form-row" id="div_msb_last_updated_time">
+							<label><script language=Javascript>document.write(_("gps msb last updated time"))</script></label>
+							<div class="location-settings">
+								<span class="normal-text" id="msb_last_updated_time"></span>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button type="button" id="msb_save"><script language=Javascript>document.write(_("save msb"))</script></button>
+						<button type="button" id="msb_update" class="secondary" style="width:auto;"><script language=Javascript>document.write(_("update xtra"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>	<!-- div class="right-column white-box -->
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "MSB", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["agps_int"]=_("Msg106");		// Entered interval value is out of range!
+	$.validator.addMethod("agps_int",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 60) || (c > 65534) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.agps_int);
+
+#else
+function validate_agps_int(field) {
+	if( (field.val() < 60) || (field.val() > 65534) ) {
+		return _("Msg106");		// Entered interval value is out of range!
+	}
+}
+#endif
+</script>
+</body>
+</html>

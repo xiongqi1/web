@@ -1,0 +1,88 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>String Tools</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if ( request['REQUEST_METHOD'] == "POST" ) {
+
+}
+else { //GET
+	form['qq']=request['QUERY_STRING'];
+}
+%>
+<body>
+<script language="JavaScript" src="/jquery-1.6.min.js"></script>
+<!--script type="text/javascript" src="/lang/b28n.js"></script-->
+<script language='Javascript'>
+//Butterlate.setTextDomain("tool");
+qs="<%v=request['QUERY_STRING'];%>@@v";
+var file="status";
+var ref="<%_ref=get_single('webinterface.ref_lang');%>@@_ref";
+var dsp="<%_lang=get_single('webinterface.language');%>@@_lang";
+var r=new Array();
+var d=new Array();
+if (ref=="" || ref=="N/A")
+	ref="en";
+if (dsp=="" || dsp=="N/A")
+	dsp="en";
+
+function setForm() {
+	h="<tr><td width='20%'><b>String Id:</b></td><td width='30%'><b>Reference Language String:</b></td><td width='50%'><b>Display String:</b></td><tr>"
+	for( i in r ) {
+		//alert(i+r[i]);
+		//break;
+		h+="<tr><td>"+i+"</td><td>"+r[i]+"</td><td><input type='text' size='80' value='"+d[i]+"']/></td><tr>"
+	}
+	$("#stringTools").html(h);
+}
+
+function getDsp(v) {
+	eval(v);
+	setForm();
+}
+
+function getRef(v) {
+	eval(v);
+	if(ref != dsp) {
+		$.get("/cgi-bin/xml_arr.cgi?"+file+".xml&"+dsp+"&d", getDsp );
+	}
+	else {
+		d=r;
+		setForm();
+	}
+}
+
+$(document).ready(function() {
+	eval(qs.replace(/%27/g, "'"));
+	//alert(file+"--"+ref+"--"+dsp);
+	$.get("/cgi-bin/rdb.cgi?webinterface.ref_lang", function(v){
+		eval(v.replace(/%22/g, "'"));
+		ref=webinterface_ref_lang;
+		$.get("/cgi-bin/xml_arr.cgi?"+file+".xml&"+ref+"&r", getRef );
+	});
+});
+</script>
+
+
+
+<table border=0 cellSpacing=5 cellPadding=5>
+<tbody>
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" >
+<tr>
+	<td><b>Translation Manager</b></td>
+	<td id="apply" align="right"><input type="button" value="Apply Change"/></td>
+	<td align="right"><b>String Search:&nbsp;</b><input type="text" name="search"/><input type="button" value="Search"/></td>
+</tr>
+<table id="stringTools">
+</table>
+</form>
+
+</tbody>
+</table>
+
+</body>
+</html>

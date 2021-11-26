@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Firmware Update</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+    .upgrading_fw_stage {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .upgrading_fw_stage_done {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        color: green;
+    }
+    .upgrading_fw_stage_failed {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        color: red;
+    }
+    .upgrading_fw_details_block {
+        border-style: solid;
+        border-width: 1px;
+        border-color: #aaa;
+        padding: 10px;
+    }
+    .upgrading_fw_details_messages {
+        padding-top: 10px;
+        min-height: 20px;
+    }
+    </style>
+    <script src="js/all.js"></script>
+    <script>
+    const NO_UPDATING = 0;
+    const TRIGGERED = 1;
+    const DOWNLOADING = 2;
+    const FLASHING = 3;
+    const PREPARE_REBOOT = 4;
+    const REBOOTING = 5;
+    const REBOOTED = 6;
+    const DONE = 7;
+    const FAILED = 8;
+
+    var upgrading_stage_str = [];
+    upgrading_stage_str[NO_UPDATING] = "No updating";
+    upgrading_stage_str[TRIGGERED] = "Updating has been triggered";
+    upgrading_stage_str[DOWNLOADING] = "Downloading firmware to OWA";
+    upgrading_stage_str[FLASHING] = "Flashing OWA firmware";
+    upgrading_stage_str[PREPARE_REBOOT] = "Preparing to reboot OWA";
+    upgrading_stage_str[REBOOTING] = "Rebooting OWA";
+    upgrading_stage_str[REBOOTED] = "OWA has been rebooted";
+    upgrading_stage_str[DONE] = "OWA firmware has been updated successfully";
+    upgrading_stage_str[FAILED] = "Failed to update OWA firmware";
+
+    /*
+     * Process firmware status report
+     * @param fwStatus received status
+     * @param openWsIfNeeded true: open websocket if needed
+     */
+    function processStatus(fwStatus, openWsIfNeeded) {
+        if (fwStatus.hasOwnProperty("current_version")) {
+            var curVersionEl = document.getElementById("current_version");
+            if (curVersionEl.textContent != fwStatus.current_version) {
+                curVersionEl.textContent = fwStatus.current_version;
+            }
+        }
+        if (fwStatus.stage == NO_UPDATING || fwStatus.stage == DONE || fwStatus.stage == FAILED) {
+            document.getElementById("target_version").textContent = "N/A";
+            document.getElementById("loading_indicator").setAttribute("style", "display:none");
+            document.getElementById("warning_updating_in_progress").setAttribute("style", "display:none");
+        } else {
+            if (fwStatus.hasOwnProperty("target_version")) {
+                var targetVersionEl = document.getElementById("target_version");
+                if (targetVersionEl.textContent != fwStatus.target_version) {
+                    targetVersionEl.textContent = fwStatus.target_version;
+                }
+            }
+            document.getElementById("loading_indicator").setAttribute("style", "");
+            document.getElementById("warning_updating_in_progress").setAttribute("style", "");
+            if (openWsIfNeeded) {
+                setWebsocketReportFilter(BITMASK_UPGRADING_FW_STATUS);
+            }
+        }
+
+        if (fwStatus.hasOwnProperty("messages")) {
+            var messagesEl = document.getElementById("upgrading_details");
+            for (var i = 0; i < fwStatus.messages.length; i++) {
+                var msgDiv = document.createElement("div");
+                msgDiv.textContent = fwStatus.messages[i];
+                messagesEl.appendChild(msgDiv);
+            }
+        }
+
+        var stageEl = document.getElementById("upgrading_stage")
+        if (stageEl.textContent != upgrading_stage_str[fwStatus.stage]) {
+            stageEl.textContent = upgrading_stage_str[fwStatus.stage];
+            if (fwStatus.stage == DONE) {
+                stageEl.setAttribute("class", "upgrading_fw_stage_done");
+            } else if (fwStatus.stage == FAILED) {
+                stageEl.setAttribute("class", "upgrading_fw_stage_failed");
+            } else {
+                stageEl.setAttribute("class", "upgrading_fw_stage");
+            }
+        }
+    }
+
+    /*
+     * Handle firmware upgrade status report from websocket
+     * @param fwStatus received status report
+     */
+    function handleFwUpgradeStatusWsReport(fwStatus) {
+        processStatus(fwStatus, false);
+    }
+
+    /*
+     * Handle firmware upgrade status response, which is not from websocket.
+     * @param fwStatus received status response
+     */
+    function fwUpgradeStatus(fwStatus) {
+        processStatus(fwStatus, true);
+    }
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        ajaxGetRequest("/owa_firmware_upgrade/upgrade_status", true, fwUpgradeStatus);
+    });
+    </script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box">
+        <div class="box-header">
+            <h2>OWA Firmware Update</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+              <div class="data_field_set_row fixed_field_height">
+                  <div class="data_field_text fixed_field_height valign_middle" id="loading_indicator"><img src="/loading.gif"></div>
+                  <span class="data_field_text fixed_field_height" id="upgrading_stage"></span>
+              </div>
+            </div>
+            <div class="data_field_set_line" id="warning_updating_in_progress" style="display:none">
+                <b>Please do not remove the Antenna Alignment tool until the update is complete.</b>
+            </div>
+            <div class="data_field_set_line">
+              <div class="data_field_set_block">
+                <div class="data_field_set_row fixed_field_height">
+                <div class="data_field_label wide_label">Current Version</div>
+                    <div class="data_field_text" id="current_version"></div>
+                </div>
+                <div class="data_field_set_row fixed_field_height">
+                    <div class="data_field_label wide_label fixed_field_height">Target Version</div>
+                    <div class="data_field_text fixed_field_height" id="target_version"></div>
+                </div>
+              </div>
+            </div>
+            <div class="upgrading_fw_details_block">
+                <div class="data_field_set_line"><b>Details</b></div>
+                <div class="data_field_set_line upgrading_fw_details_messages" id="upgrading_details"></div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

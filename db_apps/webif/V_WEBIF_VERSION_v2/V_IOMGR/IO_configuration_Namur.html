@@ -1,0 +1,190 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Namur Settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+idx=form['profidx'];
+
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['typesel'];
+	set_single( 'sys.sensors.io.xaux'+idx+'.type='+tempval, '-p' );
+
+	tempval = form['characteristicsel'];
+	set_single( 'sys.sensors.io.xaux'+idx+'.characteristic='+tempval, '-p' );
+
+	redirect('/IO_configuration_Namur.html?'+idx);
+}
+else { //GET
+	idx=request['QUERY_STRING'];
+	form['typesel'] = get_single('sys.sensors.io.xaux'+idx+'.type');
+	form['characteristicsel'] = get_single('sys.sensors.io.xaux'+idx+'.characteristic');
+}
+
+idx=validate_number(request['QUERY_STRING']);
+form['profidx'] = idx;
+%>
+<script language='javascript'>
+var periodic=3000;
+var ajaxerror=0;
+var id="@@idx";
+var lookup_continuous = [ // NO(make) state,NC(break) state, min, max
+        ["Open circuit", "Open circuit", -1023, 0.35],
+        ["Non activated", "Activated", 0.35, 1.55],
+        //Switching point happens at 1.65
+        ["Switching transition", "Switching transition", 1.55, 1.75],
+        ["Activated", "Non activated", 1.75, 6],
+        ["Short circuit", "Short circuit", 6, 1023]
+        ];
+
+var lookup_discontinuous = [ // NO(make) state,NC(break) state, min, max
+        ["Open circuit", "Open circuit", -1023, 0.35],
+        ["Non activated", "Activated", 0.35, 1.2],
+        ["Switching transition", "Switching transition", 1.2, 2.1],
+        ["Activated", "Non activated", 2.1, 6],
+        ["Short circuit", "Short circuit", 6, 1023]
+        ];
+
+function updateNamurStatus(lut, current) {
+	var i;
+	for (i = 0; i < lut.length; i++) {
+	    if (lut[i][2] <= current && lut[i][3] > current) {
+		if($("#typesel").val()=="make") {
+		    $("#Status").html(lut[i][0]);
+		}
+		else if($("#typesel").val()=="break") {
+		    $("#Status").html(lut[i][1]);
+		}
+		else
+		    $("#Status").html("Undefined state");
+	    }
+	}
+}
+
+function updateNamurSensorState(b) {
+	// The parameter b will have value like "8.23" and hence the need to convert it to float value
+	// to calculate the sensor current
+	d=b.split("\"");
+	//Deriving the Sensor Current
+	var current=parseFloat("8.20") - parseFloat(d[1]);
+	//Switching states based on type,characteristic and sensor current
+	if($("#characteristicsel").val()=="continuous") {
+	    updateNamurStatus(lookup_continuous, current);
+	}
+	else if($("#characteristicsel").val()=="discontinuous") {
+	    updateNamurStatus(lookup_discontinuous, current);
+	}
+}
+
+function cgiUpdate(r) {
+	ajaxerror=0;
+	a=r.split("=");
+
+	b=a[1].split(";");
+	updateNamurSensorState(b[0]);
+}
+
+function cgiCmd() {
+	c="";
+	c+="sys.sensors.io.xaux"+id+".adc";
+	return c;
+}
+
+function updateInput() {
+	if( ++ajaxerror <= (3*60*1000/periodic) ) { //3 mins
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+cgiCmd(), cgiUpdate );
+	} else {
+		location.reload();
+	}
+}
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<input type="hidden" name="profidx" id="profidx" value="@@form['profidx']">
+				<h2><script language=Javascript>document.write(_("namurSettingsTitle"))</script></h2>
+				<div id="Type_sel" class="form-row no-bg-form">
+				    <fieldset>
+					<label for="Type_sel_title"><script language="Javascript">document.write(_("namurType"))</script></label>
+					<div class="field">
+					    <select name="typesel" id="typesel" value="@@form['typesel']">
+						<option id="make" value="make"><script language=Javascript>document.write(_("namurNO"))</script></option>
+						<option id="break" value="break"><script language=Javascript>document.write(_("namurNC"))</script></option>
+					    </select>
+					</div>
+				    </fieldset>
+				</div>
+
+				<div id="Characteristic_sel" class="form-row no-bg-form">
+				    <fieldset>
+					<label for="Characteristic_sel_title"><script language="Javascript">document.write(_("namurCharacteristic"))</script></label>
+					<div class="field">
+					    <select name="characteristicsel" id="characteristicsel" value="@@form['characteristicsel']">
+						<option id="continuous" value="continuous"><script language=Javascript>document.write(_("namurCont"))</script></option>
+						<option id="discontinuous" value="discontinuous"><script language=Javascript>document.write(_("namurDiscont"))</script></option>
+					    </select>
+					</div>
+				    </fieldset>
+				</div>
+
+				<div class="form-row">
+				    <label for="Status"><script language=Javascript>document.write(_("namurStatus"))</script></label>
+					<div class="field" style="margin:6px 0 0 3px;">
+					    <span name="Status" id="Status" style="color: rgb(0, 128, 0);"></span>
+					</div>
+				</div>
+
+				<div class="submit-row">
+					<button type="button" name="save" id="save" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='IO_configuration.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "IOCONFIG", <%_val = session["user"];%>"@@_val");
+
+$(document).ready(function() {
+	type="<%get_single_direct('sys.sensors.io.xaux'+request['QUERY_STRING']+'.type');%>";
+	characteristic="<%get_single_direct('sys.sensors.io.xaux'+request['QUERY_STRING']+'.characteristic');%>";
+
+	if(type == "make")
+	  $("#typesel").val("make");
+	else if(type == "break")
+	  $("#typesel").val("break");
+	if(characteristic == "continuous")
+	  $("#characteristicsel").val("continuous");
+	else if(characteristic == "discontinuous")
+	  $("#characteristicsel").val("discontinuous");
+	updateInput();
+	setInterval(updateInput, periodic);
+
+	$("#save").click(function() {
+		$("#form").submit();
+	});
+});
+
+
+</script>
+</body>
+</html>

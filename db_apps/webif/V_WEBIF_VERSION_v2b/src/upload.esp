@@ -1,0 +1,65 @@
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+   // check session ID except when server side is not using it (eg. factory reset)
+   if (session["sessionid"] != undefined && request["SESSION_ID"] != session["sessionid"] ) {
+      exit(0);
+   }
+
+   // CSRF token must be valid at post request
+   if (session["csrfToken"] != form["csrfTokenPost"]) {
+      exit(254);
+   }
+
+   function getTargetFileName(label) {
+      var fn = "";
+   //fileNameGenerationCode
+      return fn;
+   }
+
+   setHeader("Content-type:text/json",false);
+
+   function jsonQuote(val) {
+      return '"' + val + '"';
+   }
+
+   function jsonStr(name,val) {
+         return jsonQuote(name) + ':' + jsonQuote(val);
+   }
+
+   function jsonObj(name,obj) {
+      var str = "";
+      var i = 0;
+      for (m in obj) {
+         if (i>0) str = str + ',';
+         var s = '' + obj[m];
+         //if (s == "[object val]") s = "An Obj";
+         str = str + jsonStr(m,s);
+         i++;
+      }
+      return jsonQuote(name) + ":{" + str + "}";
+   }
+
+   var output = jsonObj("files", files);
+
+   output = output + ',' + jsonStr("param", form["param"]);
+
+   // result changes to zero if renaming is successful
+   var result = -1;
+
+   for (f in files) {
+      files[f].target = getTargetFileName(f);
+      output = output + ',' + jsonObj(f, files[f]);
+      if (files[f].target != "") {
+         //rename(files[f].FILENAME, files[f].target);
+         // Rename doesn't work, use shell
+         exec_cmd('mv ' + files[f].FILENAME + ' ' + files[f].target);
+         result = 0;
+      }
+   }
+
+   output = output + ',' + jsonStr("result", result);
+   write('{' + output + '}');
+
+   exit(200);
+}
+%>

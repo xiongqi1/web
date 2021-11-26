@@ -1,0 +1,4 @@
+.location-settings label.on {color:#333 !important;}
+.location-settings label.on.click {color:#fff !important;filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#c9d243', endColorstr='#c9d243',GradientType=0 );}
+.location-settings label.off {color:#333 !important;}
+.location-settings label.off.click {color:#fff !important;filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#a5a5a5', endColorstr='#a5a5a5',GradientType=0 );}

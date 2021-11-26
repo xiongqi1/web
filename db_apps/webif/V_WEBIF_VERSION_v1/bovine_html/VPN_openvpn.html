@@ -1,0 +1,2256 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>VPN</title>
+<% include vpnCommon.inc %>
+<%
+// The following code assembles required link information from the RDB and puts it into an array called "st".
+// See vpnCommon.inc for more details
+var createStDevices=new Array ("openvpn.0","openvpn.0"); // Specify twice otherwise its not a proper array
+var createStArgs=new Array ("name", new Array("enable","","0"), "vpn_type", "network_addr", "network_mask", "tls_auth", "vpn_authtype", "user", "pass", "serveraddress", "serverport", "serverporttype", "conn_type", new Array("defaultgw","","0"), "certi", "local_ipaddr", "remote_ipaddr", "remote_nwaddr", "remote_nwmask");
+stElements=createVpnElements( createStDevices, createStArgs);
+%>
+<script>
+var st=[@@stElements];
+</script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<style>
+.bar_bg {
+	left:47px;
+	width:200px;
+	height:10px; 
+	font-size: 12px;	
+	background-color:lightgrey; 
+	border-top:1px solid white;
+	border-bottom:1px solid white;
+	border-left:1px solid white;
+	border-right:1px solid white;
+}
+
+.bar_fg {
+	height:10px; 
+	width:50%;
+	font-size: 12px;	
+	background-color:blue; 
+	align:center
+}
+</style>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['rdbCmd'];
+	if( tempval != "" )
+		set_list( tempval, '-p' );
+	// restart openvpn
+	set_single('openvpn.0.restart=1');
+}
+else { /*GET*/
+	//form['editindex'] = -1;
+}
+if(request['QUERY_STRING']!="") {
+	form['curindex'] = request['QUERY_STRING'];
+}
+else {
+	form['curindex'] = -1;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("VPN_openvpn");
+var client_certificate;
+var installed_certificate;
+var server_certificate;
+var server_secret_time="1";
+var client_secret_time="1";
+
+var default_vpnport="1194";
+var default_vpnporttype="UDP";
+var default_vpnnwaddr="10.0.0.0";
+var default_vpnnwmask="255.255.255.0";
+
+var IPSRsaLocalCertValid="";
+var IPSRsaRemoteCertValid="";
+var IPSRsaKeyValid="";
+var curDate;
+var curTime;
+var actTunnelNum=0;
+
+function exitHandler() {
+	if(document.form.curindex.value >= 0)
+		window.location="/VPN_vpns.html"
+	else
+		showedit( 'edit', false, st.length );
+}
+
+function hasSubStr(str, substr) {
+	return str.search(substr) >= 0;
+}
+
+function isValidIpAddress(str) {
+	regaddr=/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/
+	return regaddr.exec(str)!=null;
+}
+
+function checkOpenVpnForm() {
+	vpnType=readElement("vpnType");
+
+	if (readElement("newname").length==0) {
+		alert(_("Msg124"));
+		return false;
+	}
+
+	if( vpnType=="server" ) {
+		if( (readElement("vpnServerServerPort").length==0) || (readElement("vpnServerNwAddr").length==0) || (readElement("vpnNwMask").length==0) ) {
+			alert(_("Msg81"));//Please ensure you enter server port, network address and network mask
+			return false;
+		}
+
+		if(readElement("vpnServerAuthTypeValue")==1) {
+			if( (readElement("vpnServerAuthUser").length==0) || (readElement("vpnServerAuthPass").length==0) ) {
+				alert(_("Msg82"));//Please ensure you enter user name and password
+				return false;
+			}
+		}
+	}
+	else if (vpnType=="client") {
+		if( (readElement("vpnClientServerAddr").length==0) || (readElement("vpnClientServerPort").length==0)) {
+			alert(_("Msg83"));//Please ensure you enter server IP address and port
+			return false;
+		}
+
+		if(readElement("vpnClientAuthTypeValue")==1) {
+			if( (readElement("vpnClientAuthUser").length==0) || (readElement("vpnClientAuthPass").length==0) ) {
+				alert(_("Msg82"));//Please ensure you enter user name and password
+				return false;
+			}
+		}
+
+		if(readElement("vpnClientCertiSel2").length==0) {
+			alert(_("Msg84"));//Please ensure you select certificate
+			return false;
+		}
+	}
+	else if (vpnType=="peer") {
+		if( (readElement("vpnPeerServerPort").length==0) || (readElement("vpnLocalAddr").length==0) || (readElement("vpnRemoteAddr").length==0) ) {
+				alert(_("Msg85"));//Please ensure you enter server port and local IP address
+				return false;
+		}
+
+		var nwaddr=readElement("vpnCertiPeerNwAddr");
+		var nwmask=readElement("vpnCertiPeerNwMask");
+		
+		if(nwaddr.length>0 || nwmask.length>0) {
+			if(!isValidIpAddress(nwaddr)) {
+				alert(_("Msg86"));//Please ensure you enter correct network address
+				return;
+			}
+		
+			if(!isValidIpAddress(nwmask)) {
+				alert(_("Msg88"));//Please ensure you enter correct network mask
+				return;
+			}
+		}
+
+		if( readElement("vpnPeerServerAddr").length==0) {
+			if(server_secret_time=="") {
+				alert(_("Msg127"));//Please ensure you generate server secret key
+				return false;
+			}
+		}
+		else {
+			if(client_secret_time=="") {
+				alert(_("Msg125"));//Error: Please upload remote peer secret key.
+				return false;
+			}
+		}
+		
+	}
+	return true;
+}
+
+function submitOpenVpn() {
+	var f=document.form;
+	var header = "&link.profile."+i+".";
+
+	authType="";
+	authUser="";
+	authPass="";
+	serverAdd="";
+	serverPort="";
+	serverPortType="UDP";
+	clientDefGw="0";
+
+	if(f.vpnType.value=="server") {
+		serverAddr=""
+		serverPort=f.vpnServerServerPort.value;
+		serverPortType=f.vpnServerServerPortType.value;
+		authType=f.vpnServerAuthTypeValue.value;
+		authUser=f.vpnServerAuthUser.value;
+		authPass=f.vpnServerAuthPass.value;
+		clientDefGw="0";
+	}
+	else if(f.vpnType.value=="client") {
+		serverAddr=f.vpnClientServerAddr.value;
+		serverPort=f.vpnClientServerPort.value;
+		serverPortType=f.vpnClientServerPortType.value;
+		authType=f.vpnClientAuthTypeValue.value;
+		authUser=f.vpnClientAuthUser.value;
+		authPass=f.vpnClientAuthPass.value;
+		if(f.vpnClientServerGateway.checked)
+			clientDefGw="1";
+		else
+			clientDefGw="0";
+	}
+	else if(f.vpnType.value=="peer") {
+		serverAddr=f.vpnPeerServerAddr.value;
+		serverPort=f.vpnPeerServerPort.value;
+		serverPortType=f.vpnPeerServerPortType.value;
+	}
+	else {
+		alert(_("Msg121"));//Error: Unknown VPN mode found #1
+	}
+
+	f.rdbCmd.value = "link.profile."+i+".dev=openvpn.0"
+		+header+"name="+f.newname.value
+		+header+"enable="+f.vpnenable.value
+		+header+"vpn_type="+f.vpnType.value
+		+header+"network_addr="+f.vpnServerNwAddr.value
+		+header+"network_mask="+f.vpnNwMask.value
+		+header+"vpn_authtype="+authType
+		+header+"user="+authUser
+		+header+"pass="+authPass
+		+header+"serveraddress="+serverAddr
+		+header+"serverport="+serverPort
+		+header+"serverporttype="+serverPortType
+		+header+"local_ipaddr="+f.vpnLocalAddr.value
+		+header+"remote_ipaddr="+f.vpnRemoteAddr.value
+		+header+"remote_nwaddr="+f.vpnCertiPeerNwAddr.value
+		+header+"remote_nwmask="+f.vpnCertiPeerNwMask.value
+		+header+"certi="+f.vpnClientCertiSel2.value
+		+header+"defaultgw="+clientDefGw;
+		+header+"delflag=0"
+	f.submit();
+}
+
+function submitForm() {       
+	var f=document.form;
+	try {
+		document.form.rdbCmd.value = "";
+		if (f.vpnEnable[0].checked == true) {
+			if(!checkOpenVpnForm())
+				return;
+		}
+
+		value = parseInt(f.editindex.value);  
+		if( st.length==0 || isNaN(value)==true || value < 0 || value >= st.length ) {
+			i = newprofilenum; //add new	
+		}
+		else if( isNaN(st[value].profilenum)==true ) {
+			alert(_("Msg71"));//Error: Profile number incorrectly
+			return;
+		}
+		else {
+			i=st[value].profilenum;
+		}
+		submitOpenVpn();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+} 
+
+function delentry( index ) {
+	try {
+		i=st[index].profilenum;
+		document.form.rdbCmd.value = "link.profile."+i+".name=&link.profile."+i+".enable=0&link.profile."+i+".delflag=1";
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function setVpnEnable(en) {
+	var f=document.form;
+	f.vpnEnable[0].checked=(en==1);
+	f.vpnEnable[1].checked=(en==0);
+
+	vpnElments=[
+		// openvpn common part
+		"vpnType",
+		"newname",
+		// openvpn server
+		"vpnServerServerPort",
+		"vpnServerServerPortType",
+		"vpnServerNwAddr",
+		"vpnNwMask",
+		"vpnServerAuthTypeValue",
+		"vpnServerAuthUser",
+		"vpnServerAuthPass",
+
+		"vpnCertiCaNwAddr",
+		"vpnCertiCaNwMask",
+
+		// openvpn server - certificate
+		"vpnServerCertiSel",
+
+		"vpnCertiName",
+		"vpnCertiCountry",
+		"vpnCertiState",
+		"vpnCertiCity",
+		"vpnCertiOrg",
+		"vpnCertiEmail",
+
+		"vpnClientServerAddr",
+		"vpnClientServerPort",
+		"vpnClientServerPortType",
+
+		"vpnClientAuthUser",
+		"vpnClientAuthPass",
+
+		"vpnClientCertiSel",
+
+		"vpnCertiName2",
+		"vpnCertiCountry2",
+		"vpnCertiState2",
+		"vpnCertiCity2",
+		"vpnCertiOrg2",
+		"vpnCertiEmail2",
+
+		"vpnPeerServerAddr",
+		"vpnPeerServerPort",
+		"vpnPeerServerPortType",
+
+		"vpnLocalAddr",
+		"vpnRemoteAddr",
+
+		"vpnCertiPeerNwAddr",
+		"vpnCertiPeerNwMask",
+
+		"vpnSecretServerKeyTime",
+		"vpnSecretClientKeyTime",
+
+		"vpnClientAuthTypeCerti",
+		"vpnClientAuthTypeCerti",
+		"vpnServerAuthTypeCerti",
+		"vpnServerAuthTypeCerti",
+
+		"vpnServerGenCertiBtn",
+		"vpnServerDnCertiBtn",
+
+		"vpnServerGenClientBtn",
+		"vpnServerDnClientBtn",
+		"vpnServerRmClientBtn",
+
+		"vpnClientUpCerti",
+		"vpnClientDelCerti",
+		"vpnServerNwAddr",
+		"vpnNwMask",
+		"vpnServerGenDhBtn",
+		"vpnClientServerGateway",
+		"vpnCertiUpFile",
+		"vpnClientDelCertiBtn"
+	];
+
+	var i;
+	for(i=0;i<vpnElments.length;i++) {
+		el=document.getElementById(vpnElments[i]);
+		if(el!=null)
+			el.disabled=(en==0);
+	}
+}
+
+function initEmptyForm(idx) {
+	var f=document.form;
+
+	f.vpnenable.value='1';
+
+	f.vpnEnable[0].checked=true;
+	f.vpnEnable[1].checked=false;
+
+	// openvpn common part
+	f.vpnType.value="server";
+	// openvpn server
+	f.vpnServerServerPort.value=default_vpnport;
+	f.vpnServerServerPortType.value=default_vpnporttype;
+	f.vpnServerNwAddr.value=default_vpnnwaddr;
+	f.vpnNwMask.value=default_vpnnwmask;
+	f.vpnServerAuthTypeValue.value=0;
+	f.vpnServerAuthUser.value="";
+	f.vpnServerAuthPass.value="";
+	// openvpn server - certificate
+	f.vpnServerCertiSel.value=0;
+	f.vpnCertiName.value="";
+	f.vpnCertiCountry.value="";
+	f.vpnCertiState.value="";
+	f.vpnCertiCity.value="";
+	f.vpnCertiOrg.value="";
+	f.vpnCertiEmail.value="";
+	f.vpnClientServerAddr.value="";
+	f.vpnClientServerPort.value=default_vpnport;
+	f.vpnClientServerPortType.value=default_vpnporttype;
+	f.vpnClientServerGateway.checked=false;
+	f.vpnClientAuthTypeValue.value=0;
+	f.vpnClientAuthUser.value="";
+	f.vpnClientAuthPass.value="";
+	f.vpnClientCertiSel.value="";
+	f.vpnCertiName2.value="";
+	f.vpnCertiCountry2.value="";
+	f.vpnCertiState2.value="";
+	f.vpnCertiCity2.value="";
+	f.vpnCertiOrg2.value="";
+	f.vpnCertiEmail2.value="";
+	f.vpnPeerServerAddr.value="";
+	f.vpnPeerServerPort.value=default_vpnport;
+	f.vpnPeerServerPortType.value=default_vpnporttype;
+	f.vpnLocalAddr.value="";
+	f.vpnRemoteAddr.value="";
+	f.vpnSecretServerKeyTime.value="";
+	f.vpnSecretClientKeyTime.value="";
+}
+
+function initOpenVpnForm(idx) {
+	var f=document.form;
+
+	f.vpnenable.value=st[idx].enable;
+
+	f.newname.value=st[idx].name;
+	f.vpnType.value=st[idx].vpn_type;
+
+	//if(f.vpnType.value=="server") {
+	// server
+		f.vpnServerServerPort.value=st[idx].serverport;
+
+		f.vpnServerServerPortType.value=st[idx].serverporttype;
+		f.vpnServerAuthTypeValue.value=st[idx].vpn_authtype;
+		f.vpnServerAuthUser.value=st[idx].user;
+		f.vpnServerAuthPass.value=st[idx].pass;
+	//}
+	//else if(f.vpnType.value=="client") {
+	// client
+		f.vpnClientServerAddr.value=st[idx].serveraddress;
+		f.vpnClientServerPort.value=st[idx].serverport;
+		f.vpnClientServerPortType.value=st[idx].serverporttype;
+
+		if(st[idx].defaultgw=="1")
+			f.vpnClientServerGateway.checked=true;
+		else
+			f.vpnClientServerGateway.checked=false;
+
+		f.vpnClientAuthTypeValue.value=st[idx].vpn_authtype;
+		f.vpnClientAuthUser.value=st[idx].user;
+		f.vpnClientAuthPass.value=st[idx].pass;
+//	}
+//	else if(f.vpnType.value=="peer") {
+	// peer
+		f.vpnPeerServerAddr.value=st[idx].serveraddress;
+		f.vpnPeerServerPort.value=st[idx].serverport;
+		f.vpnPeerServerPortType.value=st[idx].serverporttype;
+		
+/*
+	}
+	else {
+		alert("Error: Unknown VPN mode found #1");
+	}
+*/
+
+	f.vpnServerNwAddr.value=st[idx].network_addr;
+	f.vpnNwMask.value=st[idx].network_mask;
+
+	f.vpnLocalAddr.value=st[idx].local_ipaddr;
+	f.vpnRemoteAddr.value=st[idx].remote_ipaddr;
+
+	f.vpnCertiPeerNwAddr.value=st[idx].remote_nwaddr;
+	f.vpnCertiPeerNwMask.value=st[idx].remote_nwmask;
+
+	f.vpnClientCertiSel.value="";
+	f.vpnClientCertiSel2.value=st[idx].certi;
+/*
+	f.vpnserver.value=st[idx].serveraddress;
+	f.reconnectDelay.value = st[idx].reconnect_delay;
+	f.reconnectRetries.value = st[idx].reconnect_retries;
+	f.ttl.value = st[idx].ttl;
+	f.snatEnable.value = st[idx].snat;
+*/
+}
+
+// This routine translates an IP address (i.e in 192.168,etc form) to the individual
+// segments needed to fill in the form in the web browser
+function transformIPtoFormInfo(ipAddress, documentItem) {
+	var ip=ipAddress.split(".");
+	document.getElementById(documentItem+"1").value = ip[0];
+	document.getElementById(documentItem+"2").value = ip[1];
+	document.getElementById(documentItem+"3").value = ip[2];
+	document.getElementById(documentItem+"4").value = ip[3];
+}
+
+function showedit( myid, action, idx ) {
+	document.form.editindex.value=idx;
+	document.getElementById( myid+"Div" ).style['display']=action?"":"none";
+	document.getElementById( myid+"Div1" ).style['display']=action?"":"none";
+	document.getElementById( "listDiv" ).style['display']=action?"none":"";
+	document.getElementById( "saveDiv" ).style['display']=action?"":"none";
+
+	if( action ) {
+		initEmptyForm(idx);
+		if( idx < st.length ) {
+			initOpenVpnForm(idx);
+		}
+	}
+	else {
+		document.form.editindex.value=-1;
+	}
+	updateFormArrange();
+
+	setVpnEnable(document.form.vpnenable.value);
+	updateVpnInfo();
+}
+
+function readElement(elementName) {
+	var element;
+
+	element=document.getElementById(elementName);
+	if( (typeof(element)=="undefined") || (element==null) ) {
+		alert(_("not found")+" - " + elementName);
+		return "";
+	}
+	return document.getElementById(elementName).value;
+}
+
+function enableElement(elementName,ena) {
+	document.getElementById(elementName).disabled=!ena;
+}
+
+function checkElement(elementName,check) {
+	document.getElementById(elementName).checked=check;
+}
+
+function showElement(elementName,show) {
+	document.getElementById(elementName).style['display']=show?"":"none";
+}
+
+// re-arrange server elements (vpn auth type - certi and unpw)
+function setVpnServerAuthType(auth) {
+	// change radio button
+	document.getElementById("vpnServerAuthTypeValue").value=auth;
+	updateFormArrange();
+}
+
+function updateFormArrange() {
+	vpnEnable=readElement("vpnenable");
+
+	// open vpn
+	showElement("vpnDiv",true);
+
+	vpnType=readElement("vpnType");
+		// server
+		showElement("vpnServerDiv",vpnType=="server");
+
+		serverAuthType=readElement("vpnServerAuthTypeValue");
+		checkElement("vpnServerAuthTypeCerti",(serverAuthType==0) || (serverAuthType==""));
+		checkElement("vpnServerAuthTypeUNPW",serverAuthType==1);
+		showElement("vpnServerAuthCertiDiv",(serverAuthType==0) || (serverAuthType==""));
+		showElement("vpnServerAuthUnpwDiv",serverAuthType==1);
+
+		// client
+		showElement("vpnClientDiv",vpnType=="client");
+		clientAuthType=readElement("vpnClientAuthTypeValue");
+		checkElement("vpnClientAuthTypeCerti",(clientAuthType==0) || (clientAuthType==""));
+		checkElement("vpnClientAuthTypeUNPW",clientAuthType==1);
+		showElement("vpnClientAuthCertiSubjectDiv",true);
+		showElement("vpnClientAuthCerti3Div",(clientAuthType==0) || (clientAuthType==""));
+		showElement("vpnClientAuthCertiDiv",(clientAuthType==0) || (clientAuthType==""));
+		showElement("vpnClientAuthUnpwDiv",clientAuthType==1);
+
+		// peer
+		showElement("vpnPeerDiv",vpnType=="peer");
+	
+	// open vpn updown divistion
+	showElement("vpn2Div",(vpnType!="server"));
+	showElement("vpnCaUpDiv",(vpnType=="client") && (clientAuthType==1));
+	showElement("vpnCertiUpDiv",(vpnType=="client") && (clientAuthType==0 || clientAuthType==""));
+	showElement("vpnSecretUpDiv",(vpnType=="peer"));
+}
+
+// re-arrange client elements (vpn auth type - certi and unpw)
+function setVpnClientAuthType(auth) {
+	document.getElementById("vpnClientAuthTypeValue").value=auth;
+	updateFormArrange();
+}
+
+function setVpnClientCerti(thisValue) {
+	var cce;
+	var cc;
+	var cc2;
+
+	if(typeof(installed_certificate)=="undefined" || typeof(installed_certificate[thisValue])=="undefined") {
+		cc=["","","","","",""];
+		cc2=["","","","","",""];
+		cc3=["N/A","N/A"];
+	}
+	else {
+		cce=installed_certificate[thisValue].split("/");
+		cc=cce[0].split(",");
+		cc2=cce[1].split(",");
+		cc3=cce[2].split(",");
+	}
+
+	document.getElementById("vpnClientCertiSel2").value=readValueWithDef(cc2[4],"");
+	document.getElementById("vpnCertiExpS").value=readValueWithDef(cc3[0],"N/A");
+	document.getElementById("vpnCertiExpE").value=readValueWithDef(cc3[1],"N/A");
+	document.getElementById("vpnCertiCountry2").value=readValueWithDef(cc[0],"");
+	document.getElementById("vpnCertiState2").value=readValueWithDef(cc[1],"");
+	document.getElementById("vpnCertiCity2").value=readValueWithDef(cc[2],"");
+	document.getElementById("vpnCertiOrg2").value=readValueWithDef(cc[3],"");
+	document.getElementById("vpnCertiName2").value=readValueWithDef(cc[4],"");
+	document.getElementById("vpnCertiEmail2").value=readValueWithDef(cc[5],"");
+	
+	document.getElementById("vpnCertiCountry3").value=readValueWithDef(cc2[0],"");
+	document.getElementById("vpnCertiState3").value=readValueWithDef(cc2[1],"");
+	document.getElementById("vpnCertiCity3").value=readValueWithDef(cc2[2],"");
+	document.getElementById("vpnCertiOrg3").value=readValueWithDef(cc2[3],"");
+	document.getElementById("vpnCertiName3").value=readValueWithDef(cc2[4],"");
+	document.getElementById("vpnCertiEmail3").value=readValueWithDef(cc2[5],"");
+}
+
+function readValueWithDef(val,def) {
+	if( (typeof(val)=="undefined") || (val==null) )
+		return def;
+	return val;
+}
+
+function vpnSecretServerKeyGenBtnClick() {
+	var req="/cgi-bin/vpn_action.cgi?action=gensecret";
+	var ajaxDelCerti = cretaeAjax();
+	
+	ajaxDelCerti.onreadystatechange = function() {
+		if (ajaxDelCerti.readyState != 4)
+			return;
+
+		document.getElementById("vpnSecretServerKeyGenBtn").disabled = false;
+		document.body.style.cursor = 'default';
+		
+		if (ajaxDelCerti.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxDelCerti.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+		updateVpnInfo();
+	}
+	document.getElementById("vpnSecretServerKeyGenBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+	ajaxDelCerti.open('GET', req, true);
+	ajaxDelCerti.send(null);
+}
+
+function vpnSecretClientUpBtnClick() {
+	document.getElementById("vpnSecretUpSubaction").value="upsecret";
+	document.getElementById("uploadfile").value=document.getElementById("secretfile").value;
+	document.getElementById("vpnSecretUpParam").value="";
+	document.getElementById("formVpnSecretUp").submit();
+}
+
+function vpnClientDelCertiBtnClick() {
+	certiName=document.getElementById("vpnCertiName3").value;
+
+	var req="/cgi-bin/vpn_action.cgi?action=delclient&param="+certiName;
+	var ajaxDelClient = cretaeAjax();
+
+	ajaxDelClient.onreadystatechange = function() {
+		if (ajaxDelClient.readyState != 4)
+			return;
+
+		document.getElementById("vpnClientDelCertiBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxDelClient.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxDelClient.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("Msg87"));//The delete operation has failed. Please check the connection the the router
+				return;
+		}
+		updateVpnInfo();
+	}
+
+	document.getElementById("vpnClientDelCertiBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxDelClient.open('GET', req, true);
+	ajaxDelClient.send(null);
+}
+
+function vpnSecretClientDelBtnClick() {
+	var req="/cgi-bin/vpn_action.cgi?action=delsecret";
+	var ajaxDelSec = cretaeAjax();
+
+	ajaxDelSec.onreadystatechange = function() {
+		if (ajaxDelSec.readyState != 4)
+			return;
+
+		document.getElementById("vpnSecretClientDelBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxDelSec.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxDelSec.responseText);
+		
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+		updateVpnInfo();
+	}
+
+	document.getElementById("vpnSecretClientDelBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxDelSec.open('GET', req, true);
+	ajaxDelSec.send(null);
+}
+
+function vpnSecretServerKeyDnBtnClick() {
+	document.getElementById("dn_action").value="dnsecret";
+	document.getElementById("dn_param").value="";
+	document.getElementById("formVpnActionDn").submit();
+}
+
+function vpnCertiCaNwSetBtnClick() {
+	certiName="ca"
+	nwaddr=document.getElementById("vpnCertiCaNwAddr").value;
+	nwmask=document.getElementById("vpnCertiCaNwMask").value;
+	
+	regaddr=/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/
+	
+	if(nwaddr.length>0 || nwmask.length>0) {
+		if(regaddr.exec(nwaddr)==null) {
+			alert(_("Msg86"));//Please ensure you enter correct network address.
+			return;
+		}
+		
+		if(regaddr.exec(nwmask)==null) {
+			alert(_("Msg88"));//Please ensure you enter correct network mask
+			return;
+		}
+	}
+
+	var req="/cgi-bin/vpn_action.cgi?action=setclientnw&param="+certiName+","+nwaddr+","+nwmask;
+	var ajaxSetClntNw = cretaeAjax();
+
+	ajaxSetClntNw.onreadystatechange = function() {
+		if (ajaxSetClntNw.readyState != 4)
+			return;
+
+		document.getElementById("vpnCertiCaNwSetBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxSetClntNw.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxSetClntNw.responseText);
+		
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+		updateVpnInfo();
+	}
+
+	document.getElementById("vpnCertiCaNwSetBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxSetClntNw.open('GET', req, true);
+	ajaxSetClntNw.send(null);
+}
+
+function vpnCertiNwSetBtnClick() {
+	certiName=document.getElementById("vpnCertiName").value;
+	nwaddr=document.getElementById("vpnCertiNwAddr").value;
+	nwmask=document.getElementById("vpnCertiNwMask").value;
+
+	regaddr=/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/
+
+	if(nwaddr.length>0 || nwmask.length>0) {
+		if(regaddr.exec(nwaddr)==null) {
+			alert(_("Msg86"));//Please ensure you enter correct network address
+			return;
+		}
+		
+		if(regaddr.exec(nwmask)==null) {
+			alert(_("Msg88"));//Please ensure you enter correct network mask
+			return;
+		}
+	}
+
+	var req="/cgi-bin/vpn_action.cgi?action=setclientnw&param="+certiName+","+nwaddr+","+nwmask;
+	var ajaxSetClntNw = cretaeAjax();
+
+	ajaxSetClntNw.onreadystatechange = function() {
+		if (ajaxSetClntNw.readyState != 4)
+			return;
+
+		document.getElementById("vpnCertiNwSetBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxSetClntNw.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxSetClntNw.responseText);
+
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+		updateVpnInfo();
+	}
+
+	document.getElementById("vpnCertiNwSetBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+	
+	ajaxSetClntNw.open('GET', req, true);
+	ajaxSetClntNw.send(null);
+}
+
+function vpnServerRmClientBtnClick() {
+	certiName=document.getElementById("vpnCertiName").value;
+	var req="/cgi-bin/vpn_action.cgi?action=rmclient&param="+certiName;
+	var ajaxRmClient = cretaeAjax();
+
+	ajaxRmClient.onreadystatechange = function() {
+		if (ajaxRmClient.readyState != 4)
+			return;
+
+		document.getElementById("vpnServerRmClientBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxRmClient.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxRmClient.responseText);
+
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+		updateVpnInfo();
+	}
+
+	document.getElementById("vpnServerRmClientBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxRmClient.open('GET', req, true);
+	ajaxRmClient.send(null);
+}
+
+function vpnServerDnCertiBtnClick() {
+	document.getElementById("dn_action").value="dnca";
+	document.getElementById("dn_param").value="";
+	document.getElementById("formVpnActionDn").submit();
+}
+
+function vpnServerDnClientBtnClick() {
+	certiName=document.getElementById("vpnCertiName").value;
+	document.getElementById("dn_action").value="dnclient";
+	document.getElementById("dn_param").value=certiName;
+	document.getElementById("formVpnActionDn").submit();
+}
+
+function setVpnServerCerti(thisValue) {
+	divArray=[
+		"vpnCertiName",
+		"vpnCertiCountry",
+		"vpnCertiState",
+		"vpnCertiCity",
+		"vpnCertiOrg",
+		"vpnCertiEmail",
+	];
+
+	editable=(thisValue<0) || typeof(client_certificate)=="undefined" || typeof(client_certificate[thisValue])=="undefined";
+
+	var i;
+	for(i=0;i<divArray.length;i++) {
+		if(document.getElementById( divArray[i] )==null)
+			continue;
+
+		document.getElementById( divArray[i] ).readOnly=!editable;
+		if(editable)
+			document.getElementById( divArray[i] ).setAttribute("class","");
+		else
+			document.getElementById( divArray[i] ).setAttribute("class","certi_menu_item");
+	}
+
+	// buttons
+	document.getElementById("vpnServerGenClientBtn").disabled=!editable;
+	document.getElementById("vpnServerDnClientBtn").disabled=editable;
+	document.getElementById("vpnServerRmClientBtn").disabled=editable;
+	showElement("vpnCertiRev",!editable);
+	showElement("vpnCertiRevText",!editable);
+	
+	// network information
+	enableElement("vpnCertiNwSetBtn",!editable);
+	enableElement("vpnCertiNwMask",!editable);
+	enableElement("vpnCertiNwAddr",!editable);
+
+	// bypass if new
+	if(editable) {
+		cc=["","","","","","","","",""];
+	}
+	else {
+		// get cc
+		cc=client_certificate[thisValue].split(",");
+	}
+
+	document.getElementById("vpnCertiCountry").value=readValueWithDef(cc[1],"");
+	document.getElementById("vpnCertiState").value=readValueWithDef(cc[2],"");
+	document.getElementById("vpnCertiCity").value=readValueWithDef(cc[3],"");
+	document.getElementById("vpnCertiOrg").value=readValueWithDef(cc[4],"");
+	document.getElementById("vpnCertiName").value=readValueWithDef(cc[5],"");
+	document.getElementById("vpnCertiEmail").value=readValueWithDef(cc[6],"");
+	document.getElementById("vpnCertiRev").value=readValueWithDef(cc[7],"");
+	
+	// client network information
+	nwinfo=cc[8].split(" ");
+	document.getElementById("vpnCertiNwAddr").value=readValueWithDef(nwinfo[0],"");
+	document.getElementById("vpnCertiNwMask").value=readValueWithDef(nwinfo[1],"");
+}
+
+function cretaeAjax() {
+	var ajaxHttp;    
+	try {
+		ajaxHttp = new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer  
+		try {
+			ajaxHttp = new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				ajaxHttp = new XMLHttpRequest();
+
+			}
+			catch (e) {
+				//alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}      
+	return ajaxHttp;
+}
+
+function updateVpnInfoDh_handler(responseText,callVpn) {
+	var result;
+	var openvpn_dh=0;
+	var openvpn_output=[];
+
+	eval(responseText);
+	document.getElementById("vpnDhOutput").value=openvpn_output;
+	if(openvpn_dh==2)
+		setTimeout("updateVpnInfoDh()", 500)
+	else {
+		if(callVpn)
+			updateVpnInfo();
+	}
+}
+
+var ajaxUpdVpnDhInfo = null;
+var ajaxUpdVpnInfo = null;
+
+function updateVpnInfoDh() {
+	var req="/cgi-bin/vpn_action.cgi?action=info_dh";
+
+	if(ajaxUpdVpnDhInfo)
+		return;
+
+	ajaxUpdVpnDhInfo = cretaeAjax();
+	ajaxUpdVpnDhInfo.onreadystatechange = function() {
+		if (ajaxUpdVpnDhInfo.readyState != 4) {
+			return;
+		}
+		if (ajaxUpdVpnDhInfo.status != 200) {
+			ajaxUpdVpnDhInfo=null;
+			return;
+		}
+		updateVpnInfoDh_handler(ajaxUpdVpnDhInfo.responseText,true);
+		ajaxUpdVpnDhInfo=null;
+	}
+	ajaxUpdVpnDhInfo.open('GET', req, true);
+	ajaxUpdVpnDhInfo.send(null);
+}
+
+function updateVpnInfo() {
+	if(ajaxUpdVpnInfo)
+		return;
+
+	var req="/cgi-bin/vpn_action.cgi?action=info";
+	var vpnServerCertiSel=document.getElementById('vpnServerCertiSel');
+	var vpnClientCertiSel=document.getElementById('vpnClientCertiSel');
+	var vpnClientCertiSel2=document.getElementById('vpnClientCertiSel2');
+	ajaxUpdVpnInfo = cretaeAjax();
+
+	ajaxUpdVpnInfo.onreadystatechange = function() {
+		if (ajaxUpdVpnInfo.readyState != 4)
+			return;
+
+		vpnServerCertiSel.disabled = false;
+		vpnClientCertiSel.disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxUpdVpnInfo.status != 200) {
+			ajaxUpdVpnInfo=null;
+			return;
+		}
+
+		var result;
+		eval(ajaxUpdVpnInfo.responseText);
+		
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("failed"));
+				return;
+		}
+
+		// clear client select
+		while(vpnServerCertiSel.length)
+			vpnServerCertiSel.remove(0);
+
+		// add clients
+		var i;
+		for(i=0;client_certificate!=null && i<client_certificate.length;i++) {
+			var elOptNew = document.createElement('option');
+
+			cc=client_certificate[i].split(",");
+			elOptNew.text = cc[5];
+			elOptNew.value = i;
+			elOptNew.selected == (i==0);
+			try {
+				vpnServerCertiSel.add(elOptNew,null);
+			}
+			catch(ex) {
+				vpnServerCertiSel.add(elOptNew);
+			}
+		}
+
+		var elOptNew = document.createElement('option');
+		elOptNew.text = _("new")+"..."
+		elOptNew.value = "-1";
+
+		try {
+			vpnServerCertiSel.add(elOptNew,null);
+		}
+		catch(ex) {
+			vpnServerCertiSel.add(elOptNew);
+		}
+
+		// update position
+		setVpnServerCerti(vpnServerCertiSel.value);
+
+		// backup the value
+		if(vpnClientCertiSel.value!="" && vpnClientCertiSel.value<installed_certificate.length) {
+			cce=installed_certificate[vpnClientCertiSel.value].split("/");
+			cc=cce[0].split(",");
+			cc2=cce[1].split(",");
+			
+			vpnClientCertiSel2.value=cc2[4];
+		}
+
+		// clear installed certificate
+		while(vpnClientCertiSel.length)
+			vpnClientCertiSel.remove(0);
+
+		var found=0;
+		// add installed certificate
+		for(i=0;installed_certificate!=null && i<installed_certificate.length;i++) {
+			var elOptNew = document.createElement('option');
+
+			cce=installed_certificate[i].split("/");
+			cc=cce[0].split(",");
+			cc2=cce[1].split(",");
+
+			elOptNew.text = cc[4] + " - " + cc2[4];
+			elOptNew.value = i;
+
+			if(cc2[4] == vpnClientCertiSel2.value) {
+				elOptNew.selected = true;
+				found=i;
+			}
+			else {
+				elOptNew.selected = false;
+			}
+
+			try {
+				vpnClientCertiSel.add(elOptNew,null);
+			}
+			catch(ex) {
+				vpnClientCertiSel.add(elOptNew);
+			}
+		}
+
+		// update position
+		setVpnClientCerti(found);
+		enableElement("vpnClientDelCertiBtn",installed_certificate!=null && installed_certificate.length>0);
+
+		// secret time - server
+		serverSecretTime=server_secret_time;
+		if(serverSecretTime=="")
+			serverSecretTime="N/A";
+		document.getElementById("vpnSecretServerKeyTime").value=serverSecretTime;
+
+		// secret time - client
+		clientSecretTime=client_secret_time;
+		if(clientSecretTime=="")
+			clientSecretTime="N/A";
+		document.getElementById("vpnSecretClientKeyTime").value=clientSecretTime;
+
+		// server certificate
+		if(server_certificate!=null) {
+			cce=server_certificate.split("/");
+			cc=cce[0].split(",");
+			cc2=cce[1].split(",");
+			cc3=cce[2].split(" ");
+		}
+		else {
+			cc="";
+			cc2="";
+			cc3=["",""];
+		}
+
+		serverCertiExpS=readValueWithDef(cc2[0],"N/A");
+		if(serverCertiExpS=="")
+			serverCertiExpS="N/A";
+
+		serverCertiExpE=readValueWithDef(cc2[1],"N/A");
+		if(serverCertiExpE=="")
+			serverCertiExpE="N/A";
+
+		if(cc3.length==2) {
+			document.getElementById("vpnCertiCaNwAddr").value=cc3[0];
+			document.getElementById("vpnCertiCaNwMask").value=cc3[1];
+		}
+		else {
+			document.getElementById("vpnCertiCaNwAddr").value="";
+			document.getElementById("vpnCertiCaNwMask").value="";
+		}
+
+		// openvpn dh
+		updateVpnInfoDh_handler(ajaxUpdVpnInfo.responseText,false);
+
+		document.getElementById("vpnServerCertiExpS").value=serverCertiExpS;
+		document.getElementById("vpnServerCertiExpE").value=serverCertiExpE;
+		document.getElementById("vpnCertiCountry4").value=readValueWithDef(cc[0],"");
+		document.getElementById("vpnCertiState4").value=readValueWithDef(cc[1],"");
+		document.getElementById("vpnCertiCity4").value=readValueWithDef(cc[2],"");
+		document.getElementById("vpnCertiOrg4").value=readValueWithDef(cc[3],"");
+		document.getElementById("vpnCertiEmail4").value=readValueWithDef(cc[5],"");
+
+		enableElement("vpnServerGenDhBtn",typeof(openvpn_dh)=="undefined" || openvpn_dh!=2);
+		// enable elements
+		serverCertiExisting=(cc2[0]!="") && (cc2[1]!="");
+		dhExisting=typeof(openvpn_dh)!="undefined" && openvpn_dh==1;
+		if(!serverCertiExisting || !dhExisting)
+			enableElement("vpnServerGenClientBtn",false);
+		enableElement("vpnServerDnCertiBtn",serverCertiExisting && dhExisting);
+		// enable elements
+		enableElement("vpnSecretServerKeyDnBtn",server_secret_time!="");
+		enableElement("vpnSecretClientDelBtn",client_secret_time!="");
+		// enable elements
+		enableElement("vpnServerGenCertiBtn",dhExisting);
+		showElement("vpnDhOutput",typeof(openvpn_output)!="undefined" && openvpn_output.length>0);
+		
+		ajaxUpdVpnInfo=null;
+	}
+
+	vpnServerCertiSel.disabled = true;
+	vpnClientCertiSel.disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxUpdVpnInfo.open('GET', req, true);
+	ajaxUpdVpnInfo.send(null);
+}
+
+function isIncorrect(xStr) {  
+	var regEx = /^[a-zA-Z0-9@_\-\. ]+$/;
+	return !xStr.match(regEx);  
+}  
+
+function vpnServerGenClientBtnClick() {
+	certiName=document.getElementById("vpnCertiName").value;
+	countryName=document.getElementById("vpnCertiCountry").value;
+	certiState=document.getElementById("vpnCertiState").value;
+	certiCity=document.getElementById("vpnCertiCity").value;
+	certiOrg=document.getElementById("vpnCertiOrg").value;
+	certiEmail=document.getElementById("vpnCertiEmail").value;
+
+	if(isIncorrect(certiName)) {
+		alert(_("Msg89"));//Error: Please ensure you enter a correct certificate name.
+		return;
+	}
+
+	if(countryName.length>2 || isIncorrect(countryName)) {
+		alert(_("Msg95"));//Error: Please ensure you enter 1 or 2 letters country name.
+		return;
+	}
+
+	if(isIncorrect(certiState) || isIncorrect(certiCity) || isIncorrect(certiOrg) || isIncorrect(certiEmail)) {
+		alert(_("Msg96"));//Error: Please ensure you input certificate fields.
+		return;
+	}
+
+	certiState
+
+	var req="/cgi-bin/vpn_action.cgi?action=genclient&param="
+		+document.getElementById("vpnCertiName").value+","
+		+countryName+","
+		+document.getElementById("vpnCertiState").value+","
+		+document.getElementById("vpnCertiCity").value+","
+		+document.getElementById("vpnCertiOrg").value+","
+		+document.getElementById("vpnCertiEmail").value;
+
+	var ajaxGenClnt = cretaeAjax();
+	
+	ajaxGenClnt.onreadystatechange = function() {
+		if (ajaxGenClnt.readyState != 4)
+			return;
+			
+		document.getElementById('vpnServerGenClientBtn').disabled = false;
+		document.body.style.cursor = 'default';
+		
+		if (ajaxGenClnt.status != 200) {
+			return;
+		}
+		
+		var result;
+		eval(ajaxGenClnt.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("Msg97"));//The router failed to generate the client key. Please ensure you enter correct certificate information.
+		}
+		else {
+			updateVpnInfo();
+		}
+	}
+
+	document.getElementById('vpnServerGenClientBtn').disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxGenClnt.open('GET', req, true);
+	ajaxGenClnt.send(null);
+}
+
+function vpnServerGenDhClick() {
+	if(!confirm(_("Msg98")))//Info: It will take up to 20 minutes to generate DH parameters. All the previously generated server and client keys will be deleted and invalidated by this procedure. Are you sure you want to continue?
+		return;
+
+	var req="/cgi-bin/vpn_action.cgi?action=init&param=";
+	var ajaxGenDh = cretaeAjax();
+
+	ajaxGenDh.onreadystatechange = function() {
+		if (ajaxGenDh.readyState != 4)
+			return;
+			
+		document.getElementById('vpnServerGenDhBtn').disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxGenDh.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxGenDh.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("Msg99"));//The router failed to start to generate the DH key.
+		}
+		
+		updateVpnInfo();
+	}
+
+	document.getElementById('vpnServerGenDhBtn').disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxGenDh.open('GET', req, true);
+	ajaxGenDh.send(null);
+}
+
+function vpnServerGenCertiBtnClick() {
+	countryName=document.getElementById("vpnCertiCountry4").value;
+	certiState=document.getElementById("vpnCertiState4").value;
+	certiCity=document.getElementById("vpnCertiCity4").value;
+	certiOrg=document.getElementById("vpnCertiOrg4").value;
+	certiEmail=document.getElementById("vpnCertiEmail4").value;
+
+	if(countryName.length>2 || isIncorrect(countryName)) {
+		alert(_("Msg95"));//"ERROR: Please ensure you enter 1 or 2 letters country name"
+		return;
+	}
+
+	if(isIncorrect(certiState) || isIncorrect(certiCity) || isIncorrect(certiOrg) || isIncorrect(certiEmail)) {
+		alert(_("Msg96"));//"ERROR: Please ensure you input certificate fields"
+		return;
+	}
+
+	if(!confirm(_("Msg100")))//Info: It will take about a minute to generate new CA and server keys. All the previously generated client keys will be invalidated by this procedure. Are you sure you want to continue?
+		return;
+
+	var req="/cgi-bin/vpn_action.cgi?action=ca&param="
+		+","
+		+countryName+","
+		+document.getElementById("vpnCertiState4").value+","
+		+document.getElementById("vpnCertiCity4").value+","
+		+document.getElementById("vpnCertiOrg4").value+","
+		+document.getElementById("vpnCertiEmail4").value;
+
+	var ajaxGenCa = cretaeAjax();
+	ajaxGenCa.onreadystatechange = function() {
+		if (ajaxGenCa.readyState != 4)
+			return;
+
+		document.getElementById('vpnServerGenCertiBtn').disabled = false;
+		document.body.style.cursor = 'default';
+		
+		if (ajaxGenCa.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxGenCa.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert(_("Msg101"));//The router failed to generate the CA key. Please ensure you enter correct certificate information/
+		}
+
+		updateVpnInfo();
+	}
+
+	document.getElementById('vpnServerGenCertiBtn').disabled = true;
+	document.body.style.cursor = 'wait';
+
+	ajaxGenCa.open('GET', req, true);
+	ajaxGenCa.send(null);
+}
+
+function vpnCaUpBtnClick() {
+	document.getElementById("vpnCaUpParam").value=document.getElementById("vpnCaUpName").value;
+	uploadTargetStart(document.getElementById("formVpnCaUp"));
+}
+
+var upload_running=false;
+
+function uploadTargetStart(form) {
+	form.target = "uploadTarget";
+	document.getElementById("uploadTarget").onload = uploadTargetOnLoad;
+	form.submit();
+
+	// disable certi
+	enableElement("vpnCertiUpBtn",false);
+	enableElement("vpnCertiUpFile",false);
+	// disable secret
+	enableElement("vpnSecretUpBtn",false);
+	enableElement("vpnSecretUpFile",false);
+	// disable ca
+	enableElement("vpnCaUpFile",false);
+	enableElement("vpnCaUpName",false);
+	enableElement("vpnCaUpBtn",false);
+
+	document.body.style.cursor = 'wait';
+	upload_running=true;
+}
+
+function resetForm(formName) {
+
+	document.getElementById(formName).reset();
+}
+
+function uploadTargetOnLoad() {
+	if(upload_running) {
+		//Function will be called when iframe is loaded
+		var ret = frames['uploadTarget'].document.getElementsByTagName("body")[0].innerHTML;
+
+		//window.location.reload(true);
+		eval(ret);
+
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+			alert(_("Msg102"));//The upload operation has failed. Please ensure the connection to the router.
+			return;
+		}
+	}
+
+	document.body.style.cursor = 'default';
+
+	// reset certi
+	resetForm("formVpnCertiUp");
+	enableElement("vpnCertiUpFile",true);
+	// reset secret
+	resetForm("formVpnSecretUp");
+	enableElement("vpnSecretUpFile",true);
+	// reset ca
+	resetForm("formVpnCaUp");
+	enableElement("vpnCaUpFile",true);
+	enableElement("vpnCaUpName",true);
+
+	updateVpnInfo();
+	upload_running=false;
+} 
+
+
+function vpnCaUpFileChange() {
+	selected= (document.getElementById("vpnCaUpFile").value.length>0) && (document.getElementById("vpnCaUpName").value.length>0);
+	document.getElementById("vpnCaUpBtn").disabled=!selected;
+}
+
+function vpnCertiUpFileChange() {
+	selected=document.getElementById("vpnCertiUpFile").value.length>0;
+	document.getElementById("vpnCertiUpBtn").disabled=!selected;
+}
+
+function vpnSecretUpFileChange() {
+	selected=document.getElementById("vpnSecretUpFile").value.length>0;
+	document.getElementById("vpnSecretUpBtn").disabled=!selected;
+}
+
+function getCheckedValue(radioObj) {
+	if(!radioObj)
+		return "";
+	var radioLength = radioObj.length;
+	if(radioLength == undefined)
+		if(radioObj.checked)
+			return radioObj.value;
+		else
+			return "";
+	for(var i = 0; i < radioLength; i++) {
+		if(radioObj[i].checked) {
+			return radioObj[i].value;
+		}
+	}
+	return "";
+}
+
+function FinalToDisplay() {   
+	var editIndex = document.form.editindex.value;
+	var curIndex = document.form.curindex.value;
+
+	if( curIndex >= 0) {
+		showedit("edit",true, ipsecTunnelMap[curIndex]);
+	}
+	else if( editIndex == "") {
+		showedit("edit",false, 0);
+	}
+	else if( editIndex >=0 ) {
+		showedit("edit",true, editIndex);
+	}
+	else
+		showedit("edit",false, 0);
+	$("#addBtn").val(" "+_("add")+" ");
+	$("#submitBtn").val(_("CSsave"));
+	$("#exitBtn").val(_("exit"));
+	$("#vpnServerCertiExpSText").val(_("notBefore"));
+	$("#vpnServerCertiExpEText").val(_("notAfter"));
+	$("#vpnCertiCountryText4").val(_("country")+":");
+	$("#vpnCertiStateText4").val(_("state")+":");
+	$("#vpnCertiCityText4").val(_("city")+":");
+	$("#vpnCertiOrgText4").val(_("organization")+":");
+	$("#vpnCertiEmailText4").val(_("email")+":");
+	$("#vpnServerAuthUserText").val(_("user name"));
+	$("#vpnServerAuthPassText").val(_("password"));
+	$("#vpnServerDnCertiBtn").val(_("downloadCAcertificate"));
+	$("#vpnCertiCaNwAddrText").val(_("network address")+":");
+	$("#vpnCertiCaNwMaskText").val(_("network mask")+":");
+	$("#vpnCertiCaNwSetBtn").val(_("setNetworkInformation"));
+	$("#vpnServerCertiSelText").val(_("certificate")+":");
+	$("#vpnCertiNameText").val(_("name")+":");
+	$("#vpnCertiNameText2").val(_("name")+":");
+	$("#vpnCertiNameText3").val(_("name")+":");
+	$("#vpnCertiCountryText").val(_("country")+":");
+	$("#vpnCertiCountryText2").val(_("country")+":");
+	$("#vpnCertiCountryText3").val(_("country")+":");
+	$("#vpnCertiStateText").val(_("state")+":");
+	$("#vpnCertiStateText2").val(_("state")+":");
+	$("#vpnCertiStateText3").val(_("state")+":");
+	$("#vpnCertiCityText").val(_("city")+":");
+	$("#vpnCertiCityText2").val(_("city")+":");
+	$("#vpnCertiCityText3").val(_("city")+":");
+	$("#vpnCertiOrgText").val(_("organization")+":");
+	$("#vpnCertiEmailText").val(_("email")+":");
+	$("#vpnCertiOrgText2").val(_("organization")+":");
+	$("#vpnCertiEmailText2").val(_("email")+":");
+	$("#vpnCertiOrgText3").val(_("organization")+":");
+	$("#vpnCertiEmailText3").val(_("email")+":");
+	$("#vpnCertiRevText").val(_("revoked"));
+	$("#vpnServerRmClientBtn").val(_("revoke"));
+	$("#vpnServerDnClientBtn").val(_("download"));
+	$("#vpnServerGenClientBtn").val(_("generate"));
+	$("#vpnCertiNwAddrText").val(_("network address")+":");
+	$("#vpnCertiNwMaskText").val(_("network mask")+":");
+	$("#vpnCertiNwSetBtn").val(_("setNetworkInformation"));
+	$("#vpnClientAuthUserText").val(_("user name")+":");
+	$("#vpnClientAuthPassText").val(_("password")+":");
+	$("#vpnClientCertiSelText").val(_("certificate")+":");
+	$("#vpnCertiExpSText").val(_("notBefore")+":");
+	$("#vpnCertiExpEText").val(_("notAfter")+":");
+	$("#vpnCertiPeerNwAddrText").val(_("network address")+":");
+	$("#vpnCertiPeerNwMaskText").val(_("network mask")+":");
+	$("#vpnSecretServerKeyTimeText").val(_("update time")+":");
+	$("#vpnSecretServerKeyGenBtn").val(_("generate"));
+	$("#vpnSecretServerKeyDnBtn").val(_("download")+"...");
+	$("#vpnSecretClientKeyTimeText").val(_("update time")+":");
+	$("#vpnSecretClientDelBtn").val(_("delete"));
+	$("#vpnCaUpFileText").val(_("select file"));
+	$("#vpnCaUpBtn").val(_("upload"));
+	$("#vpnCertiUpBtn").val(_("upload"));
+	$("#vpnSecretUpBtn").val(_("upload"));
+}
+
+$(document).ready( function() {
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+</script>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("VPN")+" > "+_("OpenVPN"));</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="editindex" value="@@form['editindex']">
+<input type="hidden" name="curindex" value="@@form['curindex']">
+<input type="hidden" name="snatEnable" value="@@form['snatEnable']">
+<input type="hidden" name="sdefGwEnable" value="@@form['sdefGwEnable']">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("VPN")+" > "+_("OpenVPN"));</script></h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<div id="listDiv">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("openVPNServerList"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("name"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("networkAddressMask"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("authentication type"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("user name"));</script></b></td>
+<td width="4%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("enable"));</script></b></td>
+<td width="16%" nowrap bordercolor="#0033cc"><div align="center">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function VPNserverlist() {
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='6' align='center'>"+_("vpn empty")+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		if((st[i].type=="openvpn.0") && (st[i].vpn_type=="server")) {
+			document.write("<tr>"); 
+			document.write("<td><div align=\"center\">"+st[i].name+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].network_addr+"</div>");
+			document.write("<div align=\"center\">"+st[i].network_mask+"</div></td>");
+			if(st[i].vpn_authtype =="0")
+				document.write("<td ><div align=\"center\">"+"Certs"+"</div></td>");
+			else
+				document.write("<td ><div align=\"center\">"+"User/Pass"+"</div></td>");
+			if(st[i].vpn_authtype =="1")
+				document.write("<td><div align=\"center\">"+st[i].user+"</div></td>");
+			else
+				document.write("<td><div align=\"center\">"+"N.A"+"</div></td>");
+			document.write("<td><div align=\"center\"><input type=checkbox "+(st[i].enable=='1'?'checked=true':'')+" name='Enable' disabled=true></div></td>");
+			document.write("<td><a href=javascript:showedit('edit',"+true+","+i+") >"+_("edit")+"</a>&nbsp;&nbsp;");
+			document.write("&nbsp;&nbsp;<a href=javascript:delentry("+i+");>"+_("delete")+"</a></td>");
+			document.write("</tr>");
+		}
+	}
+}
+VPNserverlist();
+</script>
+</table>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("openVPNClientList"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("name"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("serveraddr"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("authentication type"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("user name"));</script></b></td>
+<td width="4%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("enable"));</script></b></td>
+<td width="16%" nowrap bordercolor="#0033cc"><div align="center">&nbsp;</td>
+</tr>
+
+<script language="Javascript">
+function VPNclilist() {
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='6' align='center'>"+_('vpn empty')+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		if((st[i].type=="openvpn.0") && (st[i].vpn_type=="client")) {
+			document.write("<tr>"); 
+			document.write("<td><div align=\"center\">"+st[i].name+"</div></td>");
+  			document.write("<td ><div align=\"center\">"+st[i].serveraddress+"</div></td>");
+			if(st[i].vpn_authtype =="0")
+				document.write("<td ><div align=\"center\">"+"Certs"+"</div></td>");
+			else
+				document.write("<td ><div align=\"center\">"+"User/Pass"+"</div></td>");
+			if(st[i].vpn_authtype =="1")
+				document.write("<td><div align=\"center\">"+st[i].user+"</div></td>");
+			else
+				document.write("<td><div align=\"center\">"+"N.A"+"</div></td>");
+			document.write("<td><div align=\"center\"><input type=checkbox "+(st[i].enable=='1'?'checked=true':'')+" name='Enable' disabled=true></div></td>");
+			document.write("<td><a href=javascript:showedit('edit',"+true+","+i+") >"+_("edit")+"</a>&nbsp;&nbsp;");
+			document.write("&nbsp;&nbsp;<a href=javascript:delentry("+i+");>"+_("delete")+"</a></td>");
+			document.write("</tr>");
+		}
+	}
+}
+VPNclilist();
+</script>
+</table>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("ptp list"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="10%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("name"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("serveraddr"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("local IP"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("remote IP"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("remoteNetworkMask"));</script></b></td>
+<td width="4%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("enable"));</script></b></td>
+<td width="16%" nowrap bordercolor="#0033cc"><div align="center">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function VPNpeerlist() {
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='7' align='center'>"+_("vpn empty")+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		if((st[i].type=="openvpn.0") && (st[i].vpn_type=="peer")) {
+			document.write("<tr>"); 
+			document.write("<td><div align=\"center\">"+st[i].name+"</div></td>");
+  			document.write("<td ><div align=\"center\">"+st[i].serveraddress+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].local_ipaddr+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].remote_ipaddr+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].remote_nwaddr+"</div>");
+			document.write("<div align=\"center\">"+st[i].remote_nwmask+"</div></td>");
+			document.write("<td><div align=\"center\"><input type=checkbox "+(st[i].enable=='1'?'checked=true':'')+" name='Enable' disabled=true></div></td>");
+			document.write("<td><a href=javascript:showedit('edit',"+true+","+i+") >"+_("edit")+"</a>&nbsp;&nbsp;");
+			document.write("&nbsp;&nbsp;<a href=javascript:delentry("+i+");>"+_("delete")+"</a></td>");
+			document.write("</tr>");
+		}
+	}
+}
+VPNpeerlist();
+</script>
+</table>
+
+<div align="center" style="margin-right:10% ">
+<p></p>
+<input type="button" value="&nbsp;Add&nbsp;" id="addBtn" onClick="javascript:showedit( 'edit', true, st.length )" style="width:120px;">
+</div>
+</div>
+
+<div id="editDiv" style="display:none">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("openVPNEdit"));</script></th></tr>
+</table>
+
+<input type="hidden" name="vpnenable" id="vpnenable" value="@@form['vpnenable']"/>
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+<table width="90%">
+	<tr>
+		<td width="38%">
+			<div id="enableDiv"><script language="JavaScript">document.write(_("enableOpenVPN"));</script></div>
+		</td>
+		<td>
+			<input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='1';setVpnEnable(1)">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='0';setVpnEnable(0)">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td>Profile Name</td>
+		<td><input type="text" name="newname" id="newname" size=32 maxlength=64 value="@@form['newname']"></td>
+	</tr>
+	
+</table>
+
+<div id="vpnDiv" name="vpnDiv">
+<table id="vpnTypeDiv" width="90%">
+	<tr>
+		<td id="vpnTypeText" width="38%"><script language="JavaScript">document.write(_("openVPNType"));</script></td>
+		<td>
+			<select id="vpnType" name="vpnType" onChange="updateFormArrange()">
+				<option value="server"><script language="JavaScript">document.write(_("lan dhcp type server"));</script></option>
+				<option value="client"><script language="JavaScript">document.write(_("client"));</script></option>
+				<option value="peer"><script language="JavaScript">document.write(_("peer to peer"));</script></option>
+			</select>
+		</td>
+	</tr>
+</table>
+<input type="hidden" id="vpnServerAuthTypeValue" name="vpnServerAuthTypeValue">
+<table id="vpnServerDiv" width="90%">
+	<tr>
+		<td><div id="vpnServerServerPortText"><script language="JavaScript">document.write(_("server port"));</script></div></td>
+		<td>
+			<input type="text" id="vpnServerServerPort" name="vpnServerServerPort" size=16 maxlength=32 value="">
+			<select name="vpnServerServerPortType" id="vpnServerServerPortType" size=1>
+				<option value="UDP"><script language="JavaScript">document.write(_("UDP"));</script></option>
+				<option value="TCP"><script language="JavaScript">document.write(_("rtcp"));</script></option>
+			</select>
+		</td>
+	</tr>
+
+	<tr>
+		<td width="38%" id="vpnServerNwAddrText"><script language="JavaScript">document.write(_("vpnNetworkAddress"));</script></div></td>
+		<td><input type="text" id="vpnServerNwAddr" name="vpnServerNwAddr" size=32 maxlength=64 value=""></td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnNwMaskText"><script language="JavaScript">document.write(_("vpnNetworkMask"));</script></div></td>
+		<td><input type="text" id="vpnNwMask" name="vpnNwMask" size=32 maxlength=64 value=""></td>
+	</tr>
+
+	<tr id="vpnServerDhDiv">
+		<td><div id="vpnServerGenDHText"><script language="JavaScript">document.write(_("diffieHellmanParameters"));</script></div></td>
+		<td>
+			<p>
+				<input id="vpnServerGenDhBtn" type="button" value="Generate DH..." onclick="vpnServerGenDhClick()">
+			</p>
+			<p>
+				<textarea id="vpnDhOutput" cols="60" rows="5" style="background:#F0EFEB; border:2px;overflow:auto; display:none" tabindex="1" name="installMsg" readonly="readonly"></textarea>
+			</p>
+		</td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnServerCertiText"><script language="JavaScript">document.write(_("serverCertificates"));</script></div></td>
+		<td>
+			<p>
+			<input id='vpnServerCertiExpSText' type="text" size=10 maxlength=10 value="Not Before :" class="certi_menu_item" readonly>
+			<input id='vpnServerCertiExpS' name="vpnCertiName3" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnServerCertiExpEText' type="text" size=10 maxlength=10 value="Not After :" class="certi_menu_item" readonly>
+			<input id='vpnServerCertiExpE' name="vpnCertiName3" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiCountryText4' type="text" size=10 maxlength=10 value="Country :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCountry4' type="text" name="vpnCertiCountry4" size=32 maxlength=64>
+			</p>
+
+			<p>
+			<input id='vpnCertiStateText4' type="text" size=10 maxlength=10 value="State :" class="certi_menu_item" readonly>
+			<input id='vpnCertiState4' type="text" name="vpnCertiState4" size=32 maxlength=64>
+			</p>
+
+			<p>
+			<input id='vpnCertiCityText4' type="text" size=10 maxlength=10 value="City :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCity4' type="text" name="vpnCertiCity4" size=32 maxlength=64>
+			</p>
+
+			<p>
+			<input id='vpnCertiOrgText4' type="text" size=10 maxlength=10 value="Organization :" class="certi_menu_item" readonly>
+			<input id='vpnCertiOrg4' type="text" name="vpnCertiOrg4" size=32 maxlength=64>
+			</p>
+
+			<p>
+			<input id='vpnCertiEmailText4' type="text" size=10 maxlength=10 value="Email :" class="certi_menu_item" readonly>
+			<input id='vpnCertiEmail4' type="text" name="vpnCertiEmail4" size=32 maxlength=64>
+			</p>
+
+			<input id="vpnServerGenCertiBtn" type="button" value="Generate CA certificate..." onclick="vpnServerGenCertiBtnClick()">
+		</td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnServerAuthTypeText"><script language="JavaScript">document.write(_("authentication type"));</script></div></td>
+		<td>
+			<p></p>
+			<p>
+				<input type="radio" onclick="setVpnServerAuthType(0)" name="vpnServerAuthType" id="vpnServerAuthTypeCerti">&nbsp;&nbsp;<script language="JavaScript">document.write(_("certificate"));</script>
+			</p>
+			<p></p>
+			<p>
+				<input type="radio" onclick="setVpnServerAuthType(1)" name="vpnServerAuthType" id="vpnServerAuthTypeUNPW">&nbsp;&nbsp;<script language="JavaScript">document.write(_("usernamePassword"));</script>
+			</p>
+			<p></p>
+		</td>
+	</tr>
+
+	<tr id="vpnServerAuthUnpwDiv">
+		<td id="vpnServerUnpwText"><script language="JavaScript">document.write(_("usernamePassword"));</script></td>
+		<td>
+			<p></p>
+			<p>
+			<input id="vpnServerAuthUserText" type="text" size=10 maxlength=10 value="User Name :" class="certi_menu_item" readonly>
+			<input id='vpnServerAuthUser' name="vpnServerAuthUser" type="text" size=32 maxlength=64 value="Client2">
+			</p>
+
+			<p>
+			<input id='vpnServerAuthPassText' type="text" size=10 maxlength=10 value="Password :" class="certi_menu_item" readonly>
+			<input id='vpnServerAuthPass' name="vpnServerAuthPass" type="password" size=32 maxlength=64 value="Client2">
+			</p>
+			<p></p>
+			<p>
+			<input type="button" id="vpnServerDnCertiBtn" size=32 value="Download CA certificate..." onclick="vpnServerDnCertiBtnClick()">
+			</p>
+
+			<p></p>
+			<p></p>
+
+			<p>
+			<input id='vpnCertiCaNwAddrText' type="text" size=16 value="Network address:" class="certi_menu_item" readonly>
+			<input id='vpnCertiCaNwAddr' type="text" name="vpnCertiCaNwAddr" size=26 maxlength=24 >
+			</p>
+
+			<p>
+			<input id='vpnCertiCaNwMaskText' type="text" size=16 value="Network Mask:" class="certi_menu_item" readonly>
+			<input id='vpnCertiCaNwMask' type="text" name="vpnCertiCaNwMask" size=26 maxlength=24 >
+			</p>
+
+			<p>
+			<input type="button" id="vpnCertiCaNwSetBtn" size=32 value="Set Network Information" onclick="vpnCertiCaNwSetBtnClick()">
+			</p>
+
+		</td>
+	</tr>
+	<tr id="vpnServerAuthCertiDiv">
+		<td><div id="vpnNwMask"><script language="JavaScript">document.write(_("certificateManagement"));</script></div></td>
+		<td>
+			<p></p>
+			<p>
+			<input id="vpnServerCertiSelText" type="text" size=10 maxlength=10 value="Certificate :" class="certi_menu_item" readonly>
+			<select id="vpnServerCertiSel" name="vpnServerCertiSel" size=1 onChange="setVpnServerCerti(this.value)" >
+			</select>
+			</p>
+
+			<p>
+			<input id='vpnCertiNameText' type="text" size=10 maxlength=10 value="Name :" class="certi_menu_item" readonly>
+			<input id='vpnCertiName' name="vpnCertiName" type="text" size=32 maxlength=64 value="Client2">
+			</p>
+
+			<p>
+			<input id='vpnCertiCountryText' type="text" size=10 maxlength=10 value="Country :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCountry' name="vpnCertiCountry" type="text" size=32 maxlength=64 value="AU">
+			</p>
+
+			<p>
+			<input id='vpnCertiStateText' type="text" size=10 maxlength=10 value="State :" class="certi_menu_item" readonly>
+			<input id='vpnCertiState' name="vpnCertiState" type="text" size=32 maxlength=64 value="NSW">
+			</p>
+
+			<p>
+			<input id='vpnCertiCityText' type="text" size=10 maxlength=10 value="City :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCity' type="text" name="vpnCertiCity" size=32 maxlength=64 value="Sydney">
+			</p>
+
+			<p>
+			<input id='vpnCertiOrgText' type="text" size=10 maxlength=10 value="Organization :" class="certi_menu_item" readonly>
+			<input id='vpnCertiOrg' type="text" name="vpnCertiOrg" size=32 maxlength=64 value="NetCommWireless">
+			</p>
+
+			<p>
+			<input id='vpnCertiEmailText' type="text" size=10 maxlength=10 value="Email :" class="certi_menu_item" readonly>
+			<input id='vpnCertiEmail' type="text" name="vpnCertiEmail" size=32 maxlength=64 value="service@netcommwireless.com">
+			</p>
+
+			<p>
+			<input id='vpnCertiRevText' type="text" size=10 maxlength=10 value="Revoked:" class="certi_menu_item" readonly>
+			<input id='vpnCertiRev' type="text" name="vpnCertiRev" size=32 maxlength=64 class="certi_menu_item" value="" readonly>
+			</p>
+			<p></p>
+			<p>
+			<input type="button" id="vpnServerGenClientBtn" size=32 value="Generate" onclick="vpnServerGenClientBtnClick()">
+			<input type="button" id="vpnServerDnClientBtn" size=32 value="Download" onclick="vpnServerDnClientBtnClick()">
+			<input type="button" id="vpnServerRmClientBtn" size=32 value="Revoke" onclick="vpnServerRmClientBtnClick()">
+			</p>
+
+			<p></p>
+			<p></p>
+
+			<p>
+			<input id='vpnCertiNwAddrText' type="text" size=16 value="Network address:" class="certi_menu_item" readonly>
+			<input id='vpnCertiNwAddr' type="text" name="vpnCertiNwAddr" size=26 maxlength=24 >
+			</p>
+
+			<p>
+			<input id='vpnCertiNwMaskText' type="text" size=16 value="Network Mask:" class="certi_menu_item" readonly>
+			<input id='vpnCertiNwMask' type="text" name="vpnCertiNwMask" size=26 maxlength=24 >
+			</p>
+
+			<p>
+			<input type="button" id="vpnCertiNwSetBtn" size=32 value="Set Network Information" onclick="vpnCertiNwSetBtnClick()">
+			</p>
+		</td>
+	</tr>
+</table>
+<input type="hidden" id="vpnClientAuthTypeValue" name="vpnClientAuthTypeValue">
+<input id='vpnClientCertiSel2' type="hidden">
+<table width="90%" id="vpnClientDiv">
+	<tr>
+		<td width="38%" id="vpnClientServerAddrText"><script language="JavaScript">document.write(_("serverIPAddress"));</script></td>
+		<td>
+			<input type="text" id="vpnClientServerAddr" name="vpnClientServerAddr" size=32 maxlength=64 value="">
+		</td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnClientServerPortText"><script language="JavaScript">document.write(_("server port"));</script></div></td>
+		<td>
+			<input type="text" id="vpnClientServerPort" name="vpnClientServerPort" size=16 maxlength=64 value="">
+			<select name="vpnClientServerPortType" id="vpnClientServerPortType" size=1>
+				<option value="UDP"><script language="JavaScript">document.write(_("UDP"));</script></option>
+				<option value="TCP"><script language="JavaScript">document.write(_("rctp"));</script></option>
+			</select>
+		</td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnClientServerGatewayText"><script language="JavaScript">document.write(_("default gateway"));</script></div></td>
+		<td>
+			<input type="checkbox" name="vpnClientServerGateway" id="vpnClientServerGateway">&nbsp;&nbsp;<script language="JavaScript">document.write(_("Msg103"));</script>
+		</td>
+	</tr>
+
+	<tr>
+		<td><div id="vpnClientAuthTypeText"><script language="JavaScript">document.write(_("authentication type"));</script></div></td>
+		<td>
+			<p></p>
+			<p>
+			<input type="radio" onclick="setVpnClientAuthType(0)" name="vpnClientAuthType" id="vpnClientAuthTypeCerti">&nbsp;&nbsp;<script language="JavaScript">document.write(_("certificate"));</script>
+			</p>
+			<p></p>
+			<p>
+			<input type="radio" onclick="setVpnClientAuthType(1)" name="vpnClientAuthType" id="vpnClientAuthTypeUNPW">&nbsp;&nbsp;<script language="JavaScript">document.write(_("usernamePassword"));</script>
+			</p>
+			<p></p>
+		</td>
+	</tr>
+
+	<tr id="vpnClientAuthUnpwDiv">
+		<td id="vpnClientUnpwText"><script language="JavaScript">document.write(_("usernamePassword"));</script></td>
+		<td>
+			<p></p>
+			<p>
+			<input id="vpnClientAuthUserText" type="text" size=10 maxlength=10 value="User Name :" class="certi_menu_item" readonly>
+			<input id='vpnClientAuthUser' name="vpnClientAuthUser" type="text" size=32 maxlength=64 value="Client2">
+			</p>
+			<p>
+			<input id='vpnClientAuthPassText' type="text" size=10 maxlength=10 value="Password :" class="certi_menu_item" readonly>
+			<input id='vpnClientAuthPass' name="vpnClientAuthPass" type="password" size=32 maxlength=64 value="Client2">
+			</p>
+			<p>
+			</p>
+		</td>
+	</tr>
+	<tr id="vpnClientAuthCertiSubjectDiv">
+		<td><script language="JavaScript">document.write(_("selectCertificate"));</script></td>
+		<td>
+			<p></p>
+			<p>
+			<input id='vpnClientCertiSelText' type="text" size=10 maxlength=10 value="Certificate :" class="certi_menu_item" readonly>
+			<select id="vpnClientCertiSel" name="vpnClientCertiSel" size=1 onChange="setVpnClientCerti(this.value)" >
+			</select>
+			<input type="button" size=32 id="vpnClientDelCertiBtn" value="Delete" onclick="vpnClientDelCertiBtnClick()">
+			</p>
+
+			<p>
+			<input id='vpnCertiExpSText' type="text" size=10 maxlength=10 value="Not Before :" class="certi_menu_item" readonly>
+			<input id='vpnCertiExpS' name="vpnCertiName3" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiExpEText' type="text" size=10 maxlength=10 value="Not After :" class="certi_menu_item" readonly>
+			<input id='vpnCertiExpE' name="vpnCertiName3" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p></p>
+		</td>
+	</tr>
+
+	<tr id="vpnClientAuthCertiDiv">
+		<td><div id="vpnClientCertiText"><script language="JavaScript">document.write(_("certificateIssuerInformation"));</script></div></td>
+		<td>
+			<p>
+			<input id='vpnCertiNameText2' type="text" size=10 maxlength=10 value="Name :" class="certi_menu_item" readonly>
+			<input id='vpnCertiName2' name="vpnCertiName2" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiCountryText2' type="text" size=10 maxlength=10 value="Country :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCountry2' type="text" name="vpnCertiCountry2" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiStateText2' type="text" size=10 maxlength=10 value="State :" class="certi_menu_item" readonly>
+			<input id='vpnCertiState2' type="text" name="vpnCertiState2" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiCityText2' type="text" size=10 maxlength=10 value="City :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCity2' type="text" name="vpnCertiCity2" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiOrgText2' type="text" size=10 maxlength=10 value="Organization :" class="certi_menu_item" readonly>
+			<input id='vpnCertiOrg2' type="text" name="vpnCertiOrg2" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiEmailText2' type="text" size=10 maxlength=10 value="Email :" class="certi_menu_item" readonly>
+			<input id='vpnCertiEmail2' type="text" name="vpnCertiEmail2" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+			<p></p>
+		</td>
+	</tr>
+
+	<tr id="vpnClientAuthCerti3Div">
+		<td><div id="vpnClientCertiText"><script language="JavaScript">document.write(_("certificateSubjectInformation"));</script></div></td>
+		<td>
+			<p>
+			<input id='vpnCertiNameText3' type="text" size=10 maxlength=10 value="Name :" class="certi_menu_item" readonly>
+			<input id='vpnCertiName3' name="vpnCertiName3" type="text" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiCountryText3' type="text" size=10 maxlength=10 value="Country :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCountry3' type="text" name="vpnCertiCountry3" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiStateText3' type="text" size=10 maxlength=10 value="State :" class="certi_menu_item" readonly>
+			<input id='vpnCertiState3' type="text" name="vpnCertiState3" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiCityText3' type="text" size=10 maxlength=10 value="City :" class="certi_menu_item" readonly>
+			<input id='vpnCertiCity3' type="text" name="vpnCertiCity3" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiOrgText3' type="text" size=10 maxlength=10 value="Organization :" class="certi_menu_item" readonly>
+			<input id='vpnCertiOrg3' type="text" name="vpnCertiOrg3" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input id='vpnCertiEmailText3' type="text" size=10 maxlength=10 value="Email :" class="certi_menu_item" readonly>
+			<input id='vpnCertiEmail3' type="text" name="vpnCertiEmail3" size=32 maxlength=64 class="certi_menu_item" readonly>
+			</p>
+
+			<p></p>
+		</td>
+	</tr>
+</table>
+
+<table width="90%" id="vpnPeerDiv">
+	<tr>
+		<td width="38%"><div id="vpnPeerServerAddrText"><script language="JavaScript">document.write(_("serverIPAddress"));</script></div></td>
+		<td>
+			<input type="text" id="vpnPeerServerAddr" name="vpnPeerServerAddr" size=32 maxlength=64 value="">
+			<script language="JavaScript">document.write(_("Msg104"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td><div id="vpnPeerServerPortText"><script language="JavaScript">document.write(_("server port"));</script></div></td>
+		<td>
+			<input type="text" id="vpnPeerServerPort" name="vpnPeerServerPort" size=16 maxlength=32 value="">
+
+			<select name="vpnPeerServerPortType" id="vpnPeerServerPortType" size=1>
+				<option value="UDP"><script language="JavaScript">document.write(_("UDP"));</script></option>
+				<option value="TCP"><script language="JavaScript">document.write(_("rtcp"));</script></option>
+			</select>
+		</td>
+	</tr>
+	<tr>
+		<td><div id="vpnLocalAddrText"><script language="JavaScript">document.write(_("status lan ipaddr"));</script></div></td>
+		<td><input type="text" id="vpnLocalAddr" name="vpnLocalAddr" size=32 maxlength=64 value=""></td>
+	</tr>
+	<tr>
+		<td><div id="vpnRemoteAddrText"><script language="JavaScript">document.write(_("remote IP add"));</script></div></td>
+		<td>
+			<input type="text" id="vpnRemoteAddr" name="vpnRemoteAddr" size=32 maxlength=64 value="">
+		</td>
+	</tr>
+	<tr>
+		<td><div id="vpnRemoteNwText"><script language="JavaScript">document.write(_("remoteNetwork"));</script></div></td>
+		<td>
+			<p></p>
+			<p>
+			<input id='vpnCertiPeerNwAddrText' type="text" size=16 value="Network address:" class="certi_menu_item" readonly>
+			<input id='vpnCertiPeerNwAddr' type="text" name="vpnCertiPeerNwAddr" size=14 maxlength=24 >
+			</p>
+			<p>
+			<input id='vpnCertiPeerNwMaskText' type="text" size=16 value="Network Mask:" class="certi_menu_item" readonly>
+			<input id='vpnCertiPeerNwMask' type="text" name="vpnCertiPeerNwMask" size=14 maxlength=24 >
+			</p>
+			<p></p>
+		</td>
+	</tr>
+	<tr>
+		<td id="vpnSecretServerKeyText"><script language="JavaScript">document.write(_("serverSecretKey"));</script></td>
+		<td>
+			<p>
+			<input type="text" id="vpnSecretServerKeyTimeText" size=10 maxlength=10 value="Update Time:" class="certi_menu_item" readonly>
+			<input type="text" id="vpnSecretServerKeyTime" name="vpnSecretServerKeyTime" size=32 maxlength=64 value="May 5 2011 14:18:00" class="certi_menu_item" readonly>
+			</p>
+
+			<p>
+			<input type="button" size=32 value="Generate" id="vpnSecretServerKeyGenBtn" onclick="vpnSecretServerKeyGenBtnClick()">
+			<input type="button" size=32 value="Download..." id="vpnSecretServerKeyDnBtn" onclick="vpnSecretServerKeyDnBtnClick()">
+			</p>
+		</td>
+	</tr>
+	<tr>
+		<td id="vpnSecretClientKeyText"><script language="JavaScript">document.write(_("clientSecretKey"));</script></td>
+		<td>
+			<p>
+			<input type="text" id="vpnSecretClientKeyTimeText" size=10 maxlength=10 value="Update Time :" class="certi_menu_item" readonly>
+			<input type="text" id="vpnSecretClientKeyTime" name="vpnSecretClientKeyTime" size=32 maxlength=64 value="May 5 2011 14:18:00" class="certi_menu_item" readonly>
+			</p>
+			<p>
+			<input type="button" size=32 value="Delete" id="vpnSecretClientDelBtn" onclick="vpnSecretClientDelBtnClick()">
+			</p>
+		</td>
+	</tr>
+</table>
+</div>
+</div>
+</form>
+
+<div id="editDiv1" style="display:none">
+<div id="vpn2Div" name="vpn2Div">
+	<!--- upload form for client --->
+	<div id="vpnCaUpDiv">
+		<form id="formVpnCaUp" name="formVpnCaUp" class="content" method="POST" action="/cgi-bin/vpn_action.cgi?action=upload" encType="multipart/form-data">
+		<table width="90%">
+			<tr>
+				<td width="38%"><script language="JavaScript">document.write(_("caUpload"));</script></td>
+				<td>
+					<input type="hidden" id="vpnCaUpSubaction" name="subaction" value="upca"/>
+					<input type="hidden" id="vpnCaUpParam" name="param" value=""/>
+					
+					<input type="text" id="vpnCaUpFileText" size=10 maxlength=10 value="Select File:" class="certi_menu_item" readonly>
+					<input type="file" height="40" size="30" id="vpnCaUpFile" name="vpnCaUpFile" onchange="vpnCaUpFileChange()">
+					<p></p>
+
+					<p>
+					<input type="text" id="vpnCaUpNameText" size=10 maxlength=10 value="CA Name:" class="certi_menu_item" readonly>
+					<input type="text" id="vpnCaUpName" height="40" size=30 maxlength=64 onkeyup="vpnCaUpFileChange()">
+					<input type="button" size=32 value="Upload" id="vpnCaUpBtn" onclick="vpnCaUpBtnClick()" disabled=true>
+					</p>
+				</td>
+			</tr>
+		</table>	
+		</form>
+	</div>
+
+	<div id="vpnCertiUpDiv">
+		<form id="formVpnCertiUp" name="formVpnCertiUp" class="content" method="POST" action="/cgi-bin/vpn_action.cgi?action=upload" encType="multipart/form-data">
+		<table width="90%">
+			<tr>
+				<td width="38%"><script language="JavaScript">document.write(_("certificateUpload"));</script></td>
+				<td>
+					<input type="hidden" id="vpnCertiUpSubaction" name="subaction" value="upclient"/>
+					<input type="hidden" id="vpnCertiUpParam" name="param" value=""/>
+					<input type="file" height="40" size="35" id="vpnCertiUpFile" name="vpnCertiUpFile" onchange="vpnCertiUpFileChange()">
+					<input type="button" size=32 value="Upload" id="vpnCertiUpBtn" onclick="uploadTargetStart(formVpnCertiUp)" disabled=true>
+				</td>
+			</tr>
+		</table>	
+		</form>
+	</div>
+
+	<!--- upload form for peer --->
+	<div id="vpnSecretUpDiv">
+		<form id="formVpnSecretUp" name="formVpnSecretUp" class="content" method="POST" action="/cgi-bin/vpn_action.cgi?action=upload" encType="multipart/form-data">
+		<table width="90%">
+			<tr>
+				<td width="38%"><script language="JavaScript">document.write(_("clientSecretKeyUpload"));</script></td>
+				<td>
+					<input type="hidden" id="vpnSecretUpSubaction" name="subaction" value="upsecret"/>
+					<input type="hidden" id="vpnSecretUpParam" name="param" value=""/>
+					<input type="file" height="40" size="35" id="vpnSecretUpFile" name="vpnSecretUpFile" onchange="vpnSecretUpFileChange()">
+					<input type="button" size=32 value="Upload" id="vpnSecretUpBtn" onclick="uploadTargetStart(formVpnSecretUp)" disabled=true>
+				</td>
+			</tr>
+		</table>	
+		</form>
+	</div>
+</div>	
+</div>
+
+<div class="line" style="margin: 20px 10% 16px 0;"></div>	
+	<div align="center" id=saveDiv style="margin-right:10% ">
+		<p></p>
+		<input type="button" value="Save" id="submitBtn" onClick="javascript:submitForm()" style="width:120px;">&nbsp;&nbsp;
+		<input type="button" value="&nbsp;Exit&nbsp;" id="exitBtn" onClick="javascript:exitHandler()" style="width:120px;">
+	</div>
+</div>  <!-- <div class="hide_for_pppoe_en"> -->
+</div>  <!-- <div id="contentWrapper"> -->
+
+<!--- hidden download form --->
+<form id="formVpnActionDn" name="formVpnActionDn" method="GET" action="/cgi-bin/vpn_action.cgi" encType="multipart/form-data" style='display:none'>
+<input type="hidden" id="dn_action" name="action" value=""/>
+<input type="hidden" id="dn_param" name="param" value=""/>
+</form>
+
+<!--- hidden iframe for upload --->
+<iframe id="uploadTarget" name="uploadTarget" src="" style="width:0;height:0;border:0px solid #fff;" onload="javascript:uploadTargetOnLoad();"></iframe>
+
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+FinalToDisplay();
+</script>
+
+</body>
+</html>

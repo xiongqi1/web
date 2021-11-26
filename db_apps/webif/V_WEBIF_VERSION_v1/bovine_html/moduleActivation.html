@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Module Activation</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+
+</script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	redirect('/moduleOTAct.html?moduleActivation.html');
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form name="form1" method="POST">
+<h3>&nbsp;&nbsp;Internet Settings > Mobile Broadband > Activation</h3>
+
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+	<tr><th>Activation</th></tr>
+</table>
+
+<table width="90%">
+<tr> 
+	<td width="22%">Service Activation Status</td>
+	<td>
+		<span id="activated_ID" style="display:none">
+			&nbsp;&nbsp;Activated
+		</span>
+		<span id="nonactivated_ID" style="display:none">
+			<input type=submit onClick="javascript:submit()" value="&nbsp;&nbsp;Not Activated, Please click here to activate your service">
+		</span>
+	</td>
+	</tr>
+</table>
+
+<script type="text/javascript">
+var module_activated=<%temp_val=get_single('wwan.0.module_info.cdma.activated');%>"@@temp_val";
+if(module_activated == "0") {
+	document.getElementById("activated_ID").style['display']='none';
+	document.getElementById("nonactivated_ID").style['display']='';
+}
+else {
+	document.getElementById("activated_ID").style['display']='';
+	document.getElementById("nonactivated_ID").style['display']='none';
+}
+</script>
+
+</div>
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>
+

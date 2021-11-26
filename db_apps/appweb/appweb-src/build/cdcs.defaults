@@ -1,0 +1,29 @@
+#
+#	cdcs.defaults 
+#
+#
+#	See standard.defaults for comments on each variable.
+#
+###############################################################################
+
+. ${BLD_TOP}/build/standard.defaults
+
+BLD_APPWEB_CONFIG=cdcs.conf
+BLD_DEBUG=0
+BLD_DEFAULTS="cdcs"					# Name of this defaults file
+BLD_FEATURE_DOC="0"
+BLD_PACKAGES="" 							# List of external packages
+BLD_TYPE="RELEASE" 
+BLD_COMPANY="NetComm Wireless Limited"
+BLD_WEB_PREFIX="/www"
+
+. ${BLD_TOP}/build/product.config
+
+BLD_BUILD_CFLAGS="-Wno-write-strings"
+#
+#  Local variables:
+#  tab-width: 4
+#  c-basic-offset: 4
+#  End:
+#  vim: sw=4 ts=4 
+#

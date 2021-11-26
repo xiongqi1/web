@@ -1,0 +1,346 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>WPS</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "GET") {
+	v=get_single('wlan.0.wps_enable');
+	if(v=="N/A")	
+		v="0";
+	form['wps_enable'] = v;
+	p=get_single('wlan.0.wps_PIN');
+	if(p=="N/A" || p=="")
+		p="";
+	form['wps_pin'] = p;
+
+	v=get_single('wlan.0.wps_PIN_pbc');
+	if(v!="1" && v!="2") {
+		v="2";
+		set_single( 'wlan.0.wps_PIN_pbc=2', '-p' );
+	}
+	form['pin_pbc']=v;
+}
+else {
+	v=form['wps_enable'];
+	set_single('wlan.0.wps_enable='+v, '-p' );
+	if(v=="1")
+		set_single('wlan.0.wps_trigger=1');
+}
+%>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+
+Butterlate.setTextDomain("wps");
+
+function WPSUpdateHTML(str) {
+	eval(str);
+
+	if(typeof(WscConfigured)=="undefined")
+		return;
+
+	wpsconfigured = document.getElementById("WPSConfigured");
+	if( WscConfigured == "1" || WscConfigured == "0")
+		wpsconfigured.innerHTML = _("no");
+	else if( WscConfigured == "2")
+		wpsconfigured.innerHTML = _("wps yes");
+	else
+		wpsconfigured.innerHTML = _("unknown");
+
+	document.getElementById("WPSSSID").innerHTML = WscSsid;
+	document.getElementById("WPSAuthMode").innerHTML = AuthMode;
+	document.getElementById("WPSEncryptype").innerHTML = EncrypType;
+	document.getElementById("WPSDefaultKeyIndex").innerHTML = DefaultKeyIdx;
+
+	wpskeytype = document.getElementById("WPSKeyType");
+	if(EncrypType == "WEP")
+		wpskeytype.innerHTML = _("wps default key value1");
+	else
+		wpskeytype.innerHTML = _("wps default key value2");
+
+	document.getElementById("WPSWPAKey").innerHTML = WscWPAKey;
+	document.getElementById("WPSCurrentStatus").innerHTML = WscStatus;
+	document.getElementById("wpsAPPIN").innerHTML = apPIN;
+
+	/*if(WscResult == "-1")
+		document.getElementById("WPSInfo").value = "WSC failed";
+	else if(WscResult == "0")
+		document.getElementById("WPSInfo").value = "WSC:" + WscStatus;
+	else if(WscResult == "1")
+		document.getElementById("WPSInfo").value = "WSC Success";*/
+}
+
+function updateWPS() {
+	$.get('/cgi-bin/ajax.cgi?updateWPS', WPSUpdateHTML);
+}
+
+function enableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = false;
+	else {
+		field.onfocus = field.oldOnFocus;
+	}
+}
+
+function disableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = true;
+	else {
+		field.oldOnFocus = field.onfocus;
+		field.onfocus = skip;
+	}
+}
+
+function ValidateChecksum(PIN) {
+	var accum = 0;
+	accum += 3 * (parseInt(PIN / 10000000) % 10);
+	accum += 1 * (parseInt(PIN / 1000000) % 10);
+	accum += 3 * (parseInt(PIN / 100000) % 10);
+	accum += 1 * (parseInt(PIN / 10000) % 10);
+	accum += 3 * (parseInt(PIN / 1000) % 10);
+	accum += 1 * (parseInt(PIN / 100) % 10);
+	accum += 3 * (parseInt(PIN / 10) % 10);
+	accum += 1 * (parseInt(PIN / 1) % 10);
+	return ((accum % 10) == 0);
+}
+
+<%
+var _wps_mode=get_single('wlan.0.wps_PIN_pbc');
+%>
+function submitWPS() {
+	var wps_mode="@@_wps_mode";
+	if(	document.WPS.PINPBCRadio[0].checked) {
+		if(document.WPS.wps_pin.value != ""){
+			// Driver 1.9 supports 4 digit PIN code.
+			if( document.WPS.wps_pin.value.length != 4 && document.WPS.wps_pin.value.length != 8 ) {
+				if( !ValidateChecksum( document.WPS.wps_pin.value) ){
+					alert(_("wps warningMsg1"));//"PIN number validation failed\n"
+					return false;
+				}
+			}
+		}
+	}
+	/*// do not start WSC process by pressing 'apply' button when already in PBC mode.
+	if (document.WPS.PINPBCRadio[0].checked || (document.WPS.PINPBCRadio[1].checked && wps_mode == '1')) {*/
+		cmd="/cgi-bin/rdb.cgi?wlan.0.wps_PIN="+document.WPS.wps_pin.value+"&wlan.0.wps_PIN_pbc="+document.WPS.pin_pbc.value+"&wlan.0.wps_trigger=1";
+	/*} else {
+		cmd="/cgi-bin/rdb.cgi?wlan.0.wps_PIN="+document.WPS.wps_pin.value+"&wlan.0.wps_PIN_pbc="+document.WPS.pin_pbc.value;
+	}*/
+	$.get(cmd);
+}
+
+function initTranslation() {
+	document.getElementById("wpsConfig_text").innerHTML = _("wps config");
+	document.getElementById("wpsWPS_text").innerHTML = _("wps");
+
+	document.getElementById("wpsConfigApply_text").value = _("apply");
+	document.getElementById("wpsSummary_text").innerHTML = _("wps summary");
+	document.getElementById("wpsCurrentStatus_text").innerHTML = _("status");
+	document.getElementById("wpsConfigured_text").innerHTML = _("wps configured");
+	document.getElementById("wpsSSID_text").innerHTML = _("station ssid");
+	document.getElementById("wpsAuthMode_text").innerHTML = _("wps auth mode");
+	document.getElementById("wpsEncrypType_text").innerHTML = _("wps encryp type");
+	document.getElementById("wpsDefaultKeyIndex_text").innerHTML = _("wps default key index");
+
+	document.getElementById("wpsResetOOB_text").value = _("wps reset oob");
+	document.getElementById("wpsProgress_text").innerHTML = _("wps progress");
+	document.getElementById("wpsMode_text").innerHTML = _("wps mode");
+	document.getElementById("wpsPINMode_text").innerHTML = _("wps pin num");
+	document.getElementById("wpsPBCMode_text").innerHTML = _("wps pbc");
+	document.getElementById("wpsPINNum_text").innerHTML = _("wps pin num");
+	document.getElementById("wpsPINApply_text").value = _("apply");
+	document.getElementById("wpsPINMode_desc").innerHTML = _("wps pin mode desc");
+}
+
+function wps_enable_change() {
+	document.WPSConfig.wps_enable.value=document.WPSConfig.WPSEnable.value;
+	if( document.WPSConfig.wps_enable.value=="1" ) {
+		// enable WPS
+		document.getElementById("div_wps_status").style.display = "";
+		document.getElementById("div_wps").style.display = "";
+		//document.getElementById("div_wps_info").style.display = "";
+
+		if( document.WPS.pin_pbc.value == "" )
+			document.WPS.pin_pbc.value=2;
+
+		document.WPS.PINPBCRadio[0].checked=document.WPS.pin_pbc.value==1;
+		document.WPS.PINPBCRadio[1].checked=document.WPS.pin_pbc.value==2;
+		onPINPBCRadioClick(document.WPS.pin_pbc.value);
+
+		setInterval(updateWPS, 3000);
+	}
+	else {
+		document.getElementById("div_wps_status").style.display = "none";
+		document.getElementById("div_wps").style.display = "none";
+		//document.getElementById("div_wps_info").style.display = "none";
+	}
+}
+
+function pageInit() {
+	initTranslation();
+	document.getElementById("WPSEnable").value=document.WPSConfig.wps_enable.value;
+	updateWPS();
+	wps_enable_change();
+	onPINPBCRadioClick(document.WPS.pin_pbc.value);
+}
+
+function onPINPBCRadioClick(value) {
+	if(value == "1") { // PIN selected
+		document.getElementById("PINRow").style.display = "";
+		document.getElementById("PINModeDesc").style.display = "";
+	} else { // PBC selected
+		document.getElementById("PINRow").style.display = "none";
+		document.getElementById("PINModeDesc").style.display = "none";
+	}
+	document.WPS.pin_pbc.value=value;
+}
+$(document).ready(function() { pageInit();});
+</script>
+
+<form name="WPSConfig" method='POST' action="@@request['SCRIPT_NAME']">
+<!-- <form method="post" name ="" action=""><goform/WPSSetup-->
+<input type="hidden"  name='wps_enable' value="@@form['wps_enable']"/>
+
+<h3><script language="JavaScript">document.write( _("wirelessLAN")+" > "+_("wps"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+
+<table>
+<tr><th><script language="JavaScript">document.write(_("wps intro"))</script></th>
+<tr>
+	<td><p><script language="JavaScript">document.write(_("wps introduction")+" "+_("wps introduction2"))</script></p></td>
+</tr>
+</table>
+
+<table>
+<!-- ==================  WPS Config  ================== -->
+<tr>
+	<th colspan="2" id="wpsConfig_text"></th>
+</tr>
+<tr>
+	<td width="30%" id="wpsWPS_text">WPS: </td>
+	<td><select id="WPSEnable" name="WPSEnable" size="1" onClick="document.WPSConfig.wps_enable.value=this.value;">
+		<option value=0 ><script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value=1 ><script language="JavaScript">document.write(_("enable"))</script></option>
+	</select></td>
+</tr>
+<tr>
+	<td colspan="2"> 
+	<div align="center"><input type="submit" value="" style="width:120px;" id="wpsConfigApply_text" name="submitWPSEnable" ></div>
+	</td>
+</tr>
+</table>
+</form>
+
+<form method="post" name ="SubmitOOB" action="">
+<table id="div_wps_status" style="display:none;">
+
+<!--=============  WPS Summary ==============-->
+<tr><th colspan="2" id="wpsSummary_text"></th></tr>
+<tr>
+	<td width="30%" id="wpsCurrentStatus_text"></td>
+	<td><span id="WPSCurrentStatus"></span></td>
+</tr>
+<tr>
+	<td id="wpsConfigured_text"></td>
+	<td><span id="WPSConfigured"></span></td>
+</tr>
+<tr>
+	<td id="wpsSSID_text"></td>
+	<td><span id="WPSSSID"></span></td>
+</tr>
+<tr>
+	<td id="wpsAuthMode_text"></td>
+	<td><span id="WPSAuthMode"></span></td>
+</tr>
+<tr>
+	<td id="wpsEncrypType_text"></td>
+	<td><span id="WPSEncryptype"></span></td>
+</tr>
+<tr>
+	<td id="wpsDefaultKeyIndex_text"></td>
+	<td><span id="WPSDefaultKeyIndex"></span></td>
+</tr>
+<tr >
+	<td><span id="WPSKeyType"><script language="JavaScript">document.write(_("stawps key"))</script></span></td>
+	<td><span id="WPSWPAKey"></span></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("wps pin num"))</script></td>
+	<td id="wpsAPPIN"></td>
+</tr>
+<tr>
+	<td colspan="2">
+		<div align="center"><input type="button" style="width:120px;" id="wpsResetOOB_text" name="submitResetOOB" onClick="$.get('/cgi-bin/rdb.cgi?wlan.0.enable=1');" value="Reset OOB"/></div>
+	</td>
+</tr>
+</table>
+</form>
+
+<!--==============  WPS ===============-->
+<form method="post" name ="WPS" >
+<input type="hidden" name='pin_pbc' value="@@form['pin_pbc']">
+
+<table id="div_wps" name="div_wps">
+<tr><th colspan="2" id="wpsProgress_text"></th></tr>
+<tr>
+	<td width="30%" id="wpsMode_text"></td>
+	<td>
+		<input name="PINPBCRadio" id="PINPBCRadio" value="1" type="radio" checked onClick="onPINPBCRadioClick(1)">&nbsp;&nbsp;&nbsp;
+<script language="JavaScript">
+	if(Butterlate.getLang()=="ar")
+		document.write("<font id=\"wpsPINMode_text\" dir=\"rtl\">");
+	else
+		document.write("<font id=\"wpsPINMode_text\">");
+</script>
+		&nbsp;</font>&nbsp;&nbsp;
+		<input name="PINPBCRadio" id="PINPBCRadio" value="2" type="radio" onClick="onPINPBCRadioClick(2)">&nbsp;&nbsp;&nbsp;
+<script language="JavaScript">
+	if(Butterlate.getLang()=="ar")
+		document.write("<font id=\"wpsPBCMode_text\" dir=\"rtl\">");
+	else
+		document.write("<font id=\"wpsPBCMode_text\">");
+</script>
+		&nbsp;</font>
+	</td>
+</tr>
+
+<tr id="PINRow">
+	<td id="wpsPINNum_text"></td>
+	<td>
+		<input name="wps_pin" id="wps_pin" size="8" maxlength="16" type="text" value="@@form['wps_pin']" >
+	</td>
+</tr>
+
+<tr id="PINModeDesc">
+	<td colspan="2" id="wpsPINMode_desc" style="color:BLUE;text-align:center"></td>
+</tr>
+
+<tr>
+	<td colspan="2">
+	<div align="center"><input type="button" style="width:120px;" value="Apply" id="wpsPINApply_text" onClick="submitWPS();"></div>
+	</td>
+</tr>
+</table>
+</form>
+
+<!-- =======================  WPS Info Bar  ======================= -->
+<!--table id="div_wps_info" name="div_wps_info" style="display:none;">
+<tr><th id="wpsStatus_text"></th></tr>
+<tr>
+	<td> <textarea name="WPSInfo" id="WPSInfo" cols="63" rows="2" wrap="off" readonly="1"></textarea></td>
+</tr>
+</table-->
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Start the turbontc.lua web server.
+#
+# This template is not associated with any RDB triggers, and so just uses the "init" stage
+# of the template manager to delay start of the web server until after RDB is up.
+#
+# Copyright (C) 2018 NetComm Wireless Limited.
+pkill -f 'turbontc.lua -h'
+/usr/bin/turbontc.lua -h &>/dev/null &

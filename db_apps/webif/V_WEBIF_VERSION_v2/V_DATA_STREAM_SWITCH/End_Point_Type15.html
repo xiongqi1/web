@@ -1,0 +1,439 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type15 (TCP Client on Demand)</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p",varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=validate_number(form['idxEP']);
+	EP_Name=form['nameEP'];
+	// validate input
+	if (string_regex_match(EP_Name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	var portNumber = string_to_number(form['primary-server-port']);
+	if (portNumber < 1 || portNumber > 65535) {
+		onBadRequest();
+	}
+	backupServerIp = form['backup-server-ip'];
+	if (backupServerIp != "") {
+		portNumber = string_to_number(form['backup-server-port']);
+		if (portNumber < 1 || portNumber > 65535) {
+			onBadRequest();
+		}
+	}
+	validateOnOffRadio(form['keepalive-enable']);
+	if (form['keepcnt'] != "") {
+		var keepCnt = string_to_number(form['keepcnt']);
+		if (keepCnt < 1 || keepCnt > 50) {
+			onBadRequest();
+		}
+	}
+	if (form['keepidle'] != "") {
+		var keepIdle = string_to_number(form['keepidle']);
+		if (keepIdle < 1 || keepIdle > 10000) {
+			onBadRequest();
+		}
+	}
+	if (form['keepintvl'] != "") {
+		var keepIntvl = string_to_number(form['keepintvl']);
+		if (keepIntvl < 1 || keepIntvl > 1000) {
+			onBadRequest();
+		}
+	}
+	var timeout = string_to_number(form['timeout']);
+	if (timeout < 0 || timeout > 10000) {
+		onBadRequest();
+	}
+	var bufSize = string_to_number(form['bufsize']);
+	if (bufSize < 1 || bufSize > 1500) {
+		onBadRequest();
+	}
+
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type",'15');
+	setDsmRdb(EP_Name+".primary_server_ip",form['primary-server-ip']);
+	setDsmRdb(EP_Name+".backup_server_ip",form['backup-server-ip']);
+	setDsmRdb(EP_Name+".primary_server_port",form['primary-server-port']);
+	setDsmRdb(EP_Name+".backup_server_port",form['backup-server-port']);
+	setDsmRdb(EP_Name+".keep_alive",form['keepalive-enable']);
+	setDsmRdb(EP_Name+".keepcnt",form['keepcnt']);
+	setDsmRdb(EP_Name+".keepidle",form['keepidle']);
+	setDsmRdb(EP_Name+".keepintvl",form['keepintvl']);
+	setDsmRdb(EP_Name+".buf_size",form['bufsize']);
+	setDsmRdb(EP_Name+".timeout",form['timeout']);
+	setDsmRdb(EP_Name+".ident_start",form['ident-start']);
+	setDsmRdb(EP_Name+".ident_end",form['ident-end']);
+
+	set_single_direct("","service.dsm.trigger","1");
+	redirect('/end_points.html?success');
+}
+%>
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+	$("#idxEP").val(i);
+	$("#nameEP").val(EP_Name);
+	$("#form").submit();
+}
+
+$(document).ready(function() {
+<%
+#if 0
+	// WARNING: no validation on this IP Address!
+#endif
+	ipAddr = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.primary_server_ip', '', '--base64');
+	if (ipAddr == "N/A") {
+		ipAddr = "";
+	}
+%>
+	$("#primary-server-ip").val(Base64.decode("@@ipAddr"));
+<%
+	ipAddr = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.backup_server_ip', '', '--base64');
+	if (ipAddr == "N/A") {
+		ipAddr = "";
+	}
+%>
+	$("#backup-server-ip").val(Base64.decode("@@ipAddr"));
+	$("#primary-server-port").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.primary_server_port');%>");
+	$("#backup-server-port").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.backup_server_port');%>");
+	$("#keepalive").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keep_alive');%>");
+	$("#keepcnt").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepcnt');%>");
+	$("#keepidle").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepidle');%>");
+	$("#keepintvl").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.keepintvl');%>");
+
+	// set a few defaults
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.buf_size');%>";
+	$("#bufsize").val(v==""?"1":v);
+
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.timeout');%>";
+	$("#timeout").val(v==""?"10":v);
+<%
+	ident = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.ident_start', '', '--base64');
+	if (ident == "N/A") {
+		ident = "";
+	}
+%>
+	$("#ident-start").val(Base64.decode("@@ident"));
+<%
+	ident = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.ident_end', '', '--base64');
+	if (ident == "N/A") {
+		ident = "";
+	}
+%>
+	$("#ident-end").val(Base64.decode("@@ident"));
+	load_value_to_element($("input:radio[name=keepalive-enable]"), $("#keepalive").val()=="1");
+	$("input:radio.access[name=keepalive-enable]").change(function() {
+		en=$("#keepalive-enable-0").is(":checked");
+		$("#keepalive-div").css("display",en?"":"none");
+	});
+	$("input:radio.access[name=keepalive-enable]").trigger("change");
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<input type="hidden" name="keepalive" id="keepalive" value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type15")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="primary-server-ip"><script language=Javascript>document.write(_("primaryServerIPAddress"))</script></label>
+						<div class="field">
+							<input type="text" name="primary-server-ip" id="primary-server-ip" class="large required validate[required]" onkeyup="urlFilter(this);" value="">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="primary-server-port"><script language=Javascript>document.write(_("Port number"))</script></label>
+						<div class="field">
+							<input type="text" name="primary-server-port" id="primary-server-port" class="large required field1and65535 validate[required, funcCall[validate_field1and65535]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-65535"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="backup-server-ip"><script language=Javascript>document.write(_("backupServerIPAddress"))</script></label>
+						<div class="field">
+							<input type="text" name="backup-server-ip" id="backup-server-ip" class="large" onkeyup="urlFilter(this);" value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("Leave blank if backup server not required"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="backup-server-port"><script language=Javascript>document.write(_("Port number"))</script></label>
+						<div class="field">
+							<input type="text" name="backup-server-port" id="backup-server-port" class="large validate[funcCall[validate_field1and65535_special]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-65535"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="timeout"><script language=Javascript>document.write(_("inactivityTimeoutConnectOnDemand"))</script></label>
+						<div class="field">
+							<input type="text" name="timeout" id="timeout" class="sml required fieldzand10000 validate[required,funcCall[validate_fieldzand10000]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("0-10000")+"&nbsp;"+_("seconds")+",&nbsp;"+"0"+"&nbsp;"+_("disconnectImmediately"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="bufsize"><script language=Javascript>document.write(_("bufSizeConnectOnDemand"))</script></label>
+						<div class="field">
+							<input type="text" name="bufsize" id="bufsize" class="sml required field1and1500 validate[required,funcCall[validate_field1and1500]]" maxLength="4" onKeyUp='NumfieldEntry(this)' value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-1500"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ident-start"><script language=Javascript>document.write(_("identStartConnectOnDemand"))</script></label>
+						<div class="field">
+							<input type="text" name="ident-start" id="ident-start" class="sml" maxLength="32" onkeyup="urlFilter(this);" value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("identStartSendHelper"))</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ident-end"><script language=Javascript>document.write(_("identEndConnectOnDemand"))</script></label>
+						<div class="field">
+							<input type="text" name="ident-end" id="ident-end" class="sml" maxLength="32" onkeyup="urlFilter(this);" value="">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("identEndSendHelper"))</script></span>
+						</div>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="keepalive"><script language=Javascript>document.write(_("Keepalive"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="keepalive-enable-0" name="keepalive-enable" class="access" value=1>
+									<label for="keepalive-enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="keepalive-enable-1" name="keepalive-enable" class="access" value=0>
+									<label for="keepalive-enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div id="keepalive-div">
+						<div class="form-row">
+							<label for="keepcnt"><script language=Javascript>document.write(_("Keepalive count"))</script></label>
+							<div class="field">
+								<input type="text" name="keepcnt" id="keepcnt" class="large required field1and50 validate[required, funcCall[validate_field1and50]]" maxLength="2" onKeyUp='NumfieldEntry(this)' value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-50"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="keepidle"><script language=Javascript>document.write(_("Keepalive idle"))</script></label>
+							<div class="field">
+								<input type="text" name="keepidle" id="keepidle" class="large required field1and10000 validate[required,funcCall[validate_field1and10000]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-10000")+"&nbsp;&nbsp;"+_("seconds"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="keepintvl"><script language=Javascript>document.write(_("Keepalive interval"))</script></label>
+							<div class="field">
+								<input type="text" name="keepintvl" id="keepintvl" class="large required field1and1000 validate[required,funcCall[validate_field1and1000]]" maxLength="4" onKeyUp='NumfieldEntry(this)' value="">
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-1000")+"&nbsp;&nbsp;"+_("seconds"))</script></span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("field1and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and65535"));
+
+	$.validator.addMethod("field1and20",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 20 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and20"));
+
+	$.validator.addMethod("field1and50",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 50 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and50"));
+
+	$.validator.addMethod("field1and1000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 1000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and1000"));
+
+	$.validator.addMethod("field1and1500",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 1500 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and1500"));
+
+	$.validator.addMethod("fieldzand1000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 1000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldzand1000"));
+
+	$.validator.addMethod("fieldzand10000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 10000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldzand10000"));
+
+	$.validator.addMethod("field1and10000",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 10000 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and10000"));
+#else
+function validate_field1and65535(field) {
+	if( field.val() < 1 || field.val() > 65535 ) {
+		return _("field1and65535");
+	}
+}
+function validate_field1and65535_special(field) {
+	// only complain if ip address 2 is non-empty
+	if ($("#backup-server-ip").val() != "") {
+		if( field.val() < 1 || field.val() > 65535 ) {
+			blockUI_alert (_("field1and65535"));
+		}
+	}
+}
+function validate_field1and50(field) {
+	if( field.val() < 1 || field.val() > 50 ) {
+		return _("field1and50");
+	}
+}
+function validate_field1and1000(field) {
+	if( field.val() < 1 || field.val() > 1000 ) {
+		return _("field1and1000");
+	}
+}
+function validate_field1and1500(field) {
+	if( field.val() < 0 || field.val() > 1500 ) {
+		return _("field1and1500");
+	}
+}
+function validate_field1and10000(field) {
+	if( field.val() < 1 || field.val() > 10000 ) {
+		return _("field1and10000");
+	}
+}
+function validate_fieldzand1000(field) {
+	if( field.val() < 0 || field.val() > 1000 ) {
+		return _("fieldzand1000");
+	}
+}
+function validate_fieldzand10000(field) {
+	if( field.val() < 0 || field.val() > 10000 ) {
+		return _("fieldzand10000");
+	}
+}
+#endif
+</script>
+</body>
+</html>

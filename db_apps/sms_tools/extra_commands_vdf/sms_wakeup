@@ -1,0 +1,68 @@
+#!/bin/sh
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+		echo "This shell script is used by SMS tools to wakeup an inactive WAN"
+        echo "connection, when dial-on-demand is in use."
+		echo "WARNING: Using this command may cause loss of network connectivity, and may ruin internal system state."
+        echo ""
+        echo "This command is only intended for use by SMS tools, but by"
+        echo "running it without arguments, it could be used to wakeup the"
+        echo "WAN connection."
+        exit 0
+fi
+
+DOD_EN=`rdb_get dialondemand.enable`
+
+DEFAULT_PF=1
+for i in 1 2 3 4 5 6; do
+	if [ "`rdb_get link.profile.$i.defaultroute`" = "1" ]; then
+		DEFAULT_PF=$i
+		break;
+	fi
+done
+# search the activated profile
+PROFILE_ENABLED="0"
+for i in 1 2 3 4 5 6; do
+	if [ `rdb_get "link.profile.$i.enable"` = "1" ]; then
+		PROFILE_ENABLED=$i
+		break;
+	fi
+done
+
+# enable the default profile when no profile is activated
+if [ "$PROFILE_ENABLED" = "0" ]; then
+	rdb_set "link.profile.$DEFAULT_PF.enable" 1
+	echo "Enabling Profile-$DEFAULT_PF..."
+	logger "SMS wakeup: Enabling Auto-APN and Profile-$DEFAULT_PF"
+fi
+
+# make it online if dial-on-demand is configured
+if [ "$DOD_EN" = "1" ]; then
+	i=0
+
+	res=1
+	while [ $i -lt 5 ]; do
+		diald-ctrl.sh up
+		res=$?
+		if [ $res = 0 ]; then
+			break
+		fi
+		i=$(( $i + 1 ))
+		sleep 5
+	done
+	
+	if [ $res = 0 ]; then
+		echo "Set dial-on-demand up command successful"
+		logger "SMS wakeup: Set dial-on-demand up command successful."
+	else
+		echo "Set dial-on-demand up command has failed"
+		logger "SMS wakeup: Set dial-on-demand up command has failed."
+	fi
+else
+	if [ "$PROFILE_ENABLED" != "0" ]; then
+		logger "SMS wakeup: no effect, the WAN connection is already up."
+	fi
+fi  

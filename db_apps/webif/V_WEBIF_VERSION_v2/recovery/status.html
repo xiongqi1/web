@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Status</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="/cgi-bin/emergencyTXT.cgi"></script>
+
+</head>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language='javascript'>
+var imageidx = 0;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var pincounter = 0;
+var ajaxerror = 0;
+
+function toUpTime( uptime ) {
+var	upday = parseInt(uptime / (24 * 3600));
+var uphr = parseInt((uptime - upday * 24 * 3600) / (3600));
+var upmin = parseInt((uptime - upday * 24 * 3600 - uphr * 3600) / 60);
+var upsec = parseInt(uptime - upday * 24 * 3600 - uphr * 3600 - upmin * 60);
+	uphr=uphr<10?"0"+uphr.toString():uphr.toString();
+	upmin=upmin<10?"0"+upmin.toString():upmin.toString();
+	upsec=upsec<10?"0"+upsec.toString():upsec.toString();
+	if (upday) {
+		var buf2=upday.toString() + " Day";
+		if (upday > 1)
+			buf2=buf2+"s";
+		buf2=buf2+"  ";
+	}
+	else {
+		buf2="";
+	}
+	return buf2+uphr+":"+upmin+":"+upsec;
+}
+
+#include "port_status.js"
+
+function ajaxUpdate(responseText) {
+var findword;
+var csq;
+	ajaxerror = 0;
+	eval( responseText );
+	csq = csq.substring(0, csq.indexOf("dBm") );
+	csqstr = "(not available)";
+
+	if(serialnum=="" || serialnum=="N/A") {
+		$("#serialnum-div").css("display", "none");
+	}
+	// Changed by Testra recommendation : Test Track #3794
+	if(csq == 0)
+		imageidx = 0;
+	else if(csq >= -77 ) {
+		csqstr = "(strong)";
+		imageidx = 5;
+	}
+	else if(csq >= -92 ) {
+		csqstr = "(medium)";
+		if(csq >= -86 )
+			imageidx = 4;
+		else
+			imageidx = 3;
+	}
+	else if(csq > -110 ) {
+		csqstr = "(poor)";
+		if(csq >= -102)
+			imageidx = 2;
+		else
+			imageidx = 1;
+	}
+	else
+		imageidx = 0;
+
+	if(csq=="")
+		$("#umtsss").html("");
+	else
+		$("#umtsss").html( csq+" dBm             "+csqstr+"<img style='margin-left:80px' src='/images/csq"+imageidx+".GIF' width='67' height='18'/>");
+
+	showPortStatus( portStatus );
+
+	document.form1.uptime.value = toUpTime( uptime );
+	document.form1.provider.value = provider;
+	document.form1.connType.value = connType;
+	document.form1.coverage.value = coverage;
+	document.form1.imei.value = imei;
+	document.form1.freq.value = freq;
+
+	simStatusID=document.getElementById('simID');
+	document.form1.simStatus.value = simStatus;
+	if(document.form1.simStatus.value == "SIM OK") {
+		simStatusID.style.color = 'GREEN';
+		document.getElementById( "simwait" ).style['display']='none';
+	}
+	else if(document.form1.simStatus.value == "N/A") {
+		document.form1.simStatus.value = "Negotiating";
+		simStatusID.style.color = 'Orange'
+		document.getElementById( "simwait" ).style['display']='';
+	}
+	else {
+		document.getElementById( "simwait" ).style['display']='none';
+		simStatusID.style.color = "RED";
+		if( prvSimStatus != simStatus )
+		{
+			if( ++ pincounter >= 3 )
+			{
+				prvSimStatus = simStatus;
+				switch(simStatus)
+				{
+				case "SIM removed":
+					alert( "SIM not installed, reboot required" );
+					break;
+				case "SIM general failure":
+					alert( "SIM general failure" );
+					break;
+				case "SIM locked":
+					alert( "You need to enter the PIN code to unlock the SIM before use" );
+					break;
+				case "SIM CHV1 blocked":
+					alert( "You need to enter the PUK code to unlock the SIM before use" );
+					break;
+				case "MEP locked":
+					alert( "MEP locked" );
+					break;
+				case "Network reject - Account":
+					alert( "Network reject - Account" );
+					break;
+				case "Network reject":
+					alert( "Network reject" );
+					break;
+				default:
+					pincounter = 0;
+				break;
+				}
+			}
+		}
+	}
+}
+
+$(document).ready(function() {
+	document.getElementById( "connectiondiv1" ).style['display']='none';
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 3000);
+});
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+<form class="content" name="form1" >
+<h3 id="statusdiv">Status</h3>
+</p>
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px">
+	<th width="100%">System&nbsp;Information</th></td>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%">System Up time</td>
+	<td><input type="text" name="uptime"  size="40" class='cdcsAjax' width="25%" readonly/></td>
+</tr>
+<tr>
+	<td>Router Version</td>
+	<td >
+	Hardware:&nbsp;<%val=get_single('uboot.hw_ver');%>@@val&nbsp;&nbsp;
+	&nbsp;&nbsp;Software:&nbsp;
+	<script language=Javascript>document.write(version);</script>
+	</td>
+</tr>
+<tr id="serialnum-div">
+	<td>Serial Number</td>
+	<td>
+		<script language=Javascript> document.write(serialnum);</script>
+	</td>
+</tr>
+<tr>
+	<td>Trigger</td>
+	<td>
+		<script language=Javascript> document.write(trigger);</script>
+	</td>
+</tr>
+</table>
+
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px">
+	<th width="100%">&nbsp;&nbsp;LAN</th></td>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%">IP</td>
+	<td >
+	<%val=headers['HOST'];%>@@val
+	&nbsp;&nbsp;/&nbsp;&nbsp;
+	<%val=get_single('link.profile.0.netmask');%>@@val
+	</td>
+</tr>
+<tr>
+	<td>MAC Address</td>
+	<td>
+	<script language=Javascript>
+	function showMACAddr() {
+		document.write(eth0mac);
+	}
+	showMACAddr();
+	</script>
+	</td>
+</tr>
+</table>
+<div id="connectiondiv1">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr>
+		<th width="100%">&nbsp;&nbsp;Connection Status</th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%">Provider</td>
+	<td><input type="text" name="provider" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td>Service Type</td>
+	<td><input type="text" name="connType" width="40" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td>Coverage</td>
+	<td><input type="text" name="coverage" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td>IMEI</td>
+	<td><input type="text" name="imei" size='40' class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td>Frequency</td>
+	<td><input type="text" name="freq" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td>Signal Strength (dBm)</td>
+	<td id="umtsss" class="innerText"></td>
+</tr>
+<tr>
+	<td>SIM Status</td>
+	<td><input type="text" name="simStatus" id="simID" size="40" style="border-style:none; background:#F0EFEB" />
+		<img src="images/waiting.gif" width="24" height="24" id="simwait" style="display:none" /></td>
+	</tr>
+</table>
+</div>
+
+#include "port_status.htm"
+</form>
+</div>
+<div id="footer">&nbsp;<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

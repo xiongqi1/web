@@ -1,0 +1,91 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Package Manager</title>
+<% include topinc_v2.inc %>
+#define CHECK_ROOT_USER		// Instruct redirectOnSessionTimeout.inc to also check user is root.
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript" src="/cgi-bin/pkManager.cgi"></script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+		<div class="grid-9 omega">
+			<div class="right-column white-box">
+				<div class="pad">
+					<h2><script language=Javascript>document.write(_("pkg manager"))</script></h2>
+					<table border="0" cellspacing="0" ID="Table2">
+					<thead id="listTitle">
+						<tr>
+							<th width="20%" class="align10"><script language=Javascript>document.write(_("packageName"))</script></div></th>
+							<th width="10%" class="align10"><script language=Javascript>document.write(_("version"))</script></div></th>
+							<th width="15%" class="align10"><script language=Javascript>document.write(_("architecture"))</script></div></th>
+							<th width="20%" class="align10"><script language=Javascript>document.write(_("installedTime"))</script></div></th>
+							<th width="20%">&nbsp;</th>
+							<th width="15%">&nbsp;</th>
+						</tr>
+					</thead>
+					<script language="Javascript">
+					function uninstall( idx ) {
+						var msg="";
+						if( st[idx].detail.indexOf("/etc/appweb/appweb.conf")>0 ) {
+							msg = _("Msg111");//Stop! This package contains the web server configuration file,uninstall this package will disable the web server!
+						}
+						msg += _("Msg112")+" '"+st[idx].Package+"'?";//Do you really want to uninstall this package
+						blockUI_confirm(msg, function() {
+							$.get("/cgi-bin/file_action.cgi?<%appendCsrfTokenToQueryString();%>U&"+st[idx].Package, function(v) {alert(v); location.reload();});
+						});
+					}
+					function pkDetailWindow(msg) {
+						var detailWindow = window.open("", "", "resizable=yes,scrollbars=yes,toolbar=no,width=800,height=800,top=100,left=200");
+						detailWindow.document.write(msg);
+						detailWindow.document.close();
+					}
+					function makeList() {
+						if (st.length == 0) {
+							$("#listTitle").css("display", "none");
+							document.write( "<tr><th colspan='6' style='text-align:center'>"+_("package list empty")+"</td></tr>" );
+							return;
+						}
+						//document.form2.stlength.value = st.length;
+						for (var i = 0; i < st.length; i++) {
+							installedTime = new Date(st[i].Installed_Time*1000);
+							document.write("<tr>");
+							document.write("<td>"+st[i].Package+"</td>");
+							document.write("<td>"+st[i].Version+"</td>");
+							document.write("<td>"+st[i].Architecture+"</td>");
+							document.write("<td>"+installedTime.toLocaleString()+"</td>");
+							// convert "\n" to "<br/>"
+							alert_msg=st[i].description.replace("Description: ","Description:<br/>")+"<br/><br/>"+_('package details')+":<br/>"+
+									  st[i].detail.replace(/\\n/g, "<br/>");
+							// escape double quotes twice so "alert_msg" string still has single escaping when pkDetailWindow is called
+							alert_msg=alert_msg.replace(/"/g,"\\\"").replace(/'/g,"&#39;");
+							esc_description=st[i].description.replace(/"/g,"&quot;");
+							document.write("<td><a href='javascript:pkDetailWindow(\""+alert_msg+"\");' title=\""+esc_description+"&#10;"+st[i].title+"\">"+_('package details')+"</a></td>");
+							document.write("<td><a href=javascript:uninstall(\""+i+"\"); title=\"Uninstall "+st[i].Package+"\">"+_('uninstall')+"</td>");
+							document.write("</tr>");
+						}
+					}
+					makeList();
+					</script>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("System", "PKG_MANAGER", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

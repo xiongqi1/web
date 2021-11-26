@@ -1,0 +1,465 @@
+#ifdef V_MODCOMMS_y
+#define MULTI_IGNITION
+#endif
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Low power standby</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+if(is_edge_browser()) {
+	$("head").append("<style type='text/css'>#sleepMode,#wakeMode{width: 395px;}</style>");
+}
+else {
+	$("head").append("<style type='text/css'>#sleepMode,#wakeMode{width: auto;}</style>");
+}
+
+function SleepTrigger() {
+	system_bootwait="<%get_single_direct("power.switch.Standby.options");%>";
+	if(system_bootwait=="") {
+		v1=$("input:radio.access[name=c1]:checked").val();
+		v1v=(v1=="ignore")?0:$("#v1").val();
+		v2=$("input:radio.access[name=c2]:checked").val();
+		v2v=(v2=="ignore")?0:$("#v2").val();
+		rdbCmd="system.bootwait="+v1+","+v1v+","+v2+","+v2v+","+$("#guard").val();
+	} else {
+		a=system_bootwait.split(":");
+		rdbCmd="system.bootwait="+a[0];
+	}
+	$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+rdbCmd, function() {window.location.href="/low_power_standby.html?sleep"});
+}
+
+function submitForm() {
+
+#ifdef V_WEBIF_SPEC_vdf
+	/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	en=$("input:radio.access[name=lpm_enable]:checked").val();
+
+	switch ( $("#wakeMode").val() ) {
+		case "1": //Only wake after specified duration and ignore ignition pin
+			v1="ignore";
+			v1v=0;
+			v2="ignore";
+			v2v=0;
+		break;
+		case "2": //Wake triggered by ignition pin status
+			v1="ignore";
+			v1v=0;
+			v2=$("input:radio.access[name=wakeIgnition]:checked").val();
+			v2v=100;
+		break;
+		case "3": //Advanced
+			v1=$("input:radio.access[name=c1]:checked").val();
+			v1v=(v1=="ignore")?0:$("#v1").val();
+			v2=$("input:radio.access[name=c2]:checked").val();
+			v2v=(v2=="ignore")?0:$("#v2").val();
+		break;
+	}
+
+	switch ( $("#sleepMode").val() ) {
+		case "1": //Sleep by manual trigger only
+			sleepIgnition="ignore";
+			sleepTimer="-1"
+		break;
+		case "2": //Sleep after specified duration and ignore ignition pin
+			sleepIgnition="ignore";
+			sleepTimer=parseInt($("#sleepTimer").val())*100;
+
+		break;
+		case "3": //Sleep triggered by ignition pin status
+			sleepIgnition=$("input:radio.access[name=sleepIgnition]:checked").val();
+			sleepTimer="-1"
+		break;
+		case "4": //Sleep after specified duration or triggered by ignition pin
+			sleepIgnition=$("input:radio.access[name=sleepIgnition]:checked").val();
+			sleepTimer=parseInt($("#sleepTimer").val())*100;
+		break;
+	}
+
+	rdbCmd="power.switch.Standby="+en+" -p&power.switch.Standby.options="+v1+","+v1v+","+v2+","+v2v+","+$("#guard").val()+":"+$("#wakeMode").val()+":"+sleepIgnition+","+sleepTimer+":"+$("#sleepMode").val()+" -p";
+#ifdef MULTI_IGNITION
+	rdbCmd += "&sys.sensors.iocfg.ignition="+$("#ignSelect").val()+" -p";
+#endif
+
+	$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+rdbCmd, function() {
+		$.get("/cgi-bin/power_profile.cgi?<%appendCsrfTokenToQueryString();%>cmd=setup", function() {window.location.href="/low_power_standby.html?success"});
+	});
+}
+
+$(document).ready( function() {
+	load_value_to_element("input:radio.access[name=lpm_enable]","<%get_single_direct("power.switch.Standby");%>"=="1");
+	$("input:radio.access[name=lpm_enable]").change(function() {
+		$("#lpm-toggle-div").css("display", $("#lpm_enable-0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=lpm_enable]").trigger("change");
+
+#ifdef MULTI_IGNITION
+	var list = {};
+	list.ignInternal= _("ignInternal");
+	if (gps_mice_ready =="ready") {
+		list.ignNMA1500= _("ignNMA1500");
+	}
+	var ignSelect ="<%get_single_direct('sys.sensors.iocfg.ignition');%>"
+	add_options("ignSelect", list, ignSelect );
+#endif
+
+	$("#sleepMode").change(function() {
+		switch(this.value) {
+			case "1":
+				$("#sleepTimer-div").css("display", "none");
+				$("#sleepIgnition-div").css("display", "none");
+				$("#triggerSleep-div").css("display", "");
+			break;
+			case "2":
+				$("#sleepTimer-div").css("display", "");
+				$("#sleepIgnition-div").css("display", "none");
+				$("#triggerSleep-div").css("display", "none");
+			break;
+			case "3":
+				$("#sleepTimer-div").css("display", "none");
+				$("#sleepIgnition-div").css("display", "");
+				$("#triggerSleep-div").css("display", "none");
+			break;
+			case "4":
+				$("#sleepTimer-div").css("display", "");
+				$("#sleepIgnition-div").css("display", "");
+				$("#triggerSleep-div").css("display", "none");
+			break;
+			break;
+		}
+	});
+	$("#sleepMode").trigger("change");
+
+	$("#wakeMode").change(function() {
+		switch(this.value) {
+			case "1":
+				$("#wakeIgnition-div").css("display", "none");
+				$("#wakeAdvanced-div").css("display", "none");
+			break;
+			case "2":
+				$("#wakeIgnition-div").css("display", "");
+				$("#wakeAdvanced-div").css("display", "none");
+			break;
+			case "3":
+				$("#wakeIgnition-div").css("display", "none");
+				$("#wakeAdvanced-div").css("display", "");
+			break;
+			break;
+		}
+	});
+
+	system_bootwait="<%get_single_direct("power.switch.Standby.options");%>";
+	if(system_bootwait=="") {
+		system_bootwait="ignore,0,ignore,0,0:1:ignore,-1:1";
+	}
+	a=system_bootwait.split(":");
+	b=a[0].split(",");
+
+	$("input:radio.access[name=c1]").change(function() {
+		if($("input:radio.access[name=c1]:checked").val()=="ignore") {
+			$("#v1").prop("disabled", true);
+		}
+		else {
+			$("#v1").prop("disabled", false);
+		}
+	});
+	$("input:radio.access[name=c2]").change(function() {
+		if($("input:radio.access[name=c2]:checked").val()=="ignore") {
+			$("#v2").prop("disabled", true);
+		}
+		else {
+			$("#v2").prop("disabled", false);
+		}
+	});
+
+	if ( b[0]=="on" ) $("#c1_0").prop("checked", true);
+	else if ( b[0]=="off" ) $("#c1_1").prop("checked", true);
+	else $("#c1_2").prop("checked", true);
+
+	if( b[0]!="ignore" ) {
+		if ( b[0]=="on" ) $("##wakeIgnition_0").prop("checked", true);
+		else $("##wakeIgnition_1").prop("checked", true);
+	}
+	else if( b[2]!="ignore" ) {
+		if ( b[2]=="on" ) $("#wakeIgnition_0").prop("checked", true);
+		else if ( b[2]=="off" ) $("#wakeIgnition_1").prop("checked", true);
+	}
+	else {
+		$("#wakeIgnition_1").prop("checked", true);
+	}
+	$("#v1").val(b[1]);
+
+	if ( b[2]=="on" ) $("#c2_0").prop("checked", true);
+	else if ( b[2]=="off" ) $("#c2_1").prop("checked", true);
+	else $("#c2_2").prop("checked", true);
+
+	$("#v2").val(b[3]);
+	$("#guard").val(b[4]);
+	$("#wakeMode").val(a[1]);
+	$("#wakeMode").trigger("change");
+
+	c=a[2].split(",");
+
+	if(c[0]=="ignore") {
+		$("#sleepIgnition_0").prop("checked", true);
+	}
+	else {
+		if ( c[0]=="off" ) $("#sleepIgnition_0").prop("checked", true);
+		else if ( c[0]=="on" ) $("#sleepIgnition_1").prop("checked", true);
+	}
+	if(parseInt(c[1])<300) {
+		$("#sleepTimer").val(3600);
+	}
+	else {
+		$("#sleepTimer").val(parseInt(c[1])/100);
+	}
+	$("#sleepMode").val(a[3]);
+	if($("#sleepMode").val()!="1" || $("input:radio.access[name=lpm_enable]:checked").val()!="1") {
+		$("#SleepTrigge_button").attr("disabled", "disabled");
+	}
+	$("#sleepMode").trigger("change");
+	$("input:radio.access[name=c1]").trigger("change");
+	$("input:radio.access[name=c2]").trigger("change");
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form class="validate" name="form" id ="form" novalidate="novalidate">
+		<div class="right-column white-box" id="boot_setup">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("lowPowerMode"))</script></h2>
+				<div class="p-des-full-width">
+					<p><script language=Javascript>document.write(_("lowPowerModeIntroduction"))</script></p>
+				</div>
+				<div style="padding:15px 0 60px 20px; width:660px;">
+					<label for="field-1"><script language=Javascript>document.write(_("lpmFunctionality"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div id="lpm_enable-div" class="radio-switch">
+								<input type="radio" id="lpm_enable-0" name="lpm_enable" class="access" value="1">
+								<label for="lpm_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="lpm_enable-1" name="lpm_enable" class="access" value="0">
+								<label for="lpm_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="lpm-toggle-div">
+#ifdef MULTI_IGNITION
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row">
+							<label for="ignSelect"><script language=Javascript>document.write(_("ignSelect"))</script></label>
+							<div class="field">
+								<select name="ignSelect" id="ignSelect" style="width:auto">
+								</select>
+							</div>
+						</div>
+					</div>
+#endif
+					<b><script language=Javascript>document.write(_("sleepSettings"))</script></b>
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row">
+							<label for="sleepMode"><script language=Javascript>document.write(_("sleepMode"))</script></label>
+							<div class="field">
+								<select name="sleepMode" id="sleepMode">
+									<option value="1"><script language=Javascript>document.write(_("sleepByManual"))</script></option>
+									<option value="2"><script language=Javascript>document.write(_("sleepByTimer"))</script></option>
+									<option value="3"><script language=Javascript>document.write(_("sleepByIgnitionStatus"))</script></option>
+									<option value="4"><script language=Javascript>document.write(_("sleepByTimerOrIgnition"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div  class="form-row no-bg-form" id="sleepIgnition-div">
+							<label for="sleepIgnition_0"><script language=Javascript>document.write(_("sleepByIgnitionCondition"))</script></label>
+							<div class="field">
+								<div class="radio-box-group">
+									<div class="radio-box">
+										<input type="radio" class="access" name='sleepIgnition' id='sleepIgnition_0' value="off" onClick="">
+										<label for="sleepIgnition_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+									</div>
+									<div class="radio-box">
+										<input type="radio" class="access" name='sleepIgnition' id='sleepIgnition_1' value="on" onClick="">
+										<label for="sleepIgnition_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row" id="sleepTimer-div">
+							<label for="sleepTimer"><script language=Javascript>document.write(_("sleepAfterBooting"))</script></label>
+							<div class="field">
+								<input type="text" name="sleepTimer" id="sleepTimer" class="validate[required,funcCall[validate_sleep]] large" value=0 onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("sleepTimerRange")+")&nbsp;&nbsp;"+_("seconds"))</script></span>
+							</div>
+						</div>
+						<div class="submit-row" id="triggerSleep-div">
+									<button type="button" class="secondary" id="SleepTrigge_button" onClick="SleepTrigger()" style="width:auto"><script language=Javascript>document.write(_("triggerSleepNow"))</script></button>
+						</div>
+					</div>
+					<div style="width:300px;"><b><script language=Javascript>document.write(_("wakeSettings"))</script></b></div>
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row">
+							<label for="wakeMode"><script language=Javascript>document.write(_("wakeMode"))</script></label>
+							<div class="field">
+								<select name="wakeMode" id="wakeMode">
+									<option value="1"><script language=Javascript>document.write(_("wakeByTimerAndIgnition"))</script></option>
+									<option value="2"><script language=Javascript>document.write(_("wakeByIgnitionStatus"))</script></option>
+									<option value="3"><script language=Javascript>document.write(_("AdvancedConfigureBelow"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div  class="form-row no-bg-form" id="wakeIgnition-div">
+							<label for="wakeIgnition_0"><script language=Javascript>document.write(_("wakeByIgnitionCondition"))</script></label>
+							<div class="field">
+								<div class="radio-box-group">
+									<div class="radio-box">
+										<input type="radio" class="access" name='wakeIgnition' id='wakeIgnition_0' value="on">
+										<label for="wakeIgnition_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+									</div>
+									<div class="radio-box">
+										<input type="radio" class="access" name='wakeIgnition' id='wakeIgnition_1' value="off">
+										<label for="wakeIgnition_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div id="wakeAdvanced-div">
+							<b><script language=Javascript>document.write(_("advancedWakeSettings"))</script></b>
+							<p><script language=Javascript>document.write(_("advancedWakeIntroduction"))</script></p>
+							<p><script language=Javascript>document.write(_("step1Introduction"))</script></p>
+							<b><script language=Javascript>document.write(_("event1"))</script></b>
+							<div class="form-row no-bg-form">
+								<label for="UseFixedAckDest"><script language=Javascript>document.write(_("chooseValueStep1"))</script></label>
+								<div class="field">
+									<div class="radio-box-group">
+										<div class="radio-box">
+											<input type="radio" class="access" name='c1' id='c1_0' value="on" onClick="">
+											<label for="c1_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+										</div>
+										<div class="radio-box">
+											<input type="radio" class="access" name='c1' id='c1_1' value="off" onClick="">
+											<label for="c1_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+										</div>
+										<div class="radio-box">
+											<input type="radio" class="access" name='c1' id='c1_2' value="ignore" onClick="">
+											<label for="c1_2"><div class="radioText"><script language=Javascript>document.write(_("skip"))</script></div></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="form-row">
+								<label for="v1"><script language=Javascript>document.write(_("stableTime"))</script></label>
+								<div class="field">
+									<input type="text" name="v1" id="v1" class="validate[required,funcCall[validate_v1v2]] large" value=0 onKeyUp='NumfieldEntry(this)'>
+									<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("zTo65535")+")&nbsp;&nbsp;x10ms")</script></span>
+								</div>
+							</div>
+							<br/>
+							<b><script language=Javascript>document.write(_("event2"))</script></b>
+							<div class="form-row no-bg-form">
+								<label for="UseFixedAckDest"><script language=Javascript>document.write(_("chooseValueStep2"))</script></label>
+								<div class="field">
+									<div class="radio-box-group">
+										<div class="radio-box">
+											<input type="radio" class="access" name='c2' id='c2_0' value="on" onClick="">
+											<label for="c2_0"><div class="radioText"><script language=Javascript>document.write(_("ioLow"))</script></div></label>
+										</div>
+										<div class="radio-box">
+											<input type="radio" class="access" name='c2' id='c2_1' value="off" onClick="">
+											<label for="c2_1"><div class="radioText"><script language=Javascript>document.write(_("ioHigh"))</script></div></label>
+										</div>
+										<div class="radio-box">
+											<input type="radio" class="access" name='c2' id='c2_2' value="ignore" onClick="">
+											<label for="c2_2"><div class="radioText"><script language=Javascript>document.write(_("skip"))</script></div></label>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="v2"><script language=Javascript>document.write(_("stableTime"))</script></label>
+								<div class="field">
+									<input type="text" name="v2" id="v2" class="validate[required,funcCall[validate_v1v2]] large" value=0 onKeyUp='NumfieldEntry(this)'>
+									<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("zTo65535")+")&nbsp;&nbsp;x10ms")</script></span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row" id="guard_time-div">
+							<label for="v2"><script language=Javascript>document.write(_("wakeUpAfter"))</script></label>
+							<div class="field">
+								<input type="text" name="guard" id="guard" class="validate[required,funcCall[validate_timer]] large" value=0 onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("zTo4294967")+")&nbsp;&nbsp;"+_("seconds"))</script></span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="submit-row" style="margin-left:252px;">
+					<button type="button" onClick="submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div></div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+#ifdef V_WEBIF_SPEC_vdf
+    set_menu("Services", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#else    
+    set_menu("System", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#endif    
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}
+	else if(request['QUERY_STRING']=="sleep") {%>
+		success_alert("",_("systemShuttingDown"));
+<%	}%>
+
+function validate_v1v2(field) {
+	if( field.val() < 0 || field.val() > 65535 ) {
+		return _("zTo65535warningMeg");
+	}
+}
+function validate_timer(field) {
+	if( field.val() < 0 || field.val() > 4294967 ) {
+		return _("zTo4294967warningMeg");
+	}
+}
+function validate_sleep(field) {
+	if( field.val() < 300 || field.val() > 4294967 ) {
+		return _("sleepTimerWarningMeg");
+	}
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+digraph "ProSLIC Configuration Options"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node0 [label="ProSLIC Configuration\l Options",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node2 [label="Code feature options",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___c_o_d_e___o_p_t_s.html"];
+  Node4 [label="PSTN Detection Options",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_s_t_n___c_f_g.html"];
+  Node3 [label="Multiple Device/BOM\l Option Support",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___m_u_l_t_i___b_o_m.html"];
+  Node1 [label="ProSLIC Driver Selection",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_r_i_v_e_r___s_e_l.html"];
+  Node0->Node1 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+}

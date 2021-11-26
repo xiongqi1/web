@@ -1,0 +1,173 @@
+<img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+
+<div style="position:absolute; font-size:12px; left:90px; top:690px" ><a class="a1" href="JavaScript:toHotSpot()">Hotspot Web UI</a></div>
+<%_m=get_single('mhs.operationmode'); if( request["SESSION_ID"]==session["sessionid"] && _m=='poweruser') {%>
+<div style="position:absolute; font-size:12px; left:420px; top:690px" ><a class="a1" href="/login.html?logoff"><script language="JavaScript">document.write(_("logoff"))</script></a></div>
+<%}%>
+
+<div style="position:absolute; top:40px; left:780px; color:#e52f17; font-size:14px; font-weight:bold;">Sierra Wireless AirCard® Hub</div>
+<a href="/AirCard_Hub_User_Guide.pdf" target="_blank">
+<div style="position:absolute; top:62px; left:930px; color:#e52f17; font-size:14px;">Help</div>
+<div style="position:absolute; top:60px; left:965px;" ><img src="/images/Help-Icon-SWI.png" width="16" height="16"/></div>
+</a>
+
+<div style="position:absolute; top:105px; left:560px; width:440px" >
+<div style="width:auto" class='a1'><script language="JavaScript">document.write(_("select mode"))</script></div>
+<br/>
+<input type=radio name='changeMode' value="simple" onClick="chMode(this.value)">&nbsp;
+<span id="id_easy"><script language="JavaScript">document.write(_("easy"))</script></span>
+<br/>
+Easy mode is best for users that just want to extend the functionality of their hotspot.
+(The cradle will not function when the hotspot is not present).
+<br/><br/>
+
+<input type=radio name='changeMode' value="soho" onClick="chMode(this.value)">&nbsp;
+<span id="id_soho"><script language="JavaScript">document.write(_("small office"))</script></span>
+<br/>
+Small Office/Home Office mode is best for users that want to both extend their hotspot
+capability as well as have a local network when the mobile hotspot is not present.
+<br/><br/>
+
+<input type=radio name='changeMode' value="poweruser" onClick="chMode(this.value)">&nbsp;
+<span id="id_poweruser"><script language="JavaScript">document.write(_("power user"))</script></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a class="a1" href="/login.html" id="sToAdv"><script language="JavaScript">document.write(_("GUI sToAdv"))</script></a>
+<br/>
+Power User mode opens all advanced user options for the cradle and is meant for users that possess a comfort level with networking technology.
+</div>
+
+<script language="JavaScript">
+m="@@_m";
+set_mode(m);
+
+function chModeHandler(responseText) {
+	eval( responseText );
+	
+	reconnect_msg="You may have to reconnect your Wi-Fi enabled device (or computer) to your cradle. Use Wi-Fi network name and passphrase in hotspot screen.";
+	
+	if(wwan_0_mhs_docked!="1") {
+		switch(mhs_operationmode) {
+			case "simple":
+				alert("The Hotspot should be docked for this operation. Please dock the Hotspot now." + " " + reconnect_msg);
+			break;
+			case "soho":
+				alert("The Hotspot should be docked for this operation. Please dock the Hotspot now." + " " + reconnect_msg);
+			break;
+			case "poweruser":
+				alert("Warning: The Hotspot is not docked. You can dock the Hotspot now." + " " + reconnect_msg);
+			break;
+		}
+	}
+	else {
+		alert(reconnect_msg);
+	}
+	
+	document.location.reload();
+/*	if(mhs_operationmode=="poweruser")
+		$("#sToAdv").css("display","");
+	else
+		$("#sToAdv").css("display","none");*/
+}
+
+function chMode(v) {
+	if(m==v && v!="poweruser") {
+		if(v=="poweruser")
+			window.location=('/login.html');
+		return;
+	}
+	m=v;
+	set_mode(v);
+	$.get('/cgi-bin/rdb.cgi?mhs.operationmode='+v+'&wwan.0.mhs.docked&mhs.operationmode', chModeHandler);
+}
+
+function toHotSpotHandler(responseText) {
+	if (responseText.length<6 ) return;
+	eval( responseText );
+	if(wwan_0_mhs_docked!="1")
+		alert(_("device undocked"));
+	else
+		window.open("http://"+wwan_0_mhs_hswlanip);
+}
+
+function toHotSpot() {
+	$.get('/cgi-bin/rdb.cgi?wwan.0.mhs.hswlanip&wwan.0.mhs.docked',toHotSpotHandler);
+}
+
+function set_mode( mode ) {
+	document.getElementById('id_easy').style.color = '#000';
+	document.getElementById('id_soho').style.color = '#000';
+	document.getElementById('id_poweruser').style.color = '#000';
+
+	switch(mode) {
+	case "simple":
+		document.getElementById('id_easy').style.color = '#ff0000';
+		document.form.changeMode[0].checked=true;
+		$("#sToAdv").css("display","none");
+	break;
+	case "soho":
+		document.getElementById('id_soho').style.color = '#ff0000';
+		document.form.changeMode[1].checked=true;
+		$("#sToAdv").css("display","none");
+	break;
+	case "poweruser":
+		document.getElementById('id_poweruser').style.color = '#ff0000';
+		document.form.changeMode[2].checked=true;
+		$("#sToAdv").css("display","");
+	break;
+	default:
+		document.getElementById('id_easy').style.color = '#ff0000';
+		document.form.changeMode[0].checked=true;
+		$("#sToAdv").css("display","none");
+	break;
+	}
+}
+
+var changeHintTextPosition = function(event) {
+	var hinttextX = event.pageX - 8;
+	var hinttextY = event.pageY + 8;
+	$('div.hint-text').css({top: hinttextY, left: hinttextX});
+};
+/*
+var showHintTextEasy = function(event) {
+	$('div.hint-text').remove();
+	$('<div class="hint-text">Easy mode is best for users that just want to extend the functionality of their hotspot. (The cradle will not function when the hotspot is not present).</div>').appendTo('body');
+	changeHintTextPosition(event);
+};
+
+var showHintTextSoho = function(event) {
+	$('div.hint-text').remove();
+	$('<div class="hint-text">Small Office/Home Office mode is best for users that want to both extend their hotspot capability as well as have a local network when the mobile hotspot is not present.</div>').appendTo('body');
+	changeHintTextPosition(event);
+};
+
+var showHintTextPoweruser = function(event,mytext) {
+	$('div.hint-text').remove();
+	$('<div class="hint-text">Power User mode opens all advanced user options for the cradle and is meant for users that possess a comfort level with networking technology.</div>').appendTo('body');
+	changeHintTextPosition(event);
+};
+
+var hideHintText = function() {
+	$('div.hint-text').remove();
+};
+
+$("#id_easy").bind({
+	mousemove : changeHintTextPosition,
+	mouseenter : showHintTextEasy,
+	mouseleave: hideHintText
+});
+
+$("#id_soho").bind({
+	mousemove : changeHintTextPosition,
+	mouseenter : showHintTextSoho,
+	mouseleave: hideHintText
+});
+
+$("#id_poweruser").bind({
+	mousemove : changeHintTextPosition,
+	mouseenter : showHintTextPoweruser,
+	mouseleave: hideHintText
+});*/
+
+</script>

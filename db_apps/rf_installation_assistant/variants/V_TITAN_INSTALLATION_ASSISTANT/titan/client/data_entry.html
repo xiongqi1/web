@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+    <script>
+        function disable_pass(cid, pass) {
+            var elem_cid = document.getElementById(cid);
+            var elem_pass = document.getElementById(pass);
+            if (elem_cid.value == "") {
+                elem_pass.disabled = true;
+            } else {
+                elem_pass.disabled = false;
+            }
+        }
+
+        function disable_pass1() {
+            disable_pass("cid1", "pass1");
+        }
+        function disable_pass2() {
+            disable_pass("cid2", "pass2");
+        }
+        function disable_pass3() {
+            disable_pass("cid3", "pass3");
+        }
+
+        function make_plmn_readonly(plmn_array) {
+            for (var i = 0; i < plmn_array.length; i++) {
+                var elem = document.getElementById("plmn" + (i+1));
+                if (elem != null && elem.value != "") {
+                    elem.readOnly = true;
+                    elem.style.backgroundColor = "#CCCCCC";
+                }
+            }
+        }
+
+        function getCellDetail() {
+
+            ajaxGetRequest("/user_entry/landing", true, function(data) {
+                //console.log(data);
+                formObject = document.forms['selectSectorIds'];
+                formObject.elements["cid1"].value = data.cid[0];
+                formObject.elements["cid2"].value = data.cid[1];
+                formObject.elements["cid3"].value = data.cid[2];
+                formObject.elements["plmn1"].value = data.plmn[0];
+                formObject.elements["plmn2"].value = data.plmn[1];
+                formObject.elements["plmn3"].value = data.plmn[2];
+                formObject.elements["pass1"].value = data.pass[0];
+                formObject.elements["pass2"].value = data.pass[1];
+                formObject.elements["pass3"].value = data.pass[2];
+                // enable rsrp if cell not empty
+                disable_pass1();
+                disable_pass2();
+                disable_pass3();
+                // make PLMN non-editable if it is not empty.
+                // Avoids AT&T hardcoded PLMN if necessary, for testing for example.
+                make_plmn_readonly(data.plmn);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("document is ready");
+            getCellDetail();
+            // invalidate timestamps when this page is visited.
+            localStorage.setItem("testStart", "N/A");
+            // work out if this is iPhone, iPad or iPod touch to decide which HTML5 control to use
+            // (meter or progress)
+            g_is_html5_supported = is_html5_supported();
+            if (!g_is_html5_supported) {
+                console.log("Will use progress element instead of a HTML5 meter element");
+            }
+
+	    // populate versions
+            getVersions();
+        });
+
+        // validate one cell sector id. Can be either empty (if last argument is true) or 15 digits combined length
+        function validate_one_cell(plmn, cell_id, can_be_empty) {
+            if (cell_id == "" && can_be_empty) {
+                return true;
+            } else {
+                // if not empty, has to be 15 (6+9) digits combined
+                var is_num1 = /^\d+$/.test(plmn);
+                var is_num2 = /^\d+$/.test(cell_id);
+                if (is_num1 && is_num2 && (plmn.length == 6) && (cell_id.length == 9)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // validate on RSRP pass level. This should probably be narrowed to more reasonable values,
+        // but for now matched constants defined on the server side in data_collector, g_limits data object.
+        // Param cid is passed to allow not to enter rsrp if cid is also not entered.
+        function validate_one_rsrp(rsrp_pass, cid) {
+
+            // if cell id is empty, rsrp pass can be empty too
+            if (cid == "" && rsrp_pass == "") {
+                return true;
+            }
+            // -140 to -44. Data entry is inverted
+            if (rsrp_pass >= 44 && rsrp_pass <= 140) {
+                return true;
+            }
+            return false;
+        }
+
+        function record_values_local_storage(c1, c2, c3, p1, p2, p3) {
+            localStorage.setItem("cid1", c1);
+            localStorage.setItem("cid2", c2);
+            localStorage.setItem("cid3", c3);
+            localStorage.setItem("pass1", p1);
+            localStorage.setItem("pass2", p2);
+            localStorage.setItem("pass3", p3);
+        }
+
+        function validate() {
+            formObject = document.selectSectorIds;
+            if ((validate_one_cell(formObject.plmn1.value, formObject.cid1.value, false) == false) ||
+                (validate_one_cell(formObject.plmn2.value, formObject.cid2.value, true) == false) ||
+                (validate_one_cell(formObject.plmn3.value, formObject.cid3.value, true) == false)) {
+                alert ("Please enter at least one 9-digit cell IDs and a minimum RSRP");
+                return false;
+            } else if ((validate_one_rsrp(formObject.pass1.value, formObject.cid1.value) == false) ||
+                (validate_one_rsrp(formObject.pass2.value, formObject.cid2.value) == false) ||
+                (validate_one_rsrp(formObject.pass3.value, formObject.cid3.value) == false)) {
+                alert ("Please enter minimum RSRP in the range of -140dBm to -44dBm");
+                return false;
+            }
+            record_values_local_storage(
+                formObject.plmn1.value + formObject.cid1.value,
+                formObject.plmn2.value + formObject.cid2.value,
+                formObject.plmn3.value + formObject.cid3.value,
+                formObject.pass1.value, formObject.pass2.value, formObject.pass3.value)
+            return true;
+        }
+
+	// build versions
+	function buildVersions(data) {
+		var versions = data;
+		var res = "";
+
+		res += "<p>OA S/W Version: " + versions.sw_ver + "</p>";
+
+		return res;
+	}
+
+	// called when DOM is loaded before the page is first displayed
+	// Gets all relevant data from the server.
+	function getVersions() {
+		ajaxGetRequest("/versions/landing", true, function(data) {
+		    var res = buildVersions(data);
+		    document.getElementById("versions").innerHTML = res;
+		});
+	}
+    </script>
+</head>
+
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>Cell Sector IDs</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="selectSectorIds" class="content" method="POST" action="/user_entry/landing" onsubmit="return(validate());">
+                <p>Enter up to three Cell Sector ID's in the same order as they appear on the work order:</p>
+                <p>Enter Minimum RSRP value provided in the work order without '-' sign.</p>
+
+                <!-- <h3>Cell Sector #1:</h3> -->
+                <div id="cell_sector_1" class="form-row">
+
+                    <fieldset>
+                        <label for="cid1">Cell Sector ID #1</label>
+                        <div class="field">
+                            <input type="text" name="plmn1" id="plmn1" size="6" maxlength="6">
+                            <input type="text" name="cid1" id="cid1" size="9" maxlength="9" onkeyup="disable_pass1();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass1">Minimum RSRP</label>
+                        <div class="field">
+                            <input type="text" name="pass1" id="pass1" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <!-- <h3>Cell Sector #2:</h3> -->
+                <div id="cell_sector_2" class="form-row">
+                    <fieldset>
+                        <label for="cid2">Cell Sector ID #2</label>
+                        <div class="field">
+                            <input type="text" name="plmn2" id="plmn2" size="6" maxlength="6">
+                            <input type="text" name="cid2" id="cid2" size="9" maxlength="9" onkeyup="disable_pass2();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass2">Minimum RSRP</label>
+                        <div class="field">
+                            <input type="text" name="pass2" id="pass2" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <!-- <h3>Cell Sector #3:</h3> -->
+                <div id="cell_sector_3" class="form-row">
+
+                    <fieldset>
+                        <label for="cid3">Cell Sector ID #3</label>
+                        <div class="field">
+                            <input type="text" name="plmn3" id="plmn3" size="6" maxlength="6">
+                            <input type="text" name="cid3" id="cid3" size="9" maxlength="9" onkeyup="disable_pass3();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass3">Minimum RSRP</label>
+                        <div class="field">
+                            <input type="text" name="pass3" id="pass3" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="submit-row">
+                    <button class="med" type="submit">Apply</button>
+                    <!-- Hide the skip button for now -->
+                    <!-- <button class="med" type="button" onclick="window.location='/scan.html'">Skip</button> -->
+                </div>
+            </form>
+        </div>
+    </div>
+#ifdef V_TITAN_INSTALLATION_ASSISTANT_CONN_nrb200
+    <div class="box" id="app-data-entry-batt">
+        <div class="box-header">
+            <h2>Battery Status</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <div id="battResult"></div>
+        </div>
+    </div>
+
+    <!-- AT&T CR-7065 show the firmware version of the OWA -->
+    <div class="box" id="app-data-entry-versions">
+        <div class="box-header">
+            <h2>Firmware Version</h2>
+        </div>
+        <div class="box-content">
+            <div id="versions"></div>
+        </div>
+    </div>
+#endif
+</div>
+</div>
+</body>
+</html>

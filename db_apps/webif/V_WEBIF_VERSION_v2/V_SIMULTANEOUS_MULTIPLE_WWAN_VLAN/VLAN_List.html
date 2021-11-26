@@ -1,0 +1,96 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>VLAN List</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getVLANs"></script>
+<script language='javascript'>
+
+<%
+function toInt( str ) {
+	return str-0;
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	numProfiles=toInt(form['numProfiles']);
+	redirect(request['SCRIPT_NAME'] + "?success");
+}
+%>
+
+$(document).ready(function() {
+	var h="";
+	var len=vlan.length;
+	for( i=0; i<len; i++ ) {
+		h += "<tr>";
+		h += "   <td class='first' style=';text-align:center;'>"+breakWord(vlan[i].name, 10)+"</td>";
+		h += "   <td style=';text-align:center;'>"+vlan[i].address+"</td>";
+		h += "   <td style=';text-align:center;'>"+vlan[i].netmask+"</td>";
+		h += "   <td style=';text-align:center;'>"+vlan[i].vlanid+"</td>";
+		h += "   <td class='last'><a class='secondary sml' style='padding:0;border:0;' href='VLAN_Settings.html?"+i+"' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+		h += "</tr>";
+	}
+	$("#TBlist").html(h);
+	$.get("/js/selectivizr.js");
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div id="main_div" class="grid-9 omega">
+		<form name="form" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="numProfiles" id="numProfiles"/>
+		<div class="right-column white-box">
+			<div class="pad" id="profiles-div">
+				<h2><script language=Javascript>document.write(_("vlanNameList"))</script></h2>
+				<table class="name-list">
+					<colgroup>
+						<col width="100px">
+						<col width="100px">
+						<col width="100px">
+						<col width="100px">
+						<col width=auto>
+					</colgroup>
+					<thead>
+						<tr>
+							<th><script language=Javascript>document.write(_("name"))</script></th>
+							<th style=";text-align:center;"><script language=Javascript>document.write(_("address"))</script></th>
+							<th style=";text-align:center;"><script language=Javascript>document.write(_("netmask"))</script></th>
+							<th style=";text-align:center;"><script language=Javascript>document.write(_("VLAN ID"))</script></th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="TBlist"></tbody>
+				</table>
+			</div>
+
+			<div class="pad">
+				<div class="submit-row">
+					<button class="secondary" id="button2" type="button" onClick="window.location='VLAN_List.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "VLAN_List", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('submitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

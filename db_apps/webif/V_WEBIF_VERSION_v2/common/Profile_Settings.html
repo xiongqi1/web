@@ -1,0 +1,1101 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Profile Settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<%
+#if defined V_CUSTOM_FEATURE_PACK_Santos
+isp_telstra = 1
+#else
+plmn_mcc=get_single('wwan.0.imsi.plmn_mcc');
+plmn_mnc=get_single('wwan.0.imsi.plmn_mnc');
+if (plmn_mcc == '505' && (plmn_mnc == '01' || plmn_mnc == '1')) {
+	isp_telstra = 1
+}
+else {
+	isp_telstra = 0
+}
+#endif
+
+i = form['profileidx'];
+if( i == undefined ) {
+	idx=request['QUERY_STRING'];
+	if( idx>=0 && idx<6 )
+		i = idx+1;
+	else
+		i = 1;
+}
+
+#ifdef V_PER_PROFILE_MTU_y
+_mtu = get_single( 'link.profile.'+i+'.mtu' );
+#else
+if (isp_telstra == 1) {
+	_mtu = get_single( 'system.config.telstra.mtu' );
+	if (_mtu < 1358 || _mtu > 1460) {
+		_mtu = 1358;
+		retval=set_single( 'system.config.telstra.mtu='+_mtu, '-p' );
+	}
+}
+else {
+	_mtu = get_single( 'system.config.mtu' );
+}
+#endif
+
+function validateRoutes() {
+	var v = form['routes'];
+	if (v != "/") {
+		var validIpNumber = "([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])";
+		var leadingOnes="(0|1(28|92)|2(24|40|48|52|54))";
+		var allOnes="(255\\.)";
+		var validSubnetMask = "(" + allOnes + "{3}255)|(" + allOnes + "{3}" + leadingOnes + ")|" + "(" + allOnes + "{2}" + leadingOnes + "\\.0" + ")|" + "(" + allOnes + "{1}" + leadingOnes + "(\\.0){2}" + ")|" + "(" + leadingOnes + "(\\.0){3}" + ")";
+		var validIpWithSubnetMask = "^(" + validIpNumber + "\\.){3}" + validIpNumber + "/" + validSubnetMask + "$";
+		if (string_regex_match(v, validIpWithSubnetMask) == false) {
+			onBadRequest();
+		}
+	}
+}
+function validateProfileName() {
+	var v = form['APNName'];
+	// derived from client validation function
+	var validProfileName = "^[ !()*/0-9;?A-Z_a-z-]+$";
+	var v = form['profilename'];
+	if (string_regex_match(v, validProfileName) == false) {
+		onBadRequest();
+	}
+}
+function validateReconnectDelay() {
+	var v = string_to_number(form['reconnectDelay']);
+	if (v < 30 || v > 65535) {
+		onBadRequest();
+	}
+}
+function validateReconnectRetries() {
+	var v = string_to_number(form['reconnectRetries']);
+	if (v < 0 || v > 65535) {
+		onBadRequest();
+	}
+}
+function validateMetric() {
+	var v = string_to_number(form['metric']);
+	if (v < 0 || v > 65535) {
+		onBadRequest();
+	}
+}
+function validateAuthType() {
+	var v = form['AuthType'];
+	if ((v != "chap") && (v != "pap") && (v != "none")) {
+		onBadRequest();
+	}
+}
+#ifdef PLATFORM_Serpent
+function validatePDPType() {
+	var v = form['PDPType'];
+	if ((v != "ipv4") && (v != "ipv6") && (v != "ipv4v6")) {
+		onBadRequest();
+	}
+}
+#endif
+function validateMtu() {
+	var v = string_to_number(form['mtu']);
+#ifdef PLATFORM_Serpent
+	if (v < 1 || v > 2000) {
+		onBadRequest();
+	}
+#else
+	if (isp_telstra == 1) {
+		if (v < 1358 || v > 1460) {
+			onBadRequest();
+		}
+	}
+	else {
+		if (v < 1 || v > 1500) {
+			onBadRequest();
+		}
+	}
+#endif
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	// validate input
+#if 0
+	//TODO: validate preferred_ipenable and preferred_ipaddr
+#endif
+	validateProfileName();
+#if 0
+	// Redflags: There are no filtering or conversion or validation functions for APNName, pppuser, ppppass !!!
+#endif
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	// When a field is disabled, validation check will fail always
+	// because real value can't be read so have to skip validation
+	// for disabled fields.
+	if (form['readonlyProfile'] != 1) {
+#endif
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+		validateRoutes();
+#endif
+		validateOnOffRadio(form['snatEnable']);
+		validateReconnectDelay();
+		validateReconnectRetries();
+		validateMetric();
+		validateAuthType();
+		#ifdef PLATFORM_Serpent
+		validatePDPType();
+		#endif
+		validateMtu();
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	}
+#endif
+	validateOnOffRadio(form['autoapn']);
+	validateOnOffRadio(form['gascEnable']);
+
+#if !defined(V_WEBIF_SPEC_vdf) && (defined(V_MODULE_cinterion) || defined(PVS8))
+	set_single( 'link.profile.'+i+'.preferred_ip.enable='+form['preferred_ipenable'], '-p' );
+	set_single( 'link.profile.'+i+'.preferred_ip.addr='+form['preferred_ipaddr'], '-p' );
+#endif
+	// Has the user choosen to enable or disable the current profile (profile number i)?
+	enable_checked = form['gascEnable'] == '1';
+	already_enabled = get_single('link.profile.' + i + '.enable') == '1';
+	if (enable_checked != already_enabled) {
+		// Determine which profile, if any, is the default one.
+		var current_default = 0;
+		var new_default = 0;
+		for (var j = 1; j <= 6; j++) {
+			if (get_single('link.profile.' + j + '.defaultroute') == '1') {
+				current_default = j;
+				break;
+			}
+		}
+		if (enable_checked) {
+			// The user is enabling this profile.  If there's no default then make it this one.
+			set_single('link.profile.' + i + '.enable=1', '-p');
+			if (current_default == 0) {
+				new_default = i;
+			}
+		} else {
+			// The user is disabling this profile.	If we were the default try to find another.
+			set_single('link.profile.' + i + '.enable=0', '-p');
+			set_single('link.profile.' + i + '.defaultroute=0', '-p');
+			if ((current_default == 0) || (current_default == i)) {
+				for (var j = 1; j <= 6; j++) {
+					if (get_single('link.profile.' + j + '.enable') == '1') {
+						new_default = j;
+						break;
+					}
+				}
+			}
+		}
+
+		// We need to change the default profile; update the RDB accordingly
+		if (new_default) {
+			set_single('link.profile.' + new_default + '.defaultroute=1', '-p');
+#ifdef V_DIAL_ON_DEMAND
+			if (get_single('dialondemand.enable') == '1') {
+				set_single('dialondemand.profile=' + new_default, '');
+				set_single('dialondemand.status=0', '');
+			}
+#endif // V_DIAL_ON_DEMAND
+		}
+	}
+
+	tempval = form['profilename'];
+	set_single( 'link.profile.'+i+'.name='+tempval, '-p' );
+	old_apn = get_single( 'link.profile.'+i+'.apn' );
+	tempval = form['APNName'];
+	set_single( 'link.profile.'+i+'.apn='+tempval, '-p' );
+	old_user = get_single( 'link.profile.'+i+'.user' );
+	tempval = form['pppuser'];
+	set_single( 'link.profile.'+i+'.user='+tempval, '-p' );
+	old_pass = get_single( 'link.profile.'+i+'.pass' );
+	tempval = form['ppppass'];
+	set_single( 'link.profile.'+i+'.pass='+tempval, '-p' );
+
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	// When a field is disabled, validation check will fail always
+	// because real value can't be read so have to skip validation
+	// for disabled fields.
+	if (form['readonlyProfile'] != 1) {
+#endif
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+		set_single( 'link.profile.'+i+'.routes='+form['routes'], '-p' );
+#endif
+		tempval = form['snatEnable'];
+		set_single( 'link.profile.'+i+'.snat='+tempval, '-p' );
+		tempval = form['reconnectDelay'];
+		set_single( 'link.profile.'+i+'.reconnect_delay='+tempval, '-p' );
+		tempval = form['reconnectRetries'];
+		set_single( 'link.profile.'+i+'.reconnect_retries='+tempval, '-p' );
+		tempval = form['metric'];
+		set_single( 'link.profile.'+i+'.defaultroutemetric='+tempval, '-p' );
+		old_auth_type = get_single( 'link.profile.'+i+'.auth_type' );
+		tempval = form['AuthType'];
+		set_single( 'link.profile.'+i+'.auth_type='+tempval, '-p');
+#ifdef PLATFORM_Serpent
+		old_pdp_type = get_single( 'link.profile.'+i+'.pdp_type' );
+		tempval = form['PDPType'];
+		set_single( 'link.profile.'+i+'.pdp_type='+tempval, '-p');
+#endif
+		tempval = form['mtu'];
+#ifdef V_PER_PROFILE_MTU_y
+		set_single( 'link.profile.'+i+'.mtu='+tempval, '-p' );
+#else
+		if (isp_telstra == 1)
+			retval=set_single( 'system.config.telstra.mtu='+tempval, '-p' );
+		else
+			retval=set_single( 'system.config.mtu='+tempval, '-p' );
+#endif
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	}
+#endif
+
+	autoapn=form['autoapn'];
+	set_single( 'link.profile.'+i+'.autoapn='+autoapn, '-p');
+	// if auto-APN is selected, reset current APN as it will be derived by connection scripts
+	if (autoapn == "1") {
+		set_single( 'link.profile.'+i+'.apn.current=');
+	}
+
+#if 0
+	// Disable profile 2 (ims) and 3 (SOS) enable/disable button when these two
+	// profiles are locked.
+#endif
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	if (form['readonlyProfile'] != 1) {
+		gasc = form['gascEnable'];
+		if( gasc=='1' ) {
+#ifndef PLATFORM_Serpent
+			//need re-enable wwan if MTU is changed
+			if(tempval != _mtu) {
+				set_single( 'link.profile.'+i+'.enable=0', '-p' );
+				esp_sleep(1000);
+			}
+#endif
+			set_single( 'link.profile.'+i+'.enable=1', '-p' );
+		}
+		else {
+			set_single( 'link.profile.'+i+'.enable=0', '-p' );
+		}
+	}
+#endif
+
+#if defined V_CUSTOM_FEATURE_PACK_Telstra_140 || defined V_CUSTOM_FEATURE_PACK_Telstra_145w || defined V_CUSTOM_FEATURE_PACK_Telstra_6200 || defined V_CUSTOM_FEATURE_PACK_Select_Solutions
+	set_single( 'link.profile.'+i+'.ESM_reconnect_delay=0' );
+#endif
+	set_single( 'link.profile.'+i+'.trigger=1' );
+
+#ifdef V_MODULE_VZ20Q
+	set_single( 'link.profile.sync_trigger=1');
+#endif
+
+#ifdef PLATFORM_Serpent
+	// check if writeflag needs to be set
+	if (autoapn != "1" && (old_apn != form['APNName'] || old_user != form['pppuser'] || old_pass != form['ppppass']
+#ifndef V_LOCK_IMS_SOS_PROFILE_y
+		|| old_auth_type != form['AuthType'] || old_pdp_type != form['PDPType']
+#endif
+		))
+		set_single( 'link.profile.'+i+'.writeflag=1' );
+#endif
+
+	redirect('/Profile_Name_List.html?success');
+}
+else { //GET
+	form['mtu'] = _mtu;
+}
+idx=request['QUERY_STRING'];
+if( idx>=0 && idx<6 ) {
+	form['profileidx'] = idx+1;
+}
+else {
+	form['profileidx'] = 1;
+}
+var _custom_roam_simcard=get_single("manualroam.custom_roam_simcard");
+%>
+<script language='javascript'>
+
+#include "net_util.js"
+
+var roam_simcard="@@_custom_roam_simcard";
+
+function autoAPNchange() {
+	if(document.formS.autoapnRadio[0].checked==true) {
+		$(".hide_for_autoapn").css("display","none");
+		$("#autoapn").val("1");
+		$(".show_for_autoapn").css("display","");
+	}
+	else {
+		$(".hide_for_autoapn").css("display","");
+		$("#autoapn").val("0");
+	}
+}
+
+function prefIPchange() {
+	if(document.formS.prefIpRadio[0].checked==true) {
+		$("#preferred_ipenable").val("1");
+		$(".show_for_perferredipaddr").css("display","");
+	}
+	else {
+		$("#preferred_ipenable").val("0");
+		$(".show_for_perferredipaddr").css("display","none");
+	}
+}
+
+function Init_Form() {
+	var i = document.getElementById("profileidx").value-1;
+	if(i=="") {
+		i=0;
+	}
+
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+	var network_netmask=new Array();
+
+	if(stpf[i].routes!==undefined)
+	network_netmask=stpf[i].routes.split("/");
+
+	if(network_netmask[0]===undefined)
+		network_netmask[0]="";
+	if(network_netmask[1]===undefined)
+		network_netmask[1]="";
+
+	parse_ip_into_fields(network_netmask[0],"network");
+	parse_ip_into_fields(network_netmask[1],"netmask");
+#endif
+
+// <start> To support perferred WWAN IP
+	if (stpf[i].preferredIPAddr != undefined)
+		parse_ip_into_fields(stpf[i].preferredIPAddr,"preferred_ipaddr");
+	else
+		parse_ip_into_fields("","preferred_ipaddr");
+
+	$("#preferred_ipenable").val(stpf[i].preferredIPEnable);
+	if(stpf[i].preferredIPEnable=="1") {
+		$("#prefIpRadio-0").attr("checked", "checked");
+		$(".show_for_perferredipaddr").css("display","");
+	}
+	else {
+		$("#prefIpRadio-1").attr("checked", "checked");
+		$(".show_for_perferredipaddr").css("display","none");
+	}
+
+    $(".show_for_perferredip").css("display","");
+// < end > To support perferred WWAN IP
+
+	$("#profilename").val(stpf[i].name);
+	$("#APNName").val(stpf[i].APNName);
+	$("#pppuser").val(stpf[i].user);
+	$("#ppppass").val(stpf[i].pass);
+
+	$("#reconnectDelay").val(stpf[i].reconnect_delay);
+	$("#reconnectRetries").val(stpf[i].reconnect_retries);
+	$("#metric").val(stpf[i].metric);
+
+	if( stpf[i].authtype=="chap" )
+		$("#AuthType-0").attr("checked", "checked");
+	else if( stpf[i].authtype=="pap" )
+		$("#AuthType-1").attr("checked", "checked");
+	else
+		$("#AuthType-2").attr("checked", "checked");
+
+#ifdef PLATFORM_Serpent
+	if( stpf[i].pdp_type=="ipv4" )
+		$("#PDPType-0").attr("checked", "checked");
+	else if( stpf[i].pdp_type=="ipv6" )
+		$("#PDPType-1").attr("checked", "checked");
+	else
+		$("#PDPType-2").attr("checked", "checked");
+#endif
+
+	document.formS.snatEnable.value = stpf[i].snat;
+	if( parseInt(document.formS.snatEnable.value)==1 ) {
+		$("#NatEnable-0").attr("checked", "checked");
+	}
+	else {
+		$("#NatEnable-1").attr("checked", "checked");
+	}
+
+	if ( (document.formS.reconnectDelay.value < 30 ) || (document.formS.reconnectDelay.value > 65535) ) {
+		document.formS.reconnectDelay.value = 30;
+	}
+
+	if ( (document.formS.reconnectRetries.value == "N/A") ||(document.formS.reconnectRetries.value < 0 ) || (document.formS.reconnectRetries.value > 65535) ) {
+		document.formS.reconnectRetries.value = 0;
+	}
+
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	document.formS.readonlyProfile.value = 0;
+#endif
+
+	if( stpf[i].readonly == '1' ) {
+		document.formS.pppuser.disabled = true;
+		document.formS.APNName.disabled = true;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = true;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='none';
+		document.formS.ppppass.disabled = true;
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+		// Prohibit profile2 (IMS) and profile3(SOS) setting except for APN name
+		if (i == 1 || i == 2) {
+			document.formS.APNName.disabled = false;
+			$("#pppAutoCon-0").attr("disabled", true);
+			$("#pppAutoCon-1").attr("disabled", true);
+			$("#prefIpRadio-0").attr("disabled", true);
+			$("#prefIpRadio-1").attr("disabled", true);
+			$("#preferred_ipaddr1").attr("disabled", true);
+			$("#preferred_ipaddr2").attr("disabled", true);
+			$("#preferred_ipaddr3").attr("disabled", true);
+			$("#preferred_ipaddr4").attr("disabled", true);
+			$("#AuthType-0").attr("disabled", true);
+			$("#AuthType-1").attr("disabled", true);
+			$("#AuthType-2").attr("disabled", true);
+#ifdef PLATFORM_Serpent
+			$("#PDPType-0").attr("disabled", true);
+			$("#PDPType-1").attr("disabled", true);
+			$("#PDPType-2").attr("disabled", true);
+#endif
+			$("#reconnectDelay").attr("disabled", true);
+			$("#reconnectRetries").attr("disabled", true);
+			$("#metric").attr("disabled", true);
+			$("#mtu").attr("disabled", true);
+			$("#NatEnable-0").attr("disabled", true);
+			$("#NatEnable-1").attr("disabled", true);
+			$("#network1").attr("disabled", true);
+			$("#network2").attr("disabled", true);
+			$("#network3").attr("disabled", true);
+			$("#network4").attr("disabled", true);
+			$("#netmask1").attr("disabled", true);
+			$("#netmask2").attr("disabled", true);
+			$("#netmask3").attr("disabled", true);
+			$("#netmask4").attr("disabled", true);
+			document.formS.readonlyProfile.value = 1;
+		}
+#endif
+	}
+	else {
+		document.formS.pppuser.disabled = false;
+		document.formS.APNName.disabled = false;
+		document.formS.ppppass.disabled = false;
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+		// Prohibit profile2 (IMS) and profile3(SOS) setting except for APN name
+		if (i == 1 || i == 2) {
+			document.formS.APNName.disabled = false;
+			$("#pppAutoCon-0").attr("disabled", false);
+			$("#pppAutoCon-1").attr("disabled", false);
+			$("#prefIpRadio-0").attr("disabled", false);
+			$("#prefIpRadio-1").attr("disabled", false);
+			$("#preferred_ipaddr1").attr("disabled", false);
+			$("#preferred_ipaddr2").attr("disabled", false);
+			$("#preferred_ipaddr3").attr("disabled", false);
+			$("#preferred_ipaddr4").attr("disabled", false);
+			$("#AuthType-0").attr("disabled", false);
+			$("#AuthType-1").attr("disabled", false);
+			$("#AuthType-2").attr("disabled", false);
+#ifdef PLATFORM_Serpent
+			$("#PDPType-0").attr("disabled", false);
+			$("#PDPType-1").attr("disabled", false);
+			$("#PDPType-2").attr("disabled", false);
+#endif
+			$("#reconnectDelay").attr("disabled", false);
+			$("#reconnectRetries").attr("disabled", false);
+			$("#metric").attr("disabled", false);
+			$("#mtu").attr("disabled", false);
+			$("#NatEnable-0").attr("disabled", false);
+			$("#NatEnable-1").attr("disabled", false);
+			$("#network1").attr("disabled", false);
+			$("#network2").attr("disabled", false);
+			$("#network3").attr("disabled", false);
+			$("#network4").attr("disabled", false);
+			$("#netmask1").attr("disabled", false);
+			$("#netmask2").attr("disabled", false);
+			$("#netmask3").attr("disabled", false);
+			$("#netmask4").attr("disabled", false);
+		}
+#endif
+	}
+
+	if(roam_simcard == "1") {
+		autoapn=0;
+		$("#div_autoapn").css("display","none");
+	}
+	else {
+		autoapn=stpf[i].autoapn;
+	}
+
+	$("#gascEnable").val(stpf[i].enable);
+	if( stpf[i].enable==1 ) {
+		$("#pppAutoCon-0").attr("checked", "checked");
+		$(".hide_profile_off").css("display","");
+	}
+	else {
+		$("#pppAutoCon-1").attr("checked", "checked");
+		$(".hide_profile_off").css("display","none");
+	}
+	if(autoapn=="1") {
+		$(".show_for_autoapn").css("display","");
+		$(".hide_for_autoapn").css("display","none");
+	}
+	else {
+		$(".hide_for_autoapn").css("display","");
+	}
+
+	if(roam_simcard == "1") {
+		$("#div_autoapn").css("display","none");
+	}
+
+	$("#autoapn").val(autoapn);
+	if(autoapn=="1") {
+		$("#autoapnRadio-0").attr("checked", "checked");
+	}
+	else {
+		$("#autoapnRadio-1").attr("checked", "checked");
+	}
+
+	var imsi="<%get_single_direct('wwan.0.imsi.msin');%>";
+	if(imsi.substring(0,5)=="50501") {
+		$("#telstra_au_div").css("display","none")
+	}
+
+// hide autoapn and reconnect retries until they are implemented in Serpent
+#ifdef PLATFORM_Serpent
+	$("#div_autoapn").css("display","none");
+	$("#div_reconn_retries").css("display","none");
+#endif
+}
+
+function checkEnabledProfiles() {
+	var j = document.getElementById("profileidx").value-1;
+
+	en=0;
+	for( i=0; i<stpf.length; i++ ) {
+		if( (i!=j) && stpf[i].enable == 1) {
+			en++;
+		}
+	}
+	return en;
+}
+#if defined V_CUSTOM_FEATURE_PACK_Telstra_140 || defined V_CUSTOM_FEATURE_PACK_Telstra_145w || defined V_CUSTOM_FEATURE_PACK_Telstra_6200 || defined V_CUSTOM_FEATURE_PACK_Select_Solutions
+<% if (isp_telstra == 1) { %>
+var max_enabled_profiles=1;
+<%} else {%>
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+<%}%>
+#else
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+#endif
+function profile_enable(en) {
+	clear_alert();
+	if(en=="1" && checkEnabledProfiles()>=max_enabled_profiles) {
+		validate_alert("", _("maxEnabledProfilesExceeded"));
+		$("#pppAutoCon-1").attr("checked", "checked");
+		return;
+	}
+	$("#gascEnable").val(en);
+	if(en=="0") {
+		$(".hide_profile_off").css("display","none");
+	}
+	else {
+		$(".hide_profile_off").css("display","");
+		if(document.formS.autoapnRadio[0].checked==true) {
+			$(".hide_for_autoapn").css("display","none");
+		}
+		else {
+			$(".hide_for_autoapn").css("display","");
+		}
+	}
+	if(roam_simcard == "1") {
+		$("#div_autoapn").css("display","none");
+	}
+}
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="formS" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<input style="display:none" type="text" name="fakeusernameremembered"/>
+		<input style="display:none" type="password" name="fakepasswordremembered"/>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("wwanSettingsTitle"))</script></h2>
+				<input type="hidden" name="gascEnable" id="gascEnable" value="@@form['gascEnable']">
+				<input type="hidden" name="snatEnable" id="snatEnable" value="@@form['snatEnable']"/>
+				<input type="hidden" name="profileidx" id="profileidx" value="@@form['profileidx']">
+				<input type="hidden" name="autoapn" id="autoapn" value="@@form['autoapn']">
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+				<input type="hidden" name="readonlyProfile" id="readonlyProfile" value="@@form['readonlyProfile']">
+#endif
+				<div class="form-row no-bg-form"
+#ifdef V_CBRS_SAS_y
+					style="display:none"
+#endif
+				>
+					<label for="pppAutoCon"><script language=Javascript>document.write(_("profile"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="pppAutoCon-0" name="pppAutoCon" class="access" value=1>
+								<label for="pppAutoCon-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="pppAutoCon-1" name="pppAutoCon" class="access" value=0>
+								<label for="pppAutoCon-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="profilename"><script language=Javascript>document.write(_("profile name"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required] required large" name="profilename" id="profilename" onKeyUp="nameFilterWSpace(this);" value="@@form['profilename']">
+					</div>
+				</div>
+#ifdef V_CUSTOM_FEATURE_PACK_Verizon_USA
+				<div class="form-row no-bg-form" id="div_autoapn" style="display:none">
+#else
+				<div class="form-row no-bg-form" id="div_autoapn">
+#endif
+					<label for="autoapnRadio"><script language=Javascript>document.write(_("autoAPN"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="autoapnRadio-0" name="autoapnRadio" class="access" onclick='autoAPNchange()'/>
+								<label for='autoapnRadio-0' class='on'><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="autoapnRadio-1" name="autoapnRadio" class="access" onclick='autoAPNchange()'/>
+								<label for='autoapnRadio-1' class='off'><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="grey-box hide_for_autoapn">
+					<div class="form-row">
+						<label for="APNName"><script language=Javascript>document.write(_("apn"))</script></label>
+						<div class="field">
+							<input type="text" class="large" name="APNName" id="APNName" onKeyUp="hostNameFilter(this);" value="@@form['APNName']" maxlength='100'>
+#ifndef V_WEBIF_SPEC_vdf
+							&nbsp;&nbsp;
+							<span class="normal-text" id="apn_length"></span>
+#endif
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="pppuser"><script language=Javascript>document.write(_("user"))</script></label>
+						<div class="field">
+							<input type="text" class="large" name="pppuser" id="pppuser" onKeyUp="hostNameFilter(this);" value="@@form['pppuser']" maxlength='200'>
+#ifndef V_WEBIF_SPEC_vdf
+							&nbsp;&nbsp;
+							<span class="normal-text" id="pppuser_length"></span>
+#endif
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="ppppass"><script language=Javascript>document.write(_("password"))</script></label>
+						<div class="field">
+							<input type="password" class="large" name="ppppass" id="ppppass" value="@@form['ppppass']" autocomplete="new-password">
+						</div>
+					</div>
+#ifdef V_WEBIF_SPEC_vdf
+					<div style="display:none">
+#elif defined(V_MODULE_cinterion) || defined(PVS8)
+					<div class="form-row no-bg-form show_for_perferredip">
+#else
+					<div style="display:none">
+#endif
+						<input type="hidden" name="preferred_ipenable" id="preferred_ipenable">
+						<input type="hidden" name="preferred_ipaddr" id="preferred_ipaddr">
+						<div class="form-row">
+							<label for="prefIpRadio"><script language=Javascript>document.write(_("static ip"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="prefIpRadio-0" name="prefIpRadio" class="access" onclick='prefIPchange()'/>
+										<label for='prefIpRadio-0' class='on'><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="prefIpRadio-1" name="prefIpRadio" class="access" onclick='prefIPchange()'/>
+										<label for='prefIpRadio-1' class='off'><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+						<div class="form-row show_for_perferredipaddr">
+							<label><script language=Javascript>document.write(_("preferred ip"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("preferred_ipaddr");</script>
+						</div>
+#endif
+					</div>
+				</div>
+				<div class="form-row hide_for_autoapn">
+					<div class="form-row">
+						<label for="AuthType"><script language=Javascript>document.write(_("authentication type"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name="AuthType" id="AuthType-0" value="chap">
+								<label for="AuthType-0"><div class="radioText"><script language=Javascript>document.write(_("chap"))</script></div></label>
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name="AuthType" id="AuthType-1" value="pap">
+								<label for="AuthType-1"><div class="radioText"><script language=Javascript>document.write(_("pap"))</script></div></label>
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name="AuthType" id="AuthType-2" value="none">
+								<label for="AuthType-2"><div class="radioText"><script language=Javascript>document.write(_("none"))</script></div></label>
+							</div>
+						</div>
+					</div>
+#ifdef PLATFORM_Serpent
+					<div class="form-row">
+						<label for="PDPType"><script language=Javascript>document.write(_("pdpType"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name="PDPType" id="PDPType-0" value="ipv4">
+								<label for="PDPType-0"><div class="radioText"><script language=Javascript>document.write(_("ipv4"))</script></div></label>
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name="PDPType" id="PDPType-1" value="ipv6">
+								<label for="PDPType-1"><div class="radioText"><script language=Javascript>document.write(_("ipv6"))</script></div></label>
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name="PDPType" id="PDPType-2" value="ipv4v6">
+								<label for="PDPType-2"><div class="radioText"><script language=Javascript>document.write(_("ipv4v6"))</script></div></label>
+							</div>
+						</div>
+					</div>
+#endif
+				</div>
+#if defined V_CUSTOM_FEATURE_PACK_Telstra_140 || defined V_CUSTOM_FEATURE_PACK_Telstra_145w || defined V_CUSTOM_FEATURE_PACK_Telstra_6200 || defined V_CUSTOM_FEATURE_PACK_Select_Solutions
+				<div id="telstra_au_div">
+#endif
+					<div class="form-row show_for_autoapn">
+						<label for="reconnectDelay"><script language=Javascript>document.write(_("reconnectDelay"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required,funcCall[validate_reconnectDelay]] required reconnectDelay sml" name="reconnectDelay" id="reconnectDelay" value="@@form['reconnectDelay']" onKeyUp="NumfieldEntry(this);">
+#ifdef V_WEBIF_SPEC_vdf
+						</div>
+						<div>
+#endif
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("thirtyTo65535secs"))</script></span>
+						</div>
+					</div>
+					<div class="form-row show_for_autoapn" id="div_reconn_retries">
+						<label for="reconnectRetries"><script language=Javascript>document.write(_("reconnectRetries"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required,funcCall[validate_reconnectRetries]] required reconnectRetries sml" name="reconnectRetries" id="reconnectRetries" value="@@form['reconnectRetries']" onKeyUp="NumfieldEntry(this);">
+#ifdef V_WEBIF_SPEC_vdf
+						</div>
+						<div>
+#endif
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("zTo65535Unlimited"))</script></span>
+						</div>
+					</div>
+#if defined V_CUSTOM_FEATURE_PACK_Telstra_140 || defined V_CUSTOM_FEATURE_PACK_Telstra_145w || defined V_CUSTOM_FEATURE_PACK_Telstra_6200 || defined V_CUSTOM_FEATURE_PACK_Select_Solutions
+				</div>
+#endif
+				<div class="form-row show_for_autoapn">
+					<label for="metric"><script language=Javascript>document.write(_("routing del metric"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_metric]] required metric sml" name="metric" id="metric" onKeyUp="NumfieldEntry(this);" value="@@form['metric']">
+#ifdef V_WEBIF_SPEC_vdf
+					</div>
+					<div>
+#endif
+						<span class="normal-text">&nbsp;(0-65535)</span>
+					</div>
+				</div>
+				<div class="form-row show_for_autoapn">
+					<label for="mtu"><script language=Javascript>document.write(_("mtu"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_mtu]] required mtu sml" name="mtu" id="mtu" onKeyUp="NumfieldEntry(this);" value="@@form['mtu']">
+#ifdef V_WEBIF_SPEC_vdf
+					</div>
+					<div>
+#endif
+#ifdef PLATFORM_Serpent
+						<span class="normal-text">&nbsp;(1-2000)</span>
+#else
+<%if (isp_telstra == 1) {%>
+						<span class="normal-text">&nbsp;(1358-1460)</span>
+<%}else{ %>
+						<span class="normal-text">&nbsp;(1-1500)</span>
+<%}%>
+#endif
+					</div>
+				</div>
+				<div class="form-row no-bg-form show_for_autoapn">
+					<label for="field-12"><script language=Javascript>document.write(_("NatMasq"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="NatEnable-0" name="NatEnable" class="access"  onClick="javascript:$('#snatEnable').val('1')">
+								<label for="NatEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="NatEnable-1" name="NatEnable" class="access" onClick="javascript:$('#snatEnable').val('0')">
+								<label for="NatEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+				<input type="hidden" name="routes" id="routes">
+				<h2 class="show_for_autoapn"><script language=Javascript>document.write(_("profileRoutingSettings"))</script></h2>
+				<div class="p-des-full-width show_for_autoapn">
+					<p><script language=Javascript>document.write(_("profile routing settings desc"))</script></p>
+				</div>
+				<div class="form-row no-bg-form show_for_autoapn">
+					<label><script language=Javascript>document.write(_("network address"))</script></label>
+					<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("network");</script>
+				</div>
+				<div class="form-row no-bg-form show_for_autoapn">
+					<label><script language=Javascript>document.write(_("network mask"))</script></label>
+					<script language="JavaScript">htmlGenMaskBlocksWithoutRequired("netmask");</script>
+				</div>
+#endif
+				<div class="submit-row">
+					<button type="button" id="save" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='Profile_Name_List.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "Profile_List", <%_val = session["user"];%>"@@_val");
+#ifndef V_WEBIF_SPEC_vdf
+$(function(){
+
+	/* keyup apn and user name count */
+	function update_countersfunction(src){
+		var len=$(src).val().length;
+		var target;
+
+		/* get target object */
+		target=$(src).attr("id")=="APNName"?$("#apn_length"):$("#pppuser_length");
+
+		/* print count */
+		target.html(_("size")+":&nbsp;"+len);
+		/* hide if len is zero */
+		target.toggle(len>0);
+	}
+
+	$("#APNName,#pppuser").keyup(function(){
+		update_countersfunction(this);
+	});
+
+	$("#APNName,#pppuser").keydown(function(){
+		update_countersfunction(this);
+	});
+
+	$("#APNName,#pppuser").change(function(){
+		update_countersfunction(this);
+	});
+
+	/* trigger keyup */
+	$("#APNName,#pppuser").trigger("change");
+
+});
+#endif
+$(document).ready(function() {
+	Init_Form();
+	// check pppoe serial
+	$("input:radio[name=pppAutoCon]").click(function(){
+		pppoe_en="<% get_single_direct('service.pppoe.server.0.enable'); %>";
+		if(pppoe_en == "1") {
+			load_value_to_element($("input:radio[name=pppAutoCon]"),false);
+			blockUI_alert(_("Msg51"));
+		}
+		else {
+			profile_enable( $(this).val() );
+		}
+	});
+
+	$("#save").click(function() {
+	//	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			validate_alert("","");
+			return;
+		}
+#endif
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+		ip_addr=parse_ip_from_fields("network");
+
+		if(ip_addr!="") {
+			if( !isValidIpAddress0(ip_addr) ) {
+				validate_alert("", _("warningMsg05"));
+				return;
+			}
+			switch(isValidSubnetMask(parse_ip_from_fields("netmask"))) {
+				case -1:
+					validate_alert("", _("invalidSubnetMask"));
+					return;
+				break;
+				case -2:
+					validate_alert("", _("wlan warningMsg16"));//The subnet mask has to be contiguous. Please enter a valid mask
+					return;
+				break;
+			}
+		}
+#endif
+
+		ip_addr=parse_ip_from_fields("preferred_ipaddr");
+
+		if ( $("#preferred_ipenable").val() == "1" ) {
+			if(!isValidIpAddress0(ip_addr)) {
+				validate_alert("", _("warningMsg05"));
+				return;
+			}
+		}
+		$("#preferred_ipaddr").val(ip_addr);
+
+#ifdef V_WEBIF_SPEC_ntc_v2
+		jQuery("#form").validationEngine("attach", {
+			onValidationComplete: function(form, status) {
+				if( status == false ) {
+					validate_alert("",_("errorsSummary"));
+					return false;
+				}
+				else {
+					//clear_alert();
+					return true;
+				}
+			}
+		});
+#endif
+		$("button").attr("disabled",true);
+#ifndef V_PROFILE_ROUTING_WEBUI_none
+		var network_netmask=[parse_ip_from_fields("network"),parse_ip_from_fields("netmask")];
+		$("#routes").val(network_netmask.join("/"));
+#endif
+		$("form[name=formS]").submit();
+	});
+});
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["metric"]=_("Msg48");
+	$.validator.addMethod("metric",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.metric);
+#ifdef PLATFORM_Serpent
+	VALIDATOR.config.errors["mtu"]=_("MTU error 2000");//Error: MTU must have a value between 1 and 2000
+#else
+<%if (isp_telstra == 1) {%>
+	VALIDATOR.config.errors["mtu"]=_("MTU error Telstra");//Error: MTU must have a value between 1358 and 1460
+<%}else{ %>
+	VALIDATOR.config.errors["mtu"]=_("MTU error");//Error: MTU must have a value between 1 and 1500
+<%}%>
+#endif
+	$.validator.addMethod("mtu",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+#ifdef PLATFORM_Serpent
+			if( c < 1 || c > 2000 || !isAllNum(c) ) {
+#else
+<%if (isp_telstra == 1) {%>
+			if( c < 1358 || c > 1460 || !isAllNum(c) ) {
+<%}else{ %>
+			if( c < 1 || c > 1500 || !isAllNum(c) ) {
+<%}%>
+#endif
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.mtu);
+
+	VALIDATOR.config.errors["reconnectDelay"]=_("Msg49");
+	$.validator.addMethod("reconnectDelay",function(c,a) {
+		if(($(a).hasClass("required")&&c!==$(a).attr("data-watermark"))||(c!==$(a).attr("data-watermark"))) {
+			if( c < 30 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.reconnectDelay);
+
+	VALIDATOR.config.errors["reconnectRetries"]=_("Msg50");
+	$.validator.addMethod("reconnectRetries",function(c,a) {
+		if(($(a).hasClass("required")&&c!==$(a).attr("data-watermark"))||(c!==$(a).attr("data-watermark"))) {
+			if( c < 0 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.reconnectRetries);
+#else
+/********* for NTC ValidationEngine **********/
+function validate_reconnectRetries(field, rules, i, options) {
+	if( field.val() < 0 || field.val() > 65535 ) {
+		return _("Msg50");
+	}
+}
+
+function validate_reconnectDelay(field, rules, i, options) {
+	if( field.val() < 30 || field.val() > 65535 ) {
+		return _("Msg49");
+	}
+}
+
+function validate_metric(field, rules, i, options) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("Msg48");
+	}
+}
+
+function validate_mtu(field, rules, i, options) {
+#ifdef PLATFORM_Serpent
+	if( field.val() < 1 || field.val() > 2000 || !isAllNum(field.val()) ) {
+		return _("MTU error 2000");
+	}
+#else
+<%if (isp_telstra == 1) {%>
+	if( field.val() < 1358 || field.val() > 1460 || !isAllNum(field.val()) ) {
+		return _("MTU error Telstra");
+	}
+<%}else{%>
+	if( field.val() < 1 || field.val() > 1500 || !isAllNum(field.val()) ) {
+		return _("MTU error");
+	}
+<%}%>
+#endif
+}
+#endif
+
+</script>
+</body>
+</html>

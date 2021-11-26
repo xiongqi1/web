@@ -1,0 +1,309 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+
+<style>
+.list-col-hdr {text-align:left;}
+</style>
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Wireless Station List</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<% include mbssid.inc %>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(key, val) {
+		set_single_direct("-p","wlan.reservation."+key, val);
+	}
+	function setResRdb(idx, mac, name) {
+		setRdb("mac."+idx,mac);
+		setRdb("hostname."+idx,name);
+	}
+
+	// Transfer the form data to the RDB
+	var max = form['maxIdx'];
+	max = max-0; // make it an integer
+	for(var i=0; i<max; i++) {
+		validateMacAddress(form['macid'+i]);
+		setResRdb(i,form['macid'+i], form['hostname'+i]);
+	}
+	// Terminate the list with a blank entry
+	setResRdb(max,"","");
+	redirect('wlstationlist.html?success');
+}
+%>
+
+<!-- ================================================================================================ -->
+<script language="JavaScript">
+var maxReservation = 0;
+
+function submitF() {
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	blockUI_wait(_("GUI pleaseWait"));
+	var f = document.forms[1];
+	f.maxIdx.value=maxReservation;
+	f.submit();
+}
+
+function addElement(mac, hostname) {
+var num = maxReservation;
+var divIdName = 'myDiv'+num;
+
+	$("#ReservationDiv-title").css("display","");
+	h='<tr id="'+divIdName+'">\
+		<td>'+(num+1)+'</td>\
+		<td><input type="text" class="large validate[required,funcCall[validate_new_mac_addr]] required new_mac_addr" id="macid'+num+'" name="macid'+num+'" value="'+mac+'"></td>\
+		<td><input type="text" class="large" id="hostname'+num+'" name="hostname'+num+'"></td>\
+		<td class="last"><button type=button onClick="removeThis('+"'"+num+"'"+')" class="secondary sml" style="padding:0;border:0;margin-left:0"><i class="icon close"></i></button></td>\
+	</tr>';
+	$("#ReservationDiv").append(h);
+	$('#hostname'+num).val(Base64.decode(hostname));
+	maxReservation++;
+}
+
+function removeThis(dId) {
+	var f = document.forms[1];
+	var shiftcmd='';
+	// Decrease the reservation count, move following entries up in table
+	maxReservation--;
+	for ( var i = Number(dId); i < maxReservation; i++ ) {
+		shiftcmd+='f.macid'+i+'.value=f.macid'+(i+1)+'.value;f.hostname'+i+'.value=f.hostname'+(i+1)+'.value;';
+	}
+	eval(shiftcmd);
+	// clear last entry
+	$("#ReservationDiv").children("#myDiv"+maxReservation).remove();
+}
+
+function cloneData( mac, hostname ) {
+	for( i=0; i<maxReservation; i++) {
+		if(mac==$("#macid"+i).val()) {
+			blockUI_alert(_("macCloneWarning"));
+			return;
+		}
+	}
+	addElement( mac, hostname );
+}
+
+var isAjaxComplete=true;
+
+function makelist(v) {
+	eval(v)
+	isAjaxComplete=true;
+	var h="";
+	for(i=0; i<wlst.length; i++) {
+		h+="<tr>";
+		h+="<td width='13%'>"+wlst[i].ssid+"</td>";
+		h+="<td width='15%'>"+wlst[i].mac+"</td>";
+#if !defined(V_WIFI_qca_soc_lsdk) || defined(V_COPROCESSOR_hannibal_onboard)
+		h+="<td width='15%'>"+wlst[i].ipaddr+"</td>";
+		h+="<td width='18%'>"+htmlNumberEncode(Base64.decode(wlst[i].host))+"</td>";
+#endif
+		h+="<td width='6%'>" +wlst[i].rssi+"</td>";
+#ifdef V_WIFI_ralink
+		<!-- These fields are only supported on the Ralink driver -->
+		h+="<td width='12%'>"+wlst[i].psm+"</td>";
+		h+="<td width='6%'>" +wlst[i].bw+"</td>";
+		h+="<td width='15%'>"+wlst[i].uptime+"</td>";
+#endif
+#if defined(V_WEBIF_SPEC_vdf)
+		h+="<td class='last'><button type='button' class='secondary sml' style='margin-right:0;width:100px' onClick=\"cloneData('"+wlst[i].mac+"','"+wlst[i].host+"')\"><i class='icon clone'></i>"+_("Monitor")+"</button></td>";
+#endif
+		h+="</tr>";
+	}
+	$("#wlist").html(h);
+}
+
+var prev_length=0;
+$(document).ready(function() {
+
+#ifndef V_WIFI_ralink
+
+#ifdef V_WEBIF_SPEC_vdf
+	$("#id_ssid" ).attr("width", "20%");
+	$("#id_mac"  ).attr("width", "15%");
+	$("#id_ip"   ).attr("width", "15%");
+	$("#id_hname").attr("width", "20%");
+	$("#id-rssi" ).attr("width", "10%");
+#else
+	$("#id_ssid" ).attr("width", "20%");
+	$("#id_mac"  ).attr("width", "20%");
+	$("#id_ip"   ).attr("width", "20%");
+	$("#id_hname").attr("width", "25%");
+	$("#id-rssi" ).attr("width", "10%");
+#endif
+#endif
+
+#ifdef V_EVENT_NOTIFICATION
+	$.getJSON("/cgi-bin/wlan_mac_reservation.cgi", function(data) {
+		prev_length=data.length;
+		for(i=0; i<data.length; i++) {
+			addElement(data[i].mac, data[i].host);
+		}
+	});
+#endif
+	function makeRequest() {
+		if ( isAjaxComplete ) {
+			isAjaxComplete=false;
+			$.get('/cgi-bin/ajax.cgi?wlInfo', makelist);
+		}
+	}
+
+	makeRequest();
+#ifdef V_WIFI_qca_soc_lsdk
+	setInterval(makeRequest, 10000);
+#else
+	setInterval(makeRequest, 5000);
+#endif
+});
+
+</script>
+<!-- ================================================================================================ -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<form name="wstalist" id="form" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+			<input type="hidden" name="maxIdx" id="maxIdx" value="@@form['maxIdx']"/>
+			<div class="pad" id="station_list_block">
+				<h2><script language=Javascript>document.write(_("treeapp station list"))</script></h2>
+				<table id="wlInfo" width="80%" class="no-border">
+				<tr>
+					<th id="id_ssid"  class="list-col-hdr wlist-align align10" width="13%">SSID</th>
+					<th id="id_mac"   class="list-col-hdr wlist-align align10" width="15%"><script language=Javascript>document.write(_("macAddress"))</script></th>
+#if !defined(V_WIFI_qca_soc_lsdk) || defined(V_COPROCESSOR_hannibal_onboard)
+					<th id="id_ip"    class="list-col-hdr wlist-align align10" width="15%"><script language=Javascript>document.write(_("ip address"))</script></th>
+					<th id="id_hname" class="list-col-hdr wlist-align align10" width="18%"><script language=Javascript>document.write(_("host name"))</script></th>
+#endif
+					<th id="id-rssi"  class="list-col-hdr wlist-align align10" width="6%">RSSI</th>
+#ifdef V_WIFI_ralink
+					<!-- According to sta_info.lua these should not be displayed for the Linux driver -->
+					<th class="list-col-hdr wlist-align align10" width="12%">PSM</th>
+					<th class="list-col-hdr wlist-align align10" width="6%">BW</th>
+					<th class="list-col-hdr wlist-align align10" width="15%"><script language=Javascript>document.write(_("stalist connectedTime"))</script></th>
+#endif
+#ifdef V_WEBIF_SPEC_vdf
+					<th class="list-col-hdr" id="id-clone" width="10%"></th>
+#endif
+				</tr>
+				<tbody id="wlist"></tbody>
+				</table>
+
+
+				<!--div class="submit-row">
+					<button type="button" onClick="javascript:submitF1()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" id="bt_cancel" class="secondary"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div-->
+#ifdef V_EVENT_NOTIFICATION
+#ifdef V_WEBIF_SPEC_vdf
+				<div class="grid-50">
+#else
+				<div class="grid-66">
+#endif
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("monitoredWirelessClientList"))</script></h2>
+					</div>
+				</div>
+#ifdef V_WEBIF_SPEC_vdf
+				<div class="grid-50">
+#else
+				<div class="grid-33">
+#endif
+					<div class="pad omega">
+						<div style="margin-top:14px">
+							<button type="button" class="secondary sml fr" id="addbutton01" onClick="addElement('','')"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<div class="form-row">
+					<table class="no-border" id="ReservationDiv-title">
+						<colgroup>
+							<col width="10%">
+							<col width="30%">
+							<col width="40%">
+							<col width="auto">
+						</colgroup>
+						<thead>
+							<tr>
+								<th class="align10"><script language=Javascript>document.write(_("number"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("macAddress"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("host name"))</script></th>
+								<th></th>
+							</tr>
+						</thead>
+					<tbody id="ReservationDiv"></tbody>
+					</table>
+				</div>
+				<div class="submit-row">
+					<button type="button" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+#endif
+			</div>		<!-- div class="pad" id="station_list_block" -->
+			</form>		<!-- name="wstalist" -->
+
+		</div>	<!-- div class="right-column white-box" -->
+
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "Station_info", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["new_mac_addr"]=_("warningMsg11");	// You've entered the MAC address incorrectly. Please try again in the format (XX:XX:XX:XX:XX:XX).
+	$.validator.addMethod("new_mac_addr",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( !isValidMacAddress(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.new_mac_addr);
+#else
+function validate_new_mac_addr(field) {
+	if(!isValidMacAddress(field.val())) {
+		return _("warningMsg11");			// You've entered the MAC address incorrectly. Please try again in the format (XX:XX:XX:XX:XX:XX).
+	}
+}
+#endif
+
+</script>
+
+</body>
+</html>

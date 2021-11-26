@@ -1,0 +1,275 @@
+body {
+	font-size:12px;
+	font-family: Arial;
+	background-color:#ffffff;
+	direction:ltr;
+}
+a {
+	font-size:14px;
+	color:#ffffff;
+	font-weight:bold;
+}
+
+.a1 {
+	color:#516b08;
+}
+
+.a2 {
+	font-size: 9px;
+}
+
+#basicLogin {
+	top:140px;
+}
+
+#basicGUI {
+	position:absolute;
+	left:50px;
+	top:200px;
+}
+#GUI-battery {
+	left:132px;
+	top:59px;
+	position:absolute;
+}
+#GUI-CSQ {
+	left:158px;
+	top:235px;
+	position:absolute;
+}
+#GUI-confirmKey {
+	left:40px;
+	top:154px;
+	position:absolute;
+}
+
+.div_input {
+	left:180px;
+	position:absolute;
+	width: 200px;
+}
+.div_text {
+	color:#FFFFFF;
+	font-weight:bold;
+	left:47px;
+	position:absolute;
+	font-size: 12px;
+}
+.div_small_text {
+	color:#FFFFFF;
+	font-weight:bold;
+	left: 47px;
+	position:absolute;
+	width:370px;
+	font-size: 9px;
+}
+.div_button{
+	left:180px;
+	position:absolute;
+	top:478px;
+}
+
+.finchAjax {
+	border-style:none;
+	background-color:transparent;
+}
+
+.Rotate-90-IE10 {
+	direction:ltr;
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+	-ms-transform: rotate(-90deg);
+}
+.Rotate-90 {
+	direction:ltr;
+	position:absolute;
+	color:#FFFFFF;
+	height:100px;
+	width:100px;
+
+	filter: progid:DXImageTransform.Microsoft.BasicImage(rotation=3);
+	-moz-transform:rotate(-90deg);
+	/*-moz-transform-origin: bottom left;*/
+	-webkit-transform: rotate(-90deg);
+	/*-webkit-transform-origin: bottom left;*/
+	-o-transform: rotate(-90deg);
+	/*-o-transform-origin:  bottom left;*/
+}
+
+#langTab {
+	display:block;
+	position:absolute;
+	font-size:12px;
+	left:360px;
+	top:-30px;
+}
+#CShelp {
+	display:none;
+}
+#tab-status {
+	left:10px;
+	top:-10px;
+}
+#tab-status2 {
+	left:10px;
+	top:-10px;
+}
+#tab-login {
+	left:10px;
+	top:135px; 
+}
+#tab-login2 {
+	left:5px;
+	top:135px; 
+}
+#tab-wlan {
+	left:10px;
+	top:140px;
+}
+#tab-wlan2 {
+	left:5px;
+	top:140px;
+}
+#tab-3gwwan {
+	left:10px;
+	top:275px;
+}
+#tab-3gwwan5 {
+	left:5px;
+	top:275px;
+}
+#chooseAPN {
+	background-color:#FFFFFF;
+	text-decoration:underline;
+	color:#0000FF;
+}
+/* ================================================================ 
+This copyright notice must be kept untouched in the stylesheet at 
+all times.
+
+The original version of this stylesheet and the associated (x)html
+is available at http://www.stunicholls.com/menu/pro_drop_2.html
+Copyright (c) 2005-2007 Stu Nicholls. All rights reserved.
+This stylesheet and the associated (x)html may be modified in any 
+way to fit your requirements.
+=================================================================== */
+
+/*=================================================================== */
+#nav2
+{
+	padding:0;
+	margin:0;
+	list-style:none;
+	height:32px;
+	position:relative;
+	z-index:50;
+	font-family:arial, verdana, sans-serif;
+	font-size:11px;
+}
+
+#nav2 li.top
+{
+	display:block;
+	float:left;
+	height:32px;
+}
+
+#nav2 li p.top_link
+{
+	display:block;
+	float:inherit;
+	height:12px;
+	text-decoration:none;
+	font-size:11px;
+
+	padding:6px 0 0 3px; 
+	cursor:pointer;
+}
+
+#nav2 li:hover {position:relative; z-index:200;}
+
+#nav2 li:hover ul.sub
+{
+	left:1px; /*position-x*/
+	top:13px; /*position-y*/
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #aaaaaa;*/
+	white-space:nowrap;
+	width:132px;/*Country*/
+	height:auto;
+	z-index:300;
+	background-color: #cccccc;
+}
+#nav2 li:hover ul.sub li
+{display:block; height:20px; position:relative; float:left; width:80px; font-weight:normal;}
+
+
+/*#nav2 li:hover ul.sub li a,*/
+#nav2 li:hover ul.sub li span
+{
+	display:block;
+	height:18px;
+	width:130px;/*Country & Carrier*/
+	line-height:18px;
+	text-indent:5px;
+	color:#000;
+	text-decoration:none;
+	border:1px solid #FFFFFF;
+}
+
+/*#nav2 li:hover ul.sub li a:hover,*/ 
+#nav2 li:hover ul.sub li span:hover
+{
+	/*color:#005799;*/
+	border-color:#ffffff;
+	background-color: #aaaaaa;
+}
+
+#nav2 li:hover li:hover ul
+{
+	left:88px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /* Carrier */
+	z-index:400;
+	height:auto;
+}
+
+#nav2 li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover li:hover ul
+{
+	left:120px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /*APN*/
+	z-index:400;
+	height:auto;
+}
+
+#nav2 ul, 
+#nav2 li:hover ul ul,
+#nav2 li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover li:hover ul ul
+{position:absolute; left:-9999px; top:-9999px; list-style:none;}
+
+
+#nav2 li:hover li:hover span.fly,
+#nav2 li:hover li:hover li:hover span.fly,
+#nav2 li:hover li:hover li:hover li:hover span.fly
+{background:#aaaaaa no-repeat; color:#fff; border-color:#fff;} 
+
+
+#nav2 li:hover li:hover li span.fly,
+#nav2 li:hover li:hover li:hover li span.fly,
+#nav2 li:hover li:hover li:hover li:hover li span.fly
+{background:#cccccc no-repeat; color:#000; border-color:#fff;} 

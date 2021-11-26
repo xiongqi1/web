@@ -1,0 +1,315 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Email Client Setting</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+var dummyPW="**********";
+if (request['REQUEST_METHOD'] == "POST") {
+	set_single_direct("-p",'service.email.client.conf.addr_fm', form['EmailClientFmAddr']);
+	set_single_direct("-p",'service.email.client.conf.addr_cc', form['EmailClientCcAddr']);
+	set_single_direct("-p",'service.email.client.conf.server_addr', form['EmailServerAddr']);
+	set_single_direct("-p",'service.email.client.conf.server_port', form['EmailServerPort']);
+	set_single_direct("-p",'service.email.client.conf.username', form['EmailServerUsername']);
+	if (form['EmailServerPassword'] != dummyPW)
+		set_single_direct("-p",'service.email.client.conf.password', form['EmailServerPassword']);
+	set_single_direct("-p",'service.email.client.conf.useauth', form['EmailUseAuth']);
+	set_single_direct("-p",'service.email.client.conf.security', form['EmailSecType']);
+	redirect('/email_client.html?success');
+}
+else { /*GET*/
+	form['EmailClientFmAddr'] = get_single( 'service.email.client.conf.addr_fm' );
+	form['EmailClientCcAddr'] = get_single( 'service.email.client.conf.addr_cc' );
+	form['EmailServerAddr'] = get_single( 'service.email.client.conf.server_addr' );
+	form['EmailServerPort'] = get_single( 'service.email.client.conf.server_port' );
+	form['EmailServerUsername'] = get_single( 'service.email.client.conf.username' );
+	form['EmailUseAuth'] = get_single( 'service.email.client.conf.useauth' );
+	form['EmailSecType'] = get_single( 'service.email.client.conf.security' );
+}
+%>
+
+
+<script language="JavaScript">
+
+function ValidateSettings(is_email_test)
+{
+    clear_alert();
+
+	if (document.EMAILCLIENT.EmailServerPassword.value != document.EMAILCLIENT.EmailServerConfirmPassword.value) {
+		validate_alert("", _("password not matched"));
+		return false;
+	}
+	if ( $("#EmailServerAddr").val() != "" && ($("#EmailServerPort").val()<1 || $("#EmailServerPort").val()>65535)  ) {
+		validate_alert("", _("warningMsg07"));
+		return false;
+	}
+
+	if (is_email_test) {
+		if (!($("#EmailServerTestRecipent").val())) {
+			validate_alert("", _("email warningMsg01"));
+			return false;
+		}
+	}
+
+	return true;
+}
+
+function EmailClientConfigSet() {
+
+	if (!ValidateSettings(false)) {
+		return;
+	}
+
+	en=$("input:radio.access[name=EmailUseAuthR]:checked").val();
+	$("#EmailUseAuth").val(en);
+
+	//document.EMAILCLIENT.wtSave.disabled = true;
+	//blockUI_wait(_("saveSettings"));
+	document.EMAILCLIENT.submit();
+}
+
+function onSecurityChange(v) {
+#ifdef V_NONE_SECURE_WARNING_y
+	if (v == "none") {
+		blockUI_alert(_("emailNoneSecurityWarning"));
+	}
+#endif
+}
+
+$(document).ready(function() {
+
+    /*
+     * Click handler for the "Send test email button".
+     * Packages the email settings into an html post and
+     * hands it off to cgi to send the test email.
+     */
+    $("#send_test_email").click(function() {
+
+        if (!ValidateSettings(true)) {
+            return;
+        }
+
+        $.blockUI
+        (
+            {
+                message: "<div> Sending test email... </div>"
+            }
+        );
+
+        $.post(
+            "cgi-bin/send_test_email.cgi?<%appendCsrfTokenToQueryString();%>",
+            {
+                recipient:$("#EmailServerTestRecipent").val(),
+                server:$("#EmailServerAddr").val(),
+                port:$("#EmailServerPort").val(),
+                username:$("#EmailServerUsername").val(),
+                password:$("#EmailServerPassword").val(),
+                security:$("#EmailSecType").val(),
+                useauth:$("input:radio.access[name=EmailUseAuthR]:checked").val()
+            },
+            function(res) {
+                if (res.cgiresult == 1) {
+                    $.blockUI({
+                        message: "<div>"+_("test email succeeded") +
+                            "<div class='button-raw med'>" +
+                            "<button class='secondary med' " +
+                            "onClick='$.unblockUI();'>"+ _("CSok") +
+                            "</button></div></div>"
+                    });
+                }
+                else {
+                    $.blockUI({
+                        message: "<div>"+_("test email failed") +
+                            "<div class='button-raw med'>" +
+                            "<button class='secondary med' " +
+                            "onClick='$.unblockUI();'>"+ _("CSok") +
+                            "</button></div></div>"
+                    });
+                }
+            }
+        );
+    })
+
+	load_value_to_element("input:radio.access[name=EmailUseAuthR]",$("#EmailUseAuth").val()!="0");
+	$("#EmailAuth").css("display", $("#EmailUseAuth").val()=="0"?"none":"");
+
+	$("#EmailUseAuth-0").click(function() {
+		clear_alert();
+		$("#EmailAuth").css("display","");
+	});
+	$("#EmailUseAuth-1").click(function() {
+		clear_alert();
+		$("#EmailAuth").css("display","none");
+	});
+	$("#EmailSecType").val("@@form['EmailSecType']");
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="EMAILCLIENT" id="form" class="validate div-all" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("outgoing email settings"))</script></h2>
+
+				<!-- From Address -->
+				<div class="form-row no-bg-form">
+					<label for="EmailClientFmAddr"><script language=Javascript>document.write(_("email from"))</script></label>
+					<div class="field">
+						<input type="text" name="EmailClientFmAddr" id="EmailClientFmAddr" value="@@form['EmailClientFmAddr']">
+					</div>
+				</div>
+
+				<!-- CC Address -->
+				<div class="form-row no-bg-form">
+					<label for="EmailClientCcAddr"><script language=Javascript>document.write(_("email cc"))</script></label>
+					<div class="field">
+						<input type="text" name="EmailClientCcAddr" id="EmailClientCcAddr" value="@@form['EmailClientCcAddr']">
+					</div>
+				</div>
+
+				<!-- Mail Server Address -->
+				<div class="form-row no-bg-form">
+					<label for="EmailServerAddr"><script language=Javascript>document.write(_("email smtp server addr"))</script></label>
+					<div class="field">
+						<input type="text" name="EmailServerAddr" id="EmailServerAddr" value="@@form['EmailServerAddr']">
+					</div>
+				</div>
+
+				<!-- Mail Server Port Number -->
+				<div class="form-row no-bg-form">
+					<label for="EmailServerPort"><script language=Javascript>document.write(_("email smtp server port"))</script></label>
+					<div class="field">
+						<input type="text" name="EmailServerPort" id="EmailServerPort" class="sml validate[funcCall[validate_port]] port" value="@@form['EmailServerPort']" maxLength="5" onKeyUp="NumfieldEntry(this);">
+						<label class="field-right-desc">&nbsp;<script language=Javascript>document.write(" ( "+_("email smtp port desc")+" )")</script></label>
+					</div>
+				</div>
+
+				<div class="form-row">
+					<label for="hostname"><script language=Javascript>document.write(_("encryption"))</script></label>
+					<div class="field">
+						<select name="EmailSecType" id="EmailSecType" style="width:auto;" onchange="onSecurityChange(this.value)">
+							<option value="none">None</option>
+							<option value="ssl">SSL</option>
+							<option value="tls">STARTTLS</option>
+						</select>
+					</div>
+				</div>
+
+				<!-- When auth is off hide the username and password -->
+				<div class="form-row no-bg-form">
+					<label for="field-0"><script language=Javascript>document.write(_("enable auth"))</script></label>
+					<div class="field">
+						<input type="hidden" name="EmailUseAuth" id="EmailUseAuth" value="@@form['EmailUseAuth']"/>
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="EmailUseAuth-0" name="EmailUseAuthR" class="access" value="1">
+								<label for="EmailUseAuth-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="EmailUseAuth-1" name="EmailUseAuthR" class="access" value="0">
+								<label for="EmailUseAuth-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="grey-box" id="EmailAuth" >
+					<!-- Mail Server Username -->
+					<div class="form-row no-bg-form">
+						<label for="EmailServerUsername"><script language=Javascript>document.write(_("user"))</script></label>
+						<div class="field">
+							<input type="text" name="EmailServerUsername" id="EmailServerUsername" value="@@form['EmailServerUsername']">
+						</div>
+					</div>
+
+					<!-- Mail Server Password -->
+					<div class="form-row no-bg-form">
+						<label for="EmailServerPassword"><script language=Javascript>document.write(_("password"))</script></label>
+						<div class="field">
+							<input type="password" name="EmailServerPassword" id="EmailServerPassword" value="@@dummyPW">
+						</div>
+					</div>
+
+					<!-- Mail Server Confirm Password -->
+					<div class="form-row no-bg-form">
+						<label for="EmailServerConfirmPassword"><script language=Javascript>document.write(_("confirmPassword"))</script></label>
+						<div class="field">
+							<input type="password" name="EmailServerConfirmPassword" id="EmailServerConfirmPassword" value="@@dummyPW">
+						</div>
+					</div>
+				</div>
+
+				<!-- Mail Server Send Test Email -->
+				<div class="form-row no-bg-form">
+					<label for="EmailServerTestRecipent">
+						<script language=Javascript>
+							document.write(_("email test recipient"))
+						</script>
+					</label>
+					<div class="field">
+						<input type="text" name="EmailServerTestRecipent"
+							id="EmailServerTestRecipent">
+					</div>
+					<button type="button" id="send_test_email"
+						class="secondary" style="margin-left:20px">
+						<script language=Javascript>
+							document.write(_("send test email"))
+						</script>
+					</button>
+				</div>
+
+				<div class="submit-row">
+					<button type="button" id="wtSave" onClick="EmailClientConfigSet()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='email_client.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Services", "EMAIL_CLIENT", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('email setting saved'));
+<%	}%>
+
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	$.validator.addMethod("port",function(c,a) {
+		if( c.length==0 ) {
+			return true;
+		}
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		return true;
+	},_("Msg126"));//Port number must have a value between 1 and 65535.
+#else
+/********* NTC ValidationEngine **********/
+	function validate_port(field, rules, i, options) {
+		if( field.val().length>0 && ( field.val() < 1 || field.val() > 65535 )) {
+			return _("Msg126");
+		}
+	}
+#endif
+</script>
+</body>
+</html>

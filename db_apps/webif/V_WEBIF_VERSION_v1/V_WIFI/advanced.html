@@ -1,0 +1,964 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Advanced Wireless Configurations</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	mydata="wlan.0.bg_protection="+form['advBGProtect']+
+		"&wlan.0.country="+form['country_code']+
+		"&wlan.0.ht_rxstream="+form['rx_stream']+
+		"&wlan.0.ht_txstream="+form['tx_stream']+
+		"&wlan.0.ht_mcs="+form['advHTAutoMCS']+
+	"&wlan.0.ht_extra="+form['n_extchaH']+
+		"&wlan.0.conf.preamble_type="+form['short_preambleH']+
+		"&wlan.0.short_slot="+form['short_slotH']+
+		"&wlan.0.tx_burst="+form['tx_burstH']+
+		"&wlan.0.pkt_aggregate="+form['pkt_aggregateH']+
+	"&wlan.0.apisolated="+form['apisolatedH']+
+	"&wlan.0.mbssidapisolated="+form['mbssidapisolatedH']+
+	"&wlan.0.wmm_capable="+form['wmm_capableH']+
+	"&wlan.0.apsd_capable="+form['apsd_capableH']+
+	"&wlan.0.dsl_capable="+form['dls_capableH']+
+	"&wlan.0.m2u="+form['m2u_enableH']+
+	"&wlan.0.ht_opmode="+form['n_modeH']+
+	"&wlan.0.conf.bandwidth="+form['n_bandwidthH']+
+	"&wlan.0.ht_gi="+form['n_giH']+
+	"&wlan.0.amsdu="+form['n_amsduH']+
+	"&wlan.0.autoba="+form['n_autobaH']+
+	"&wlan.0.badecline="+form['n_badeclineH']+
+	"&wlan.0.hide_accesspoint="+form['hide_accesspointH']+
+	"&wlan.0.conf.beacon_interval="+form['advBeaconIntervalH']+
+	"&wlan.0.conf.fragmentation_threshold="+form['advFragH']+
+	"&wlan.0.idletimeout="+form['advIdleTimeoutH']+
+	"&wlan.0.conf.rts_threshold="+form['advRTSH']+
+	"&wlan.0.conf.dtim_interval="+form['advDTIMH']+
+	"&wlan.0.conf.transmit_power="+form['advTxPWH']+
+	"&wlan.0.hide_ssid="+form['hide_ssidH']+
+	"&wlan.0.bssid_num="+form['bssid_numH']+
+	"&wlan.1.ssid="+form['mssid_1H']+
+	"&wlan.2.ssid="+form['mssid_2H']+
+	"&wlan.3.ssid="+form['mssid_3H'];
+	set_list( mydata );
+}
+else {
+	form['short_preambleH']=get_single('wlan.0.conf.preamble_type');
+	form['short_slotH']=get_single('wlan.0.short_slot');
+	form['tx_burstH']=get_single('wlan.0.tx_burst');
+	form['pkt_aggregateH']=get_single('wlan.0.pkt_aggregate');
+	form['apisolatedH']=get_single('wlan.0.apisolated');
+	form['mbssidapisolatedH']=get_single('wlan.0.mbssidapisolated');
+	form['wmm_capableH']=get_single('wlan.0.wmm_capable');
+	form['apsd_capableH']=get_single('wlan.0.apsd_capable');
+	form['dls_capableH']=get_single('wlan.0.dsl_capable');
+	form['m2u_enableH']=get_single('wlan.0.m2u');
+	form['n_modeH']=get_single('wlan.0.ht_opmode');
+	form['n_bandwidthH']=get_single('wlan.0.conf.bandwidth');
+	form['n_giH']=get_single('wlan.0.ht_gi');
+	form['n_amsduH']=get_single('wlan.0.amsdu');
+	form['n_autobaH']=get_single('wlan.0.autoba');
+	form['n_badeclineH']=get_single('wlan.0.badecline');
+	form['n_extchaH']=get_single('wlan.0.ht_extra');
+	form['advBGProtectH']=get_single('wlan.0.bg_protection');
+	form['country_codeH']=get_single('wlan.0.country');
+	form['rx_streamH']=get_single('wlan.0.ht_rxstream');
+	form['tx_streamH']=get_single('wlan.0.ht_txstream');
+	form['advHTAutoMCSH']=get_single('wlan.0.ht_mcs');
+	form['advBeaconIntervalH']=get_single('wlan.0.conf.beacon_interval');
+	form['advFragH']=get_single('wlan.0.conf.fragmentation_threshold');
+	form['advRTSH']=get_single('wlan.0.conf.rts_threshold');
+	form['advDTIMH']=get_single('wlan.0.conf.dtim_interval');
+	form['advTxPWH']=get_single('wlan.0.conf.transmit_power');
+	form['advIdleTimeoutH']=get_single('wlan.0.idletimeout');
+	form['hide_accesspointH']=get_single('wlan.0.hide_accesspoint');
+	form['mssid_1H']=get_single('wlan.1.ssid');
+	form['mssid_2H']=get_single('wlan.2.ssid');
+	form['mssid_3H']=get_single('wlan.3.ssid');
+}
+%>
+
+<body onload="formLoad()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript">
+Butterlate.setTextDomain("advanced");
+
+function style_display_on() {
+	if (window.ActiveXObject) { // IE
+		return "block";
+	}
+	else if (window.XMLHttpRequest) { // Mozilla, Safari,...
+		return "table-row";
+	}
+}
+
+function formLoad() {
+	var f=document.formA;
+	with ( f[0] ) {
+		if(f.short_preambleH.value==1)
+			f.short_preamble[0].checked = 1;
+		else
+			f.short_preamble[1].checked = 1;
+
+		if(f.short_slotH.value==1)
+			f.short_slot[0].checked = 1;
+		else
+			f.short_slot[1].checked = 1;
+
+		if(f.tx_burstH.value==1)
+			f.tx_burst[0].checked = 1;
+		else
+			f.tx_burst[1].checked = 1;
+
+		if(f.pkt_aggregateH.value==1)
+			f.pkt_aggregate[0].checked = 1;
+		else
+			f.pkt_aggregate[1].checked = 1;
+		if(f.apisolatedH.value==1)
+			f.apisolated[0].checked = 1;
+		else
+			f.apisolated[1].checked = 1;
+		if(f.mbssidapisolatedH.value==1)
+			f.mbssidapisolated[0].checked = 1;
+		else
+			f.mbssidapisolated[1].checked = 1;
+		if(f.wmm_capableH.value==1)
+			f.wmm_capable[0].checked = 1;
+		else
+			f.wmm_capable[1].checked = 1;
+
+		if(f.apsd_capableH.value==1)
+			f.apsd_capable[0].checked = 1;
+		else
+			f.apsd_capable[1].checked = 1;
+		if(f.dls_capableH.value==1)
+			f.dls_capable[0].checked = 1;
+		else
+			f.dls_capable[1].checked = 1;
+		if(f.m2u_enableH.value==1)
+			f.m2u_enable[0].checked = 1;
+		else
+			f.m2u_enable[1].checked = 1;
+		if(f.n_modeH.value==1)
+			f.n_mode[0].checked = 1;
+		else
+			f.n_mode[1].checked = 1;
+		if(f.n_giH.value==1)
+
+			f.n_gi[0].checked = 1;
+		else
+			f.n_gi[1].checked = 1;
+		if(f.n_rdgH.value==1)
+
+			f.n_rdg[0].checked = 1;
+		else
+			f.n_rdg[1].checked = 1;
+
+		if(f.n_amsduH.value==1)
+			f.n_amsdu[0].checked = 1;
+		else
+			f.n_amsdu[1].checked = 1;
+
+		if(f.n_autobaH.value==1)
+			f.n_autoba[0].checked = 1;
+		else
+			f.n_autoba[1].checked = 1;
+
+		if(f.n_badeclineH.value==1)
+			f.n_badecline[0].checked = 1;
+		else
+			f.n_badecline[1].checked = 1;
+
+		if(f.hide_accesspointH.value == 0)
+			f.advbroadcastssid[0].checked = 1;
+		else
+			f.advbroadcastssid[1].checked = 1;
+
+		var ht_mcs =  <%val='\"'+get_single('wlan.0.ht_mcs')+'\"';%>@@val;
+		if (1*ht_mcs <= 15)
+			document.formA.advHTAutoMCS.options.selectedIndex = ht_mcs;
+		else if (1*ht_mcs == 32)
+			document.formA.advHTAutoMCS.options.selectedIndex = 16;
+		else if (1*ht_mcs == 33)
+			document.formA.advHTAutoMCS.options.selectedIndex = 17;
+
+		if (1*f.n_bandwidthH.value == 0) {
+			f.n_bandwidth[0].checked = true;
+			document.getElementById("extension_channel").style.visibility = "hidden";
+			document.getElementById("extension_channel").style.display = "none";
+			f.n_extcha.disabled = true;
+		}
+		else {
+			f.n_bandwidth[1].checked = true;
+			document.getElementById("extension_channel").style.visibility = "visible";
+			document.getElementById("extension_channel").style.display = style_display_on();
+			f.n_extcha.disabled = false;
+		}
+		var option_length = f.n_extcha.options.length;
+
+		if (1*f.n_extchaH.value == 0) {
+			if (option_length > 1)
+				f.n_extcha.options.selectedIndex = 0;
+		}
+		else if (1*f.n_extchaH.value == 1) {
+			if (option_length > 1)
+				f.n_extcha.options.selectedIndex = 1;
+		}
+		else {
+			f.n_extcha.options.selectedIndex = 0;
+		}
+
+		wmmCapable = 1*f.wmm_capableH.value;
+		if (wmmCapable == 1) {
+			f.wmm_capable[0].checked = true;
+			f.wmm_capable[1].checked = false;
+		}
+		else {
+			f.wmm_capable[0].checked = false;
+			f.wmm_capable[1].checked = true;
+		}
+
+		document.getElementById("div_apsd_capable").style.visibility = "hidden";
+		document.getElementById("div_apsd_capable").style.display = "none";
+		f.apsd_capable.disabled = true;
+		document.getElementById("div_dls_capable").style.visibility = "hidden";
+		document.getElementById("div_dls_capable").style.display = "none";
+		f.dls_capable.disabled = true;
+
+		dlsBuilt = 1;
+		if (wmmCapable == 1) {
+			document.getElementById("div_apsd_capable").style.visibility = "visible";
+			document.getElementById("div_apsd_capable").style.display = style_display_on();
+			f.apsd_capable.disabled = false;
+			if (dlsBuilt == 1) {
+				document.getElementById("div_dls_capable").style.visibility = "visible";
+				document.getElementById("div_dls_capable").style.display = style_display_on();
+				f.dls_capable.disabled = false;
+			}
+		}
+
+		apsd_capable = 1*f.apsd_capableH.value;
+		if (apsd_capable == 1) {
+			f.apsd_capable[0].checked = true;
+			f.apsd_capable[1].checked = false;
+		}
+		else {
+			f.apsd_capable[0].checked = false;
+			f.apsd_capable[1].checked = true;
+		}
+
+		if (dlsBuilt == 1) {
+			dls_capable = 1*f.dls_capableH.value;
+			if (dls_capable == 1) {
+				f.dls_capable[0].checked = true;
+				f.dls_capable[1].checked = false;
+			}
+			else {
+				f.dls_capable[0].checked = false;
+				f.dls_capable[1].checked = true;
+			}
+		}
+
+		f.advBGProtect.value = f.advBGProtectH.value;
+		f.country_code.value = f.country_codeH.value;
+		f.rx_stream.value = f.rx_streamH.value;
+		f.tx_stream.value = f.tx_streamH.value;
+		f.advBeaconInterval.value = f.advBeaconIntervalH.value;
+		f.advFrag.value = f.advFragH.value ;
+		f.advRTS.value = f.advRTSH.value;
+		f.advDTIM.value = f.advDTIMH.value;
+		f.advTxPW.value = f.advTxPWH.value;
+		f.advIdleTimeout.value = f.advIdleTimeoutH.value;
+
+		f.mssid_1.value = f.mssid_1H.value;
+		f.mssid_2.value = f.mssid_2H.value;
+		f.mssid_3.value = f.mssid_3H.value;
+
+		var e = document.getElementById("advIntroduction");
+		e.innerHTML = _("adv introduction");
+		e = document.getElementById("advWMMConf");
+		e.value = _("adv wmm configuration");
+	}
+}
+
+
+function CheckValue() {
+	var f=document.formA;
+	if (f.advIdleTimeout.value == "" ) {
+		alert(_("adv warningMsg11"));//'Please specify Idle Timeout'
+		f.advIdleTimeout.focus();
+		f.advIdleTimeout.select();
+		return false;
+	}
+
+	if (isNaN(f.advIdleTimeout.value) || f.advIdleTimeout.value < 20 || f.advIdleTimeout.value > 999) {
+		alert(_("adv warningMsg12"));//'Invalid Idle Timeout'
+		f.advIdleTimeout.focus();
+		f.advIdleTimeout.select();
+		return false;
+	}
+
+	if (f.advBeaconInterval.value == "" ) {
+		alert(_("adv warningMsg1"));//'Please specify Beacon Interval'
+		f.advBeaconInterval.focus();
+		f.advBeaconInterval.select();
+		return false;
+	}
+
+	if (isNaN(f.advBeaconInterval.value) || f.advBeaconInterval.value < 20 || f.advBeaconInterval.value > 999) {
+		alert(_("adv warningMsg2"));//'Invalid Beacon Interval'
+		f.advBeaconInterval.focus();
+		f.advBeaconInterval.select();
+		return false;
+	}
+
+	if (f.advDTIM.value == "" ) {
+		alert(_("adv warningMsg3"));//'Please specify DTIM Interval'
+		f.advDTIM.focus();
+		f.advDTIM.select();
+		return false;
+	}
+
+	if (isNaN(f.advDTIM.value) || f.advDTIM.value < 1 || f.advDTIM.value > 255) {
+		alert(_("adv warningMsg4"));//'Invalid DTIM Interval'
+		f.advDTIM.focus();
+		f.advDTIM.select();
+		return false;
+	}
+
+	if (f.advFrag.value == "" ) {
+		alert(_("adv warningMsg5"));//'Please specify Fragmentation Length'
+		f.fragment.focus();
+		f.fragment.select();
+		return false;
+	}
+
+	if (isNaN(f.advFrag.value) || f.advFrag.value < 1 || f.advFrag.value > 2346) {
+		alert(_("adv warningMsg6"));//'Invalid Fragmentation Length'
+		f.advFrag.focus();
+		f.advFrag.select();
+		return false;
+	}
+
+	if (f.advRTS.value == "" ) {
+		alert(_("adv warningMsg7"));//'Please specify RTS Threshold'
+		f.advRTS.focus();
+		f.advRTS.select();
+		return false;
+	}
+
+	if (isNaN(f.advRTS.value) || f.advRTS.value < 1 || f.advRTS.value > 2347) {
+		alert(_("adv warningMsg8"));//'Invalid RTS Threshold'
+		f.advRTS.focus();
+		f.advRTS.select();
+		return false;
+	}
+	if (f.advTxPW.value == "" ) {
+		alert(_("adv warningMsg10"));//'Please specify Tx Power'
+		f.advTxPW.focus();
+		f.advTxPW.select();
+		return false;
+	}
+	if (isNaN(f.advTxPW.value) || f.advTxPW.value < 1 || f.advTxPW.value > 100) {
+		alert(_("adv warningMsg9"));//'Invalid Tx Power Threshold'
+		f.advTxPW.focus();
+		f.advTxPW.select();
+		return false;
+	}
+
+	if (f.short_preamble[0].checked == true)
+		f.short_preambleH.value=1;
+	else
+		f.short_preambleH.value=0;
+
+	if(f.short_slot[0].checked == true)
+		f.short_slotH.value = 1;
+	else
+		f.short_slotH.value = 0;
+
+	if(f.tx_burst[0].checked == true)
+		f.tx_burstH.value = 1;
+	else
+		f.tx_burstH.value = 0;
+
+	if(f.pkt_aggregate[0].checked == true)
+		f.pkt_aggregateH.value=1;
+	else
+		f.pkt_aggregateH.value=0;
+
+	if(f.apisolated[0].checked == true)
+		f.apisolatedH.value = 1;
+	else
+		f.apisolatedH.value = 0;
+
+	if(f.mbssidapisolated[0].checked == true)
+		f.mbssidapisolatedH.value = 1;
+	else
+		f.mbssidapisolatedH.value = 0;
+
+	if(f.wmm_capable[0].checked == true)
+		f.wmm_capableH.value=1;
+	else
+		f.wmm_capableH.value=0;
+	if(f.apsd_capable[0].checked == true)
+		f.apsd_capableH.value=1;
+	else
+		f.apsd_capableH.value=0;
+	if(f.dls_capable[0].checked == true)
+		f.dls_capableH.value=1;
+	else
+		f.dls_capableH.value=0;
+	if(f.m2u_enable[0].checked == true)
+		f.m2u_enableH.value = 1;
+	else
+		f.m2u_enableH.value = 0;
+
+	if(f.n_mode[0].checked == true)
+		f.n_modeH.value = 1;
+	else
+		f.n_modeH.value = 0;
+
+	if(f.n_bandwidth[0].checked == true)
+		f.n_bandwidthH.value=0;
+	else
+		f.n_bandwidthH.value=1;
+
+	if(f.n_gi[0].checked == true)
+
+		f.n_giH.value=1;
+	else
+		f.n_giH.value=0;
+
+	if(f.n_rdg[0].checked == true)
+
+		f.n_rdgH.value=1;
+	else
+		f.n_rdgH.value=0;
+
+	if( f.n_amsdu[0].checked == true)
+		f.n_amsduH.value=1;
+	else
+		f.n_amsduH.value=0;
+
+	if(f.n_autoba[0].checked == true)
+		f.n_autobaH.value = 1;
+	else
+		f.n_autobaH.value = 0;
+
+	if(f.n_badecline[0].checked == true)
+		f.n_badeclineH.value = 1;
+	else
+		f.n_badeclineH.value = 0;
+
+	if(f.advbroadcastssid[0].checked == true)
+		f.hide_accesspointH.value = 0;
+	else
+		f.hide_accesspointH.value = 1;
+	if(f.n_extcha[0].checked == true)
+		f.n_extchaH.value = 1;
+	else
+		f.n_extchaH.value = 0;
+
+	f.advBeaconIntervalH.value=f.advBeaconInterval.value;
+	f.advFragH.value=f.advFrag.value;
+	f.advIdleTimeoutH.value=f.advIdleTimeout.value;
+	f.advRTSH.value=f.advRTS.value;
+	f.advDTIMH.value=f.advDTIM.value;
+	f.advTxPWH.value=f.advTxPW.value;
+	f.mssid_1H.value=f.mssid_1.value;
+	f.mssid_2H.value=f.mssid_2.value;
+	f.mssid_3H.value=f.mssid_3.value;
+	f.tx_streamH.value=f.tx_stream.value;
+	f.rx_streamH.value = f.rx_stream.value;
+
+	//Check bssid number and then construct HIDESSID string
+	var i=1;
+	if(f.mssid_1H.value != "")
+		i++;
+	if(f.mssid_2H.value != "")
+		i++;
+	if(f.mssid_3H.value != "")
+		i++;
+	f.bssid_numH.value = i;
+
+	if(f.hide_accesspointH.value == 0) { // Broadcasting
+		if(f.bssid_numH.value == 1)
+			f.hide_ssidH.value="0";
+		else if(f.bssid_numH.value == 2)
+			f.hide_ssidH.value="0;0";
+		else if(f.bssid_numH.value == 3)
+			f.hide_ssidH.value="0;0;0";
+		else
+			f.hide_ssidH.value="0;0;0;0";
+	}
+	else { // Not broadcasting
+		if(f.bssid_numH.value == 1)
+			f.hide_ssidH.value="1";
+		else if(f.bssid_numH.value == 2)
+			f.hide_ssidH.value="1;1";
+		else if(f.bssid_numH.value == 3)
+			f.hide_ssidH.value="1;1;1";
+		else
+			f.hide_ssidH.value="1;1;1;1";
+	}
+	//End checking bssid num and contructing
+
+	var dls_capable= 1*f.dls_capableH.value;
+	var dlsBuilt = 1;
+	if (f.wmm_capable[0].checked == true) {
+		if (1*wmmCapable == 0)
+			f.rebootAP.value = 1;
+	}
+	else {
+		f.apsd_capable[1].checked = true;
+		if (dlsBuilt == 1) {
+			f.dls_capable[1].checked = true;
+		}
+
+		if (1*wmmCapable == 1)
+			f.rebootAP.value = 1;
+	}
+
+	if (f.apsd_capable[0].checked == true) {
+		if (1*f.apsd_capableH.value== 0)
+			f.rebootAP.value = 1;
+	}
+	else {
+		if (1*f.apsd_capableH.value == 1)
+			f.rebootAP.value = 1;
+	}
+
+	if (dlsBuilt == 1) {
+		if (f.dls_capable[0].checked == true) {
+			if (1*dls_capable == 0)
+				f.rebootAP.value = 1;
+		}
+		else {
+			if (1*dls_capable == 1)
+				f.rebootAP.value = 1;
+		}
+	}
+
+	document.formA.advApply.disabled=true;
+	document.formA.submit();
+}
+function open_wmm_window() {
+	window.open("wmm.html","WMM_Parameters_List","toolbar=no, location=yes, scrollbars=yes, resizable=yes")
+}
+
+function wmm_capable_enable_switch() {
+	var f=document.formA;
+	document.getElementById("div_apsd_capable").style.visibility = "hidden";
+	document.getElementById("div_apsd_capable").style.display = "none";
+	document.getElementById("div_dls_capable").style.visibility = "hidden";
+	document.getElementById("div_dls_capable").style.display = "none";
+	f.apsd_capable.disabled = true;
+
+	var dlsBuilt = 1;
+	if (dlsBuilt == 1) {
+		f.dls_capable.disabled = true;
+	}
+
+	if (f.wmm_capable[0].checked == true) {
+		document.getElementById("div_apsd_capable").style.visibility = "visible";
+		document.getElementById("div_apsd_capable").style.display = style_display_on();
+		f.apsd_capable.disabled = false;
+		if (dlsBuilt == 1) {
+			document.getElementById("div_dls_capable").style.visibility = "visible";
+			document.getElementById("div_dls_capable").style.display = style_display_on();
+			f.dls_capable.disabled = false;
+		}
+	}
+}
+
+function Channel_BandWidth_onClick() {
+	var f=document.formA;
+
+	if (f.n_bandwidth[0].checked == true) {
+		document.getElementById("extension_channel").style.visibility = "hidden";
+		document.getElementById("extension_channel").style.display = "none";
+		f.n_extcha.disabled = true;
+	}
+	else {
+		document.getElementById("extension_channel").style.visibility = "visible";
+		document.getElementById("extension_channel").style.display = style_display_on();
+		f.n_extcha.disabled = false;
+	}
+}
+</script>
+
+<form name="formA" method='POST' action="@@request['SCRIPT_NAME']">
+<input type="hidden" name='short_preambleH' value="@@form['short_preambleH']">
+<input type="hidden" name='advIdleTimeoutH' value="@@form['advIdleTimeoutH']">
+<input type="hidden" name='short_slotH' value="@@form['short_slotH']">
+<input type="hidden" name='tx_burstH' value="@@form['tx_burstH']">
+<input type="hidden" name='pkt_aggregateH' value="@@form['pkt_aggregateH']">
+<input type="hidden" name='apisolatedH' value="@@form['apisolatedH']">
+<input type="hidden" name='mbssidapisolatedH' value="@@form['mbssidapisolatedH']">
+<input type="hidden" name='wmm_capableH' value="@@form['wmm_capableH']">
+<input type="hidden" name='apsd_capableH' value="@@form['apsd_capableH']">
+<input type="hidden" name='dls_capableH' value="@@form['dls_capableH']">
+<input type="hidden" name='m2u_enableH' value="@@form['m2u_enableH']">
+<input type="hidden" name='n_modeH' value="@@form['n_modeH']">
+<input type="hidden" name='n_bandwidthH' value="@@form['n_bandwidthH']">
+<input type="hidden" name='n_giH' value="@@form['n_giH']">
+<input type="hidden" name='n_rdgH' value="@@form['n_rdgH']">
+<input type="hidden" name='n_amsduH' value="@@form['n_amsduH']">
+<input type="hidden" name='n_autobaH' value="@@form['n_autobaH']">
+<input type="hidden" name='n_badeclineH' value="@@form['n_badeclineH']">
+<input type="hidden" name='hide_accesspointH' value="@@form['hide_accesspointH']">
+<input type="hidden" name='n_extchaH' value="@@form['n_extchaH']">
+<input type="hidden" name='advBGProtectH' value="@@form['advBGProtectH']">
+<input type="hidden" name='country_codeH' value="@@form['country_codeH']">
+<input type="hidden" name='rx_streamH' value="@@form['rx_streamH']">
+<input type="hidden" name='tx_streamH' value="@@form['tx_streamH']">
+<input type="hidden" name='advHTAutoMCSH' value="@@form['advHTAutoMCSH']">
+<input type="hidden" name='advBeaconIntervalH' value="@@form['advBeaconIntervalH']">
+<input type="hidden" name='advFragH' value="@@form['advFragH']">
+<input type="hidden" name='advRTSH' value="@@form['advRTSH']">
+<input type="hidden" name='advDTIMH' value="@@form['advDTIMH']">
+<input type="hidden" name='advTxPWH' value="@@form['advTxPWH']">
+<input type="hidden" name='mssid_1H' value="@@form['mssid_1H']">
+<input type="hidden" name='mssid_2H' value="@@form['mssid_2H']">
+<input type="hidden" name='mssid_3H' value="@@form['mssid_3H']">
+<input type="hidden" name='bssid_numH' value="">
+
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("advanced"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write( _("adv advanced config"))</script></th></tr>
+<tr>
+	<td><p id="advIntroduction"></p></td>
+</tr>
+</table>
+
+<table width="80%" >
+<tr>
+	<td width="35%" id="advBGProtectTXt"> <script language="JavaScript">document.write( _("adv bgpro"))</script></td>
+	<td>
+		<select name="advBGProtect" size="1">
+	<option value=0 id="advBGProAuto"><script language="JavaScript">document.write( _("auto"))</script></option>
+	<option value=1 id="advBGProOn"><script language="JavaScript">document.write( _("on"))</script></option>
+	<option value=2 id="advBGProOff"><script language="JavaScript">document.write( _("off"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advIdleTimeoutTxt"><script language="JavaScript">document.write( _("adv client idle timeout"))</script></td>
+	<td>
+		<input type=text name=advIdleTimeout id="advIdleTimeout" size=5 maxlength=3"> sec <font color="#808080" id="advIdleTimeoutRange"><script language="JavaScript">document.write( _("adv idletimeout range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advBeaconIntervalTxt"><script language="JavaScript">document.write( _("adv beacon interval"))</script></td>
+	<td>
+		<input type=text name=advBeaconInterval id="advBeaconInterval" size=5 maxlength=3"> ms <font color="#808080" id="advBeaconIntervalRange"><script language="JavaScript">document.write( _("adv beacon interval range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advDTIMTxt"><script language="JavaScript">document.write( _("adv dtim"))</script></td>
+	<td>
+		<input type=text name=advDTIM id="advDTIM" size=5 maxlength=3 value=""> <font color="#808080" id="advDTIMRange"><script language="JavaScript">document.write( _("adv dtim range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advFragTxt"><script language="JavaScript">document.write( _("adv fragment threshold"))</script></td>
+	<td>
+		<input type=text name=advFrag id="advFrag" size=5 maxlength=4 value=""> <font color="#808080" id="advFragRange"><script language="JavaScript">document.write( _("adv fragment threshold range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advRTSTxt"><script language="JavaScript">document.write( _("adv rts threshold"))</script></td>
+	<td>
+		<input type=text name=advRTS id="advRTS" size=5 maxlength=4 value=""> <font color="#808080" id="advRTSRange"><script language="JavaScript">document.write( _("adv rts threshold range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advTxPWTxt"><script language="JavaScript">document.write( _("adv tx power"))</script></td>
+	<td>
+		<input type=text name=advTxPW id="advTxPW" size=5 maxlength=3 value=""> <font color="#808080" id="advTxPWRange"><script language="JavaScript">document.write( _("adv tx power range"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advShortPrTxt"><script language="JavaScript">document.write( _("adv short preamble"))</script></td>
+	<td>
+		<input type=radio name=short_preamble value="1">&nbsp;<font id="advShortPreEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=short_preamble value="0">&nbsp;<font id="advShortPreDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+#ifdef PLATFORM_Bovine
+</table>
+<table width="80%" style="display:none">
+#endif
+<tr>
+	<td width="35%" id="advShortSlot"><script language="JavaScript">document.write( _("adv short slot"))</script></td>
+	<td>
+		<input type=radio name=short_slot value="1">&nbsp;<font id="advShortSlotEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=short_slot value="0">&nbsp;<font id="advShortSlotDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advTxBurst"><script language="JavaScript">document.write( _("adv tx burst"))</script></td>
+	<td>
+		<input type=radio name=tx_burst value="1">&nbsp;<font id="advTxBurstEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=tx_burst value="0">&nbsp;<font id="advTxBurstDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advPktAggr"><script language="JavaScript">document.write( _("adv pkt aggregate"))</script></td>
+	<td>
+		<input type=radio name=pkt_aggregate value="1">&nbsp;<font id="advPktAggrEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=pkt_aggregate value="0">&nbsp;<font id="advPktAggrDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advCountryCode"><script language="JavaScript">document.write( _("country code"))</script></td>
+	<td>
+		<select name="country_code" value="@@form['country_codeH']">
+		<option value="CA" id="advCountryCodeCA"><script language="JavaScript">document.write( _("adv country code ca"))</script></option>
+		<option value="US" id="advCountryCodeUS"><script language="JavaScript">document.write( _("adv country code us"))</script></option>
+		<option value="JP" id="advCountryCodeJP"><script language="JavaScript">document.write( _("adv country code jp"))</script></option>
+		<option value="FR" id="advCountryCodeFR"><script language="JavaScript">document.write( _("adv country code fr"))</script></option>
+		<option value="TW" id="advCountryCodeTW"><script language="JavaScript">document.write( _("adv country code tw"))</script></option>
+		<option value="IE" id="advCountryCodeIE"><script language="JavaScript">document.write( _("adv country code ie"))</script></option>
+		<option value="HK" id="advCountryCodeHK"><script language="JavaScript">document.write( _("adv country code hk"))</script></option>
+		<option value="AU" id="advCountryCodeAU"><script language="JavaScript">document.write( _("adv country code au"))</script></option>
+		<option value="CN" id="advCountryCodeCN"><script language="JavaScript">document.write( _("adv country code cn"))</script></option>
+		<option value="UAE" id="advCountryCodeUAE"><script language="JavaScript">document.write( _("adv country code uae"))</script></option>
+		<option value="NONE" id="advCountryCodeNONE"><script language="JavaScript">document.write( _("none"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advApIsolatedTxt"><script language="JavaScript">document.write( _("basic apisolated"))</script></td>
+	<td>
+		<input type=radio name=apisolated value="1">&nbsp;<font id="advApIsolatedEnable"><script language="JavaScript">document.write( _("enable"))</script></font>
+		&nbsp;&nbsp;<input type=radio name=apisolated value="0">&nbsp;<font id="advApIsolatedDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advMBSSIDApIsolatedTxt"><script language="JavaScript">document.write( _("basic mbssidapisolated"))</script></td>
+	<td>
+		<input type=radio name=mbssidapisolated value="1">&nbsp;<font id="advMBSSIDApIsolatedEnable"><script language="JavaScript">document.write( _("enable"))</script></font>
+		&nbsp;&nbsp;<input type=radio name=mbssidapisolated value="0">&nbsp;<font id="advMBSSIDApIsolatedDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advBSSID"><script language="JavaScript">document.write( _("bssid"))</script></td>
+	<td>&nbsp;&nbsp;<%v=get_single('wlan.0.mac');%>@@v</td>
+</tr>
+
+<script type="text/javascript">
+	for(i=1; i<5; i++) {
+		document.write("<tr style=\"display:none\">");
+		document.write("<td width=\"35%\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font id=\"basicMSSID"+i+"\"></font>"+ _("basic multiple ssid") +i+"</td>");
+		document.write("<td><input type=text name=mssid_"+i+" size=20 maxlength=32 value=\"\"readonly></td>");
+		document.write("</tr>");
+	}
+</script>
+#ifdef PLATFORM_Bovine
+</table>
+<table width="80%">
+#endif
+<tr>
+	<td width="35%" id="advBroadcastSSIDTxt"><script language="JavaScript">document.write( _("basic broadcast ssid"))</script></td>
+	<td>
+		<input type=radio name=advbroadcastssid value="1">&nbsp;<font id="advBroadcastSSIDEnable"><script language="JavaScript">document.write( _("enable"))</script></font>
+		&nbsp;&nbsp;<input type=radio name=advbroadcastssid value="0">&nbsp;<font id="advBroadcastSSIDDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+</table>
+<input type="hidden" name="hide_ssidH" value="1">
+<input type="hidden" name="rebootAP" value="0">
+#ifdef PLATFORM_Bovine
+<table style="display:none" width="540" border="0" cellspacing="1" cellpadding="3" vspace="2" hspace="2" bordercolor="#9BABBD">
+#else
+<table width="540" border="0" cellspacing="1" cellpadding="3" vspace="2" hspace="2" bordercolor="#9BABBD">
+#endif
+<tr>
+	<td class="title" colspan="2" id="advWiFiMM"><script language="JavaScript">document.write( _("adv wmm"))</script></td>
+</tr>
+<tr>
+	<td width="35%" id="advWMM"><script language="JavaScript">document.write( _("adv wmm capable"))</script></td>
+	<td>
+		<input type=radio name=wmm_capable value="1" onClick="wmm_capable_enable_switch()">&nbsp;<font id="advWMMEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=wmm_capable value="0" onClick="wmm_capable_enable_switch()">&nbsp;<font id="advWMMDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr id="div_apsd_capable" name="div_apsd_capable">
+	<td width="35%" id="advAPDS"><script language="JavaScript">document.write( _("adv apds capable"))</script></td>
+	<td>
+		<input type=radio name=apsd_capable value="1">&nbsp;<font id="advAPDSEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=apsd_capable value="0">&nbsp;<font id="advAPDSDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr id="div_dls_capable" name="div_dls_capable">
+	<td width="35%" id="advDLS"><script language="JavaScript">document.write( _("adv dls capable"))</script></td>
+	<td>
+		<input type=radio name=dls_capable value="1">&nbsp;<font id="advDLSEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=dls_capable value="0">&nbsp;<font id="advDLSDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advWMMParameter"></td>
+	<td>
+		<input type=button name="wmm_list" value="" id="advWMMConf" onClick="open_wmm_window()">
+	</td>
+</tr>
+</table>
+
+#ifdef PLATFORM_Bovine
+<table style="display:none" id="div_m2u" name="div_m2u" width="540" border="0" cellspacing="1" cellpadding="3" vspace="2" hspace="2" bordercolor="#9BABBD">
+#else
+<table id="div_m2u" name="div_m2u" width="540" border="0" cellspacing="1" cellpadding="3" vspace="2" hspace="2" bordercolor="#9BABBD">
+#endif
+<tr>
+	<td class="title" colspan="2" id="advMul2UniConver"><script language="JavaScript">document.write( _("adv multicast2unicast converter"))</script></td>
+</tr>
+<tr>
+	<td width="35%" id="advMul2Uni"><script language="JavaScript">document.write( _("adv multicast2unicast"))</script></td>
+	<td>
+		<input type=radio name="m2u_enable" value="1">&nbsp;<font id="advMul2UniEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name="m2u_enable" value="0">&nbsp;<font id="advMul2UniDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+</table>
+
+#ifdef PLATFORM_Bovine
+<table style="display:none" id="div_11n_plugfest" name="div_11n_plugfest" width="540" border="0" cellspacing="1" cellpadding="3" bordercolor="#9BABBD">
+#else
+<table id="div_11n_plugfest" name="div_11n_plugfest" width="540" border="0" cellspacing="1" cellpadding="3" bordercolor="#9BABBD">
+#endif
+<tr>
+	<td class="title" colspan="2" id="basicOther"><script language="JavaScript">document.write( _("basic other"))</script></td>
+</tr>
+<tr>
+	<td width="35%" id="advHTTxStream"><script language="JavaScript">document.write( _("basic ht txstream"))</script></td>
+	<td>
+		<select name="tx_stream" size="1">
+		<option value = 1>1</option>
+		<option value = 2>2</option>
+		</select>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advHTRxStream"><script language="JavaScript">document.write( _("basic ht rxstream"))</script></td>
+	<td>
+		<select name="rx_stream" id="rx_stream" size="1">
+		<option value = 1>1</option>
+		<option value = 2>2</option>
+		</select>
+	</td>
+</tr>
+</table>
+
+#ifdef PLATFORM_Bovine
+<table style="display:none" id="div_11n" name="div_11n" width="540" border="0" cellspacing="1" cellpadding="3" bordercolor="#9BABBD" >
+#else
+<table id="div_11n" name="div_11n" width="540" border="0" cellspacing="1" cellpadding="3" bordercolor="#9BABBD" >
+#endif
+<tr>
+	<td class="title" colspan="2" id="advHTPhyMode"><script language="JavaScript">document.write( _("basic ht phy mode"))</script></td>
+</tr>
+<tr>
+	<td width="35%" id="advHTOPMode"><script language="JavaScript">document.write( _("basic ht op mode"))</script></td>
+	<td>
+		<input type=radio name=n_mode value="0">&nbsp;<font id="basicHTMixed"><script language="JavaScript">document.write( _("basic ht op mixed"))</script></font>
+		&nbsp;&nbsp;<input type=radio name=n_mode value="1">&nbsp;<script language="JavaScript">document.write( _("greenField"))</script>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advHTChannelBW"><script language="JavaScript">document.write( _("basic ht channel bandwidth"))</script></td>
+	<td>
+		<input type=radio name=n_bandwidth value="0" onClick="Channel_BandWidth_onClick()">&nbsp;20&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	<input type=radio name=n_bandwidth value="1" onClick="Channel_BandWidth_onClick()">&nbsp;20/40
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="advHTGI"><script language="JavaScript">document.write( _("basic ht guard interval"))</script></td>
+	<td>
+		<input type=radio name=n_gi value="0">&nbsp;<font id="advHTLongGI"><script language="JavaScript">document.write( _("wireless long"))</script></font>
+		&nbsp;&nbsp;<input type=radio name=n_gi value="1">&nbsp;<font id="advHTAutoGI"><script language="JavaScript">document.write( _("auto"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%"><script language="JavaScript">document.write( _("mcs"))</script></td>
+	<td>
+		<select name="advHTAutoMCS" size="1">
+		<option value = 0>0</option>
+		<option value = 1>1</option>
+		<option value = 2>2</option>
+		<option value = 3>3</option>
+		<option value = 4>4</option>
+		<option value = 5>5</option>
+		<option value = 6>6</option>
+		<option value = 7>7</option>
+		<option value = 8>8</option>
+		<option value = 9>9</option>
+		<option value = 10>10</option>
+		<option value = 11>11</option>
+		<option value = 12>12</option>
+		<option value = 13>13</option>
+		<option value = 14>14</option>
+		<option value = 15>15</option>
+		<option value = 32>32</option>
+		<option value = 33>33</option>
+		</select>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="basicHTRDG"><script language="JavaScript">document.write( _("basic ht rdg"))</script></td>
+	<td><input type=radio name=n_rdg value="1">&nbsp;<font id="basicHTRDGEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+	<input type=radio name=n_rdg value="0">&nbsp;<font id="basicHTRDGDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr name="extension_channel" id="extension_channel">
+	<td width="35%" id="basicHTExtChannel"><script language="JavaScript">document.write( _("basic ht extension channel"))</script></td>
+	<td>
+		<select id="n_extcha" name="n_extcha" size="1">
+		<option value=1 selected>2412MHz <script language="JavaScript">document.write( _("channel"))</script> 1</option>
+		</select>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="basicHTAMSDU"><script language="JavaScript">document.write( _("basic ht amsdu"))</script></td>
+	<td>
+		<input type=radio name=n_amsdu value="1">&nbsp;<font id="basicHTAMSDUEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=n_amsdu value="0">&nbsp;<font id="basicHTAMSDUDisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="basicHTAddBA"><script language="JavaScript">document.write( _("basic ht addba"))</script></td>
+	<td>
+		<input type=radio name=n_autoba value="1">&nbsp;<font id="basicHTAddBAEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=n_autoba value="0">&nbsp;<font id="basicHTAddBADisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+<tr>
+	<td width="35%" id="basicHTDelBA"><script language="JavaScript">document.write( _("basic ht delba"))</script></td>
+	<td>
+		<input type=radio name=n_badecline value="1">&nbsp;<font id="basicHTDelBAEnable"><script language="JavaScript">document.write( _("enable"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=n_badecline value="0">&nbsp;<font id="basicHTDelBADisable"><script language="JavaScript">document.write( _("disable"))</script></font>
+	</td>
+</tr>
+</table>
+
+<table width = "540" border = "0" cellpadding = "2" cellspacing = "1">
+<tr align="center">
+	<td>
+		<input type=button style="width:120px;" value="Apply" id="advApply" onClick="CheckValue();"> &nbsp; &nbsp;
+		<input type=reset  style="width:120px;" value="Reset" id="advCancel" onClick="window.location.reload()">
+	</td>
+</tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Administration</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<!-- <script language="JavaScript" src="/cgi-bin/lang_list.cgi"></script> -->
+</head>
+<body onload="initValue();">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("administration");
+function setLanguageOptions() {
+<%var _lang_fr=get_single('webinterface.lang_fr'); var _lang_ar=get_single('webinterface.lang_ar');%>
+var lang_fr="@@_lang_fr";
+var lang_ar="@@_lang_ar";
+var current_lang="@@_lang";
+var lang_element = document.getElementById("langSelection");
+	if (lang_fr == "1" || lang_ar == "1") {
+		lang_element.options.length = 0;
+		lang_element.options[lang_element.length] = new Option(_("english"), 'en');//'English'
+		if (lang_fr == 1) {
+			if(current_lang=="fr")
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, false);
+		}
+		if (lang_ar == 1) {
+			if(current_lang=="ar")
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, false);
+		}
+		document.getElementById("langDisplay").style["display"]="";
+	}
+}
+
+function initTranslation() {
+	document.getElementById("manLangApply").value = _("apply");
+	document.getElementById("bottomButton").value = _("CSsave");
+}
+
+function submitLang() {
+	var lang=document.getElementById("langSelection").value;
+	setLanguage(lang);
+}
+
+function greyOutPortField() {
+	try { // if the remote admin button is disabled then grey out the port field
+		document.form.incomingPort.disabled = true;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function ungreyOutPortField() {
+	try { // if the remote admin button is enabled then un-grey out the port field
+		document.form.incomingPort.disabled = false;
+		if ( (document.form.incomingPort.value < 1) || (document.form.incomingPort.value > 65534) )
+		    document.form.incomingPort.value = "8080";
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+////////////////////////////////////////
+
+function submitF() {
+	var f = document.form;
+	if(document.getElementById("webbrowser_ID").checked == true) {
+			if ( (f.incomingPort.value < 1) || (f.incomingPort.value > 65534)  || (f.incomingPort.value == "") ) {
+				alert("warningMsg07");
+				return;
+			}
+	}
+
+	if (f.Pass.value != f.PassConf.value) {
+		alert(_("wwan warningMsg2"));//passwords do not match
+		return;
+	}	
+	<%if(session["user"]=="root"){%>
+	if(f.userName.value=="root")
+		f.rootPass.value=f.Pass.value;
+	else
+		f.adminPass.value=f.Pass.value;
+	<%}else{%>
+	f.adminPass.value=f.Pass.value;
+	<%}%>
+	
+	if (f.TelnetPass.value != f.TelnetPassConf.value) {
+		alert(_("wwan warningMsg2"));//passwords do not match
+		return;
+	}
+	f.telnethiddenPass.value=f.TelnetPass.value;
+	f.submit();
+}
+
+function showitems() {
+	document.getElementById("webbrowser_trID").style['display']='';
+	document.getElementById("telnet_trID").style['display']='';
+	document.getElementById("ping_trID").style['display']=''; 
+	webbrowserclick();
+	telnetclick();
+	pingclick();
+}
+
+function hiddenitems() {
+	document.getElementById("webbrowser_trID").style['display']='none';
+	document.getElementById("telnet_trID").style['display']='none';
+	document.getElementById("ping_trID").style['display']='none';
+}
+
+function firewall_enabled() {
+	document.getElementById("webbrowser_trID").style['display']='';
+	document.getElementById("telnet_trID").style['display']='';
+	document.getElementById("ping_trID").style['display']='';
+	webbrowserclick();
+	telnetclick();
+	pingclick();
+	document.getElementById("remwanaccess_trID").style['display']='none';
+}
+
+function firewall_disabled() {
+	document.getElementById("webbrowser_trID").style['display']='none';
+	document.getElementById("telnet_trID").style['display']='none';
+	document.getElementById("ping_trID").style['display']='none';
+	document.getElementById("remwanaccess_trID").style['display']='';
+	if ( (document.form.rmthttpport.value < 1) || (document.form.rmthttpport.value > 65534) )
+		document.form.rmthttpport.value = "8080";
+}
+
+function webbrowserclick() {
+	element=document.getElementById("webbrowser_ID")
+	if(element.checked == true) {
+		ungreyOutPortField()
+		document.form.webenable.value = 1;
+	}
+	else {
+		greyOutPortField()
+		document.form.webenable.value = 0;
+	}
+}
+
+function telnetclick() {
+	element=document.getElementById("telnet_ID")
+	if(element.checked == true)
+		document.form.telnetenable.value = 1;
+	else
+		document.form.telnetenable.value = 0;
+}
+
+function pingclick() {
+	element=document.getElementById("ping_ID")
+	if(element.checked == true)
+		document.form.pingenable.value = 1;
+	else
+		document.form.pingenable.value = 0;
+}
+
+function checkboxClick(check_ctrl,hidden_ctrl) {
+	element=document.getElementById(check_ctrl)
+	hidden_element=document.getElementById(hidden_ctrl);
+
+	if(element.checked == true)
+		hidden_element.value = 1;
+	else
+		hidden_element.value = 0;
+}
+
+function checkPass( val ) {
+	if( val=="root" ) {
+		document.form.Pass.value=document.form.rootPass.value;
+		document.form.PassConf.value=document.form.rootPass.value;
+	}
+	else {
+		document.form.Pass.value=document.form.adminPass.value;
+		document.form.PassConf.value=document.form.adminPass.value;
+	}
+}
+</script>
+<%
+/* To change the value of dummyPW, check chpasswd.template first. */
+/* The template uses dummyPW for empty password                   */
+
+var dummyPW="**********";
+
+router_user="";
+router_password="";
+
+syslog(7,"administration.html: entering with request '" + request['REQUEST_METHOD'] + "'");
+
+// new login method - name-password method
+if( rdb_exists("admin.user.name") ) {
+	syslog(7,"administration.html: configurable user name rdb detected");
+
+	router_user=get_single("admin.user.name");
+	router_password=get_single("admin.user.password");
+}
+else {
+	syslog(7,"administration.html: fixed user name rdb detected");
+
+	router_user="admin"
+	if( rdb_exists("admin.user.admin") ) {
+		router_password=get_single( "admin.user.admin" );
+	}
+}
+
+syslog(7,"administration.html: router user name = '" + router_user + "'");
+
+if (request['REQUEST_METHOD'] == "POST") {
+	if(form['Pass']==form['PassConf']) {
+		var currval = get_single( 'admin.firewall.enable' );
+		var tempval = form['firewall'];
+		if (currval != tempval)
+			set_single( 'admin.firewall.enable='+tempval);
+
+		currval = get_single( 'admin.remote.webenable' );
+		tempval = form['webenable'];
+		if (currval != tempval)
+			set_single( 'admin.remote.webenable='+tempval);
+
+		currval = get_single( 'admin.remote.port' );
+		tempval = form['incomingPort'];
+		if (currval != tempval)
+			set_single( 'admin.remote.port='+tempval);
+
+		currval = get_single( 'admin.remote.telnetenable' );
+		tempval = form['telnetenable'];
+		if (currval != tempval)
+			set_single( 'admin.remote.telnetenable='+tempval);
+
+		currval = get_single( 'admin.remote.pingenable' );
+		tempval = form['pingenable'];
+		if (currval != tempval)
+			set_single( 'admin.remote.pingenable='+tempval);
+
+		currval = get_single( 'sysctl.net.ipv4.tcp_syncookies' );
+		tempval = form['syncookies_enable'];
+		syslog(7,"administration.html: setting sysctl.net.ipv4.tcp_syncookies to "+tempval);
+		if (currval != tempval) {
+			set_single( 'sysctl.net.ipv4.tcp_syncookies='+tempval);
+			set_single( 'sysctl.trigger=1');
+		}
+
+		currval = get_single( 'service.firewall.SPIFWEnabled' );
+		tempval = form['spi_enable'];
+		syslog(7,"administration.html: setting SPIFWEnabled to "+tempval);
+		if (currval != tempval)
+			set_single( 'service.firewall.SPIFWEnabled='+tempval);
+
+		tempval = form['adminPass'];
+		if(tempval==dummyPW)
+			tempval=router_password;
+		set_single( 'admin.user.password'+'='+tempval,'-p' );
+		set_single( 'admin.user.name'+'='+form['User'],'-p' );
+
+		syslog(7,"administration.html: setting user/password - user='" +form['User']+"'");
+
+		// set the fixed user login if user name is admin. otherwise, we cannot help
+		if( form['User'] == "admin" )
+			set_single( 'admin.user.admin='+tempval,'-p' );
+		else
+			set_single( 'admin.user.admin=N/A','-p' );
+
+		// apply the new user name
+		router_user=form['User'];
+
+		tempval = form['telnethiddenPass'];
+		if(tempval!=dummyPW) {
+			if(tempval == "")
+				set_single( 'telnet.passwd.new'+'='+dummyPW );
+			else
+				set_single( 'telnet.passwd.new'+'='+tempval );
+
+			set_single( 'telnet.passwd.trigger=1');
+		}
+
+	}
+	else {
+		form['firewall'] = get_single( 'admin.firewall.enable' );
+		form['webenable']=get_single( 'admin.remote.webenable');
+		form['incomingPort'] = get_single( 'admin.remote.port' );
+		form['telnetenable']=get_single( 'admin.remote.telnetenable');
+		form['pingenable']=get_single( 'admin.remote.pingenable');
+	}
+}
+/*GET*/
+	form['firewall'] = get_single( 'admin.firewall.enable' );
+	form['webenable']=get_single( 'admin.remote.webenable');
+	form['incomingPort'] = get_single( 'admin.remote.port' );
+	form['telnetenable']=get_single( 'admin.remote.telnetenable');
+	form['pingenable']=get_single( 'admin.remote.pingenable');
+	form['syncookies_enable'] = get_single( 'sysctl.net.ipv4.tcp_syncookies' );
+	form['spi_enable'] = get_single( 'service.firewall.SPIFWEnabled' );
+
+	syslog(7,"administration.html: syncookies_enable="+form['syncookies_enable']);
+	syslog(7,"administration.html: spi_enable="+form['spi_enable']);
+
+	var temp = get_single( 'admin.user.admin' );
+	session['adminPass'] =temp;
+	temp = get_single( 'admin.user.root' );
+	session["rootPass"]=temp;
+
+var temp = get_single( 'admin.user.admin' );
+session['adminPass'] =temp;
+temp = get_single( 'admin.user.root' );
+session["rootPass"]=temp;
+form['adminPass']=dummyPW;
+form['rootPass']=dummyPW;
+form['Pass']=dummyPW;
+form['PassConf']=dummyPW;
+form['telnethiddenPass']=dummyPW;
+form['TelnetPass']=dummyPW;
+form['TelnetPassConf']=dummyPW;
+%>
+
+<script language="JavaScript">
+function initValue() {
+	setLanguageOptions();
+	
+	if (document.form.webenable.value == 1)
+		document.getElementById("webbrowser_ID").checked=true;
+	else
+		document.getElementById("webbrowser_ID").checked=false;
+
+	if (document.form.telnetenable.value == 1)
+		document.getElementById("telnet_ID").checked=true;
+	else
+		document.getElementById("telnet_ID").checked=false;
+
+	if (document.form.pingenable.value == 1)
+		document.getElementById("ping_ID").checked=true;
+	else
+		document.getElementById("ping_ID").checked=false;
+
+	document.getElementById("syncookies_ID").checked=document.form.syncookies_enable.value==1;
+	document.getElementById("spi_ID").checked=document.form.spi_enable.value==1;
+
+	if(parseInt(document.form.firewall.value) == 0) {
+		document.form.firewallradio[1].checked=true;
+		firewall_disabled();
+	}
+	else {
+		document.form.firewallradio[0].checked=true;
+		firewall_enabled()
+	}
+	initTranslation();
+}
+</script>
+
+
+<h3>&nbsp;&nbsp;<script language="JavaScript">document.write(_("system")+" > "+_("administration"));</script></h3>
+<p></p>
+
+<form name="formlan" id="langDisplay" style="display:none" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%">
+	<tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("man language setting"));</script></th>
+	</tr>
+</table>
+<table width="80%">
+	<tr>
+		<td width="30%" id="manLangSet"><script language="JavaScript">document.write(_("man language setting"));</script></td>
+		<td>
+		<select name="langSelection" id="langSelection"></select>
+		</td>
+	</tr>
+	<tr>
+		<td colspan="2">
+		<div align="center">
+		<input type=button value="Apply" id="manLangApply" onClick="submitLang();" style="width:120px;">
+		</div>
+		</td>
+	</tr>
+</table>
+</form>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name='adminPass' size=32 maxlength=32  value="@@form['adminPass']">
+<input type="hidden" name='rootPass' size=32 maxlength=32  value="@@form['rootPass']">
+<input type="hidden" name='telnethiddenPass' size=32 maxlength=32  value="@@form['telnethiddenPass']">
+<input type="hidden" name="firewall" value="@@form['firewall']"/>
+<input type="hidden" name="webenable" value="@@form['webenable']"/>
+<input type="hidden" name="telnetenable" value="@@form['telnetenable']"/>
+<input type="hidden" name="pingenable" value="@@form['pingenable']"/>
+<input type="hidden" id="syncookies_enable" name="syncookies_enable" value="@@form['syncookies_enable']"/>
+<input type="hidden" id="spi_enable" name="spi_enable" value="@@form['spi_enable']"/>
+
+
+<table width="80%">
+	<tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("treeapp firewall"));</script></th>
+	</tr>
+</table>
+
+<table width="80%">
+<tr> 
+	<td width="30%"><script language="JavaScript">document.write(_("treeapp firewall"));</script></td>
+	<td>
+		<input type=radio onClick="javascript:document.form.firewall.value='1';firewall_enabled()" name='firewallradio'>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio onClick="javascript:document.form.firewall.value='0';firewall_disabled()" name='firewallradio'>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+<tr id="webbrowser_trID">
+	<td><script language="JavaScript">document.write(_("enable HTTP"));</script></td>
+	<td><input type="checkbox" id="webbrowser_ID" onclick=webbrowserclick();>
+		&nbsp;&nbsp;<script language="JavaScript">document.write(_("port"));</script>&nbsp;&nbsp;
+		<input type="text" name="incomingPort" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['incomingPort']"> &nbsp;(1 - 65534)
+	</td>
+</tr>
+<tr id="telnet_trID">
+	<td width="30%"><script language="JavaScript">document.write(_("enable Telnet"));</script></td>
+	<td> <input type="checkbox" id="telnet_ID" onclick=telnetclick();></td>
+</tr>
+<tr id="ping_trID"> 
+	<td width="30%"><script language="JavaScript">document.write(_("enable Ping"));</script></td>
+	<td><input type="checkbox" id="ping_ID" onclick=pingclick();></td>
+</tr>
+<tr id="syncookies_trID">
+	<td width="30%"><script language="JavaScript">document.write(_("enable Synccookies"));</script></td>
+	<td><input type="checkbox" id="syncookies_ID" onclick=checkboxClick("syncookies_ID","syncookies_enable");></td>
+</tr>
+<tr id="spi_trID">
+	<td width="30%"><script language="JavaScript">document.write(_("enable spi"));</script></td>
+	<td><input type="checkbox" id="spi_ID" onclick=checkboxClick("spi_ID","spi_enable");></td>
+</tr>
+
+<tr id="remwanaccess_trID"> 
+	<td width="30%"><script language="JavaScript">document.write(_("remote HTTP port"));</script></td>
+	<td><input type="text" name="rmthttpport" size="8" maxLength="5" onKeyUp="NumfieldEntry(this); document.form.incomingPort.value=this.value" value="@@form['incomingPort']"> &nbsp;(1 - 65534)</td>
+</tr>
+</table>
+<table width="80%">
+	<tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("webui account"));</script></th>
+	</tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("user name"));</script></td>
+	<td><input type="text" name='User' size=32 maxlength=32 onKeyUp="nameFilter(this);" value="@@router_user"/></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("adminPassword"));</script></td>
+	<td><input type=password name='Pass' size=32 maxlength=32 onKeyUp="nameFilter(this);" value="@@form['Pass']"></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("confirmPassword"));</script></td>
+	<td><input type=password name='PassConf' size=32 maxlength=32 onKeyUp="nameFilter(this);" value="@@form['PassConf']"></td>
+</tr>
+</table>
+<table width="80%">
+	<tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("telnet account"));</script></th>
+	</tr>
+</table>
+
+<table width="80%">
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("user name"));</script></td>
+	<td>admin</td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("adminPassword"));</script></td>
+	<td><input type=password name='TelnetPass' size=32 maxlength=32 onKeyUp="nameFilter(this);" value="@@form['TelnetPass']"></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("confirmPassword"));</script></td>
+	<td><input type=password name='TelnetPassConf' size=32 maxlength=32 onKeyUp="nameFilter(this);" value="@@form['TelnetPassConf']"></td>
+</tr>
+</table>
+
+<div align="center"><p></p><input type="button" value="Save" name="ok" id="bottomButton" onClick="javascript:submitF()" style="width:120px;"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

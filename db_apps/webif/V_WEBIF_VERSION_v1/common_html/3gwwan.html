@@ -1,0 +1,755 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Mobile Broadband</title>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+plmn_mcc=get_single('wwan.0.imsi.plmn_mcc');
+plmn_mnc=get_single('wwan.0.imsi.plmn_mnc');
+if (plmn_mcc == '505' && (plmn_mnc == '01' || plmn_mnc == '1')) {
+	isp_telstra = 1
+} else {
+	isp_telstra = 0
+}
+%>
+
+<% _apndropdown=get_single('webinterface.3gwwan_apndropdown');
+if(_apndropdown=="0"){%>
+<body onload="setIndex();">
+<%}else{ country=get_single('webinterface.apn_country');%>
+<body onload="cgCountry('@@country'); setIndex();">
+<%}%>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("3gwwan");
+
+#ifdef PLATFORM_Platypus2
+#include "failovertrans.inc"
+#endif
+
+function setAPNHandler(response) {
+	if(typeof(document.formS.countryList) == "undefined")
+		return;
+	eval( response );
+	setTimeout(stuHover, 1000);
+	for(i=1; i<st.length; i++)
+		document.formS.countryList[i-1] = new Option(st[i], st[i] );
+	document.getElementById('countryList').options.selectedIndex=selectedIdx;
+	$("#chooseAPN").html(_("choose apn"));
+	document.getElementById("chooseAPN").style['color'] = '#107010'; //GREEN
+	document.getElementById("chooseAPN").style['background'] = '#F0EFEB'; //GREY
+}
+
+function setAPN( myapn, myuser, mypass, myauth ) {
+	document.getElementById('wwanAPN').value=myapn;
+	document.formS.pppuser.value=myuser;
+	document.formS.ppppass.value=mypass;
+	if(myauth=='pap' || myauth=='PAP')
+		document.formS.AuthType[1].checked=true;
+	else
+		document.formS.AuthType[0].checked=true;
+	checkAPNdev();
+}
+
+function cgCountry( myval ) {
+	document.formS.country.value=myval;
+	$.get("/cgi-bin/wwanGetAPN.cgi?"+myval, setAPNHandler);
+}
+
+function setOption() { 
+	for( i=0; i<stpf.length; i++) {
+		document.formS.pppprofilenum.options[i] = new Option(stpf[i].name, i, false, (i==document.formS.editIndex.value)?true:false);
+	}
+	if(document.formS.autoapn.value=="1")
+		document.getElementById("autoapnCK").checked=true;
+	else
+		document.getElementById("autoapnCK").checked=false;
+	ckeckAutoAPN();
+}
+
+function submitProf() {
+	i = document.formS.editIndex.value = document.formS.pppprofilenum.selectedIndex;
+	if( stpf[i].readonly == '1' ) {
+		if((document.formS.pppuser.value!=stpf[i].user)||(document.formS.APNName.value!=stpf[i].APNName)||(document.formS.ppppass.value!=stpf[i].pass)) {
+			alert( _("profileReadOnly") );//This Profile is READ ONLY!
+			setIndex();
+			document.formS.editIndex.value = '-1';
+			return;
+		}
+		document.formS.pppuser.disabled = false;
+		document.formS.APNName.disabled = false;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = false;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='';
+		document.formS.ppppass.disabled = false;
+	}
+	if ( (document.formS.metric.value < 0 ) || (document.formS.metric.value > 65535) ) {
+		alert(_("Msg48"));//Error: Metric must have a value between 0 and 65535
+		document.formS.metric.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if ( (document.formS.reconnectDelay.value < 30 ) || (document.formS.reconnectDelay.value > 65535) ) {
+		alert(_("Msg49"));//Error: Reconnect Delay must have a value between 30 and 65535
+		document.formS.reconnectDelay.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if ( (document.formS.reconnectRetries.value < 0 ) || (document.formS.reconnectRetries.value > 65535) ) {
+		alert(_("Msg50"));//Error: Reconnect Retries must have a value between 0 and 65535
+		document.formS.reconnectRetries.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if (document.formS.profilename.value == "") {
+		alert(_("noProfileNameEntered"));//Error: no Profile Name entered.
+		document.formS.profilename.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if (document.formS.metric.value == "") {
+		alert(_("noMetricEntered"));//Error: no metric entered.
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+<%if (isp_telstra == 1) {%>
+	if ( (document.formS.mtu.value < 1358 ) || (document.formS.mtu.value > 1460) ) {
+		alert(_("MTU error Telstra"));//Error: MTU must have a value between 1358 and 1460
+<%}else{ %>
+	if ( (document.formS.mtu.value < 1 ) || (document.formS.mtu.value > 1500) ) {
+		alert(_("MTU error"));//Error: MTU must have a value between 1 and 1500
+<%}%>
+		document.formS.mtu.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+#if (defined V_3GFAILOVERNOTIFICATION)
+	if(!checkFailOverItems())
+		return;
+#endif
+/*	if(stpf[i].readonly=="1" && stpf[i].APNName=="" )
+		document.formS.autoapn.value = "1";
+	else
+		document.formS.autoapn.value = "0";*/
+
+	if (checkChanged()) {
+		document.formS.saveWWAN.disabled = true;
+		document.formS.pppprofilenum.disabled=false;
+		document.formS.profilename.disabled=false;
+		document.formS.submit();
+	}
+}
+
+function checkAPNdev() {
+	document.getElementById( "autoAPN" ).style['display']='none';
+}
+
+function setIndex() {   	
+	document.formS.editIndex.value = document.formS.pppprofilenum.value;
+	var i = document.getElementById("pppprofilenum").value;	
+	if(i=="")
+		i=0;
+	document.formS.profilenum.value = stpf[i].profilenum;
+	document.formS.profilename.value = stpf[i].name;
+	document.formS.pppuser.value = stpf[i].user;
+	//document.formS.pppdialnum.value = stpf[i].dialnum;
+	document.formS.APNName.value = stpf[i].APNName;
+	checkAPNdev();
+	document.formS.ppppass.value = stpf[i].pass;
+	document.formS.reconnectDelay.value = stpf[i].reconnect_delay;
+	document.formS.reconnectRetries.value = stpf[i].reconnect_retries;
+	document.formS.metric.value = stpf[i].metric;
+	
+	document.formS.gascEnable.value = stpf[i].enable;
+	if( parseInt(document.formS.gascEnable.value)==1 )
+		document.formS.pppAutoCon[0].checked=true;
+	else
+		document.formS.pppAutoCon[1].checked=true;
+
+	//document.formS.authtype.value = stpf[i].authtype;
+	if( stpf[i].authtype=="chap" )
+		document.formS.AuthType[0].checked=true;
+	else
+		document.formS.AuthType[1].checked=true;
+
+	document.formS.snatEnable.value = stpf[i].snat;
+	if( parseInt(document.formS.snatEnable.value)==1 )
+		document.formS.NatEnable[0].checked=true;
+	else
+		document.formS.NatEnable[1].checked=true;
+
+ 	if ( (document.formS.reconnectDelay.value < 30 ) || (document.formS.reconnectDelay.value > 65535) )
+		document.formS.reconnectDelay.value = 30;
+	if ( (document.formS.reconnectRetries.value == "N/A") ||(document.formS.reconnectRetries.value < 0 ) || (document.formS.reconnectRetries.value > 65535) )
+		document.formS.reconnectRetries.value = 0;
+	if( stpf[i].readonly == '1' ) {
+		document.formS.pppuser.disabled = true;
+	//	document.formS.pppdialnum.disabled = true;
+		document.formS.APNName.disabled = true;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = true;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='none';
+		document.formS.ppppass.disabled = true;
+	}
+	else {
+		document.formS.pppuser.disabled = false;
+	//	document.formS.pppdialnum.disabled = false;
+		document.formS.APNName.disabled = false;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = false;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='';
+		document.formS.ppppass.disabled = false;
+	}
+	if(stpf[i].readonly!='1') {
+		document.getElementById( "addDiv" ).style['display']='';
+		if(stpf[i].name=="Add") document.formS.profilename.value = "";
+	}
+	else {
+		document.getElementById( "addDiv" ).style['display']='none';
+	}
+<%if( get_pid('modem_emulator')!=0 ) {%>
+	document.formS.ppprhost.value = stpf[i].host;
+    document.formS.pppport.value = stpf[i].port;
+	if(stpf[i].padmode<1) 
+		stpf[i].padmode = 1;
+	document.formS.ppppadmode.options.selectedIndex = stpf[i].padmode-1;
+    if ( 1*stpf[i].pad_o &128)
+        document.formS.pppauto[0].checked = true;
+    else //if (stpf[i].auto == "Off")
+        document.formS.pppauto[1].checked = true;
+    if ( 1*stpf[i].pad_o &16)
+        document.formS.serprot[0].checked = true;
+    else // if (stpf[i].prot == "Off")
+        document.formS.serprot[1].checked = true;
+	setPad_o();
+	if(stpf[i].readonly!='1')
+		document.getElementById( "padDiv" ).style['display']='';
+	else
+		document.getElementById( "padDiv" ).style['display']='none';
+<%}%>
+	//document.formS.APNName.focus();
+
+}
+
+function check_field_changed(newval, oldval, name) {
+	if (oldval != newval) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+function checkChanged() {
+	var changed = 0;
+	document.formS.editIndex.value = document.formS.pppprofilenum.value;
+	var i = document.getElementById("pppprofilenum").value;
+
+	changed += check_field_changed(document.formS.profilename.value, stpf[i].name, "profilename");
+	changed += check_field_changed(document.formS.pppuser.value, stpf[i].user, "pppuser");
+	changed += check_field_changed(document.formS.APNName.value, stpf[i].APNName, "APNName");
+	changed += check_field_changed(document.formS.ppppass.value, stpf[i].pass, "ppppass");
+	changed += check_field_changed(document.formS.reconnectDelay.value, stpf[i].reconnect_delay, "reconnectDelay");
+	changed += check_field_changed(document.formS.reconnectRetries.value, stpf[i].reconnect_retries, "reconnectRetries");
+	changed += check_field_changed(document.formS.metric.value, stpf[i].metric, "metric");
+	changed += check_field_changed(document.formS.gascEnable.value, stpf[i].enable, "gascEnable");
+	if( document.formS.AuthType[0].checked==true )
+		changed += check_field_changed("chap", stpf[i].authtype, "authtype");	
+	else
+		changed += check_field_changed("pap", stpf[i].authtype, "authtype");	
+	changed += check_field_changed(document.formS.snatEnable.value, stpf[i].snat, "snatEnable");
+	session_autoapn=<%_m=get_single('webinterface.autoapn'); %>"@@_m";
+	changed += check_field_changed(document.formS.autoapn.value, session_autoapn, "autoapn");
+<%if( get_pid('modem_emulator')!=0 ) {%>
+	changed += check_field_changed(document.formS.ppprhost.value, stpf[i].host, "ppprhost");
+    changed += check_field_changed(document.formS.pppport.value, stpf[i].port, "pppport");
+	changed += check_field_changed(document.formS.ppppadmode.options.selectedIndex, stpf[i].padmode-1, "ppppadmode");
+<%}%>
+	if(document.formS.autoapn.value!=1) {
+		for( i=0; (i<stpf.length && i<6); i++ ) {
+			if(stpf[i].enable == 1 && document.formS.editIndex.value != i && document.formS.gascEnable.value == 1) {
+				alert(_("Msg52")+" \""+stpf[i].name+"\"");//Please disable and save the profile:
+				return false;
+			}
+<%if( get_pid('modem_emulator')!=0 ) {%>
+			if( document.formS.gascEnable.value=='1' && document.formS.pppport.value!="") {
+				document.formS.fw_pad_port.value=document.formS.pppport.value;
+			}
+<%}%>
+		}
+	}
+	return true;
+}
+function ckeckAutoAPN() {
+
+	if(document.getElementById("autoapnCK").checked==true) {
+		document.formS.pppprofilenum.disabled=true;
+		document.formS.profilename.disabled=true;
+		document.getElementById("hide_for_autoapn").style['display']="none";
+		document.formS.autoapn.value="1";
+		
+		var isAnyProfileEnabled=false;
+		for( i=0; (i<stpf.length && i<6); i++ ) {
+			if(stpf[i].enable == 1) {
+				isAnyProfileEnabled=true;
+				break;
+			}
+		}
+		if(!isAnyProfileEnabled) {
+			document.formS.pppAutoCon[0].checked=true;
+			document.formS.gascEnable.value='1';
+		}
+	}
+	else {
+		document.formS.pppprofilenum.disabled=false;
+		document.formS.profilename.disabled=false;
+		document.getElementById("hide_for_autoapn").style["display"]="";
+		document.formS.autoapn.value="0";
+	}
+}
+
+$(document).ready( function() {
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+
+</script>
+
+<%
+i = form['profilenum'];
+if (request['REQUEST_METHOD'] == "POST") {
+	if ( form['form_name']=='formS') {
+		set_single('roaming.voice.outgoing.en='+form['EnableVoiceRoamingMenu1']);
+		if (form['EnableVoiceRoamingMenu1']=='1')
+			set_single('roaming.voice.outgoing.blocked=');
+		set_single('roaming.voice.incoming.en='+form['EnableVoiceRoamingMenu2']);
+		if (form['EnableVoiceRoamingMenu2']=='1')
+			set_single('roaming.voice.incoming.blocked=');
+		set_single('roaming.data.en='+form['EnableDataRoamingMenu']);
+		if (form['EnableDataRoamingMenu']=='1')
+			set_single('roaming.data.blocked=');
+
+		if( form['editIndex'] != '-1') {
+			tempval = form['editIndex'];
+			set_single( 'webinterface.profileIdx='+tempval, '-p' );
+			tempval = form['profilenum'];
+			set_single( 'link.profile.profilenum='+tempval, '-p' );
+			set_single( 'link.profile.'+i+'.dev=wwan.0', '-p' );
+			tempval = form['profilename'];
+			retval=set_single( 'link.profile.'+i+'.name='+tempval, '-p' );
+			//  tempval = form['pppdialnum'];
+			//  retval=set_single( 'link.profile.'+i+'.dialstr='+tempval, '-p' );
+			tempval = form['APNName'];
+			retval=set_single( 'link.profile.'+i+'.apn='+tempval, '-p' );
+			tempval = form['pppuser'];
+			retval=set_single( 'link.profile.'+i+'.user='+tempval, '-p' );
+			tempval = form['ppppass'];
+			retval=set_single( 'link.profile.'+i+'.pass='+tempval, '-p' );
+			tempval = form['snatEnable'];
+			retval=set_single( 'link.profile.'+i+'.snat='+tempval, '-p' );
+			tempval = form['reconnectDelay'];
+			retval=set_single( 'link.profile.'+i+'.reconnect_delay='+tempval, '-p' );
+			tempval = form['reconnectRetries'];
+			retval=set_single( 'link.profile.'+i+'.reconnect_retries='+tempval, '-p' );
+			tempval = form['metric'];
+			retval=set_single( 'link.profile.'+i+'.defaultroutemetric='+tempval, '-p' );
+			tempval = form['AuthType'];
+			set_single( 'link.profile.'+i+'.auth_type='+tempval, '-p');
+			tempval = form['mtu'];
+			if (isp_telstra == 1)
+				retval=set_single( 'system.config.telstra.mtu='+tempval, '-p' );
+			else
+				retval=set_single( 'system.config.mtu='+tempval, '-p' );
+			country = form['country'];
+			set_single( 'webinterface.apn_country='+country, '-p');
+			retval=set_single( 'link.profile.'+i+'.enable=0', '-p' );
+			autoapn=form['autoapn'];
+			set_single( 'webinterface.autoapn='+autoapn, '-p');
+			if(autoapn=='1')
+				tempval='1';
+			else
+				tempval = form['gascEnable'];
+			if( tempval=='1' ) {
+				esp_sleep(2000);
+				retval=set_single( 'link.profile.'+i+'.enable=1', '-p' );
+			}
+			// failover save
+#if (defined V_3GFAILOVERNOTIFICATION)
+			#include "failover-head.inc"
+#endif
+			redirect('/3gwwan.html');
+		}
+		if( get_pid('modem_emulator')!=0 ) {
+			tempval = form['ppprhost'];
+			set_single( 'link.profile.'+i+'.pad_host='+tempval, '-p');
+			tempval = form['ppppadmode'];
+			set_single( 'link.profile.'+i+'.pad_mode='+tempval, '-p');
+			tempval = form['pppport'];
+			set_single( 'link.profile.'+i+'.pad_encode='+tempval, '-p');
+			tempval = form['pad_o'];
+			set_single( 'link.profile.'+i+'.pad_o='+tempval, '-p');
+			set_single( 'link.profile.modememulator_update=1', '-p');
+			tempval = form['fw_pad_port'];
+			set_single( 'admin.remote.pad_encode='+tempval, '-p');
+		}
+	}
+
+	#ifdef PLATFORM_Platypus2
+		#if (defined V_3GFAILOVERNOTIFICATION)
+			#include "failovernoti-head.inc"
+		#endif
+	#endif
+}
+
+	tempval = get_single( 'webinterface.profileIdx' );
+	if( (tempval == "N/A") || (tempval == "") ) tempval = 0;
+	form['editIndex'] = tempval;
+	temp = get_single( 'service.pppoe.server.0.enable' );
+	form['pppoe'] = temp;
+	form['autoapn'] = get_single( 'webinterface.autoapn' );
+
+	if ( isp_telstra == 1) {
+		tempval = get_single( 'system.config.telstra.mtu' );
+		if (tempval < 1358 || tempval > 1460) {
+			tempval = 1358;
+			retval=set_single( 'system.config.telstra.mtu='+tempval, '-p' );
+		}
+	}
+	else {
+		tempval = get_single( 'system.config.mtu' );
+	}
+	form['mtu'] = tempval;
+	tempval = get_single( 'admin.remote.pad_encode' );
+	form['fw_pad_port'] = tempval;
+
+form['EnableVoiceRoamingMenu1'] = get_single('roaming.voice.outgoing.en');
+form['EnableVoiceRoamingMenu2'] = get_single('roaming.voice.incoming.en');
+form['EnableDataRoamingMenu'] = get_single('roaming.data.en');
+
+
+%>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("mobile broadband")+" > "+_("connection"));</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="formS" id="form" method="POST" action="@@request['SCRIPT_NAME']?form_name=formS">
+<input type="hidden" name="gascEnable" value="@@form['gascEnable']">
+<input type="hidden" name="snatEnable" value="@@form['snatEnable']"/>
+<input type="hidden" name="pppoe" value="@@form['pppoe']"/>
+<input type="hidden" name="editIndex" value="@@form['editIndex']">
+<input type="hidden" name="profilenum" value="@@form['profilenum']">
+<input type="hidden" name="country" value="@@form['country']">
+<input type="hidden" name="autoapn" value="@@form['autoapn']">
+<input type="hidden" name="fw_pad_port" value="@@form['fw_pad_port']">
+
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("mobile broadband")+" > "+_("connection"));</script></h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+    <tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("mobileBroadbandSettings"));</script></th></tr>
+</table>
+<table width="90%">
+<tr> 
+	<td width="30%"><script language="JavaScript">document.write(_("profile name"));</script></td>
+	<td><select name="pppprofilenum" id="pppprofilenum" onChange="setIndex()" >
+	</select>
+<%skin=get_single('system.product.skin'); if(skin=='ro') {%>
+	<div style="display:none"><input type="checkbox" name="autoapnCK" id="autoapnCK" onclick="ckeckAutoAPN();"></div>
+<%}else{%>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="autoapnCK" id="autoapnCK" onclick="ckeckAutoAPN();">&nbsp;&nbsp;<script language="JavaScript">document.write(_("apnMsg1"));</script>
+<%}%>
+	</td>
+</tr>
+</table>
+
+<table width="90%" id="addDiv" style="display:none">
+<tr >
+	<td width="30%"><script language="JavaScript">document.write(_("profile name"));</script></td>
+	<td><input type="text" maxlength="32" name="profilename" style="width:170px" value="@@form['profilename']"></td>
+</tr>
+</table>
+
+<table id="hide_for_autoapn">
+<tr> 
+	<td width="30%"><script language="JavaScript">document.write(_("apnName"));</script></td>
+	<td><input type=text name='APNName' id="wwanAPN" size=24 maxlength=128 style="width:170px" value="@@form['APNName']" onkeyup="checkAPNdev();"><div id="autoAPN"><script language="JavaScript">document.write(_("autoAPNenabled"))</script></div></td>    
+<%if(_apndropdown=="1"){%>
+	<td> 
+	<select name="countryList" id="countryList" size=1  onChange="cgCountry(this.value)"> 
+    </select>
+	</td>
+	<td><ul id="nav2"></ul></td>
+<%}%>
+</tr>
+
+<tr>
+<td width="30%"><script language="JavaScript">document.write(_("mobile broadband connection"));</script></td>
+<td colspan="3">
+<input type=radio name='pppAutoCon' value=1 onClick="javascript:document.formS.gascEnable.value='1';checkPPPoEenable();">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+<input type=radio name='pppAutoCon' value=0 onClick="javascript:document.formS.gascEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+</table>
+
+
+
+<table>
+<tr> 
+<td width="30%"><script language="JavaScript">document.write(_("GUI username"));</script></td>
+<td><input type=text name='pppuser' size=32 maxlength=127 style="width:170px" value="@@form['pppuser']"></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("password"));</script></td>
+<td><input type=password name='ppppass' size=32 maxlength=127 style="width:170px" value="@@form['ppppass']"></td>
+</tr>
+
+<script type="text/javascript">   
+function checkPPPoEenable()
+{
+	if( parseInt(document.formS.pppoe.value) == 1 ) {
+		alert(_("Msg51"));//Please disable the PPPoE frist!
+		document.formS.pppAutoCon[1].checked=true;
+	}
+	else {
+		for( i=0; (i<stpf.length && i<6); i++ ) {
+			if( stpf[i].enable == 1 && document.formS.editIndex.value!=i) {
+				alert(_("Msg52")+" \""+stpf[i].name+"\"");//Please disable and save the profile:
+				document.formS.gascEnable.value=0;
+				document.formS.pppAutoCon[1].checked=true;
+				return;
+			}	
+		}
+		document.formS.gascEnable.value='1';
+	}
+}
+</script> 
+
+<tr> 
+<td width="30%"><script language="JavaScript">document.write(_("authentication type"));</script></td>
+<td><input type=radio name='AuthType' value="chap" >&nbsp;<script language="JavaScript">document.write(_("swCHAP"))</script>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type=radio name='AuthType' value="pap" >&nbsp;<script language="JavaScript">document.write(_("swPAP"))</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("reconnectDelay"));</script></td>
+<td><input type=text name='reconnectDelay' size=8 maxLength=5 value="@@form['reconnectDelay']" onkeyup=NumfieldEntry(this);> &nbsp;( <script language="JavaScript">document.write(_("30-65535"))</script> )&nbsp;<script language="JavaScript">document.write(_("secs"))</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("reconnectRetries"));</script></td>
+<td><input type=text name='reconnectRetries' size=8 maxLength=5 value="@@form['reconnectRetries']" onkeyup=NumfieldEntry(this);> &nbsp;( <script language="JavaScript">document.write(_("0-65535"))</script>, 0=<script language="JavaScript">document.write(_("unlimited"))</script> )</td>
+</tr>
+
+<tr> 
+    <td><script language="JavaScript">document.write(_("routing del metric"));</script></td>
+    <td><input type=text name='metric' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['metric']"> &nbsp;( <script language="JavaScript">document.write(_("0-65535"))</script> )</td>
+</tr>
+
+<tr> 
+    <td>MTU</td>
+<% if (isp_telstra == 1) {%>
+	<td><input type=text name='mtu' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['mtu']"> &nbsp;( <script language="JavaScript">document.write(_("1358-1460"))</script> )</td>
+<% } else { %>
+	<td><input type=text name='mtu' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['mtu']"> &nbsp;( <script language="JavaScript">document.write(_("1-1500"))</script> )</td>
+<% } %>
+</tr>
+
+<tr> 
+	<td width="30%"><script language="JavaScript">document.write(_("NatMasq"));</script></td>
+	<td><input type=radio name='NatEnable' onClick="javascript:document.formS.snatEnable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;&nbsp;
+    	<input type=radio name='NatEnable' onClick="javascript:document.formS.snatEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+</table>
+
+<% if( get_pid('modem_emulator')!=0 ) {%>
+<div id="padDiv">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("padMode"));</script></th></tr>
+</table>
+
+<table width="90%">
+<input type="hidden" name="pad_o">
+<tr> 
+<td width="30%"><script language="JavaScript">document.write(_("remoteHost"));</script></td>
+<td><input type=text name="ppprhost" size=32 maxlength=128 ></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("port"));</script></td>
+<td><input type=text name="pppport" size=8 maxLength=5 onkeyup=NumfieldEntry(this);> &nbsp;( 1-65535 )</td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("localEncoding"));</script></td>
+<td><input type=radio name="serprot" value="16" onclick="setPad_o()">&nbsp;Enable&nbsp;&nbsp;<input type=radio name="serprot" value="0" onclick="setPad_o()">&nbsp;Disable</td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("padMode"));</script></td>
+<td><select name="ppppadmode" size=1><option value=1>TCP</option><option value=2>UDP</option><option value=3>GMTP</option></select></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("padAutoAnswer"));</script></td>
+<td><input type=radio name="pppauto" value="128" onclick="setPad_o()">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;<input type=radio name="pppauto" value="0" onclick="setPad_o()">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>	
+</tr>
+</table>
+</div>
+<script type="text/javascript">
+function setPad_o() {
+	document.formS.pad_o.value = 0;
+	if(document.formS.serprot[0].checked==true)
+		document.formS.pad_o.value = 16;
+	if(document.formS.pppauto[0].checked==true)
+		document.formS.pad_o.value |= 128;
+}
+</script>
+<%}%>
+#if (defined V_3GFAILOVERNOTIFICATION)
+#include "failover-body.inc"
+#endif
+
+#if defined (V_WEBIF_SPEC_vdf)
+#include "dod.inc"
+#endif
+
+<table>
+<tr>
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("profile name"))</script></div></td>
+<td width="10%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("enabled"))</script></div></td>
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("apn"))</script></div></td>
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("user"))</script></div></td>
+</tr>
+<script language=Javascript>
+function makeList() {   
+	if (stpf.length == 0) {
+		document.write("<tr bgcolor=\"#DEE3EF\"> <td colspan=\"8\"><div align=\"center\">"+_("profileTableEmpty")+"</div></td></tr>");
+		return ;
+	}	
+	for (var i=0; i<stpf.length;i++) {
+		document.write("<tr bgcolor='#DEE3EF'>"); 
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+stpf[i].name+"</font></div></td>");
+		if(stpf[i].enable==1)
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+_('CSyes')+"</font></div></td>");
+		else
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+_('CSno')+"</font></div></td>");
+		/*if( stpf[i].dialnum.indexOf("*99#")>=0 || stpf[i].dialnum.indexOf("*98#")>=0 )
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>Packet</div></td>");
+		else
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>Circuit</div></td>");
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].dialnum+"</div></td>");*/
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].APNName+"</div></td>");
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].user+"</div></td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+
+#ifdef PLATFORM_Bovine
+<div id="divroaming" style="display:none">
+#else
+<div id="divroaming">
+#endif
+<input type="hidden" name="EnableVoiceRoamingMenu1" id="EnableVoiceRoamingMenu1" value="@@form['EnableVoiceRoamingMenu1']"/>
+<input type="hidden" name="EnableVoiceRoamingMenu2" id="EnableVoiceRoamingMenu2" value="@@form['EnableVoiceRoamingMenu2']"/>
+<input type="hidden" name="EnableDataRoamingMenu" id="EnableDataRoamingMenu" value="@@form['EnableDataRoamingMenu']"/>
+<table width="75%">
+    <tr><th><script language="JavaScript">document.write(_("roaming setting"))</script></th></tr>
+</table>
+
+<table width="75%">
+<tr id="voice_roaming_menu1">
+    <td width="38%"><script language="JavaScript">document.write(_("voice roaming menu1"))</script></td>
+    <td><input type=radio name="voice_roaming1" onclick="document.formS.EnableVoiceRoamingMenu1.value='1'">&nbsp;<script language="JavaScript">multiLangRadio("enable")</script></font>&nbsp;&nbsp;
+        <input type=radio name="voice_roaming1" onclick="document.formS.EnableVoiceRoamingMenu1.value='0'">&nbsp;<script language="JavaScript">multiLangRadio("disable")</script></font></td>
+</tr>
+<tr id="voice_roaming_menu2">
+    <td width="38%"><script language="JavaScript">document.write(_("voice roaming menu2"))</script></td>
+    <td><input type=radio name="voice_roaming2" onclick="document.formS.EnableVoiceRoamingMenu2.value='1'">&nbsp;<script language="JavaScript">multiLangRadio("enable")</script></font>&nbsp;&nbsp;
+        <input type=radio name="voice_roaming2" onclick="document.formS.EnableVoiceRoamingMenu2.value='0'">&nbsp;<script language="JavaScript">multiLangRadio("disable")</script></font></td>
+</tr>
+<tr>
+    <td width="38%"><script language="JavaScript">document.write(_("data roaming menu"))</script></td>
+    <td><input type=radio name="data_roaming" onclick="document.formS.EnableDataRoamingMenu.value='1'">&nbsp;<script language="JavaScript">multiLangRadio("enable")</script></font>&nbsp;&nbsp;
+        <input type=radio name="data_roaming" onclick="document.formS.EnableDataRoamingMenu.value='0'">&nbsp;<script language="JavaScript">multiLangRadio("disable")</script></font></td>
+</tr>
+</table>
+
+<script type="text/javascript">
+<%pots_disabled=get_single('potsbridge_disabled');pots_status=get_single('pots.status');%>
+    if( "@@pots_disabled"=="1" || "@@pots_status"=="pots_disabled") {
+        row_display("voice_roaming_menu1", 0);
+        row_display("voice_roaming_menu2", 0);
+    }
+
+    if(document.formS.EnableVoiceRoamingMenu1.value=='1')
+        document.formS.voice_roaming1[0].checked=true;
+    else
+        document.formS.voice_roaming1[1].checked=true;
+
+    if(document.formS.EnableVoiceRoamingMenu2.value=='1')
+        document.formS.voice_roaming2[0].checked=true;
+    else
+        document.formS.voice_roaming2[1].checked=true;
+
+    if(document.formS.EnableDataRoamingMenu.value=='1')
+        document.formS.data_roaming[0].checked=true;
+    else
+        document.formS.data_roaming[1].checked=true;
+</script>
+</div>
+<div align="center">
+<p></p><input type="button" style="width:120px;" id="saveWWAN" name="saveWWAN" value="&nbsp;Save&nbsp;" onClick="submitProf()"/>
+<p></p>
+</div>
+</form>
+
+#ifdef PLATFORM_Platypus2
+<!-- failover notification feature is only available for Platypus2 now -->
+	#if (defined V_3GFAILOVERNOTIFICATION)
+		#include "failovernoti-body.inc"
+	#endif
+#endif
+
+</div>  <!-- <div class="hide_for_pppoe_en"> -->
+</div>  <!-- <div id="contentWrapper"> -->
+
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.formS.saveWWAN.value=_("CSsave");
+setOption();
+</script>
+</body>
+</html>

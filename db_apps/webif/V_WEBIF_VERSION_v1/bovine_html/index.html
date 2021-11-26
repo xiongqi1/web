@@ -1,0 +1,113 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>system | Status</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("index");
+$(document).ready(function() {
+	document.form.username.focus();
+	$("#submitBtn").val(_("submit"));
+	$("#clearBtn").val(_("clear"));
+});
+</script>
+
+<form name="form"  class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3><script language="JavaScript">document.write(_("login"));</script></h3>
+
+<table>  
+	<tr><th><script language="JavaScript">document.write(_("login"));</script></th></tr>
+	<tr><td>&nbsp;</td></tr>
+</table>
+    
+<table id="ID0" cellspacing="0" style="display:none">
+<tr>
+	<td height="58px" width="12%" ><img align="right" src="/images/error.gif"/></td>
+	<td height="58px"><h4 style="margin-bottom:0px; color:#CC0000"><script language="JavaScript">document.write(_("admin passWarning"));</script></h4></td>
+</tr>
+</table>
+
+<table id="ID1" cellspacing="0">
+<tr>
+	<td width="30%" align="right"><script language="JavaScript">document.write(_("user name"));</script>:</td>
+	<td><input type="text" name="username" style="width:160px" value="@@form['username']"></td>
+</tr>
+<tr>
+	<td align="right"><script language="JavaScript">document.write(_("password"));</script>:&nbsp;&nbsp;</td>
+	<td><input type="password" name="password" style="width:160px" value="@@form['password']"></td>
+</tr>
+</table>
+
+<table>
+<tr>
+	<td><br/>
+	<div align=center><input type="submit" value="Submit" id="submitBtn" style="width:120px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" id="clearBtn" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''" style="width:120px;"></div>
+	<br/></td>
+</tr>
+<tr><td>&nbsp;</td></tr>
+</table>
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+
+<%
+useSession();
+if (request['REQUEST_METHOD'] == "POST") {
+	//check username and password
+	user = form['username'];
+	pass = get_single( 'admin.user.'+user );
+	mypassword = form['password'];
+	if( ( pass != 'N/A' ) && ( mypassword == pass) ) { //password ok
+		session["sessionid"] = request["SESSION_ID"];
+		session["user"] = user;
+		if( user == 'root')
+			session["userlevel"] = '0';
+		else
+			session["userlevel"] = '1';
+
+		model_type=get_single('system.product.model');
+		if (model_type == "NTC-6308") {
+			module_activated=get_single('wwan.0.module_info.cdma.activated');
+			if (module_activated == "0") {
+				redirect('/moduleOTAct.html?status.html');
+			}
+			else {
+				redirect('/status.html?setdate');
+			}
+		}
+		else {
+			redirect('/status.html?setdate');
+		}
+	}
+	else {%>
+		<script language='JavaScript'>
+		document.getElementById( "ID0" ).style['display']='';
+		document.getElementById( "ID1" ).style['display']='none';
+		setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);
+		</script>
+	<%}
+}
+else {
+	if(request['QUERY_STRING']=='logoff') {
+		session["sessionid"] = '';
+		redirect('/index.html');
+	}
+	else if( request["SESSION_ID"]!="" && session["sessionid"]==request["SESSION_ID"] ) {
+		redirect('/status.html');
+	}
+}
+%>
+
+</body>
+</html>

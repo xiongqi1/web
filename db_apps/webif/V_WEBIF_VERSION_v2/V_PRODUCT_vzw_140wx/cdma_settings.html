@@ -1,0 +1,464 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>CDMA Settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+
+#if 0
+<!-- server script -->
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+}
+%>
+#endif
+
+<!-- client script -->
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+
+var menu_main="System";
+var menu_sub="cdma_settings";
+var menu_title=_("cdma settings");
+
+/* constant settings */
+var settings = new (function(){
+	
+	var status_poll_timer = 10*1000; /* every 10 second  */
+
+	this.get_status_poll_timer=function() {
+		return status_poll_timer;
+	}
+});
+
+/* init. status */
+$(function() {
+
+	var $form=$("#form");
+
+	var timer=null;
+	
+	function schedule_poll() {
+		if(timer)
+			clearTimeout(timer);
+		
+		setTimeout(poll,settings.get_status_poll_timer());
+	}
+	
+	function poll(cb) {
+
+		var rdb=new rdb_tool("@@session[csrfTokenName]");
+		
+
+		var rdb_to_ctrl_map=[
+			// rdb						default value		control name
+			{rdb:"wwan.0.module_info.cdma.MSID",		def:"",			el:"#current_msid"},
+			{rdb:"wwan.0.module_info.cdma.MDN",		def:"",			el:"#current_mdn"},
+			{rdb:"wwan.0.cdma.perfset.mipinfo",		def:"",			el:null},
+		];
+
+		/* add rdbs */
+		rdb.add_to_mget(rdb_to_ctrl_map);
+		
+		rdb.mget(function(res){
+			/* write rdb to controls */
+			rdb.pour_to_ctrl(res,rdb_to_ctrl_map);
+
+			/* ajax.c compatible rdb - rdb is incorrectly using ampersands for new lines */
+			$("#current_mip").html(res["wwan.0.cdma.perfset.mipinfo"].replace(/&/g, "<br/>"));
+
+			if(!$("#new_mdn").data("changed"))
+				$("#new_mdn").val(res["wwan.0.module_info.cdma.MDN"]);
+
+			if(!$("#new_msid").data("changed"))
+				$("#new_msid").val(res["wwan.0.module_info.cdma.MSID"]);
+
+			if(!$("#new_nai").data("changed")) {
+				var mip_profile=res["wwan.0.cdma.perfset.mipinfo"].replace(/&/g, "\n");
+				var nai=mip_profile.match(/^NAI:.*$/mg);
+				
+				$("#new_nai").val(nai?nai[0].replace(/^NAI:/,"").replace(/^Unset$/,""):"");
+			}
+
+			if(cb)
+				cb();
+			
+			/* reschedule poll timer */
+			schedule_poll();
+		});
+	}
+
+	function convert_to_rdb_value(val) {
+		return (val=="")?"[blank]":val;
+	}
+	
+	$("#save").click(function(){
+
+		/* bypass if validation fails */
+		if(!$form.validationEngine("validate")) {
+			return;
+		}
+
+		/* additionally, do a manual validation check on msl - jquery validator is buggy about validating without required */
+		var changed=$("#new_mdn").data("changed") || $("#new_msid").data("changed");
+		if(changed && ($("#msl").val()=="")) {
+			$("#msl").validationEngine('showPrompt', _("msl code required"))
+			return;
+		}
+
+		blockUI_wait(_("GUI pleaseWait"));
+		
+		var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+		rdb.reset();
+		rdb.add("wwan.0.cdma.otasp.stat","");
+		rdb.add("wwan.0.cdma.otasp.spc",$("#msl").val());
+
+		if($("#new_nai").data("changed"))
+			rdb.add("wwan.0.cdma.otasp.nai",convert_to_rdb_value($("#new_nai").val()));
+		if($("#new_mdn").data("changed"))
+			rdb.add("wwan.0.cdma.otasp.mdn",convert_to_rdb_value($("#new_mdn").val()));
+		if($("#new_msid").data("changed"))
+			rdb.add("wwan.0.cdma.otasp.msid",convert_to_rdb_value($("#new_msid").val()));
+		
+		rdb.add("wwan.0.cdma.otasp.cmd","update-cdma-settings");
+
+		rdb.mset(function(res){
+			/* wait until spc done */
+			rdb.wait_for_rdb_result("wwan.0.cdma.otasp.stat",60000,function(res){
+				/* redirect to status page if success */
+				var succ=res.match(/^\[done\].*/);
+				if(succ) {
+
+					var poll_and_unblock=function() {
+						poll(function(){
+							$.unblockUI();
+						})
+					};
+						
+					/* wait until new value is re-read */
+					setTimeout(poll_and_unblock,settings.get_status_poll_timer());
+					
+					return;
+				}
+
+				/* unblock and show fail */
+				$.unblockUI();
+				blockUI_alert_l(_("cdma update fail"),function(){
+					$.unblockUI();
+				});
+			});
+		});
+		
+	});
+
+	$("#new_nai,#new_mdn,#new_msid").on("input",function(){
+		$(this).data("changed",true);
+	});
+	
+	
+	/* start poll */
+	blockUI_wait(_("GUI pleaseWait"));
+	poll(function(){
+		$.unblockUI();
+	});
+});
+
+/* init. oam activate */
+$(function(){
+	/* reset profile */
+	$("#button_reset_profile").click(function(){
+
+		blockUI_confirm(_("omadm warning"), function(){
+			var update_type=$("#update_type").val();
+			var rdb=new rdb_tool("@@session[csrfTokenName]");
+			
+			rdb.reset();
+
+			blockUI_wait(_("GUI pleaseWait"));
+			
+			/* start factory reset */
+			rdb.add("wwan.0.cdma.otasp.stat","");
+			rdb.add("wwan.0.cdma.otasp.cmd",update_type);
+			rdb.mset(function(res){
+				/* wait until spc done */
+				rdb.wait_for_rdb_result("wwan.0.cdma.otasp.stat",60000,function(res){
+					/* redirect to status page if success */
+					var succ=res.match(/^\[done\].*/);
+					if(succ) {
+						location.reload();
+						return;
+					}
+
+					/* unblock and show fail */
+					$.unblockUI();
+					blockUI_alert_l(_("omadm fail"),function(){
+						location.reload();
+					});
+				});
+			});
+		});
+	});
+	
+});
+
+/* init. rtn - factory reset */
+$(function(){
+
+	$("#button_rtn").click(function(){
+		blockUI_confirm(_("omadm deactivate confirm"), function(){
+
+			var rdb=new rdb_tool("@@session[csrfTokenName]");
+			var msl=$("#input_msl").val();
+			
+			/* check msl code */
+			if(msl=="") {
+				blockUI_alert(_("msl code not input"));
+				return;
+			}
+
+			blockUI_wait(_("GUI pleaseWait"));
+			
+			rdb.reset();
+			rdb.add("wwan.0.cdma.otasp.stat","");
+			rdb.add("wwan.0.cdma.otasp.spc",msl);
+			rdb.add("wwan.0.cdma.otasp.cmd","rtn");
+			
+			rdb.mset(function(res){
+				/* wait until spc done */
+				rdb.wait_for_rdb_result("wwan.0.cdma.otasp.stat",60000,function(res){
+				
+					/* redirect to status page if success */
+					var succ=res.match(/^\[done\].*/);
+					if(succ) {
+						setTimeout(function() {
+							location.reload();
+							return;
+						},20000);
+
+						return
+					}
+
+					/* unblock and show fail */
+					$.unblockUI();
+					blockUI_alert(_("omadm factory fail"));
+				});
+			});
+				
+		});
+	});
+});
+
+/* global initiation */
+$(function(){
+
+	/* show reset profile only for SPRINT */
+	var pri_carrier="<%get_single_direct('link.profile.wwan.pri');%>".replace(/\(.*\)/,"");
+	$("#div_reset_profile,#div_reset_profile2").toggle(pri_carrier=="SPRINT");
+
+	var module_pri_carrier="<%get_single_direct('wwan.0.priid_carrier');%>";
+	
+	/* display cdma settings */
+	var cdma_settings_supported=module_pri_carrier=="SPRINT";
+	$("#p_warning").toggle(!cdma_settings_supported);
+	$("#div_settigns").toggle(cdma_settings_supported);
+	
+	/* allow number only */
+	$(".numbersOnly").keyup(function() {
+		$(this).val( $(this).val().replace(/[^0-9]/g,'') )
+	});
+});
+
+
+</script>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+
+#if 0
+<!-- 
+	##template## examples
+-->
+#endif
+		<form id="form" method="post" action="@@request['SCRIPT_NAME']">
+		
+		<div class="right-column white-box">
+			<div class="pad">
+				<p id="p_warning" ><script language=Javascript>document.write(_("pri not matching"))</script></p>
+		
+ 				<div id="div_settigns" class="grey-box">
+#if 0
+					<!-- status -->
+#endif
+					<div class="pad">
+						<h2><script language=Javascript>document.write(_("current cdma settings"))</script></h2>
+						
+#if 0
+						<!-- mdn -->
+#endif
+						<div class="form-row no-bg-form">
+							<label><script language=Javascript>document.write(_("mdn"))</script></label>
+							<div class="field">
+								<span id="current_mdn" class="normal-text" ></span>
+							</div>
+						</div>
+						
+#if 0
+						<!-- msid -->
+#endif
+						<div class="form-row no-bg-form">
+							<label><script language=Javascript>document.write(_("msid"))</script></label>
+							<div class="field">
+								<span id="current_msid" class="normal-text" ></span>
+							</div>
+						</div>
+						
+#if 0
+						<!-- mip -->
+#endif
+						<div class="form-row no-bg-form">
+							<label><script language=Javascript>document.write(_("mip profile"))</script></label>
+							<div class="field">
+								<span id="current_mip" class="normal-text" ></span>
+							</div>
+						</div>
+						
+					</div>
+
+#if 0
+					<!-- update cdma settings -->
+#endif
+
+					<div id="div_new_settings" class="pad">
+
+						<h2><script language=Javascript>document.write(_("update cdma settings"))</script></h2>
+		
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("mdn"))</script></label>
+							<div class="field">
+								<input type="text" id="new_mdn" class="validate[custom[onlyNumber],groupRequired[cdma-settings]]">
+							</div>
+						</div>
+		
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("msid"))</script></label>
+							<div class="field">
+								<input type="text" id="new_msid" class="validate[custom[onlyNumber],groupRequired[cdma-settings]]">
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("nai"))</script></label>
+							<div class="field">
+								<input type="text" id="new_nai" class="validate[groupRequired[cdma-settings]]">
+							</div>
+						</div>
+		
+						<div class="form-row">
+							<label></label>
+							<div class="field">
+								<p>
+									<script language=Javascript>document.write(_("msl is required"))</script>
+								</p>
+							</div>
+						</div>
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("msl"))</script></label>
+							<div class="field">
+								<input type="text" id="msl" class="validate[custom[onlyNumber]]">
+							</div>
+						</div>
+		
+					</div>
+
+#if 0		
+#if 0
+					<!-- oma active -->
+#endif
+		
+					<div id="div_reset_profile" class="pad">
+						<h2><script language=Javascript>document.write(_("manual oma-dm"))</script></h2>
+						
+						<div class="form-row no-bg-form">
+							<label for="field-1"><script language=Javascript>document.write(_("update type"))</script></label>
+							
+							<div class="field">
+								<select id="update_type">
+									<option value="omadm-prl"><script language=Javascript>document.write(_("omadm device configuration and prl"))</script></option>
+									<option value="omadm"><script language=Javascript>document.write(_("omadm device configuration"))</script></option>
+									<option value="prl"><script language=Javascript>document.write(_("omadm prl"))</script></option>
+								</select>
+							</div>
+						</div>
+						
+						<div class="form-row no-bg-form">
+							<label for="field-1"></label>
+							<div class="location-settings">
+								<button class="secondary" id="button_reset_profile" type="button"><script language=Javascript>document.write(_("oma activate"))</script></button>
+							</div>
+						</div>
+					</div>
+				
+#if 0
+					<!-- module factory reset -->
+#endif
+
+					<div id="div_reset_profile2" class="pad">
+						<h2><script language=Javascript>document.write(_("module factory reset"))</script></h2>
+						<div class="form-row no-bg-form">
+							<label for="field-1"><script language=Javascript>document.write(_("msl code"))</script></label>
+							
+							<div class="field">
+								<input type=text id="input_msl" class="large numbersOnly" maxLength="6" >
+							</div>
+						</div>
+						
+						<div class="form-row no-bg-form">
+							<label for="field-1"></label>
+							<div class="location-settings">
+								<button class="secondary" id="button_rtn" type="button"><script language=Javascript>document.write(_("factory reset"))</script></button>
+							</div>
+						</div>
+
+					</div>
+#endif
+
+					<div class="submit-row">
+						<button id="save" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		</form>
+
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+</script>
+
+</body>
+</html> 

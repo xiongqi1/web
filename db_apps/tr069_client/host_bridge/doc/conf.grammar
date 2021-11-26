@@ -1,0 +1,22 @@
+Start => (Definition)*
+
+Definition => Object | Collection | Default | Param
+
+Object => "object" Name "{" (Definition)* "}" ";"
+Collection => "collection" Name Handler "{" (Definition)* "}" ";"
+Default => "default" "{" (Definition)* "}" ";"
+Param => "param" Name ParamType Notify AccessType Handler ";"
+
+Name => /[_a-zA-Z][-_a-zA-Z0-9]*/
+Notify => "notify" "(" Number "," Number ")"
+Handler => HandlerType "(" (ValueList)? ")"
+
+ValueList => Value ("," Value)*
+
+ParamType => "string" | "int" | "uint" | "bool" | "datetime"
+AccessType => "read-only" | "read-write" | "write-only"
+HandlerType => "none" | "const" | "internal" | "transient" | "persist" | "dynamic" 
+Value => String | Number
+
+String => /"[^"]+"/
+Number => /-?[0-9]+/

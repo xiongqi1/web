@@ -1,0 +1,136 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Reboot</title>
+<% include topinc_v2.inc %>
+#ifdef V_CUSTOM_FEATURE_PACK_bellca	// Special WEBUI for Bell Canada
+#define CHECK_ADMIN_USER	// Instruct redirectOnSessionTimeout.inc to also check user is admin.
+#endif
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+
+var reboot = Base64.decode(<%_r=base64_encode(request['QUERY_STRING']);%>"@@_r");
+
+function doConfirm() {
+	blockUI_confirm(_("rebootConfirm"), function(){document.form.submit();});
+}
+
+var counter=0;
+var estTime=100;
+var lastBootDuration="<%get_single_direct('system.startup_duration');%>";
+var rebootok=0;
+$(document).ready(function() {
+	if(reboot=="reboot") {
+
+#ifdef PLATFORM_Serpent
+		if (lastBootDuration == "" ) {
+			lastBootDuration = 30;
+		}
+#endif
+		if (lastBootDuration != "" ) {
+			var duration = parseInt(lastBootDuration);
+#ifdef PLATFORM_Serpent
+			if ( (duration >= 15) && (duration<=600) ) // Sanity check duration
+#else
+			if ( (duration >= 30) && (duration<=600) ) // Sanity check duration
+#endif
+				estTime = duration+20;
+		}
+
+		function check_reload() {
+			counter++;
+			percentage=parseInt(50*counter/estTime);
+			if( percentage<100 ) {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman rebooting");
+				document.getElementById( "rebootCt" ).innerHTML=percentage+" %"
+			}
+			else {
+				document.getElementById( "rebootCt" ).innerHTML="100 %"
+				if( percentage>120 ) {
+					document.getElementById( "rebootCt" ).innerHTML=""
+					document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg6");//"The reboot seems to be taking too long, you may need to manually power cycle the device";
+				}
+			}
+
+			if(percentage>80 && (counter%5)==0 ) {
+				$.get("/cgi-bin/ajax.cgi", function (){ rebootok++; });
+			}
+			if(rebootok) {
+				document.getElementById( "rebootCt" ).innerHTML="100 %"
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg7");//"Reboot is successful, now redirecting to the Status page...";
+				if(reboot=="default") {
+					document.cookie="language=en; path=/";
+					setTimeout("window.location='http://" + defaultIP + "/index.html'", 5000);
+				}
+				else {
+					setTimeout("window.location='/index.html'", 5000);
+				}
+			}
+		}
+		document.getElementById("reboot-div").style['display']='none';
+		document.getElementById("wait-div").style['display']='';
+
+		setInterval(check_reload, 500);
+	}
+	else {
+		document.getElementById("reboot-div").style['display']='';
+		document.getElementById("wait-div").style['display']='none';
+	}
+});
+</script>
+
+<%if(request['REQUEST_METHOD']=="POST") {
+#ifdef PLATFORM_Serpent
+	set_single( 'service.system.reset.delay=1' );
+#endif
+	set_single( 'service.system.reset=1' );
+	redirect('/Reboot.html?reboot')
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+		<div id="reboot-div">
+			<form name='form' method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+				<div class="note-lrg">
+					<div class="wrap alert clearfix">
+						<h2><span class="access"><script language=Javascript>document.write(_("log warning"))</script> - </span><script language=Javascript>document.write(_("rebootRequest"))</script></h2>
+						<p><script language=Javascript>document.write(_("rebootTime"))</script></p>
+#ifdef V_WEBIF_SPEC_vdf
+						<div class="submit-row" style="padding-bottom:40px;margin:0">
+#else
+						<div class="submit-row" style="margin-left:390px;padding-bottom:40px;">
+#endif
+							<button type="button" class="strong" onClick="doConfirm()"><script language=Javascript>document.write(_("setman reboot"))</script></button>
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+		<div id="wait-div" class="pad white-box" style="display:none;">
+			<div id="rebootMsg" align="center" style="font-size:16px; font-weight:bold; padding-top:20px;">
+				<script language=Javascript>document.write(_("GUI rebooting"))</script>
+			</div>
+			<div align="center" style="padding-top:10px;">
+				<img width="60px" height="60px" src="/img/spinner_250.gif">
+				<b id="rebootCt" style="position:relative;top:-25px; left:30px">0 %</b>
+			</div>
+		</div>
+	</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+<script language='javascript'>
+  set_menu("Reboot", "", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

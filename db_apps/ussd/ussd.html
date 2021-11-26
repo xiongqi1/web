@@ -1,0 +1,135 @@
+#ifdef PLATFORM_Platypus
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.asp'); exit(403); } %>
+#else
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+#endif
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>USSD Settings</title>
+
+#if (!defined PLATFORM_Platypus)
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+#endif
+#if (!defined PLATFORM_Avian) && (!defined PLATFORM_Platypus2)
+<script type="text/javascript" src="util.js"></script>
+#endif
+<script type="text/javascript" src="stdlibjs.htm"></script>
+<!--script type="text/javascript" src="/ussd.js"></script-->
+</head>
+
+<body onload="javascript:initTranslation();UssdConfigGet();">
+<div id="contentWrapper">
+#ifdef PLATFORM_Platypus
+<% include /menu-netcomm.asp %>
+#else
+<% include menu.html %>
+#endif
+
+<script type="text/javascript">
+#include "ussd.js"
+function makeRequest(url, content, handler) {
+	http_request = false;
+	try {
+		http_request=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			http_request=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {   // Firefox, Opera 8.0+, Safari
+				http_request=new XMLHttpRequest();
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+	http_request.onreadystatechange = handler;
+	http_request.open('POST', url, true);
+	http_request.send(content);
+	return true;
+}
+</script>
+
+<script language="JavaScript">
+#if (defined PLATFORM_Platypus)
+Butterlate.setTextDomain("internet");
+#else
+Butterlate.setTextDomain("ussd");
+#endif
+function initTranslation() {
+#ifdef PLATFORM_Bovine
+	document.getElementById("UssdPageTitle").innerHTML = _("treeapp internet settings")+" > "+_("ussd");
+#else
+	document.getElementById("UssdPageTitle").innerHTML = _("wwan3g")+" > "+_("ussd");
+#endif
+	document.getElementById("UssdTitle").innerHTML = _("ussd service");
+	document.getElementById("UssdStatus").innerHTML = _("ussd status");
+	document.getElementById("UssdContents").innerHTML = _("ussd contents");
+	document.getElementById("UssdSelection").innerHTML = _("ussd selection");
+	document.getElementById("SelectButton").value = "  "+_("start session")+"  ";
+	document.getElementById("EndButton").value = "  "+_("end session")+"  ";
+	document.getElementById("UssdIntro1").innerHTML = _("ussd intro 1");
+	document.getElementById("UssdIntro2").innerHTML = _("ussd intro 2");
+	document.getElementById("UssdIntro3").innerHTML = _("ussd intro 3");
+	document.getElementById("UssdIntro4").innerHTML = _("ussd intro 4");
+}
+</script>
+
+<style>alert { direction:rtl; }</style>
+<form name="USSD" method="POST" action="@@requst['SCRIPT_NAME']" >
+<h3><span id="UssdPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%">
+	<tr><th><span id="UssdTitle"></span></th></tr>
+	<tr><td>
+	<span id="UssdIntro1"></span><br /><br />
+	<span id="UssdIntro2"></span><br /><br />
+	<span id="UssdIntro3"></span><br /><br />
+	<span id="UssdIntro4"></span><br />
+	</td></tr>
+</table>
+
+<table width="75%">	
+<tr>
+	<td style="width:210px"><span id="UssdStatus"></span></td>
+	<td><input type="text" name="ussd_status" size="10" value="" class='cdcsAjax' style="font-weight:bold" readonly="readonly"/></td>
+</tr>
+<tr > 
+	<td style="width:210px"><span id="UssdContents"></span></td>
+	<td style="text-align:left">
+	<textarea type="text" rows="12" cols="40" name="ussd_message" value="" style="font-weight:bold" readonly="readonly"></textarea>
+</tr>
+<tr>
+	<td style="width:210px"><span id="UssdSelection"></span></td>
+	<td><input type="text" name="ussd_selection" id="ussd_selection" size="25" value="" onfocus="javascript:ClearUssdSelection()" onclick="javascript:ClearUssdSelection()"/>&nbsp;&nbsp;&nbsp;&nbsp;
+	<input type="button" id="SelectButton" onClick="javascript:UssdAction(document.USSD.ussd_selection.value)">&nbsp;&nbsp;&nbsp;&nbsp;
+	<input type="button" id="EndButton" onClick="javascript:UssdAction('end')" style="display:none"></td>
+</tr>
+</table>
+</form>
+#ifdef PLATFORM_Platypus
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+#endif
+</div>
+#ifndef PLATFORM_Platypus
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+#if (defined PLATFORM_Platypus2) || (defined PLATFORM_Avian)
+	CopyRight();
+#else
+	setCopyRight();
+#endif
+</script>
+#endif
+</body>
+</html>

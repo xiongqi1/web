@@ -1,0 +1,1273 @@
+#ifdef PLATFORM_Platypus
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.asp'); exit(403); } %>
+<%diag_blked=nvram_get('smstools.diagtool_blocked');%>
+#else
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%diag_blked=get_single('smstools.diagtool_blocked');%>
+#endif
+
+<%
+#ifdef PLATFORM_Platypus
+	var sms_enabled=nvram_get('smstools.enable');
+#else
+	var sms_enabled=get_single('smstools.enable');
+#endif
+	var system_skin=get_single('system.skin');
+	if (system_skin == '')
+		system_skin=get_single('system.product.skin');
+	var system_board=get_single('system.board');
+
+	var system_product_model=get_single('system.product.model');
+%>
+
+#ifdef PLATFORM_Platypus
+<!DOCTYPE html PUBLIC >
+#else
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+#endif
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<title>SMS</title>
+</head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+#ifndef PLATFORM_Platypus
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+#endif
+<script language="JavaScript" type="text/javascript">
+sim_status="<%tmpval=get_single('wwan.0.sim.status.status');%>@@tmpval";
+#ifdef PLATFORM_Platypus
+encoding_scheme="<%tmpval=nvram_get('smstools.conf.coding_scheme');%>@@tmpval";
+#else
+encoding_scheme="<%tmpval=get_single('smstools.conf.coding_scheme');%>@@tmpval";
+#endif
+sms_enabled="@@sms_enabled";
+tx_concat_en="<%tx_concat_en=get_single('wwan.0.sms.txconcat_en');%>@@tx_concat_en";
+</script>
+
+<% if(sms_enabled=='0'){%>
+<body onload="javascript:initTranslation();">
+<%} else if(request['QUERY_STRING']=='config'){%>
+<body onload="javascript:initTranslation();SMSConfigGet();">
+<%} else if(request['QUERY_STRING']=='newmsg' || form['mode']=='redirect'){%>
+<body onload="javascript:initTranslation();ReadMaxTxDstIdx();">
+<%} else if(request['QUERY_STRING']=='inbox'){%>
+<body onload="javascript:initTranslation();ReadRxMsgCnt();">
+<%} else if(request['QUERY_STRING']=='outbox'){%>
+<body onload="javascript:initTranslation();ReadTxMsgCnt();">
+<%} else if(request['QUERY_STRING']=='email'){%>
+<body onload="javascript:initTranslation();SSMTPConfigGet();">
+<%} else if(request['QUERY_STRING']=='diag'){%>
+<body onload="javascript:initTranslation();">
+<%} else {%>
+<body onload="javascript:initTranslation();">
+<%}%>
+
+<div id="contentWrapper">
+#ifdef PLATFORM_Platypus
+<% include /menu-netcomm.asp %>
+#else
+<% include menu.html %>
+#endif
+
+<script type="text/javascript" src="stdlibjs.htm"></script>
+#ifdef PLATFORM_Platypus
+<script type="text/javascript" src="/js/sms.js"></script>
+#else
+<script type="text/javascript" src="sms.js"></script>
+#endif
+
+#ifndef PLATFORM_Platypus
+<script type="text/javascript">
+<!--
+
+#if (defined PLATFORM_Platypus2) || (defined PLATFORM_Bovine)
+#include "sms_js_strings.inc"
+Butterlate.setTextDomain("sms");
+#endif
+
+function makeRequest(url, content, handler) {
+	http_request = false;
+	try {
+		http_request=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			http_request=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {   // Firefox, Opera 8.0+, Safari
+				http_request=new XMLHttpRequest();
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+	http_request.onreadystatechange = handler;
+	http_request.open('POST', url, true);
+	http_request.send(content);
+	return true;
+}
+//-->
+</script>
+#endif
+
+
+<script language="JavaScript" type="text/javascript">
+
+function initTranslation()
+{
+	// strings common in all pages
+	document.getElementById("SmsRefresh").value = "  "+_("refresh")+"  ";	// Refresh
+	document.getElementById("SmsRefresh").title = _("refresh title");		// Refresh Page
+#if 0
+	document.getElementById("SmsHelp").value = "  "+_("help")+"  ";			// Help
+	document.getElementById("SmsHelp").title = _("help title");				// Goto Help Page
+#endif
+
+	// strings common in some pages
+<%if(request['QUERY_STRING']!='email' && request['QUERY_STRING']!='diag' && sms_enabled != '0'){%>
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+	document.getElementById("SmsMemStBar").innerHTML = _("sms memstbar");			// Memory & Message Status
+	document.getElementById("SmsMemSt").innerHTML = _("memory status");				// Memory Status
+	document.getElementById("SmsMsgSt").innerHTML = _("message status");			// Message Status
+	document.getElementById("memst").title = _("memory status title");				// Current memory usage status
+	document.getElementById("msgst").title = _("message status title");				// Current message box status
+	document.getElementById("SmsMemStDesc").innerHTML = _("memory status desc");	// Memory Status may not match with Message Status because of concatenated messages.
+#endif
+<%}%>
+
+<%if((request['QUERY_STRING']=='inbox' || request['QUERY_STRING']=='outbox' ||
+	form['mode']=='redir_inbox' || form['mode']=='redir_outbox') && sms_enabled != '0'){%>
+	document.getElementById("MsgTime").innerHTML = _("time");					// Time
+	document.getElementById("MsgMsg").innerHTML = _("message");					// Message
+	document.getElementById("DelMsg").value = "  "+_("delete")+"  ";			// Delete
+	document.getElementById("DelMsg").title = _("del msg title");				// Delete Selected Messages
+	document.getElementById("FwdMsg").value = "  "+_("forward")+"  ";			// Forward
+	document.getElementById("FwdMsg").title = _("forward msg title");			// Forward Selected Message
+	document.getElementById("AddWL").value = "  "+_("add")+" "+_("white list")+" ";	// Add White List
+	document.getElementById("AddWL").title = _("add wl title");					// Add Destination Numbers of Selected Messages to White List
+	document.getElementById("gotoprev").title = _("gotoprev title");			// Goto Previous Page
+	document.getElementById("gotonext").title = _("gotonext title");			// Goto Next Page
+<%}%>
+
+	// sms config page strings
+<%if(request['QUERY_STRING']=='config' || sms_enabled=='0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsConfPageTitle").innerHTML = _("sms title")+" > "+_("setup");	// SMS > Setup
+#else
+	document.getElementById("SmsConfPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("setup");	// Services > SMS > Setup
+#endif
+	document.getElementById("SmsGenConf").innerHTML = _("sms gen config");						// General SMS Configuration
+	document.getElementById("SmsOnOffMenu").innerHTML = _("sms onoff");							// SMS Enable/Disable
+	document.getElementById("onoffcontrol").title = _("sms onoff title");						// Enable or Disable full SMS functions
+	document.getElementById("SmsNumOfMsg").innerHTML = _("sms numofmsg");						// Messages / Page
+	document.getElementById("SmsNumOfMsgRange").innerHTML = _("10-50");							// 10-50
+	document.getElementById("numofmsg").title = _("sms numofmsg title");						// Define the number of messages to be shown in the page in Inbox/Outbox
+	document.getElementById("SmsRedirConf").innerHTML = _("sms redir conf");					// SMS Configuration for Redirection
+	document.getElementById("SmsRedirMobile").innerHTML = _("sms redir mobile");				// Redirect to Mobile
+	document.getElementById("redirmobile").title = _("sms redir mobile title");					// Redirect incoming text message to the mobile number entered here
+	document.getElementById("SmsRedirEmail").innerHTML = _("sms redir email");					// Redirect to Email
+	document.getElementById("rediremail").title = _("sms redir email title");					// Redirect incoming text message to the email address entered here
+	document.getElementById("SmsRedirTcp").innerHTML = _("sms redir tcp");						// Redirect to TCP
+	document.getElementById("redirtcp").title = _("sms redir tcp title");						// Redirect incoming text message to the TCP server entered here
+	document.getElementById("SmsRedirAddr").innerHTML = _("sms redir serverip");				// IP address or domain name
+	document.getElementById("SmsRedirTcpPort").innerHTML = _("sms redir tcp port");				// TCP Port to Redirect
+	document.getElementById("redirtcpport").title = _("sms redir tcp port title");				// TCP port number used for TCP redirection
+	document.getElementById("SmsRedirPort").innerHTML = _("1-65535");							// 1-65535
+	document.getElementById("SmsRedirUdp").innerHTML = _("sms redir udp");						// Redirect to UDP
+	document.getElementById("redirudp").title = _("sms redir udp title");						// Redirect incoming text message to the UDP server entered here
+	document.getElementById("SmsRedirAddr2").innerHTML = _("sms redir serverip");				// IP address or domain name
+	document.getElementById("SmsRedirUdpPort").innerHTML = _("sms redir udp port");				// UDP Port to Redirect
+	document.getElementById("redirudpport").title = _("sms redir udp port title");				// UDP port number used for UDP redirection
+	document.getElementById("SmsRedirPort2").innerHTML = _("1-65535");							// 1-65535
+	document.getElementById("SmsDiagConf").innerHTML = _("sms diag config");					// SMS Configuration for Remote Diagnostics
+	document.getElementById("SmsRemoteDiag").innerHTML = _("sms remote diag");					// Enable Remote Diagnostics
+	document.getElementById("remotediag").title = _("sms remote diag title");					// Enable or disable remote diagnostic feature based on SMS
+	document.getElementById("SmsConfSave").value = "  "+_("CSsave")+"  ";						// Save
+	document.getElementById("SmsConfSave").title = _("save conf title");						// Save Configuration
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+	document.getElementById("SmsConfSimReset").value = "  "+_("sim reset")+"  ";				// SIM Reset
+	document.getElementById("SmsConfSimReset").title = _("sim reset title");					// Delete all messages in SIM card
+#endif
+	document.getElementById("SmsExtSmsClientConf").innerHTML = _("sms ext client conf");		// External SMS Client Configuration
+	document.getElementById("useextsmsclient").title = _("sms ext client conf title");			// Setting for external SMS client
+	document.getElementById("UseExtSmsClient").innerHTML = _("use sms ext client");				// Use External SMS Client
+	document.getElementById("extsmsclientip1").title = _("sms ext client ip title1");			// TCP IP address used for Primary External SMS Client
+	document.getElementById("ExtSmsClientIp1").innerHTML = _("ext sms client ip1");				// Primary Client Address
+	document.getElementById("SmsExtClientAddr1").innerHTML = _("sms redir serverip");			// IP address or domain name
+	document.getElementById("extsmsclientip2").title = _("sms ext client ip title2");			// TCP IP address used for Secondary External SMS Client
+	document.getElementById("ExtSmsClientIp2").innerHTML = _("ext sms client ip2");				// Secondary Client Address
+	document.getElementById("SmsExtClientAddr2").innerHTML = _("sms redir serverip");			// IP address or domain name
+	document.getElementById("extsmsclientport").title = _("sms ext client port title");			// TCP port number used for External SMS Client
+	document.getElementById("ExtSmsClientPort").innerHTML = _("ext sms client port");			// TCP Port for External SMS Client
+	document.getElementById("ExtSmsClientPortRange").innerHTML = _("1-65535");					// 1-65535
+	document.getElementById("encodingscheme").title = _("sms encoding scheme title");			// Select SMS encoding scheme for send message. Some special characters may not be transfered properly in GSM 7 bit mode. Maximum number of characters to be sent is restricted to 50 in UCS2 mode.
+	document.getElementById("EncodingSchemeMenu").innerHTML = _("sms encoding scheme menu");	// Encoding Scheme
+	document.getElementById("SmscAddr").innerHTML = _("smsc address");							// SMSC Address
+	document.getElementById("smscaddr").title =  _("smsc address title");						// Define SMSC(Short Message Service Center) address
+	document.getElementById("SmscAddrChangeBtn").value = _("smsc addr change");					// Change
+	document.getElementById("SmscAddrChangeBtn").title = _("smsc addr change title");			// Change SMSC address
+	document.getElementById("moservice").title = _("sms moservice title");						// Select SMS MO routing option among Packet-switched, Circuit-switched, Packet-switched preffered, Circuit-switched preffered
+	document.getElementById("MoServiceMenu").innerHTML = _("sms moservice menu");				// Routing Option
+
+<%}%>
+
+	// sms new message page strings
+<%if((request['QUERY_STRING']=='newmsg' || form['mode']=='redirect') && sms_enabled != '0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsNewMsgPageTitle").innerHTML = _("sms title")+" > "+_("newmsg");	// SMS > New Message
+#else
+	document.getElementById("SmsNewMsgPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("newmsg");	// Services > SMS > New Message
+#endif
+	document.getElementById("SmsCreateNewMsg").innerHTML = _("sms create");			// Create New Message
+	// Please prefix a '+ ' to all international numbers or the message may be  incorrectly processed and/or discarded by the network.
+	document.getElementById("SmsInternationalNumberDesc").innerHTML = _("sms intnl num desc");
+	document.getElementById("SmsMsgbody").innerHTML = _("msg body");				// Message Body
+	document.getElementById("SmsNswMsgSend").value = "  "+_("send msg")+"  ";		// Send
+	document.getElementById("SmsNswMsgSend").title = _("send msg title");			// Send Text Message
+	document.getElementById("MsgCountDesc").innerHTML = _("sms msg count desc");	// Maximum number of characters can vary depending on coding scheme. In GSM7 bit mode 160 characters can be sent within a message but the limit changes to 50 characters if the message includes special characters. In UCS2 mode most of special character set can be sent but only 50 characters can be sent within a single message.
+<%}%>
+
+	// sms inbox page strings
+<%if((request['QUERY_STRING']=='inbox' || form['mode']=='redir_inbox') && sms_enabled != '0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsInboxPageTitle").innerHTML = _("sms title")+" > "+_("inbox");	// SMS > Inbox
+#else
+	document.getElementById("SmsInboxPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("inbox");	// Services > SMS > Inbox
+#endif
+	document.getElementById("MsgFrom").innerHTML = _("from");			// From
+	document.getElementById("ReplyMsg").value = _("reply");				// Reply
+	document.getElementById("ReplyMsg").title = _("reply msg title");	// Reply to Selected Message
+<%}%>
+
+	// sms outbox page strings
+<%if((request['QUERY_STRING']=='outbox' || form['mode']=='redir_outbox') && sms_enabled != '0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsOutboxPageTitle").innerHTML = _("sms title")+" > "+_("outbox");	// SMS > Outbox
+#else
+	document.getElementById("SmsOutboxPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("outbox");	// Services > SMS > Outbox
+#endif
+	document.getElementById("MsgTo").innerHTML = _("to");		// To
+<%}%>
+
+	// sms email forwarding page strings
+<%if((request['QUERY_STRING']=='email') && sms_enabled != '0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsEmailPageTitle").innerHTML = _("sms title")+" > "+_("email");	// SMS > Email Configuration
+#else
+	document.getElementById("SmsEmailPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("email");	// Services > SMS > Email Configuration
+#endif
+	document.getElementById("SmsEmailFwdSetting").innerHTML = _("sms email forward setting");	// SMS Email Forwaring Configuration
+	document.getElementById("SmsMailServerPort").innerHTML = _("mail server and port");			// Mail Server & Port
+	document.getElementById("SmsMailHostName").innerHTML = _("mesh hostname");					// Host Name
+	document.getElementById("SmsMailUserName").innerHTML = _("user name");						// User Name
+	document.getElementById("SmsMailPassword").innerHTML = _("password");						// Password
+	document.getElementById("SmsMailFrom").innerHTML = _("from");								// From
+	document.getElementById("SmsEmailSave").value = "  "+_("CSsave")+"  ";						// Save
+	document.getElementById("SmsEmailSave").title = _("save email setting title");				// Save SSMTP Configuration
+<%}%>
+
+	// sms email forwarding page strings
+<%if(request['QUERY_STRING']=='diag' && sms_enabled != '0'){%>
+#ifdef PLATFORM_Platypus
+	document.getElementById("SmsDiagPageTitle").innerHTML = _("sms title")+" > "+_("sms diag setup");	// SMS > Diagnostics & Command Execution Setup
+#else
+	document.getElementById("SmsDiagPageTitle").innerHTML = _("services")+" > "+_("sms title")+" > "+_("sms diag setup");	// Services > SMS > Diagnostics & Command Execution Setup
+#endif
+	document.getElementById("SmsDiagConfTitle").innerHTML = _("sms diag setup title");	// SMS Diagnostics & Command Execution Configuration
+	document.getElementById("SmsDiagSave").value = "  "+_("CSsave")+"  ";				// Save
+	document.getElementById("SmsDiagSave").title = _("save diag setting title");		// Save Diagnostics Configuration
+	document.getElementById("SmsAuthSel").innerHTML = _("enable auth");					// Enable Authentication
+	document.getElementById("SmsTxAckSel").innerHTML = _("send tx ack sel");			// Send Ack. SMS for Set Command
+	document.getElementById("SmsTxAckDst").innerHTML = _("send tx ack dst");			// Send Ack. SMS to
+	document.getElementById("SmsFixedAckNo").innerHTML = _("fixed ack no");				// Fixed Ack. SMS Number
+	document.getElementById("SmsTxErrSel").innerHTML = _("send tx err sel");			// Send Error SMS for Get/Set/Exec Command
+	document.getElementById("SmsTxErrDst").innerHTML = _("send tx err dst");			// Send Error SMS to
+	document.getElementById("SmsFixedErrNo").innerHTML = _("fixed err no");				// Fixed Error SMS Number
+	document.getElementById("SmsMaxDiagTxLim").innerHTML = _("max diag tx limit");		// Max. Diag. SMS Tx Limit
+	document.getElementById("SmsMsgPer").innerHTML = _("msg per");						// messages per
+	document.getElementById("SmsMsgSent").innerHTML = _("msg sent");					// messages sent
+	document.getElementById("SmsDiagTxCntReset").value = "  "+_("reset")+"  ";			// Reset
+	document.getElementById("SmsDiagTxCntReset").title = _("reset cnt title");			// Reset Sent Message Count
+	document.getElementById("SmsDiagTxLimHour").innerHTML = _("diag hour");				// HOUR
+	document.getElementById("SmsDiagTxLimDay").innerHTML = _("diag day");				// DAY
+	document.getElementById("SmsDiagTxLimWeek").innerHTML = _("diag week");				// WEEK
+	document.getElementById("SmsDiagTxLimMonth").innerHTML = _("diag month");			// MONTH
+	document.getElementById("SmsDiagTxLimDesc").innerHTML = _("diag tx lim desc");		// Limit the maximum number of diagnostic text messages to be sent within a certain time period. The current "messages sent" count automatically resets at the beginning of the designated time unit. For example, the counter will reset to 0 at 1:00, 2:00... for "HOUR", 00:00 for "DAY", 00:00 Monday for "WEEK" and the 1st day of the month for "MONTH".
+	document.getElementById("SmsAccessGenRdb").innerHTML = _("access generic rdb menu");// Access generic RDB variables
+	document.getElementById("SmsAccessGenRdb").title = _("access generic rdb title");	// allow accessing Get or Set command to generic RDB variables
+	document.getElementById("SmsAllowGenCmds").innerHTML = _("allow generic cmd menu");	// Allow execution of generic commands
+	document.getElementById("SmsAllowGenCmds").title = _("allow generic cmd title");	// allow execution of generic commands when received command is not a predefined command
+	document.getElementById("SmsDiagWlTitle").innerHTML = _("diag wl title");			// White List for Diagnostic or Execution SMS Messages
+	document.getElementById("SmsDiagWlDesc").innerHTML = _("diag wl desc");				// Incoming diagnostic or execution SMS messages are first checked with this White List. If the sender and password of the message do not match any of the destination numbers and passwords in the list, the message is ignored and an error message is sent either to the sender, or a predefined destination. Destination numbers can be easily added from SMS Inbox/Outbox pages using the "Add White List" button, up to a maximum of 20 entries.
+<%}%>
+}
+function check_phoneRegex(e) {
+	var phoneRegEx = /[^(\d+\+)]/g;
+	e.value=e.value.replace(phoneRegEx,'');
+}
+</script>
+
+<style>alert { direction:rtl; }</style>
+
+<div class="content" >
+<form class="content" name="SMS"  method="post" action="@@requst['SCRIPT_NAME']" >
+
+<input type="hidden" name="mode" value="@@form['mode']"/>
+<input type="hidden" name="msg_cnt" value="@@form['msg_cnt']"/>
+<input type="hidden" name="redir_no" value="@@form['redir_no']"/>
+<input type="hidden" name="redir_msg" value="@@form['redir_msg']"/>
+<input type="hidden" name="msgs_pp" value="@@form['msgs_pp']"/>
+<input type="hidden" name="page_no" value="@@form['page_no']"/>
+<input type="hidden" name="total_pages" value="@@form['total_pages']"/>
+<input type="hidden" name="disp_msg_cnt" value="@@form['disp_msg_cnt']"/>
+<input type="hidden" name="created" value="@@form['created']"/>
+#if (!defined PLATFORM_Platypus) && (!defined PLATFORM_Platypus2)
+<input type="hidden" name="memstat"/>
+<input type="hidden" name="msgstat"/>
+#endif
+<input type="hidden" name="menuOnOff"/>
+<input type="hidden" name="menuEncodingScheme"/>
+<input type="hidden" name="menuRemoteCommand"/>
+<input type="hidden" name="menuUseWhiteList"/>
+<input type="hidden" name="menuEnableSetCmdAck"/>
+<input type="hidden" name="menuUseFixedAckDest"/>
+<input type="hidden" name="menuEnableErrorNoti"/>
+<input type="hidden" name="menuUseFixedErrorNotiDest"/>
+<input type="hidden" name="menuUseExtSmsClient"/>
+<input type="hidden" name="menuMoService"/>
+<input type="hidden" name="menuAccessGenericRdbVars"/>
+<input type="hidden" name="menuAllowGenericCmds"/>
+
+<% if(request['QUERY_STRING']=='config' || sms_enabled=='0'){%>
+<!-- ##################################################################################-->
+<!-- ########################   SMS configuration   ###################################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsConfPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+<% if(sms_enabled != '0'){%>
+<script language="JavaScript">
+	display_memory_and_message_status();
+</script>
+
+<div align="center" style="margin-left:5%;margin-right:5%" >
+<p>&nbsp;</p>
+<%}%>
+
+<input type="button" id="SmsConfSimReset" onClick="javascript:SMSSimReset()" <% if(sms_enabled=='0') {%> style="display:none" <%}%> />&nbsp;&nbsp;
+
+<% if(sms_enabled != '0'){%>
+<p>&nbsp;</p>
+</div>
+<%}%>
+#endif
+
+<table width="80%">
+	<tr>
+		<th><span id="SmsGenConf"></span></th>
+	</tr>
+</table>
+<table width="80%">
+	<tr id="onoffcontrol">
+		<td style="width:210px"><span id="SmsOnOffMenu"></span></td>
+		<td style="text-align:left"> <input type=radio name='SmsOnOff' onClick="javascript:document.SMS.menuOnOff.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='SmsOnOff' onClick="javascript:document.SMS.menuOnOff.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr id="numofmsg" <% if(sms_enabled=='0') {%> style="display:none" <%}%> >
+		<td style="width:210px"><span id="SmsNumOfMsg"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="msgsperpage" size="5" maxLength="5" value="@@form['msgsperpage']" />
+		&nbsp;&nbsp;<span id="SmsNumOfMsgRange"></span></td>
+	</tr>
+	<tr id="encodingscheme" <% if(sms_enabled=='0') {%> style="display:none" <%}%> >
+		<td style="width:210px"><span id="EncodingSchemeMenu"></span></td>
+		<td style="text-align:left"> <input type=radio name='EncodingScheme' onClick="javascript:document.SMS.menuEncodingScheme.value='GSM7';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms gsm7"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='EncodingScheme' onClick="javascript:document.SMS.menuEncodingScheme.value='UCS2';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms ucs2"));</script></font>&nbsp;</td>
+	</tr>
+	<tr id="smscaddr" <% if(sms_enabled=='0') {%> style="display:none" <%}%> >
+		<td style="width:210px"><span id="SmscAddr"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="SmscAddrNo" size="32" maxLength="32" value="@@form['SmscAddrNo']" />
+		&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type="button" id="SmscAddrChangeBtn" onClick="javascript:SaveSmscAddr()" style="padding:1px 6px"/></td>
+	</tr>
+	<tr id="moservice" <% if(sms_enabled=='0' || system_board=='3g22wv' || system_product_model=='ntc_8000c') {%> style="display:none" <%}%> >
+		<td style="width:210px"><span id="MoServiceMenu"></span></td>
+		<td style="text-align:left">
+		<input type=radio name='RadioMoService' onClick="javascript:document.SMS.menuMoService.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms moservice ps"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='RadioMoService' onClick="javascript:document.SMS.menuMoService.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms moservice cs"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='RadioMoService' onClick="javascript:document.SMS.menuMoService.value='2';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms moservice ps pref"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='RadioMoService' onClick="javascript:document.SMS.menuMoService.value='3';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sms moservice cs pref"));</script></font>&nbsp;</td>
+	</tr>
+</table>
+
+<table width="80%" <% if(sms_enabled=='0') {%> style="display:none" <%}%> >
+	<tr>
+		<th><span id="SmsRedirConf"></span></th>
+	</tr>
+</table>
+<table width="80%" <% if(sms_enabled=='0') {%> style="display:none" <%}%> >
+	<tr id="redirmobile">
+		<td style="width:210px"><span id="SmsRedirMobile"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="RedirMobile" size="32" maxLength="32" value="@@form['RedirMobile']" /></td>
+	</tr>
+	<tr style="display:none" id="rediremail">
+		<td style="width:210px"><span id="SmsRedirEmail"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="RedirEmail" size="32" maxLength="256" value="@@form['RedirEmail']" /></td>
+	</tr>
+	<tr id="redirtcp">
+		<td style="width:210px"><span id="SmsRedirTcp"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="RedirTCP" size="32" maxLength="256" value="@@form['RedirTCP']" />
+		&nbsp;&nbsp;<span id="SmsRedirAddr"></span></td>
+	</tr>
+	<tr id="redirtcpport">
+		<td style="width:210px"><span id="SmsRedirTcpPort"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="TCPport" size="5" maxLength="5" value="@@form['TCPport']" />
+		&nbsp;&nbsp;<span id="SmsRedirPort"></td>
+	</tr>
+	<tr id="redirudp">
+		<td style="width:210px"><span id="SmsRedirUdp"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="RedirUDP" size="32" maxLength="256" value="@@form['RedirUDP']" />
+		&nbsp;&nbsp;<span id="SmsRedirAddr2"></span></td>
+	</tr>
+	<tr id="redirudpport">
+		<td style="width:210px"><span id="SmsRedirUdpPort"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="UDPport" size="5" maxLength="5" value="@@form['UDPport']" />
+		&nbsp;&nbsp;<span id="SmsRedirPort2"></td>
+	</tr>
+</table>
+
+<table width="80%"  id="SmsDiagConfMenuTitle" <%if (diag_blked=="1" || sms_enabled=='0') {%> style="display:none" <%}%> >
+	<tr>
+		<th><span id="SmsDiagConf"></span></th>
+	</tr>
+</table>
+<table width="80%" id="SmsDiagConfMenuContents" <%if (diag_blked=="1" || sms_enabled=='0') {%> style="display:none" <%}%> >
+	<tr id="remotediag">
+		<td style="width:210px"><span id="SmsRemoteDiag"></span></td>
+		<td style="text-align:left"> <input type=radio name='RemoteCommand' onClick="javascript:document.SMS.menuRemoteCommand.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='RemoteCommand' onClick="javascript:document.SMS.menuRemoteCommand.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+</table>
+
+<table width="80%" style="display:none">
+	<tr>
+		<th><span id="SmsExtSmsClientConf"></span></th>
+	</tr>
+</table>
+<table width="80%" style="display:none">
+	<tr id="useextsmsclient">
+		<td style="width:210px"><span id="UseExtSmsClient"></span></td>
+		<td style="text-align:left"> <input type=radio name='UseExtSmsClient' onClick="javascript:document.SMS.menuUseExtSmsClient.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='UseExtSmsClient' onClick="javascript:document.SMS.menuUseExtSmsClient.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr id="extsmsclientip1">
+		<td style="width:210px"><span id="ExtSmsClientIp1"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="ExtSmsClientIp1" size="32" maxLength="256" value="@@form['ExtSmsClientIp1']" />
+		&nbsp;&nbsp;<span id="SmsExtClientAddr1"></td>
+	</tr>
+	<tr id="extsmsclientip2">
+		<td style="width:210px"><span id="ExtSmsClientIp2"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="ExtSmsClientIp2" size="32" maxLength="256" value="@@form['ExtSmsClientIp2']" />
+		&nbsp;&nbsp;<span id="SmsExtClientAddr2"></td>
+	</tr>
+	<tr id="extsmsclientport">
+		<td style="width:210px"><span id="ExtSmsClientPort"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="ExtSmsClientPort" size="5" maxLength="5" value="@@form['ExtSmsClientPort']" />
+		&nbsp;&nbsp;<span id="ExtSmsClientPortRange"></td>
+	</tr>
+</table>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+<input type="button" id="SmsConfSave" onClick="javascript:SMSConfigSet()"/>&nbsp;&nbsp;
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?config')"/>&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+</div>
+
+<script type="text/javascript">
+<!--
+	sms_onoff="@@sms_enabled";
+	if (sms_onoff == '0') {
+		document.SMS.menuOnOff.value='0';
+		document.SMS.SmsOnOff[1].checked=true;
+	} else {
+		document.SMS.menuOnOff.value='1';
+		document.SMS.SmsOnOff[0].checked=true;
+	}
+	if(document.SMS.menuEncodingScheme.value=='GSM7')
+		document.SMS.EncodingScheme[0].checked=true;
+	else
+		document.SMS.EncodingScheme[1].checked=true;
+
+	if(document.SMS.menuMoService.value=='0')
+		document.SMS.RadioMoService[0].checked=true;
+	else if(document.SMS.menuMoService.value=='1')
+		document.SMS.RadioMoService[1].checked=true;
+	else if(document.SMS.menuMoService.value=='2')
+		document.SMS.RadioMoService[2].checked=true;
+	else if(document.SMS.menuMoService.value=='3')
+		document.SMS.RadioMoService[3].checked=true;
+
+	if(document.SMS.menuRemoteCommand.value=='1')
+		document.SMS.RemoteCommand[0].checked=true;
+	else
+		document.SMS.RemoteCommand[1].checked=true;
+	if(document.SMS.menuUseExtSmsClient.value=='1')
+		document.SMS.UseExtSmsClient[0].checked=true;
+	else
+		document.SMS.UseExtSmsClient[1].checked=true;
+
+<%if (diag_blked=="1" || sms_enabled=='0') {%>
+	document.getElementById("SmsDiagConfMenuTitle").style.display='none';
+	document.getElementById("SmsDiagConfMenuContents").style.display='none';
+	// document.getElementById("SmsHelp").style.display='none';
+<%}%>
+
+	smsc_addr="<%tmpval=get_single('wwan.0.sms.smsc_addr');%>@@tmpval";
+	document.SMS.SmscAddrNo.value=smsc_addr;
+
+	ifname="<%tmpval=get_single('wwan.0.if');%>@@tmpval";
+	if (smsc_addr == '' && sim_status != 'SIM OK' && (ifname == 'cns' || ifname == 'atcns')) {
+		document.SMS.SmscAddrNo.value=_("sms warning34");
+	}
+
+
+//-->
+</script>
+
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+#if defined(PLATFORM_Bovine) && !defined(V_SMS_UPDATE_UNREAD_CNT_INBOX_ONLY_y)
+<%if (sms_enabled=='1') {%>
+<script type="text/javascript">timer_id = setTimeout("UpdateUnreadCntTimer('config')", 1000);</script>
+<%}%>
+#endif
+
+
+
+
+
+<%} else if(request['QUERY_STRING']=='newmsg' || form['mode']=='redirect'){%>
+<!-- ##################################################################################-->
+<!-- ########################   new SMS creation   ####################################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsNewMsgPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+<script language="JavaScript">
+	display_memory_and_message_status();
+</script>
+#endif
+
+<table width="80%">
+	<tr>
+		<th><span id="SmsCreateNewMsg"></span></th>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr><td style="text-align:left;line-height:1.5"><span id="SmsInternationalNumberDesc"></td></tr>
+</table>
+
+<table width="80%">
+<script type="text/javascript">
+<!--
+	var i;
+	var DestNumText;
+	var AddRecipientText;
+	var DelRecipientText;
+	var manufacturer="<%tmpval2=get_single('wwan.0.manufacture');%>@@tmpval2";
+	var is_sierra = 0;
+	if (manufacturer.search("Sierra Wireless") != -1) {
+		is_sierra = 1;
+	}
+
+	DestNumText = _("dest number");			// Destination Number
+	AddRecipientText = _("add recipient");	// Append Recipient
+	DelRecipientText = _("del recipient");	// Delete Recipient
+
+	for(i=0; i<100; i++){
+		document.write("<tr id='newmsglist"+i+"' style='display:none'>");
+		if (i < 9)
+			document.write("<td style='width:210px;text-align:left'>"+DestNumText+" 00"+(i+1)+"</td>");
+		else if (i < 99)
+			document.write("<td style='width:210px;text-align:left'>"+DestNumText+" 0"+(i+1)+"</td>");
+		else
+			document.write("<td style='width:210px;text-align:left'>"+DestNumText+" "+(i+1)+"</td>");
+		document.write("<td style='text-align:left'>&nbsp;&nbsp;");
+		document.write("<input type='checkbox' name='tx_sel'value='' />&nbsp;&nbsp;");
+		document.write("<input type='text' name='mob_num' size='32' maxLength='32' onkeyup='check_phoneRegex(this)' value='' />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+		document.write("<input type='text' name='tx_result' style='color:BLUE'size='8' value='' class='cdcsAjax' readonly='readonly' />&nbsp;&nbsp;&nbsp;");
+		document.write("<input type='button' name='add_dst' value='&nbsp;+&nbsp;' style='display:none' onclick=javascript:IncreaseMaxTxDstIdx() title='"+AddRecipientText+"'  />&nbsp;&nbsp;");
+		document.write("<input type='button' name='del_dst' value='&nbsp;-&nbsp;' style='display:none' onclick=javascript:DecreaseMaxTxDstIdx() title='"+DelRecipientText+"' />");
+		document.write("</td>");
+		document.write("</tr>");
+	}
+	for(i=0; i<100; i++){
+		if (document.SMS.tx_result[i].value=="Failure")
+			document.SMS.tx_result[i].style.color="RED";
+	}
+//-->
+</script>
+
+	<tr >
+		<td style="width:210px"><span id="SmsMsgbody"></span></td>
+		<td style="text-align:left">
+		<textarea type="text" id="NewMsgMsgBody" rows="4" cols="65" name="txmsg" value="" onkeyup=javascript:DisplayCharCount()></textarea>
+		<p><span id="CharCount" style="text-align:left;"></span>&nbsp;</p>
+		<p><span id="MsgCountDesc" style="text-align:left;display:none"></span>&nbsp;</p>
+	</tr>
+
+</table>
+
+<script type="text/javascript">
+<!--
+	if (document.SMS.redir_no.value != "") {
+		document.SMS.tx_sel[0].value="1";
+		document.SMS.tx_sel[0].checked=true;
+		document.SMS.mob_num[0].value = document.SMS.redir_no.value;
+	}
+	var decode_msg;
+	if (document.SMS.redir_msg.value != "") {
+		decode_msg = decodeURIComponent(document.SMS.redir_msg.value);
+		decode_msg=decode_msg.replace(/%22/g, "\"");
+		document.SMS.txmsg.value=decode_msg;
+	}
+	smsc_addr="<%tmpval2=get_single('wwan.0.sms.smsc_addr');%>@@tmpval2";
+	if (smsc_addr == '') {
+		DisplaySmscAddrError();
+	}
+<%if (tx_concat_en == '0') {%>
+	document.getElementById( "MsgCountDesc" ).style['display']='';
+<%}%>
+//-->
+</script>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+
+<%sim_status=get_single('wwan.0.sim.status.status');
+smsc_address=get_single('wwan.0.sms.smsc_addr');
+if (sim_status != 'SIM OK') {%>
+<input type="button" id="SmsNswMsgSend" onClick="javascript:DisplaySimError()"/>&nbsp;&nbsp;
+<%} else if (smsc_address == '') {%>
+<input type="button" id="SmsNswMsgSend" onClick="javascript:DisplaySmscAddrError()"/>&nbsp;&nbsp;
+<%} else {%>
+<input type="button" id="SmsNswMsgSend" onClick="javascript:SendMsg()"/>&nbsp;&nbsp;
+<%}%>
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?newmsg')"/>&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+</div>
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+#ifndef PLATFORM_Platypus
+<script type="text/javascript">
+<!--
+	document.getElementById("NewMsgMsgBody").style.cols="65";
+	// document.getElementById("SmsHelp").style.display='none';
+//-->
+</script>
+#endif
+
+#if defined(PLATFORM_Bovine) && !defined(V_SMS_UPDATE_UNREAD_CNT_INBOX_ONLY_y)
+<%if (sms_enabled=='1') {%>
+<script type="text/javascript">timer_id = setTimeout("UpdateUnreadCntTimer('newmsg')", 1000);</script>
+<%}%>
+#endif
+
+
+
+<%} else if(request['QUERY_STRING']=='inbox' || form['mode']=='redir_inbox'){%>
+<!-- ##################################################################################-->
+<!-- ########################   SMS Inbox   ###########################################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsInboxPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+<script language="JavaScript">
+	display_memory_and_message_status();
+</script>
+#endif
+
+<table width="80%">
+	<tr>
+		<th><span id="msgboxtitle"></span></th>
+	</tr>
+</table>
+
+<table width="80%" style="TABLE-layout:fixed">
+	<tr>
+		<td style="width:10px;text-align:center"><input type="checkbox" id="selectall" name="selectall" value="" onclick=SelectAllMsg() /></td>
+#ifdef PLATFORM_Platypus
+		<td id="SmsInboxMsgFrom" style="width:200px;text-align:center"><b><span id="MsgFrom"></span></b></td>
+#else
+		<td id="SmsInboxMsgFrom" style="width:150px;text-align:center"><b><span id="MsgFrom"></span></b></td>
+#endif
+		<td style="width:200px;text-align:center"><b><span id="MsgTime"></span></b></td>
+		<td style="text-align:center"><b><span id="MsgMsg"></span></b></td>
+	</tr>
+
+<%if(form['mode']=='redir_inbox'){%>
+<script type="text/javascript">
+<!--
+	var i;
+	var loop_limit;
+
+	for (i=0; i<=document.SMS.msgs_pp.value; i++){
+		document.write("<tr id='smsbox_msg"+i+"' style='display:none' onmouseover='MsgBoxMouseOver("+i+")' onmouseout='MsgBoxMouseOut("+i+") '>");
+		document.write("<td style='text-align:center'>");
+		document.write("<input type='checkbox' name='msg_sel' id='msg_sel"+i+"' value='' /></td>");
+		document.write("<td style='text-align:left' onclick=SmsMsgDisplay("+i+")>");
+		document.write("<input type='text' name='mob_num' size='20' value='' class='cdcsAjax' readonly='readonly' /></td>");
+		document.write("<td style='text-align:left' onclick=SmsMsgDisplay("+i+")>");
+		document.write("<input type='text' name='tx_time' size='20' value='' class='cdcsAjax' readonly='readonly' /></td>");
+		document.write("<td style='text-align:left;overflow:hidden;' onclick=SmsMsgDisplay("+i+")>");
+#ifdef PLATFORM_Platypus
+		document.write("<input type='text' name='message_body' style='width:250' value='' class='cdcsAjax' readonly='readonly' /></td>");
+#else
+		document.write("<input type='text' name='message_body' size='100' value='' class='cdcsAjax' readonly='readonly' /></td>");
+#endif
+		document.write("</tr>");
+		document.write("<input type='hidden' name='smsc_num' value='' /></td>");
+		document.write("<input type='hidden' name='rx_time' value='' /></td>");
+		document.write("<input type='hidden' name='file_name' value='' />");
+		document.write("<input type='hidden' name='coding_scheme' value='' />");
+	}
+//-->
+</script>
+<%}%>
+</table>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+<input type="button" id="DelMsg" style="color:RED" onClick="javascript:DeleteSmsboxMsg()"/>&nbsp;&nbsp;
+<input type="button" id="ReplyMsg" onClick="javascript:ReplyForwardMsg(1)"/>&nbsp;&nbsp;
+<input type="button" id="FwdMsg" onClick="javascript:ReplyForwardMsg(0)"/>&nbsp;&nbsp;
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?inbox')"/>&nbsp;&nbsp;
+<input type="button" id="AddWL" onClick="javascript:CheckAddList()" <%if (diag_blked=="1") {%> style="display:none" <%}%> />&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<input type="button" value="  <<  " id="gotoprev" style="color:BLUE" onClick="javascript:GotoPreviousPage()"/>&nbsp;&nbsp;
+<input type="text" style="text-align:right;border-style:none" size="3" maxLength="3" value="@@form['page_no']" readonly="readonly" />&nbsp;/&nbsp;
+<input type="text" style="text-align:left;border-style:none" size="3" maxLength="3" value="@@form['total_pages']" readonly="readonly" />
+<input type="button" value="  >>  " id="gotonext" style="color:BLUE" onClick="javascript:GotoNextPage()"/>
+</div>
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+#ifndef PLATFORM_Platypus
+<script type="text/javascript">
+<!--
+	document.getElementById("SmsInboxMsgFrom").style.width="200";
+	//  document.getElementById("SmsHelp").style.display='none';
+	document.getElementById("AddWL").style.display='none';
+//-->
+</script>
+#endif
+
+<%if(form['mode']=='redir_inbox'){%>
+<script type="text/javascript">
+<!--
+	ReadInBoxMsg();
+//-->
+</script>
+<%}%>
+
+
+
+
+<%} else if(request['QUERY_STRING']=='outbox' || form['mode']=='redir_outbox'){%>
+<!-- ##################################################################################-->
+<!-- ########################   SMS Outbox   ##########################################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsOutboxPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2)
+<script language="JavaScript">
+	display_memory_and_message_status();
+</script>
+#endif
+
+<table width="80%">
+	<tr>
+		<th><span id="msgboxtitle"></span></th>
+	</tr>
+</table>
+
+<table width="80%" style="TABLE-layout:fixed">
+	<tr>
+		<td style="width:10px;text-align:center"><input type="checkbox" id="selectall" name="selectall" value="" onclick=SelectAllMsg() /></td>
+#ifdef PLATFORM_Platypus
+		<td style="width:200px;text-align:center"><b><span id="MsgTo"></b></td>
+		<td style="width:200px;text-align:center"><b><span id="MsgTime"></b></td>
+#else
+		<td style="width:150px;text-align:center"><b><span id="MsgTo"></b></td>
+		<td style="width:240px;text-align:center"><b><span id="MsgTime"></b></td>
+#endif
+		<td style="text-align:center"><b><span id="MsgMsg"></b></td>
+	</tr>
+
+<%if(form['mode']=='redir_outbox'){%>
+<script type="text/javascript">
+<!--
+	var i;
+	for (i=0; i<=document.SMS.msgs_pp.value; i++){
+		document.write("<tr id='smsbox_msg"+i+"' style='display:none' onmouseover='MsgBoxMouseOver("+i+")' onmouseout='MsgBoxMouseOut("+i+") '>");
+		document.write("<td style='text-align:center'>");
+		document.write("<input type='checkbox' name='msg_sel' id='msg_sel"+i+"' value='' /></td>");
+		document.write("<td style='text-align:left' onclick=SmsMsgDisplay("+i+")>");
+		document.write("<input type='text' name='mob_num' size='20' value='' class='cdcsAjax' readonly='readonly' /></td>");
+		document.write("<td style='text-align:left' onclick=SmsMsgDisplay("+i+")>");
+#ifdef PLATFORM_Platypus
+		document.write("<input type='text' name='tx_time' size='20' value='' class='cdcsAjax' readonly='readonly' /></td>");
+#else
+		document.write("<input type='text' name='tx_time' size='33' value='' class='cdcsAjax' readonly='readonly' /></td>");
+#endif
+		document.write("<td style='text-align:left;overflow:hidden;' onclick=SmsMsgDisplay("+i+")>");
+		document.write("<input type='text' name='message_body' size='100' style='width:250' value='' class='cdcsAjax' readonly='readonly' /></td>");
+		document.write("</tr>");
+		document.write("<input type='hidden' name='file_name' value='' />");
+		document.write("<input type='hidden' name='coding_scheme' value='' />");
+	}
+//-->
+</script>
+<%}%>
+</table>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+<input type="button" id="DelMsg" style="color:RED" onClick="javascript:DeleteSmsboxMsg()"/>&nbsp;&nbsp;
+<input type="button" id="FwdMsg" onClick="javascript:ReplyForwardMsg(0)"/>&nbsp;&nbsp;
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?outbox')"/>&nbsp;&nbsp;
+<input type="button" id="AddWL" onClick="javascript:CheckAddList()" <%if (diag_blked=="1") {%> style="display:none" <%}%> />&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<input type="button" value="  <<  " id="gotoprev" style="color:BLUE" onClick="javascript:GotoPreviousPage()"/>&nbsp;&nbsp;
+<input type="text" style="text-align:right;border-style:none" size="3" maxLength="3" value="@@form['page_no']" readonly="readonly" />&nbsp;/&nbsp;
+<input type="text" style="text-align:left;border-style:none" size="3" maxLength="3" value="@@form['total_pages']" readonly="readonly" />
+<input type="button" value="  >>  " id="gotonext" style="color:BLUE" onClick="javascript:GotoNextPage()"/>
+</div>
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+#ifndef PLATFORM_Platypus
+<script type="text/javascript">
+<!--
+	//  document.getElementById("SmsHelp").style.display='none';
+	document.getElementById("AddWL").style.display='none';
+//-->
+</script>
+#endif
+
+<%if(form['mode']=='redir_outbox'){%>
+<script type="text/javascript">
+<!--
+	ReadOutBoxMsg();
+//-->
+</script>
+<%}%>
+
+
+
+
+
+
+
+
+<%} else if(request['QUERY_STRING']=='email'){%>
+<!-- ##################################################################################-->
+<!-- ########################   SMS Email Configuration  ##############################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsEmailPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+<table width="80%">
+	<tr>
+		<th><span id="SmsEmailFwdSetting"></span></th>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr >
+		<td style="width:210px"><span id="SmsMailServerPort"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="SsmtpMailHub" size="40" value="@@form['SsmtpMailHub']" /></td>
+	</tr>
+	<tr >
+		<td style="width:210px"><span id="SmsMailHostName"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="SsmtpHostName" size="40" value="@@form['SsmtpHostName']" /></td>
+	</tr>
+	<tr >
+		<td style="width:210px"><span id="SmsMailUserName"></td>
+		<td style="text-align:left">
+		<input type="text" name="SsmtpAuthUser" size="40" value="@@form['SsmtpAuthUser']" /></td>
+	</tr>
+	<tr >
+		<td style="width:210px"><span id="SmsMailPassword"></td>
+		<td style="text-align:left">
+		<input type="password" name="SsmtpAuthPass" size="40" value="@@form['SsmtpAuthPass']" /></td>
+	</tr>
+	<tr >
+		<td style="width:210px"><span id="SmsMailFrom"></td>
+		<td style="text-align:left">
+		<input type="text" name="SsmtpFromSender" size="40" value="@@form['SsmtpFromSender']" /></td>
+	</tr>
+</table>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+<input type="button" id="SmsEmailSave" onClick="javascript:SSMTPConfigSet()"/>&nbsp;&nbsp;
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?email')"/>&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+</div>
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+#if 0
+<script type="text/javascript">
+<!--
+	document.getElementById("SmsHelp").style.display='none';
+//-->
+</script>
+#endif
+
+#if defined(PLATFORM_Bovine) && !defined(V_SMS_UPDATE_UNREAD_CNT_INBOX_ONLY_y)
+<%if (sms_enabled=='1') {%>
+<script type="text/javascript">timer_id = setTimeout("UpdateUnreadCntTimer('email')", 1000);</script>
+<%}%>
+#endif
+
+
+<%} else if(request['QUERY_STRING']=='diag'){%>
+<!-- ##################################################################################-->
+<!-- ########################   SMS Diagnostics configuration   ###################################-->
+<!-- ##################################################################################-->
+<h3><span id="SmsDiagPageTitle"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="/images/waiting.gif" width="22" height="22" id="waitanimation" style="display:none" /></h3>
+#ifdef PLATFORM_Platypus
+<p></p>
+<table class="body"><tr><td style="background:transparent;">
+#else
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+#endif
+<table width="80%">
+	<tr>
+		<th><span id="SmsDiagConfTitle"></span></th>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr >
+		<td style="width:250px"><span id="SmsAuthSel"></span></td>
+		<td style="text-align:left"> <input type=radio name='UseWhiteList' onClick="javascript:document.SMS.menuUseWhiteList.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable")); </script></font>&nbsp;&nbsp;
+		<input type=radio name='UseWhiteList' onClick="javascript:document.SMS.menuUseWhiteList.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsTxAckSel"></span></td>
+		<td style="text-align:left"> <input type=radio name='EnableSetCmdAck' onClick="javascript:document.SMS.menuEnableSetCmdAck.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable")); </script></font>&nbsp;&nbsp;
+		<input type=radio name='EnableSetCmdAck' onClick="javascript:document.SMS.menuEnableSetCmdAck.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsAccessGenRdb"></span></td>
+		<td style="text-align:left"> <input type=radio name='AccessGenericRdbVars' onClick="javascript:ConfirmGenericRdbAccessOption();"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='AccessGenericRdbVars' onClick="javascript:document.SMS.menuAccessGenericRdbVars.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsAllowGenCmds"></span></td>
+		<td style="text-align:left"> <input type=radio name='AllowGenericCmds' onClick="javascript:ConfirmGenericCmdsOption();"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='AllowGenericCmds' onClick="javascript:document.SMS.menuAllowGenericCmds.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsTxAckDst"></span></td>
+		<td style="text-align:left"> <input type=radio name='UseFixedAckDest' onClick="javascript:document.SMS.menuUseFixedAckDest.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("fixed number"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='UseFixedAckDest' onClick="javascript:document.SMS.menuUseFixedAckDest.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sender number"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsFixedAckNo"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="FixedAckDestNo" size="32" maxLength="32" value="@@form['FixedAckDestNo']" /></td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsTxErrSel"></span></td>
+		<td style="text-align:left"> <input type=radio name='EnableErrorNoti' onClick="javascript:document.SMS.menuEnableErrorNoti.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("enable")); </script></font>&nbsp;&nbsp;
+		<input type=radio name='EnableErrorNoti' onClick="javascript:document.SMS.menuEnableErrorNoti.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("disable"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsTxErrDst"></span></td>
+		<td style="text-align:left"> <input type=radio name='UseFixedErrorNotiDest' onClick="javascript:document.SMS.menuUseFixedErrorNotiDest.value='1';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("fixed number"));</script></font>&nbsp;&nbsp;
+		<input type=radio name='UseFixedErrorNotiDest' onClick="javascript:document.SMS.menuUseFixedErrorNotiDest.value='0';"/>&nbsp;
+		<script language="JavaScript">multiLangRadio(_("sender number"));</script></font>&nbsp;</td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsFixedErrNo"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="FixedErrorNotiDestNo" size="32" maxLength="32" value="@@form['FixedErrorNotiDestNo']" /></td>
+	</tr>
+	<tr >
+		<td style="width:250px"><span id="SmsMaxDiagTxLim"></span></td>
+		<td style="text-align:left">
+		<input type="text" name="MaxDiagSmsTxLimit" size="5" maxLength="5" value="@@form['MaxDiagSmsTxLimit']" />&nbsp;&nbsp;<span id="SmsMsgPer"></span>&nbsp;&nbsp;
+		<select name="MaxDiagSmsTxLimitPer" value="@@form['MaxDiagSmsTxLimitPer']">
+			<option id="SmsDiagTxLimHour" value="HOUR"></option>
+			<option id="SmsDiagTxLimDay" value="DAY"></option>
+			<option id="SmsDiagTxLimWeek" value="WEEK"></option>
+			<option id="SmsDiagTxLimMonth" value="MONTH"></option>
+		</select>
+		&nbsp;
+		<input type="text" name="SmsTxCnt" size="5" maxLength="5" value="@@form['SmsTxCnt']"
+		class="cdcsAjax" readonly="readonly" style="text-align:right"/>
+		&nbsp;<span id="SmsMsgSent"></span>&nbsp;
+		<input type="button" id="SmsDiagTxCntReset" onClick="javascript:ResetTxSmsCnt()"/>
+		</td>
+	</tr>
+	<tr>
+		<td style="width:250px"></td>
+		<td style="text-align:left;line-height:1.5"><span id="SmsDiagTxLimDesc"></span></td>
+	</tr>
+</table>
+<table width="80%">
+	<tr>
+		<th><span id="SmsDiagWlTitle"></th>
+	</tr>
+	<tr>
+		<td style="text-align:left;line-height:1.5"><span id="SmsDiagWlDesc"></td>
+	</tr>
+</table>
+
+<script language='javascript'>
+<!--
+	var i;
+	var IndexText;
+	var DestNumText;
+	var PasswordText;
+	var ControlText;
+	var DeleteText;
+	var AddWLTitleText;
+	var DelWLTitleText;
+	var DelWLTitle2Text;
+
+	IndexText = _("index");					// Index
+	DestNumText = _("dest number");			// Destination Number
+	PasswordText = _("password");			// Password
+	ControlText = _("control");				// Control
+	DeleteText = _("delete");				// Delete
+	AddWLTitleText = _("add wl title2");	// Append New White List
+	DelWLTitle1Text = _("del wl title");	// Delete White List
+	DelWLTitle2Text = _("del wl title2");	// Delete a White List
+
+	document.write("<table width='80%'>");
+	document.write("<tr>");
+	document.write("<td style='width:40px;background:#808080; color:#ffffff;text-align:center'>"+IndexText+"<\/td>");
+	document.write("<td style='width:300px;background:#808080; color:#ffffff;text-align:center'>"+DestNumText+"<\/td>");
+	document.write("<td style='width:150px;background:#808080; color:#ffffff;text-align:center'>"+PasswordText+"<\/td>");
+	document.write("<td style='background:#808080; color:#ffffff;text-align:center'>"+ControlText+"<\/td>");
+	document.write("<\/tr>");
+	document.write("<\/table>");
+
+	document.write("<table width='80%'>");
+	for(i=0; i<20; i++){
+		document.write("<tr id='whitelist"+i+"' style='display:none'>");
+		if (i < 9)
+			document.write("<td style='width:40px;text-align:center'> 0"+(i+1)+"<\/td>");
+		else
+			document.write("<td style='width:40px;text-align:center'>"+(i+1)+"<\/td>");
+		document.write("<td style='width:300px;text-align:center'>&nbsp;&nbsp;");
+		document.write("<input type='text' name='DiagUserNo' size='32' maxLength='32' value='' /><\/td>");
+		document.write("<td style='width:150px;text-align:center'>&nbsp;&nbsp;");
+		document.write("<input type='text' name='DiagPassword' size='15' maxLength='32' value='' /><\/td>");
+		document.write("<td style='text-align:left'>&nbsp;&nbsp;&nbsp;&nbsp;");
+		document.write("<input type='button' name='delete_wl' value='&nbsp;"+DeleteText+"&nbsp;' style='display:none;color:RED' onclick=javascript:DeleteWhiteList("+i+") title='"+DelWLTitleText+"' />&nbsp;&nbsp;");
+		document.write("<input type='button' name='add_dst' value='&nbsp;+&nbsp;' style='display:none' onclick=javascript:IncreaseWlMaxTxDstIdx() title='"+AddWLTitleText+"' />&nbsp;&nbsp;");
+		document.write("<input type='button' name='del_dst' value='&nbsp;-&nbsp;' style='display:none' onclick=javascript:DecreaseWlMaxTxDstIdx() title='"+DelWLTitle2Text+"' />");
+		document.write("<\/td>");
+		document.write("<\/tr>");
+	}
+	document.write("<\/table>");
+//-->
+</script>
+
+#ifndef PLATFORM_Platypus
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+#endif
+<div align="center" style="margin-left:5%;margin-right:5%">
+<p>&nbsp;</p>
+<input type="button" id="SmsDiagSave" onClick="javascript:DiagConfigSet()"/>&nbsp;&nbsp;
+<input type="button" id="SmsRefresh" onClick="javascript:window.location.replace(sms_file+'?diag')"/>&nbsp;&nbsp;
+#if 0
+<input type="button" id="SmsHelp" onClick="javascript:window.open('help.htm#SMS')" />
+#endif
+</div>
+
+
+
+<script type="text/javascript">
+<!--
+	if(document.SMS.menuUseWhiteList.value=='1')
+		document.SMS.UseWhiteList[0].checked=true;
+	else
+		document.SMS.UseWhiteList[1].checked=true;
+	if(document.SMS.menuEnableSetCmdAck.value=='1')
+		document.SMS.EnableSetCmdAck[0].checked=true;
+	else
+		document.SMS.EnableSetCmdAck[1].checked=true;
+	if(document.SMS.menuUseFixedAckDest.value=='1')
+		document.SMS.UseFixedAckDest[0].checked=true;
+	else
+		document.SMS.UseFixedAckDest[1].checked=true;
+	if(document.SMS.menuEnableErrorNoti.value=='1')
+		document.SMS.EnableErrorNoti[0].checked=true;
+	else
+		document.SMS.EnableErrorNoti[1].checked=true;
+	if(document.SMS.menuUseFixedErrorNotiDest.value=='1')
+		document.SMS.UseFixedErrorNotiDest[0].checked=true;
+	else
+		document.SMS.UseFixedErrorNotiDest[1].checked=true;
+	if(document.SMS.menuAccessGenericRdbVars.value=='1')
+		document.SMS.AccessGenericRdbVars[0].checked=true;
+	else
+		document.SMS.AccessGenericRdbVars[1].checked=true;
+	if(document.SMS.menuAllowGenericCmds.value=='1')
+		document.SMS.AllowGenericCmds[0].checked=true;
+	else
+		document.SMS.AllowGenericCmds[1].checked=true;
+	DiagConfigGet();
+
+#if 0
+	document.getElementById("SmsHelp").style.display='none';
+#endif
+//-->
+</script>
+
+#if defined(PLATFORM_Bovine) && !defined(V_SMS_UPDATE_UNREAD_CNT_INBOX_ONLY_y)
+<%if (sms_enabled=='1') {%>
+<script type="text/javascript">timer_id = setTimeout("UpdateUnreadCntTimer('diag')", 1000);</script>
+<%}%>
+#endif
+
+<%}%>
+#ifdef PLATFORM_Platypus
+</table>
+#endif
+
+</form>
+</div>
+#ifdef PLATFORM_Platypus
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+#endif
+</div>
+#ifndef PLATFORM_Platypus
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+<!--
+#if (defined PLATFORM_Platypus2) || (defined PLATFORM_Avian)
+	CopyRight();
+#else
+	setCopyRight();
+#endif
+//-->
+</script>
+#endif
+</body>
+</html>

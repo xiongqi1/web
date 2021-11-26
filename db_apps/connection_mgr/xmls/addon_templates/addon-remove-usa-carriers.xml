@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+<Exclude>
+	<Country country="USA" mcc="310">
+		<Carrier carrier="Verizon Wireless" mnc="004,005">
+			<APN apn="vzwinternet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sprint" mnc="120">
+			<APN apn="r.ispsn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="AT&amp;T" mnc="030,150,170,280,380,410,560,680,980">
+			<APN apn="m2m.com.attz">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Cellular One USA" mnc="059,190">
+			<APN apn="cellular1wap">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile (Non-contract)" mnc="260,270,250,200,031,220,160,660,240,230,210,026">
+			<APN apn="wap.voicestream.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile USA" mnc="026,031,160,200,210,220,230,240,250,260,270,660">
+			<APN apn="internet2.voicestream.com">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Unicel Info2Go" mnc="890">
+			<APN apn="apn.unicel.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="USA" mcc="311">
+		<Carrier carrier="Verizon Wireless" mnc="012,480">
+			<APN apn="vzwinternet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sprint" mnc="490">
+			<APN apn="r.ispsn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+</Exclude>
+</Rt>

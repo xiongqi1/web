@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+<Exclude>
+  <Country country="Australia" mcc="505">
+    <Carrier carrier="Telstra" mnc="001">
+      <APN apn="telstra.bigpond">
+      </APN>
+    </Carrier>
+  </Country>
+</Exclude>
+</Rt>

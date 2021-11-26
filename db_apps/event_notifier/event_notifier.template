@@ -1,0 +1,76 @@
+#!/bin/sh
+# Event monitor/notifier launch
+. /etc/variant.sh
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is for internal system use only."
+	echo "It is used to start/stop event notification daemons."
+    echo "Please do not run this script manually."
+    echo ""
+	exit 0
+fi
+
+EVTNOTI_EN="?<service.eventnoti.conf.enable>;"
+
+# if event noti max size changes then restart daemons to apply
+EVTNOTI_MAX_SIZE="?<service.eventnoti.conf.max_size>;"
+
+EVT_NOTI_DEBUG=`rdb_get service.eventnoti.conf.debug`
+
+EVT_MONITOR_DAEMON="event_monitor"
+EVT_NOTIFIER_DAEMON="event_notifier"
+
+log()
+{
+	logger "event `basename ${0}`: ${1}"
+}
+
+kill_daemon()
+{
+	killall $1
+	let "TIMEOUT=10"
+	while pidof $1 2>/dev/null >/dev/null; do
+		sleep 1
+		let "TIMEOUT-=1"
+		test $TIMEOUT -lt 0 && break
+	done
+	killall -q $1 2>/dev/null >/dev/null
+	rm -f /var/lock/subsys/$1 2>/dev/null >/dev/null
+}
+
+# check whether notifier is running already
+NOTI_PID=`pidof $EVT_NOTIFIER_DAEMON`
+
+# kill all daemons first
+kill_daemon $EVT_MONITOR_DAEMON
+kill_daemon $EVT_NOTIFIER_DAEMON
+if [ "$V_ETH_PORT" != "0" ]; then
+	kill_daemon ethdevno_monitor
+fi
+
+test "$EVT_NOTI_DEBUG" = "1" && EVT_NOTI_OPTION=" -v"
+
+if [ "$EVTNOTI_EN" = "1" ]; then
+	log "start Event Notification daemons..."
+	/usr/bin/$EVT_MONITOR_DAEMON $EVT_NOTI_OPTION
+	sleep 1
+
+	# use minimal delay option for event notifier if event_notifier is already
+	# running or rebooting event notification is waiting in event notification buffer
+	# before event_notifier starts.
+	test -n "$NOTI_PID" && MIN_DELAY="1"
+	test -n "`rdb_get -L service.eventnoti.event | grep text | grep "\[EVENT\#2\]"`" && MIN_DELAY="1"
+	test "$MIN_DELAY" = "1" && EVT_NOTI_OPTION="$EVT_NOTI_OPTION -i"
+
+	/usr/bin/$EVT_NOTIFIER_DAEMON $EVT_NOTI_OPTION
+	if [ "$V_ETH_PORT" != "0" ]; then
+		/usr/bin/ethdevno_monitor&
+	fi
+else
+	log "stop Event Notification daemons..."
+fi
+
+exit 0

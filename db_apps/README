@@ -1,0 +1,28 @@
+These are all projects that are using the database driver via rdb_lib.
+If the project uses rdb_operations.h, it belongs into this category.
+
+To add a new project, its Makefile must support the install and
+clean targets.
+
+The following variables will be set before the project's Makefile
+is invoked:
+
+	INSTALLDIR      = The target root directory to install to
+	PATH            = Contains a valid toolchain
+
+Dependencies
+==============
+
+The Makefile doesn't know what the exact dependencies for the
+subprojects are. It guesses that all files in the project's
+subdirectory are dependencies. This is used to create the PROJECT.dep
+files.
+
+If you feel that this is overkill, e.g. there is no need to rebuild
+if there are changes to a README file, copy the PROJECT.dep file
+into the project's subdirectory and add it to the project.
+
+The Makefile will use that file in preference to generating a new
+one.
+
+Iwo

@@ -1,0 +1,40 @@
+
+The logger is a hardware device based on an arduino mini
+(atmega328p) with a 32K FRAM (MB85RC256V) on the I2C bus.
+
+It gets connected to a serial console port and logs console
+output into a ring buffer in FRAM.
+
+It also requires a 4-5V power supply that is *not* shut
+down by software. 3.3V works, but is a little out of spec
+for the fitted crystal.
+
+There is only one UART available on this processor. So
+we are not using the Arduino boot loader, since it would
+interfere with operations.
+
+Magic strings detected by the logger in the console output:
+
+"U-Boot " - Disables logging. This is to save space and
+	preserve the critical "before reboot" information.
+
+"\nLogger Dump\n" - Dumps the contents of the log buffer to
+	the console input and re-enables logging.
+
+
+The loggerdump program should be run early within rc2.d
+on the target, as soon as the log file file system is available.
+This allows it to use the console before the getty starts
+up.
+
+It triggers a logger dump and enables logging at system startup.
+This means that the last captured log messages (up to U-Boot)
+end up in the specified log file.
+
+The files in avr_src are there for reference only - they won't
+compile in the current arrangement.
+
+TODO: logger to eat double newlines - for some reason, the
+console seems to generate them.
+
+Iwo

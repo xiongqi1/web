@@ -1,0 +1,269 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>NTP</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="/cgi-bin/timezoneList.cgi"></script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['ntpenable'];
+	set_single( 'service.ntp.enable='+tempval );
+	tempval = form['ntpServerAddress'];
+	set_single( 'service.ntp.server_address='+tempval );
+	tempval = form['TZ'];
+	set_single( 'system.config.tz='+tempval, '-p' );
+#ifdef PLATFORM_Platypus2
+	tempval = form['DST'];
+	set_single( 'system.config.dst='+tempval, '-p' );
+#endif
+}
+else { /*GET*/
+	form['ntpenable'] = get_single( 'service.ntp.enable' );
+	form['ntpServerAddress'] = get_single( 'service.ntp.server_address' );
+	form['TZ'] = get_single( 'system.config.tz' );
+	form['DST'] = get_single( 'system.config.dst' );
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("NTP");
+function submitF() {
+var f=document.form;
+	if( f.ntpenable.value=='1' && f.ntpServerAddress.value == "") {
+		alert(_("ntpServerEmpty"));
+		return;
+	}
+#ifdef PLATFORM_Platypus2
+	if(f.dst.checked) {
+		f.DST.value=zoneinfo[f.timezone.options.selectedIndex].DST;
+	}
+	else
+		f.DST.value="";
+#endif
+	ungreyOutNTPFields();
+	f.submit();
+}
+
+function greyOutNTPFields() {
+	document.form.ntpServerAddress.disabled = true;
+}
+
+function ungreyOutNTPFields() {
+	document.form.ntpServerAddress.disabled = false;
+}
+
+function checkNTPConf() {
+	if (document.form.ntpEnable[1].checked == true)
+		greyOutNTPFields();
+	else if (document.form.ntpEnable[0].checked == true)
+		ungreyOutNTPFields();
+}
+
+function tzChange(idx) {
+#ifdef PLATFORM_Bovine
+	document.form.TZ.value=zoneinfo[idx].FL;
+	if(zoneinfo[idx].DST=="")
+		document.getElementById("div_dst").style["display"]="none"
+	else
+		document.getElementById("div_dst").style["display"]=""
+#else
+	document.form.TZ.value=zoneinfo[idx].TZ;
+	if(zoneinfo[idx].DST!="")
+		document.getElementById("div_dst").style["display"]=""
+	else
+		document.getElementById("div_dst").style["display"]="none"
+#endif
+}
+
+#ifdef PLATFORM_Bovine
+function show_DST_details(idx) {
+var dst = new Array();
+	dst = zoneinfo[idx].DST.split(",");
+//EDT,M10.1.0,M4.1.0/3
+	if(dst.length<3) {
+		alert(_("Msg105"));//Daylight Saving Time details are not available. ( Error "+dst.length+" )
+	}
+	else {
+		var start = new Array();
+		var end = new Array();
+		start = dst[1].split(".");
+		end = dst[2].split(".");
+		if(start.length!=3 || end.length!=3) {
+			alert("DST format error "+start.length+":"+end.length);
+		}
+		else {
+			var start_month=parseInt(start[0].substring(1));
+			var start_week=parseInt(start[1]);
+			var start_day=parseInt(start[2]);
+			var idx_start_hour=start[2].indexOf("/");
+			var start_hour=idx_start_hour==-1?"2:00 AM":parseInt(start[2].substring(idx_start_hour+1)).toString()+":00 AM";
+
+			var end_month=parseInt(end[0].substring(1));
+			var end_week=parseInt(end[1]);
+			var end_day=parseInt(end[2]);
+			var idx_end_hour=end[2].indexOf("/");
+
+			var end_hour=idx_end_hour==-1?"2:00 AM":parseInt(end[2].substring(idx_end_hour+1)).toString()+":00 AM";
+			
+			if(start_month>=1 && start_month<=12 && start_week>=1 && start_week<=5 && start_day>=0 && start_day<=6) {
+				month = new Array("", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December");
+				weekdays = new Array("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday");
+				weeknumbers = new Array("", "first", "second", "third", "fourth", "last");
+				var msg="Daylight Saving Time begins on the "+weeknumbers[start_week]+" "+weekdays[start_day]+" in "+month[start_month]+" at "+start_hour+ \
+				", and ends on the "+weeknumbers[end_week]+" "+weekdays[end_day]+" in "+month[end_month]+" at "+end_hour+".";
+				alert(msg);
+			}
+			else {
+				alert("DST format error-2");
+			}
+		}
+	}
+}
+#endif
+
+function initTranslation() {
+	document.getElementById("bottomButton").value=_("CSsave");
+}
+
+$(document).ready(function() {
+	initTranslation();
+	if(document.form.TZ.value=="" || document.form.TZ.value=="N/A") {
+#ifdef PLATFORM_Bovine
+		document.form.TZ.value="Australia/Sydney";
+#else
+		document.form.TZ.value="EST-10";
+#endif
+	}
+
+	for (i=0; i<zoneinfo.length; i++) {
+#ifdef PLATFORM_Bovine
+		document.form.timezone.options[i] = new Option(zoneinfo[i].NAME), zoneinfo[i].FL;
+		if(document.form.TZ.value==zoneinfo[i].FL) {
+#else
+		document.form.timezone.options[i] = new Option(zoneinfo[i].NAME), zoneinfo[i].TZ;
+		if(document.form.TZ.value==zoneinfo[i].TZ) {
+#endif
+			document.form.timezone.options[i].selected=true;
+		}
+	}
+#ifdef PLATFORM_Platypus2
+	if(document.form.DST.value=="" || document.form.DST.value=="N/A")
+		document.form.dst.checked=false;
+	else
+		document.form.dst.checked=true;
+#endif
+	if(document.form.ntpenable.value=='1') {
+		ungreyOutNTPFields();
+		document.form.ntpEnable[0].checked=true;
+	}
+	else {
+		greyOutNTPFields();
+		document.form.ntpEnable[1].checked=true;
+	}
+	tzChange(document.form.timezone.options.selectedIndex);
+	var startPoll = function() {
+		$.get('/cgi-bin/setdate.cgi', function(d){eval(d);$("#currenttime").html(date)} );
+	}
+	setInterval(startPoll, 1000);
+});
+
+$(document).ready( function() {
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+</script>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("services")+" > NTP");</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > NTP");</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="ntpenable" value="@@form['ntpenable']"/>
+<input type="hidden" name="TZ" value="@@form['TZ']"/>
+<input type="hidden" name="DST" value="@@form['DST']"/>
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("GUI timeZone"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr>
+	<td width="33%" id="manNTPCurrentTime"><script language="JavaScript">document.write(_("man ntp current time"));</script></td>
+	<td id="currenttime"></td>
+</tr>
+<tr>
+	<td id="manNTPTimeZone"><script language="JavaScript">document.write(_("GUI timeZone"));</script></td>
+	<td>
+		<select name="timezone" onChange="tzChange(this.selectedIndex)"></select>
+	</td>
+</tr>
+</table>
+
+<div id="div_dst">
+<table>
+#ifdef PLATFORM_Platypus2
+<tr>
+	<td width="33%"><script language="JavaScript">document.write(_("man dayLightSavings"))</script></td>
+	<td>
+		<input type=checkbox name='dst' value="1">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("enable dayLightSavings"))</script>
+	</td>
+</tr>
+#else
+<tr>
+	<td align="center">
+	<a href="javascript:show_DST_details(document.form.timezone.options.selectedIndex);">Click here to show the Daylight Saving Time details</a>
+	</td>
+</tr>
+#endif
+</table>
+</div>
+
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("man ntp setting"));</script></th></tr>
+</table>
+<table>
+<tr> 
+	<td width="33%"><script language="JavaScript">document.write(_("NTP Service"));</script></td>
+	<td><input type=radio name='ntpEnable' value=1 onClick="javascript:document.form.ntpenable.value='1';ungreyOutNTPFields()" >&nbsp;<script language="JavaScript">document.write(_("enable"));</script> &nbsp;&nbsp;
+	<input type=radio name='ntpEnable' value=0 onClick="javascript:document.form.ntpenable.value='0';greyOutNTPFields()" >&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("ntpServerAddress"));</script></td>
+	<td><input type=text name='ntpServerAddress' size=32 maxlength=64 value="@@form['ntpServerAddress']" />&nbsp;&nbsp;</td>
+</tr>
+</table>
+<div align="center"><p></p><input type="button" id="bottomButton" value="Save" onClick="submitF()" style="width:120px;"></div>
+</form>
+</div> <!-- <div class="hide_for_pppoe_en"> -->
+</div> <!-- <div id="contentWrapper"> -->
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

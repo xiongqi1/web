@@ -1,0 +1,239 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<title>Content Filter Settings</title>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<script language="JavaScript" type="text/javascript">
+var URLFilterNum = 0;
+var HostFilterNum = 0;
+
+function deleteClick(){
+	return true;
+}
+
+function formCheck() {
+	return true;
+}
+
+
+function updateState() {
+	if (document.webContentFilter.websFilterProxy.value == "1")
+		document.webContentFilter.websFilterProxy.checked = true;
+	if (document.webContentFilter.websFilterJava.value == "1")
+		document.webContentFilter.websFilterJava.checked = true;
+	if (document.webContentFilter.websFilterActivex.value == "1")
+		document.webContentFilter.websFilterActivex.checked = true;
+	if (document.webContentFilter.websFilterCookies.value == "1")
+		document.webContentFilter.websFilterCookies.checked = true;
+}
+
+function webContentFilterClick() {
+	document.webContentFilter.websFilterProxy.value = document.webContentFilter.websFilterProxy.checked ? "1": "0";
+	document.webContentFilter.websFilterJava.value = document.webContentFilter.websFilterJava.checked ? "1": "0";
+	document.webContentFilter.websFilterActivex.value = document.webContentFilter.websFilterActivex.checked ? "1": "0";
+	document.webContentFilter.websFilterCookies.value = document.webContentFilter.websFilterCookies.checked ? "1": "0";
+	return true;
+}
+
+function deleteWebsURLClick() {
+	for(i=0; i< URLFilterNum; i++){
+		var tmp = eval("document.websURLFilterDelete.DR"+i);
+		if(tmp.checked == true)
+			return true;
+	}
+	alert("Please select the rule to be deleted.");
+	return false;
+}
+
+function AddWebsURLFilterClick() {
+	if(document.websURLFilter.addURLFilter.value == ""){
+		alert("Please enter a URL filter.");
+		return false;
+	}
+	return true;
+}
+
+function deleteWebsHostClick() {
+	for(i=0; i< HostFilterNum; i++) {
+		var tmp = eval("document.websHostFilterDelete.DR"+i);
+		if(tmp.checked == true)
+			return true;
+	}
+	alert("Please select the rule to be deleted.");
+	return false;
+}
+
+function AddWebsHostFilterClick() {
+	if(document.websHostFilter.addHostFilter.value == ""){
+		alert("Please enter a host filter.");
+		return false;
+	}
+	return true;
+}
+</script>
+</head>
+<%   
+	if (request['REQUEST_METHOD'] == "POST") {
+		tempval = form['addRule'];
+		if(tempval=='1')
+		{
+			retval = set_single( 'service.firewall.IPPortFilterRules='+form['newRule'], '-p');
+		}
+		tempval = form['portFilterEnabled'];
+		retval = set_single( 'service.firewall.IPPortFilterEnable='+tempval, '-p');
+		tempval = form['defaultFirewallPolicy'];
+		retval = set_single( 'service.firewall.DefaultFirewallPolicy='+tempval, '-p');
+	%> var FilterRules =  <%val='\"'+get_single('service.firewall.IPPortFilterRules')+'\"';%>@@val; <%
+	}
+	else { /*GET*/
+		form['addRule']='0';
+	}
+%>
+<body onLoad=" updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+<div class="content" >
+<h3>Firewall > Content Filtering</h3>
+
+<!--form method=post name="webContentFilter" action=/goform/webContentFilter-->
+<form name="webContentFilter" method="POST" action="@@request['SCRIPT_NAME']">
+<input type='hidden' name='addRule' value="@@form['addRule']">
+<input type='hidden' name='newRule' maxlength="2048" value="@@form['newRule']">
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<th class="title" colspan="2" >Webs Content Filter</th>
+</tr>
+<tr>
+	<td class="head" width="30%">Filter:</td>
+	<td>
+		<input type=checkbox name=websFilterProxy value="0" > Proxy&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type=checkbox name=websFilterJava value="0" > Java&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type=checkbox name=websFilterActivex value="0" > ActiveX&nbsp;&nbsp;&nbsp;&nbsp;
+        <input type=checkbox name=websFilterCookies value="0" > Cookies
+	</td>
+</tr>
+</table>
+<div align="center" style="margin-right:20% ">
+<p></p>
+	<input type="button" value="Apply" id="WebsContentFilterApply" name="addFilterPort" onClick="webContentFilterClick()"> &nbsp;&nbsp;
+	<input type="reset" value="Reset" id="WebsContentFilterReset" name="reset">
+<p></p>
+</div>
+</form>
+<table width="80%"><th >Webs URL Filter Settings </th></table>
+<!--form action="/goform/websURLFilterDelete" method='POST' name="websURLFilterDelete"-->
+<form name="websURLFilterDelete" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+	<tr>
+		<td class="title" colspan="5" id="WebURLFilterCurrent">Current Webs URL Filters: </td>
+	</tr>
+	<tr>
+		<td id="WebURLFilterNo"> No.</td>
+		<td id="WebURLFilterURL"> URL</td>
+	</tr>
+	<script language="JavaScript" type="text/javascript">
+	var i;
+	var entries = new Array();
+	var all_str = <%val='\"'+get_single('service.firewall.URLFilters')+'\"';%>@@val;
+
+	if(all_str.length){
+		entries = all_str.split(";");
+		for(i=0; i<entries.length; i++){
+			document.write("<tr><td>");
+			document.write(i+1);
+			document.write("<input type=checkbox name=DR"+i+"></td>");
+	
+			document.write("<td>"+ entries[i] +"</td>");
+			document.write("</tr>\n");
+		}
+
+		URLFilterNum = entries.length;
+	}
+	</script>
+</table>
+<div align="center" style="margin-right:20% ">
+<p></p>
+<input type="button" value="Delete" id="WebURLFilterDel" name="deleteSelPortForward" onClick="deleteWebsURLClick()">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebURLFilterReset" name="reset">
+<p></p>
+</div>
+</form>
+
+<!--form action='/goform/websURLFilter' method='POST' name="websURLFilter"-->
+<form name="websURLFilter" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%" border="0" cellpadding="2" cellspacing="1">	
+	<tr>
+		<td class="title" colspan="5" >Add a URL Filter: </td>
+	</tr>
+	<tr>
+		<td width="38%">URL: </td>
+		<td> <input name="addURLFilter" size="16" maxlength="32" type="text"> </td>
+	</tr>
+</table>
+<div align="center" style="margin-right:20% ">
+<p></p>
+    <input type="button" value="&nbsp;Add&nbsp;" id="WebURLFilterAdd" name="addwebsurlfilter" onClick="AddWebsURLFilterClick()">&nbsp;&nbsp;
+    <input type="reset" value="Reset" id="WebURLFilterReset" name="reset">
+<p></p>
+</div>
+</form>
+<table width="80%"><th >Webs Host Filter Settings </th></table>
+<!--form action='/goform/websHostFilterDelete' method='POST' name="websHostFilterDelete"-->
+<form name="websHostFilterDelete" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%" border="0" cellpadding="2" cellspacing="1">	
+	<tr>
+		<td class="title" colspan="5" >Current Website Host Filters: </td>
+	</tr>
+	<tr>
+		<td id="WebsHostFilterNo"> No.</td>
+		<td id="WebsHostFilterHost"> Host(Keyword)</td>
+	</tr>
+	<script language="JavaScript" type="text/javascript">
+	var i;
+	var entries = new Array();
+	var all_str = <%val='\"'+get_single('service.firewall.HostFilters')+'\"';%>@@val;
+
+	if(all_str.length) {
+		entries = all_str.split(";");
+		for(i=0; i<entries.length; i++) {
+			document.write("<tr><td>");
+			document.write(i+1);
+			document.write("<input type=checkbox name=DR"+i+"></td>");
+
+			document.write("<td>"+ entries[i] +"</td>");
+			document.write("</tr>\n");
+		}
+		HostFilterNum = entries.length;
+	}
+	</script>
+</table>
+<div align="center" style="margin-right:20% ">
+<p></p>
+<input type="button" value="Delete" id="WebsHostFilterDel" name="deleteSelPortForward" onClick="deleteWebsHostClick()">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebsHostFilterReset" name="reset">
+<p></p>
+</div>
+</form>
+<!--form action='/goform/websHostFilter' method='POST' name="websHostFilter"-->
+<form name="websHostFilter" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%" border="0" cellpadding="2" cellspacing="1">	
+	<tr>
+		<th class="title" colspan="2" >Add a Host(keyword) Filter: </th>
+	</tr>
+	<tr>
+		<td width="38%" id="WebsHostFilterKeyword">Keyword: </td>
+		<td> <input name="addHostFilter" size="16" maxlength="32" type="text"> </td>
+	</tr>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Add" id="WebsHostFilterAdd" name="addwebscontentfilter" onClick="AddWebsHostFilterClick()" style="width:120px;">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebsHostFilterReset" name="reset" style="width:120px;">
+</div>
+</form>
+</div></div>
+</body>
+</html>

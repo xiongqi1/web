@@ -1,0 +1,558 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Routing</title>
+<script language="JavaScript" src="/cgi-bin/routes.cgi"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if ( request['REQUEST_METHOD'] == "POST" ) {
+	if( request['QUERY_STRING']=='Rip' ) {
+		tempval = form['ripenable'];
+		retval=set_single( 'service.router.rip.enable='+tempval, '-p' );
+		tempval = form['ripVersion'];
+		retval=set_single( 'service.router.rip.version='+tempval, '-p' );
+		tempval = form['ripInterface'];
+		retval=set_single( 'service.router.rip.interface='+tempval, '-p' );
+	}
+	else if( request['QUERY_STRING'] == 'Vrrp' ) {
+		tempval = form['vrrpenable'];
+		retval=set_single( 'service.vrrp.enable='+tempval, '-p' );
+		tempval = form['deviceId'];
+		retval=set_single( 'service.vrrp.deviceid='+tempval, '-p' );
+		tempval = form['vrrpPri'];
+		retval=set_single( 'service.vrrp.priority='+tempval, '-p' );
+		tempval = form['VirtualIPAddr'];
+		retval=set_single( 'service.vrrp.address='+tempval, '-p' );
+	}
+	else { /*static--add/delete */
+		set_single( 'service.router.static.route.'+form['delindex']+'=', '-p'); //delete last
+		tempval = form['rdbCmd'];
+		set_escapedlist( tempval, '-p' );
+		esp_sleep(5000);
+		redirect('/routing.html?Static');
+	}
+}
+else { /*GET*/
+	temp = get_single( 'service.router.rip.enable' );
+	form['ripenable'] = temp;
+	temp = get_single( 'service.vrrp.enable' );
+	form['vrrpenable'] = temp;
+	temp = get_single( 'service.vrrp.deviceid' );
+	form['deviceId'] = temp;
+	temp = get_single( 'service.vrrp.priority' );
+	form['vrrpPri'] = temp;
+	temp = get_single( 'service.vrrp.address' );
+	form['VirtualIPAddr'] = temp;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("routing");
+
+function submitVRRPEnable() {
+	try {
+		if (document.form2.vrrpEnable[0].checked == true) {
+			if ( (document.form2.deviceId.value) < 1 || (document.form2.deviceId.value > 255) ) {
+				alert(_("routing warningMsg01"));
+				return;
+			}
+			if ( (document.form2.vrrpPri.value) < 1 || (document.form2.vrrpPri.value > 255) ) {
+				alert(_("routing warningMsg02"));
+				return;
+			}
+			if ( (document.form2.VirtualIPAddr1.value == "") || (document.form2.VirtualIPAddr2.value == "") || (document.form2.VirtualIPAddr3.value == "") || (document.form2.VirtualIPAddr4.value == "") ) {
+				alert(_("routing warningMsg03"));
+				return;
+			}
+			alert(_("routing warningMsg04")+"\n"+_("routing warningMsg05"));
+		}
+		else {
+		    alert(_("routing warningMsg06"));
+		}
+		document.form2.VirtualIPAddr.value = document.form2.VirtualIPAddr1.value + "."  + document.form2.VirtualIPAddr2.value + "." + document.form2.VirtualIPAddr3.value + "." + document.form2.VirtualIPAddr4.value;
+		//document.form2.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function submitStaticRoute() {
+	var f=document.form3;
+	try {
+		if (f.routeName.value == "") {
+			alert(_("routing warningMsg07"));
+			f.editindex.value = '-1';
+			return;
+		}
+		if ( (f.dstIP1.value == "") || (f.dstIP2.value == "") || (f.dstIP3.value == "") || (f.dstIP4.value == "")  ) {
+			alert(_("routing warningMsg08"));
+			f.editindex.value = '-1';	
+			return;
+		}
+		if ( (f.subMaskIP1.value == "") || (f.subMaskIP2.value == "") || (f.subMaskIP3.value == "") || (f.subMaskIP4.value == "")  ) {
+			alert(_("routing warningMsg09"));
+			f.editindex.value = '-1';
+			return;
+		}
+
+		// This condition checks invalid Destination IP and Subnet Mask pair.
+		if (((f.dstIP1.value & ~ f.subMaskIP1.value) != 0) || ((f.dstIP2.value & ~ f.subMaskIP2.value) != 0) || ((f.dstIP3.value & ~ f.subMaskIP3.value) != 0) || ((f.dstIP4.value & ~ f.subMaskIP4.value) != 0)) {
+			alert(_("routing warningMsg09"));
+			f.editindex.value = '-1';
+			return;
+		}
+
+		empty_gateway_ip= (f.gatewayIP1.value == "") || (f.gatewayIP2.value == "") || (f.gatewayIP3.value == "") || (f.gatewayIP4.value == "");
+		auto_network_interface=f.networkInf.value=="auto";
+		if (auto_network_interface && empty_gateway_ip) {
+			alert(_("routing warningMsg10"));
+			f.editindex.value = '-1';
+			return;
+		}
+
+		if ( (f.metric.value == "")||(f.metric.value < 0 )||(f.metric.value > 65535) ) {
+			alert(_("Msg48"));
+			f.metric.select();
+			f.editindex.value = '-1';
+			return;
+		}
+		f.dstIP.value = f.dstIP1.value + "."  + f.dstIP2.value + "." + f.dstIP3.value + "." + f.dstIP4.value;
+		f.subMaskIP.value = f.subMaskIP1.value + "."  + f.subMaskIP2.value + "." + f.subMaskIP3.value + "." + f.subMaskIP4.value;
+		if(empty_gateway_ip)
+			f.gatewayIP.value = ""
+		else
+			f.gatewayIP.value = f.gatewayIP1.value + "."  + f.gatewayIP2.value + "." + f.gatewayIP3.value + "." + f.gatewayIP4.value;
+		value = parseInt(f.routenum.value);
+		if( isNaN(value)==true || value < 0 || value > st_routes.length ) {
+			//f.editindex.value = st_routes.length+1;
+			i=st_routes.length;
+			makeCmd();
+			f.rdbCmd.value += "service.router.static.route."+i+"="+escape(f.routeName.value)+","+f.dstIP.value+","+f.subMaskIP.value+","+f.gatewayIP.value+","+f.metric.value+","+f.networkInf.value+"&";
+			document.form3.delindex.value = i+1;
+		}
+		else {
+			//f.editindex.value = f.routenum.value;
+			if (value < 1 || value > 65535) {
+				alert(_("nat warningMsg06"));//Invalid item number.
+				f.editindex.value = '-1';
+				return;
+			}
+			i=f.routenum.value-1;
+			st_routes[i].routeName = escape(f.routeName.value);
+			st_routes[i].dstIP = f.dstIP.value;
+			st_routes[i].subMask = f.subMaskIP.value;
+			st_routes[i].gatewayIP = f.gatewayIP.value;
+			st_routes[i].metric = f.metric.value;
+			st_routes[i].networkInf = f.networkInf.value;
+			makeCmd();
+		}
+		f.rdbCmd.value += "service.router.static.route.trigger=1";
+		f.submitForm.disabled=true;
+		f.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function makeCmd() {
+	document.form3.rdbCmd.value = "";
+	k=0;
+	for (var i=0; i<st_routes.length; i++) {
+		if( st_routes[i].routeName != "" ) {
+			if( k>0 ) document.form3.rdbCmd.value += "&";
+			document.form3.rdbCmd.value += "service.router.static.route."+k+"="+st_routes[i].routeName+","+st_routes[i].dstIP+","+st_routes[i].subMask+","+st_routes[i].gatewayIP+","+st_routes[i].metric+","+st_routes[i].networkInf;
+			k++;
+		}
+		
+	}
+	document.form3.delindex.value = k;
+	if(k>0) document.form3.rdbCmd.value += "&";
+}
+function delentry(index) {
+	try {
+		st_routes[index].routeName = "";
+		makeCmd();	
+		document.form3.rdbCmd.value += "service.router.static.route.trigger=1";
+		document.form3.submitForm.disabled=true;
+		document.form3.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function greyOutVRRPFields() {
+	try { // if VRRP is disabled then grey out the fields
+		document.form2.deviceId.disabled = true;	
+		document.form2.vrrpPri.disabled = true;
+		document.form2.VirtualIPAddr1.disabled = true;
+		document.form2.VirtualIPAddr2.disabled = true;
+		document.form2.VirtualIPAddr3.disabled = true;
+		document.form2.VirtualIPAddr4.disabled = true;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function ungreyOutVRRPFields() {
+	try { // if VRRP is disabled then grey out the fields
+		document.form2.deviceId.disabled = false;
+		document.form2.vrrpPri.disabled = false;	
+		document.form2.VirtualIPAddr1.disabled = false;
+		document.form2.VirtualIPAddr2.disabled = false;
+		document.form2.VirtualIPAddr3.disabled = false;
+		document.form2.VirtualIPAddr4.disabled = false;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function checkVRRPConf() {
+	try {
+		if (document.form2.vrrpEnable[1].checked == true)
+			greyOutVRRPFields();
+		else if (document.form2.vrrpEnable[0].checked == true)
+			ungreyOutVRRPFields();
+	}
+	catch (e) {
+		alert(e.message);
+	}
+}
+
+$(document).ready( function() {
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+</script>
+
+<%if(request['QUERY_STRING']=='Rip'){%>
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > RIP");</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?Rip" >
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > RIP");</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+<input type="hidden" name="ripenable" value="@@form['ripenable']">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("rip routing"));</script></th></tr>
+</table>
+
+<table width="90%">
+<tr>
+	<td width="37%"><script language="JavaScript">document.write(_("RIP"));</script></td>
+	<td><input type=radio name='ripEnable' onClick="javascript:document.form1.ripenable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+	<input type=radio name='ripEnable' onClick="javascript:document.form1.ripenable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("version"));</script></td>
+	<td><select name="ripVersion" size="1">
+	<option value="1">1</option>
+	<option value="2">2</option>
+	</select>
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("interface"));</script></td>
+	<td><select name="ripInterface" size="1">
+	<option value="lan">LAN</option>
+	<option value="wwan0">WWAN</option>
+	<option value="lan,wwan0">BOTH</option>
+	</select>
+	</td>
+</tr>
+<script language="JavaScript">
+var  rip_version = <%val=get_single('service.router.rip.version');%>"@@val";
+var  rip_interface = <%val=get_single('service.router.rip.interface');%>"@@val";
+
+if (document.form1.ripenable.value == '1')
+	document.form1.ripEnable[0].checked=true;
+else
+	document.form1.ripEnable[1].checked=true;
+if( rip_version == "1" )
+	document.form1.ripVersion.options.selectedIndex=0;
+else
+	document.form1.ripVersion.options.selectedIndex=1;
+if( rip_interface == "wwan0" )
+	document.form1.ripInterface.options.selectedIndex=1;
+else if( rip_interface == "lan,wwan0" || rip_interface == "wwan0,lan")
+	document.form1.ripInterface.options.selectedIndex=2;
+else
+	document.form1.ripInterface.options.selectedIndex=0;
+</script>
+<tr>
+	<td colspan="2">
+	<div align="center"><input type="submit" name="submitForm" value="SAVE RIP" style="width:120px;"></div>
+	</td>
+</tr>
+</table>
+</form>
+<script type="text/javascript">
+document.form1.submitForm.value=_("CSsave");
+</script>
+</div>
+<%}else if(request['QUERY_STRING']=='Vrrp'){%>
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > VRRP");</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form2" method="POST" action="@@request['SCRIPT_NAME']?Vrrp">
+<input type="hidden" name="vrrpenable" value="@@form['vrrpenable']">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > VRRP");</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+<p>
+<input type="hidden" name="VirtualIPAddr" value="@@form['VirtualIPAddr']"></p>
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("vrrp config"));</script></th></tr>
+</table>
+
+<table width="90%">
+<tr>
+	<td width="37%"><script language="JavaScript">document.write(_("vrrp enable"));</script></td>
+	<td><input type=radio name='vrrpEnable' onClick="javascript:document.form2.vrrpenable.value='1';ungreyOutVRRPFields()">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+	<input type=radio name='vrrpEnable' onClick="javascript:document.form2.vrrpenable.value='0';greyOutVRRPFields()">&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<script language="JavaScript">
+if (document.form2.vrrpenable.value == '1')
+	document.form2.vrrpEnable[0].checked=true;
+else
+	document.form2.vrrpEnable[1].checked=true;	
+</script>
+<tr>
+	<td><script language="JavaScript">document.write(_("virtual device id"));</script></td>
+	<td><input type=text name='deviceId' size=3 maxLength=3 onkeyup=NumfieldEntry(this); value="@@form['deviceId']">&nbsp;(1-255)</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("router priority"));</script></td>
+	<td><input type=text name='vrrpPri' size=3 maxLength=3 onkeyup=NumfieldEntry(this); value="@@form['vrrpPri']">&nbsp;(1-255)</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("virtualipaddr"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("VirtualIPAddr");</script></td>
+</tr>
+<script type="text/javascript">
+var ray = new Array();
+ray = document.form2.VirtualIPAddr.value.split(".");
+if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+document.form2.VirtualIPAddr1.value=ray[0];document.form2.VirtualIPAddr2.value=ray[1];
+document.form2.VirtualIPAddr3.value=ray[2];document.form2.VirtualIPAddr4.value=ray[3];
+</script>
+<tr>
+	<td colspan="2">
+	<div align="center"><input type="submit" name="submitForm" value="SAVE VRRP" onClick="submitVRRPEnable();" ID="Button3" style="width:120px;"></div>
+	</td>
+</tr>
+</table>
+</form>
+<script type="text/javascript">
+document.form2.submitForm.value=_("CSsave");
+</script>
+</div>
+<%}else{%>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > "+_("static"));</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form3" method="POST" action="@@request['SCRIPT_NAME']?Static" >
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > "+_("static"));</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+<input type="hidden" name="editindex" value="@@form['editindex']">
+<input type="hidden" name="dstIP" value="@@form['dstIP']">
+<input type="hidden" name="subMaskIP" value="@@form['subMaskIP']">
+<input type="hidden" name="gatewayIP" value="@@form['gatewayIP']">
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+<input type="hidden" name="delindex" value="@@form['delindex']">
+
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("static route"));</script></th></tr>
+</table>
+
+<table width="90%">
+<tr>
+	<td width="37%"><script language="JavaScript">document.write(_("route no"));</script></td>
+	<td><input type="text" name="routenum" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);">&nbsp;(<script language="JavaScript">document.write(_("1-65535"));</script>)&nbsp;&nbsp;<script language="JavaScript">document.write(_("routing warningMsg11"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("route name"));</script></td>
+	<td><input type=text name='routeName' size=32 maxlength=64 value="@@form['routeName']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("destipaddr"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("dstIP");</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("ipsubnetmask"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenMaskBlocks("subMaskIP");</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("gatewayip"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("gatewayIP");</script></td>
+</tr>
+<tr>
+	<td><script language=javascript>document.write(_("network interface"));</script></td>
+	<td>
+		<select name="networkInf">
+			<option value="auto"><script language=javascript>document.write(_("auto"));</script></option>
+			<option value="br0">br0</option>
+			<option value="wwan0">wwan0</option>
+			<option value="ppp0">ppp0</option>
+<!-- 			<option value="tun0">tun0</option> -->
+<!-- 			<option value="usb0">usb0</option> -->
+		</select>
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("routing del metric"));</script></td>
+	<td><input type=text name='metric' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['metric']">&nbsp;(<script language="JavaScript">document.write(_("0-65535"));</script>)</td>
+</tr>
+<tr>
+	<td colspan="2">
+	<div align="center"><input type="button" name="submitForm" value="ADD" onClick="submitStaticRoute();" style="width:120px;"></div>
+	</td>
+</tr>
+</table>
+<script language=javascript>
+document.form3.routenum.focus();
+document.form3.submitForm.value="   "+_("add")+"   ";
+</script>
+</form>
+
+<form name="form4" method="POST" action="@@request['SCRIPT_NAME']" >
+<table width="90%">
+<tr>
+<td width="4%" ><div align="center"><script language="JavaScript">document.write(_("item"));</script></td>
+<td width="16%"><div align="center"><script language="JavaScript">document.write(_("route name"));</script></td>
+<td width="20%"><div align="center"><script language="JavaScript">document.write(_("destipaddr"));</script></td>
+<td width="20%"><div align="center"><script language="JavaScript">document.write(_("subnet mask"));</script></td>
+<td width="20%"><div align="center"><script language="JavaScript">document.write(_("gatewayip"));</script></td>
+<td width="20%"><div align="center"><script language="JavaScript">document.write(_("network interface"));</script></td>
+<td width="8%" ><div align="center"><script language="JavaScript">document.write(_("routing del metric"));</script></td>
+<td width="12%"><div align="center">&nbsp;</td>
+</tr>
+<script language=Javascript>
+function makeList() {   
+	if (st_routes.length == 0) {
+		document.write("<tr><td colspan=\"8\"><div align=\"center\">"+_("static route empty")+"</div></td></tr>");
+		return ;
+	}
+	for (var i=0; i<st_routes.length;i++) {
+		document.write("<tr>");
+		document.write("<td><div align='center'>"+(i+1)+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].routeName+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].dstIP+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].subMask+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].gatewayIP+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].networkInf+"</div></td>");
+		document.write("<td><div align='center'>"+st_routes[i].metric+"</div></td>");
+		document.write("<td><div align='center'><a href=javascript:delentry("+(i)+");>Delete Entry</a></div></td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+</form>
+
+<form name="form5" >
+<input type="hidden" name="p" value="routing.html" ID="Hidden13">
+<input type="hidden" name="routeindex" ID="Hidden14">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("active rtable"));</script></th></tr>
+</table>
+<table width="90%" ID="Table4">
+<tr>
+<td width="4%"><div align="center"><script language="JavaScript">document.write(_("item"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("destination"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("gateway"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("netmask"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("routing del flags"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("routing del metric"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("ref"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("routing del use"));</script></td>
+<td width="12%" ><div align="center"><script language="JavaScript">document.write(_("interface"));</script></td>
+</tr>
+<script language=Javascript>
+function makeRouteList() {   
+	if (routingtable.length == 0) {
+		document.write("<tr><td colspan=\"8\"><div align=\"center\">"+_("static route empty")+"</div></td></tr>");
+		return ;
+	}
+	for (var i=0; i< routingtable.length;i++) {
+		document.write("<tr>");
+		document.write("<td><div align='center'>"+(i+1)+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Destination+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Gateway+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Genmask+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Flags+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Metric+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Ref+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Use+"</div></td>");
+		document.write("<td><div align='center'>"+routingtable[i].Iface+"</div></td>");
+		document.write("</tr>");
+	}
+}
+makeRouteList();
+</script>
+</table>
+</form>
+</div>
+<%}%>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>
+    

@@ -1,0 +1,51 @@
+#!/bin/sh
+
+. /etc/variant.sh
+
+processname=btsensormon
+daemon=/usr/bin/${processname}
+
+# Sanity checks.
+[ -x $daemon ] || exit 0
+
+RETVAL=0
+
+start()
+{
+    echo "Initialising btsensormon daemon"
+
+    modprobe ${module}
+    start-stop-daemon -S -q -x ${daemon} &> /dev/null &
+    RETVAL=$?
+}
+
+stop()
+{
+    echo "Stopping btsensormon daemon"
+
+    start-stop-daemon -K -q -n ${processname}
+    RETVAL=$?
+}
+
+# See how we were called.
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    reload)
+        echo -n "Restarting $processname: "
+        start-stop-daemon -K -q -n $processname -s 1
+        RETVAL=$?
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        ;;
+esac
+exit $RETVAL

@@ -1,0 +1,48 @@
+#!/bin/sh
+
+#
+# sms_rdb_get "rdb name" "rdb def value"
+#
+#
+
+rdb_name="$1"
+rdb_set_val="$2"
+rdb_boolean_false="$3"
+rdb_boolean_true="$4"
+
+# print usage
+if [ $# -ne 2 -a $# -ne 4 ]; then
+	cat << EOF >&2
+
+	sms rdb get tool
+
+	usage>
+		sms_rdb_get <rdb name> <rdb defaule value>
+		sms_rdb_get <rdb name> <rdb defaule value> <boolean false string> <boolean true string>
+
+EOF
+	exit 1
+fi
+
+# get rdb
+result=$(rdb_get "$rdb_name")
+
+# use default if no value exists
+if [ -z "$result" ]; then
+	result="$rdb_set_val"
+fi
+
+# convert rdb into boolean
+if [ -n "$rdb_boolean_true" -a -n "$rdb_boolean_false" ]; then
+	if [ "$result" = "1" -o "$result" = "yes" ]; then
+		result="$rdb_boolean_true"
+	else
+		result="$rdb_boolean_false"
+	fi
+fi
+
+cat << EOF
+$result
+EOF
+
+exit 0

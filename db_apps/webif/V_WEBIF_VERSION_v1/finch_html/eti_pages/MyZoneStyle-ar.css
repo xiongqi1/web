@@ -1,0 +1,77 @@
+body {
+	direction:rtl;
+}
+
+.td_ltr {
+	text-align:right;
+}
+
+#myzoneGUI {
+	direction:rtl;
+}
+
+th {
+	text-align:right;
+}
+
+.paginationstyle {
+	text-align: right;
+}
+input {
+	padding-right:4px;
+}
+.div_input {
+	right:191px;
+	position:absolute;
+	width: 200px;
+}
+.div_text {
+	color:#FFFFFF;
+	font-weight:normal;
+	right:24px;
+	position:absolute;
+	font-size: 15px;
+}
+.div_small_text {
+	font-size: 12px;
+	font-weight:normal;
+}
+.a2 {
+	font-size: 12px;
+}
+#basicLogin {
+	top:158px;
+}
+#langTab {
+	display:block;
+}
+#tab-login {
+	left:10px;
+	top:150px; 
+}
+
+#nav li.top {
+	float:right;
+}
+
+#nav li ul.sub li a.fly {
+	background:#bbd37e url(/images/arrow_l.gif) 33px 10px no-repeat;
+}
+
+#nav li:hover ul.sub li a.fly:hover {
+	background:#608040 url(/images/arrow_over_l.gif) 33px 10px no-repeat;
+}
+
+#nav li:hover li:hover ul,
+#nav li:hover li:hover li:hover ul,
+#nav li:hover li:hover li:hover li:hover ul,
+#nav li:hover li:hover li:hover li:hover li:hover ul
+{right:98px; }
+
+#nav li:hover li:hover a.fly,
+#nav li:hover li:hover li:hover a.fly,
+#nav li:hover li:hover li:hover li:hover a.fly,
+#nav li:hover li:hover li:hover li:hover li:hover a.fly
+{background:#608040 url(/images/arrow_over_l.gif) 33px 10px no-repeat;}
+
+

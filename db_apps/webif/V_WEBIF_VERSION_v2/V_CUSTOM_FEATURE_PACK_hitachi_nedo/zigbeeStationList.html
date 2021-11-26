@@ -1,0 +1,400 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+
+<style>
+.list-col-hdr {text-align:left;}
+</style>
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Zigbee Station List</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(key, val) {
+		set_single_direct("-p",key, val);
+	}
+
+	var allowed=form['ALLOWEDMETERS'];
+	if (allowed == undefined) {
+		allowed = "";
+	}
+	setRdb('zigbee.conf.MeterMACAllowedList',allowed);
+	allowed=form['ALLOWEDSENSORS'];
+	if (allowed == undefined) {
+		allowed = "";
+	}
+	setRdb('zigbee.conf.SensorMACAllowedList',allowed);
+
+	exit(200);
+}
+%>
+
+<!-- ================================================================================================ -->
+<script language="JavaScript">
+<%
+function getRdb(key) {
+	return get_single(key);
+}
+
+function createArrayfromRdbList(arrayName,idxLow,idxHigh,prefix,member) {
+	write("var "+arrayName+"=[");
+	for (i=idxLow;i<idxHigh;i++) {
+		write("'"+getRdb(prefix+i+member)+"',");
+	}
+	write("'"+getRdb(prefix+idxHigh+member)+"'];\n");
+}
+
+maxDevices=20;
+write("var maxDevices="+maxDevices+";\n");
+createArrayfromRdbList("devMac",1,maxDevices,"hgw.xems.DeviceList.",".MACAddress");
+createArrayfromRdbList("devRegistered",1,maxDevices,"hgw.xems.DeviceList.",".addDeviceFlag");
+createArrayfromRdbList("devId",1,maxDevices,"hgw.xems.DeviceList.",".deviceID");
+
+maxCategories=20;
+createArrayfromRdbList("SensorType",1,maxCategories,"hgw.xems.CategoryList.",".SensorType");
+%>
+var maxReservation = 0;
+var meterMonitorList="<%get_single_direct('zigbee.conf.MeterMACAllowedList');%>";
+var sensorMonitorList="<%get_single_direct('zigbee.conf.SensorMACAllowedList');%>";
+
+var deviceTypes=[];
+
+function submitF() {
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+//	blockUI_wait(_("GUI pleaseWait"));
+	var f = document.forms[1];
+	meterMonitorList="";
+	var numMeters=0;
+	sensorMonitorList=""
+	var numSensors=0
+	for ( var i = 0; i < maxReservation; i++ ) {
+		var mac=$('#macid'+i).val();
+		if ( deviceTypes[i]=='Meter') {
+			if ( numMeters == 0 )
+				meterMonitorList+=mac;
+			else
+				meterMonitorList+=","+mac;
+			numMeters++;
+		}
+		else {
+			if ( numSensors == 0 )
+				sensorMonitorList+=mac;
+			else
+				sensorMonitorList+=","+mac;
+			numSensors++;
+		}
+	}
+
+	function refresh() { window.location.href="@@request['SCRIPT_NAME']?success"; }
+	$.post("@@request['SCRIPT_NAME']?ALLOWEDMETERS="+meterMonitorList+"&ALLOWEDSENSORS="+sensorMonitorList,refresh);
+}
+
+function addElement(mac,deviceType) {
+var num = maxReservation;
+var divIdName = 'myDiv'+num;
+	deviceTypes[num] = deviceType;
+	$("#ReservationDiv-title").css("display","");
+	h='<tr id="'+divIdName+'">\
+		<td>'+(num+1)+'</td>\
+		<td id="devType'+num+'" name=devType'+num+'">'+deviceType+'</td>\
+		<td><input type="text" class="large validate[required,funcCall[validate_new_mac_addr]] required new_mac_addr" id="macid'+num+'" name="macid'+num+'" value="'+mac+'"></td>\
+		<td class="last"><button type=button onClick="removeThis('+"'"+num+"'"+')" class="secondary sml" style="padding:0;border:0;margin-left:0"><i class="icon close"></i></button></td>\
+	</tr>';
+	$("#ReservationDiv").append(h);
+	maxReservation++;
+}
+
+function addElements(monitorList, deviceType) {
+	var arrayOfMacs=monitorList.split(",");
+	for (var i=0; i < arrayOfMacs.length; i++) {
+		if ( arrayOfMacs[i]!="" ) {
+			addElement(arrayOfMacs[i],deviceType);
+		}
+	}
+}
+
+function removeThis(dId) {
+	var f = document.forms[1];
+	var shiftcmd='';
+	// Decrease the reservation count, move following entries up in table
+	maxReservation--;
+	for ( var i = Number(dId); i < maxReservation; i++ ) {
+		$('#macid'+i).val( $('#macid'+(i+1)).val());
+		$('#devType'+i).html( $('#devType'+(i+1)).html());
+		deviceTypes[i]=deviceTypes[i+1];
+	}
+	// clear last entry
+	$("#ReservationDiv").children("#myDiv"+maxReservation).remove();
+}
+
+var isAjaxComplete=true;
+
+function makeparams(v) {
+  join_form_param_list = [
+   "state",     "nodeid",      "panid",       "channel",        "extended_panid" ];
+  join_form_name_list = [
+   "State",     "Node ID",     "PAN ID",      "Channel",        "Extended PAN ID" ];
+  main_param_list = [
+   "eui",       "version", "se_certification", "ha_certification" ];
+  main_name_list = [
+   "ZMAC",      "Version", "SE Certification", "HA Certification" ];
+
+ 	var h="";
+
+	function setrow(prefix, name, value) {
+		h+="<tr>";
+		h+="<td width='20%' style=\"text-align:right\">"+ prefix + name+"</td>";
+		h+="<td style=\"text-align:left\">"+value+"</td>";
+		h+="</tr>";
+	}
+	function get_vals(v, plist, nlist, printed_prefix) {
+		for (i = 0; i < plist.length; i++) {
+			if (typeof v[plist[i]] !== "undefined") {
+				setrow(printed_prefix, nlist[i], v[plist[i]]);
+			}
+		}
+	}
+	var enabled = false;
+	if (typeof v !== "undefined") {
+		if (typeof v['conf'] !== 'undefined' && typeof v['conf']['enable'] !== 'undefined' && v['conf']['enable'] == '1') {
+			setrow('', 'Zigbee', 'Enabled');
+			get_vals(v, main_param_list, main_name_list, "")
+			if (typeof v['form'] !== "undefined") {
+				get_vals(v['form'],join_form_param_list, join_form_name_list, "Form ")
+			}
+			if (typeof v['join'] !== "undefined") {
+				get_vals(v['join'],join_form_param_list, join_form_name_list, "Join ")
+			}
+		} else {
+			setrow('', 'Zigbee', 'Disabled');
+		}
+	}
+ 	$("#paramlist").html(h);
+}
+
+function safeOut(key) {
+	if (typeof key === 'undefined') {
+		return "undefined";
+	}
+	return key;
+}
+
+// Taken from XemsApp, List of TR-069 codes for supported devices. The index maps into the CategoryList.1.SensorType array
+var TR069CODES = [
+"00042001", // Heat pump momentary power
+"00042001", // Heat pump accumulated power of unit time.
+//        "00042001", // Heat pump total accumulated power.
+"00042002", // Whole house momentary power.
+"00042002", // Whole house accumulated power of unit time.
+//        "00042002", // Whole house total accumulated power.
+"00042003", // Motion sensor
+"00042004", // Door sensor
+"00042010", // Smart plug momentary power.
+"00042010"  // Smart plug accumulated power.
+];
+
+function devDesc( devId ) { // return detailed desciption of device
+	var tr069code=devId.substring(32, 40);
+	for( var idx=0;idx<TR069CODES.length; idx++ ) {
+		code=TR069CODES[idx];
+		if (code===tr069code)
+			return SensorType[idx];
+	}
+	return "Unknown";
+}
+
+function devIndex( eui ) { // given the mac address, this returns the corresponding array index of the device or -1
+	for (var i=0;i<maxDevices;i++) {
+		if (eui.toUpperCase()===devMac[i].toUpperCase()) return i;
+	}
+	return -1;
+}
+
+
+function makelist(v) {
+	var h="";
+	function commonRow(device) {
+		var idx=devIndex(device['eui']);
+		var registered = "??";
+		var type="??";
+		if ( idx >= 0 ) {
+			registered = "Yes";
+			if ( devRegistered[idx].toUpperCase()==="TRUE") registered = "No";
+			type=devDesc(devId[idx]);
+		}
+		h+="<td width='25%'>"+type+"</td>";
+		h+="<td width='20%'>"+safeOut(device['eui'])+"</td>";
+		h+="<td width='10%'>"+safeOut(device['profile'])+"</td>";
+		h+="<td width='25%'>"+safeOut(device['timestamp'])+"</td>";
+		h+="<td width='10%'>"+registered+"</td>";
+	}
+	function sensorRow(device) {
+		h+="<tr>";
+		commonRow(device);
+		h+="<td width='10%'>"+safeOut(device['zone_status'])+"</td>";
+		h+="</tr>";
+	}
+ 	function meterRow(device) {
+		h+="<tr>";
+		commonRow(device);
+		h+="<td width='10%'>"+safeOut(device['current_summation_delivered'])+"</td>";
+		h+="</tr>";
+	}
+
+	function iterateDevices(fn, devices)
+	{
+		for (var device in devices) {
+			fn(devices[device]);
+		}
+	}
+	iterateDevices(meterRow, v.data.meter);
+	iterateDevices(sensorRow, v.data.sensor);
+ 	$("#wlist").html(h);
+	makeparams(v.data.zigbee)
+ 	isAjaxComplete=true;
+}
+
+var prev_length=0;
+$(document).ready(function() {
+
+	function makeRequest() {
+		if ( isAjaxComplete ) {
+			isAjaxComplete=false;
+			$.get('/cgi-bin/hth_cgi.lua?command=devices', makelist);
+		}
+	}
+	addElements( meterMonitorList, "Meter");
+	addElements( sensorMonitorList,"Sensor");
+	makeRequest();
+	setInterval(makeRequest, 5000);
+});
+
+</script>
+<!-- ================================================================================================ -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<form name="wstalist" id="form" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+			<div class="pad" id="station_list_block">
+<!-- 				<h2><script language=Javascript>document.write(_("zigbeeThisStation"))</script></h2> -->
+				<h2><script language=Javascript>document.write(_("zigbeeStationList"))</script></h2>
+				<table id="wlInfo" width="80%" style="text-align:left;" class="no-border">
+				<tr>
+					<th id="id_deviceType"   class="list-col-hdr" width="25%"><script language=Javascript>document.write(_("zigbeeDeviceType"))</script></th>
+					<th id="id_ZMACaddress"   class="list-col-hdr" width="20%"><script language=Javascript>document.write(_("zigbeeMacAddress"))</script></th>
+					<th id="id_zigbeeProfile"    class="list-col-hdr" width="10%"><script language=Javascript>document.write(_("zigbeeProfile"))</script></th>
+					<th id="id_lastComms" class="list-col-hdr" width="25%"><script language=Javascript>document.write(_("zigbeeLastComms"))</script></th>
+					<th id="id_zigbeeRegistered" class="list-col-hdr" width="10%"><script language=Javascript>document.write(_("zigbeeRegistered"))</script></th>
+					<th id="id_zigbeeValue" class="list-col-hdr" width="10%"><script language=Javascript>document.write(_("zigbeeValue"))</script></th>
+				</tr>
+				<tbody id="wlist"></tbody>
+				</table>
+				<h2><script language=Javascript>document.write(_("zigbeeDeviceInfo"))</script></h2>
+				<table id="devInfo" width="80%" style="text-align:right;" class="no-border">
+				<tbody id="paramlist"></tbody>
+				</table>
+				<div class="grid-50">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("zigbeeWhiteList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-50">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" id="addbutton01" onClick="addElement('','Meter')"><i class="icon plus"></i><script language=Javascript>document.write(_("zigbeeAddMeter"))</script></button>
+							<button type="button" class="secondary sml fr" id="addbutton02" onClick="addElement('','Sensor')"><i class="icon plus"></i><script language=Javascript>document.write(_("zigbeeAddSensor"))</script></button>
+						</div>
+					</div>
+				</div>
+				<div class="form-row">
+					<table class="no-border" id="ReservationDiv-title">
+						<colgroup>
+							<col width="20%">
+							<col width="auto">
+							<col width="20%">
+						</colgroup>
+						<thead>
+							<tr>
+								<th class="align10"></th>
+								<th class="align10"><script language=Javascript>document.write(_("zigbeeDeviceType"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("zigbeeMacAddress"))</script></th>
+								<th></th>
+							</tr>
+						</thead>
+					<tbody id="ReservationDiv"></tbody>
+					</table>
+				</div>
+				<div class="submit-row">
+					<button type="button" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+
+			</div>		<!-- div class="pad" id="station_list_block" -->
+			</form>		<!-- name="wstalist" -->
+
+		</div>	<!-- div class="right-column white-box" -->
+
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "zigbeeSubmenu2", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["new_mac_addr"]=_("warningMsg11");	// You've entered the MAC address incorrectly. Please try again in the format (XX:XX:XX:XX:XX:XX).
+	$.validator.addMethod("new_mac_addr",function(c,a) {
+// 		if(c!==$(a).attr("data-watermark")) {
+// 			if( !isValidMacAddress(c) ) {
+// 				return false;
+// 			}
+// 		}
+// 		else if($(a).hasClass("required")) {
+// 			return false;
+// 		}
+		return true;
+	},VALIDATOR.config.errors.new_mac_addr);
+#else
+function validate_new_mac_addr(field) {
+// 	if(!isValidMacAddress(field.val())) {
+// 		return _("warningMsg11");			// You've entered the MAC address incorrectly. Please try again in the format (XX:XX:XX:XX:XX:XX).
+// 	}
+}
+#endif
+
+</script>
+
+</body>
+</html>

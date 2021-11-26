@@ -1,0 +1,209 @@
+#!/bin/sh -f
+#
+# Connect script for Option Wireless Packetized modules
+#
+# This script is called by wwand_deamon as follows:-
+#
+# SUSBNET_OW <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+#
+# <action> is only used for internal purpose
+#
+
+BIN=$0
+PROFILE=$1
+INSTANCE=$2
+ACTION=$3
+
+test -z "$ACTION" && ACTION=start
+
+# defines - database variable names
+dbVarName_Prefix="wwan.${INSTANCE}."
+
+dbVarName_IPAddr="network_interface.ipaddress"
+dbVarName_GWAddr="network_interface.gwaddress"
+dbVarName_PDNSAddr="network_interface.pdnsaddress"
+dbVarName_SDNSPAddr="network_interface.sdnsaddress"
+
+# defines - commands
+rdb_get=/usr/bin/rdb_get
+rdb_set=/usr/bin/rdb_set
+rdb_wait=/usr/bin/rdb_wait
+
+log() {
+	logger SUSBNET_OW -- $@
+}
+
+rdbGet() {
+	${rdb_get} "${dbVarName_Prefix}$1"
+	return $?
+}
+
+getUsbNetIp() {
+	LINE=`ifconfig hso0 | grep "inet addr"`
+	LINE=${LINE##*addr:}
+	echo ${LINE%% Bcast*}
+}
+
+execWait() {
+	timeout=$1
+	shift
+	eval "$@ &"
+	
+	pid=$!
+	count=0
+	while [ -e /proc/$pid ]; do
+
+		count=$(( $count + 1 ))
+		if [ $count -gt  $timeout ]; then
+			break;
+		fi
+	
+		sleep 1
+	done
+	
+	ret=$?
+
+	if [ -e /proc/$pid ]; then
+		kill -9 $pid
+		ret=255
+	fi
+
+	wait $pid
+
+	return $ret
+}
+
+
+startUsbNet() {
+	# enable profile
+	rdb_set link.profile.$PROFILE.enable 1
+
+	# load environment variables
+	. `dirname $0`/Env $INSTANCE
+
+	OPTUSER=""
+	OPTPASS=""
+	OPTAUTH=""
+
+	IPADDR=""
+	GWADDR=""
+	PDNSADDR=""
+	SDNSADDR=""
+
+	if [ -n "$WWAN_USER" -a -n "$WWAN_PASS" ]; then
+		OPTUSER="user $WWAN_USER"
+		OPTPASS="password $WWAN_PASS"
+
+		if [ "$WWAN_AUTH_TYPE" = "pap" ]; then
+			OPTAUTH="pap"
+		else
+			OPTAUTH="chap"
+		fi
+	fi
+
+	if ! cns_profile write id 0 apn "$WWAN_APN" $OPTAUTH $OPTUSER $OPTPASS; then
+		log "cns communication failed - setting configuration failure"
+	fi
+
+	# get the module online	
+	if ! cns_profile activate; then
+		log "cns communication failed - activation failure"
+		return 1
+	fi
+
+	IPADDR=`rdbGet ${dbVarName_IPAddr}`
+	GWADDR=`rdbGet ${dbVarName_GWAddr}`
+	PDNSADDR=`rdbGet ${dbVarName_PDNSAddr}`
+	SDNSADDR=`rdbGet ${dbVarName_SDNSPAddr}`
+
+	if [ -z "$IPADDR" -o "$IPADDR" = "0.0.0.0" ]; then
+		log "failed to get ip address"
+		return 1
+	fi
+
+	# get the interface up
+	if ! ifconfig hso0 $IPADDR netmask 255.255.255.255 up; then
+		log "ifconfig failed - having the interface up"
+		return 1
+	fi
+
+	echo "" > /etc/resolv.conf
+	if [ -n "$PDNSADDR" -a "$PDNSADDR" != "0.0.0.0" ]; then
+	  echo "nameserver	$PDNSADDR" >> /etc/resolv.conf
+	fi
+
+	if [ -n "$SDNSADDR" -a "$SDNSADDR" != "0.0.0.0" ]; then
+	  echo "nameserver	$SDNSADDR" >> /etc/resolv.conf
+	fi
+
+	# get ip address from the driver - fake dhcp server
+#	if ! execWait 20 "udhcpc -f -q -i hso0 -s /sbin/udhcpc.sh"; then
+#		log "failed to get ip address in udhcpc"
+#		return 1
+#	fi
+
+	log "usbnet connection up"
+
+	# build environment variables for ip-up script 
+	PPP_IFACE="hso0"
+	PPP_TTY=""
+	PPP_SPEED=""
+	PPP_LOCAL=`getUsbNetIp`
+	PPP_REMOTE="$GWADDR"
+	PPP_IPPARAM="$PROFILE"
+
+	/etc_ro/ppp/ip-up "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+	log "ip-up script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+stopUsbNet() {
+	if ifconfig hso0 > /dev/null 2>&1; then
+		# get the module down
+		if ! cns_profile deactivate; then
+			log "cns communication failed - deactivation failure"
+		fi
+	
+		# get the interface down
+		if ! ifconfig hso0 down; then
+			log "ifconfig failed - having the interface down"
+		fi
+	
+		log "usbnet connection down"
+	fi
+
+	# build environment variables for ip-up script 
+	PPP_IFACE="hso0"
+	PPP_TTY=""
+	PPP_SPEED=""
+	PPP_LOCAL=`getUsbNetIp`
+	PPP_REMOTE="0.0.0.0"
+	PPP_IPPARAM="$PROFILE"
+
+	/etc_ro/ppp/ip-down "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+	log "ip-down script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+
+
+case $ACTION in
+	'start')
+		# start usb net
+		if startUsbNet; then
+			# stopusbNet on term signal
+			exec runonterm "$BIN $PROFILE $INSTANCE stop"
+		fi
+		;;
+
+	'stop')
+		stopUsbNet;
+		;;
+esac
+

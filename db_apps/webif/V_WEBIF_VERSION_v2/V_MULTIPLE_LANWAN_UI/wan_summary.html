@@ -1,0 +1,1336 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>LAN/WAN Switch</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+<!-- server script -->
+<%
+
+#define MAX_PIN 99
+lastPin=MAX_PIN;
+lastPinRdb="sys.sensors.info.lastio";
+if(rdb_exists(lastPinRdb)) {
+	lastPin=string_to_number(get_single(lastPinRdb));
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+}
+else { /*GET*/
+	form['ioPinTriggerEn'] = get_single( 'service.failover.x.io_trig.en' );
+	form['ioPinDelay'] = get_single( 'service.failover.x.io_trig.delay' );
+	form['ioPinNumber'] = get_single( 'service.failover.x.io_trig.pin' );
+	form['ioPinLevel'] = get_single( 'service.failover.x.io_trig.level' );
+	form['ioPinDuration'] = get_single( 'service.failover.x.io_trig.duration' );
+}
+%>
+#endif
+
+<!-- client script -->
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+
+var menu_main="Internet";
+var menu_sub="WAN";
+var menu_title=_("wan summary");
+
+/* memory rdb class */
+function memory_rdb(rdb) {
+
+	var r;
+	r=rdb;
+
+	this.res={};
+
+	this.reset=function() {
+		this.res={};
+	};
+
+	this.add_rdbs=function(rdbs) {
+		$.extend(this.res,rdbs);
+	};
+
+	this.add_rdbs_if_not_existing=function(rdbs) {
+
+		var this_res=this.res;
+
+		$.each(rdbs,function(n,v){
+			if($.type(this_res[n])==="undefined" || this_res[n]==null || this_res[n]=="")
+				this_res[n]=v;
+		});
+	}
+
+	this.update=function(res) {
+		$.extend(this.res,res);
+	};
+
+	this.pour_to_mset=function() {
+		$.each(this.res,function(n,v){
+			rdb.add(n,v);
+		});
+	};
+
+	this.pour_to_mget=function() {
+		$.each(this.res,function(n,v){
+			rdb.add(n);
+		});
+	};
+};
+
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+var lastPin = "@@lastPin";
+function setOption() {
+	var i;
+	for( i=0; i < lastPin; i++ ) {
+		document.form.ioPinNumber[i] = new Option(i+1, i);
+	}
+	$("#ioPinNumber").attr("disabled", (lastPin == 1)? true:false);
+}
+#endif
+
+$(function(){
+
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+	var mem=new memory_rdb(rdb);
+
+	var eth=new cgi("./cgi-bin/eth.cgi", "@@session[csrfTokenName]");
+
+	var profile_idx_in_page_2;
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	var ethwan_if="";
+#endif
+
+	function enable_elements(en) {
+		$("div,#div_main,button,input").css("cursor", en?"auto":"wait");
+		$("#button_save1").attr("disabled",!en);
+	}
+
+	var res_profiles;
+
+	$("#button_ethernet,#button_wifi,#button_3g").click(function(){
+		$(location).attr('href',$(this).attr("href"));
+	});
+
+	function saveall(trigger) {
+		/* disable ui */
+		enable_elements(false);
+		blockUI_wait(_("GUI pleaseWait"));
+
+		/* build rdb */
+		rdb.reset();
+		rdb.set_flag("-p");
+		mem.pour_to_mset();
+
+		/* build trigger rdb */
+
+		$.each(res_profiles,function(n,o){
+			if(trigger=="all" || o.pf==parseInt(trigger)) {
+				rdb.add("link.profile."+o.pf+".trigger","1");
+				if(mem.res["link.profile."+o.pf+".defaultroutemetric_rdbname"]!="")
+					rdb.add(mem.res["link.profile."+o.pf+".defaultroutemetric_rdbname"],mem.res["link.profile."+o.pf+".defaultroutemetric"]);
+			}
+		});
+
+		/* submit rdb */
+		rdb.mset(function(){
+			/* enable ui */
+			enable_elements(true);
+			$.unblockUI();
+			success_alert("", "");
+		});
+	}
+
+	$("#button_save1").click(function(){
+		saveall("all");
+	});
+
+	function show_page(page) {
+		clear_alert();
+		$("#div_page_2").toggle(page==2);
+		$("#div_page_1").toggle(page==1);
+	}
+
+	$("#mon_types").change(function(){
+		var monitor_type=$(this).val();
+		$("#div_settings_ping").toggle(monitor_type=="ping");
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		var ethWan=-1;
+		if (ethwan_if != "")
+			ethWan=res_profiles[profile_idx_in_page_2].disp_name.search(ethwan_if);
+		$("#div_ioPinTriggerMenu").toggle(ethWan != -1 && monitor_type=="ping");
+#endif
+	});
+
+	$("input:radio.access[name=cons_mon_enable]").change(function() {
+		$("#cons_mon_enable-toggle-div").css("display", $("#cons_mon_enable-0").is(":checked")?"":"none");
+	});
+
+	$("input:radio.access[name=rand_mon_enable]").change(function() {
+		$("#rand_mon_enable-toggle-div").css("display", $("#rand_mon_enable-0").is(":checked")?"":"none");
+	});
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	$("input:radio.access[name=ioPinTrigger]").change(function() {
+		$("#ioPinTriggerConfig").css("display", $("#ioPinTrigger-0").is(":checked")?"":"none");
+	});
+#endif
+
+	function draw_wan_summary() {
+		/* sort based on metrics */
+		res_profiles.sort(function(a,b){
+			return parseInt(mem.res["link.profile."+a.pf+".defaultroutemetric"])-parseInt(mem.res["link.profile."+b.pf+".defaultroutemetric"]);
+		});
+
+		/* fix up metrics */
+		var dup=false;
+		$.each(res_profiles,function(n,a){
+			$.each(res_profiles,function(n,b){
+				/* do not compare itself */
+				if(a.pf==b.pf)
+					return;
+
+				if(parseInt(mem.res["link.profile."+a.pf+".defaultroutemetric"])==parseInt(mem.res["link.profile."+b.pf+".defaultroutemetric"])) {
+					dup=true;
+				}
+			});
+		});
+
+		/* re-arrage metrics */
+		if(dup) {
+			$.each(res_profiles,function(n,a){
+				mem.res["link.profile."+a.pf+".defaultroutemetric"]=(n+1)*10;
+			});
+		}
+
+		/* update wan summary */
+		var tbody_wan_summary=new Array();
+		var prev_pf=0;
+		$.each(res_profiles,function(n,o){
+			var dev=o["dev"];
+			var pf_name=o["name"];
+			var pf=o["pf"];
+
+
+			/* apply default configuration */
+			var defcfg={};
+			defcfg["link.profile."+pf+".name"]=dev;
+			defcfg["link.profile."+pf+".defaultroutemetric"]="20";
+			defcfg["service.failover."+pf+".monitor_type"]="phy";
+			defcfg["service.failover."+pf+".cons_mon_enable"]="1";
+			defcfg["service.failover."+pf+".failcount"]="3";
+			defcfg["service.failover."+pf+".succcount"]="3";
+			defcfg["service.failover."+pf+".periodicpingtimer"]="3";
+			defcfg["service.failover."+pf+".pingacceleratedtimer"]="3";
+			defcfg["service.failover."+pf+".cons_mon_enable"]="1";
+			defcfg["service.failover."+pf+".randerrtotalcount"]="10";
+			defcfg["service.failover."+pf+".randerrfailcount"]="5";
+			defcfg["service.failover."+pf+".randerrsucccount"]="5";
+			mem.add_rdbs_if_not_existing(defcfg);
+
+#ifdef V_WEBIF_SPEC_vdf
+			if(dev=="wwan.0")
+				o.disp_name="wwan." + pf;
+			else
+				o.disp_name=dev;
+#else
+			if(dev=="wwan.0")
+				o.disp_name="wwan (" + pf_name + ")";
+			else
+				o.disp_name=dev;
+#endif
+
+			var destaddr;
+
+			if(mem.res["service.failover."+pf+".monitor_type"]=="ping")
+				destaddr=mem.res["service.failover."+pf+".destaddress"];
+			else
+				destaddr=_("na");
+
+			/*
+			_("phy")
+			_("ping")
+			*/
+			tbody_wan_summary.push(
+				"<tr>"+
+					"<td>"+(parseInt(n)+1)+"</td>"+
+					"<td>"+o["disp_name"]+"</td>"+
+					"<td>" + mem.res["link.profile."+pf+".defaultroutemetric"] + "</td>"+
+					"<td>" + _(mem.res["service.failover."+pf+".monitor_type"]) + "</td>"+
+#ifndef V_WEBIF_SPEC_vdf
+					"<td>" + destaddr + "</td>"+
+#endif
+					"<td>"+
+						"<a title='Up'   class='secondary' pf_idx='"+n+"'><i class='icon-arrow-up'></i></a>"+
+						"<a title='Down' class='secondary' pf_idx='"+n+"'><i class='icon-arrow-dn'></i></a>"+
+					"</td>"+
+					"<td>"+
+#ifdef V_WEBIF_SPEC_vdf
+						"<a title='Edit' class='secondary sml' pf_idx='"+n+"'><i class='icon edit'>"+_("edit")+"</i></a>"+
+#else
+						"<a title='Edit' class='secondary' pf_idx='"+n+"'><i class='icon edit'></i></a>"+
+#endif
+					"</td>"+
+				"</tr>"
+			);
+
+		});
+		$("#tbody_wan_summary").html(tbody_wan_summary.join());
+
+		$("#tbody_wan_summary a[title=Up],#tbody_wan_summary a[title=Down]").click(function(){
+
+			var pf_idx_a=parseInt($(this).attr("pf_idx"));
+			var pf_idx_b;
+			var pf_idx_dt;
+
+			/* get profiles to swap */
+			if($(this).attr("title")=="Up")
+				pf_idx_dt=-1;
+			else
+				pf_idx_dt=+1;
+			pf_idx_b=(pf_idx_a+res_profiles.length+pf_idx_dt)%res_profiles.length;
+
+			var pf_a=res_profiles[pf_idx_a].pf;
+			var pf_b=res_profiles[pf_idx_b].pf;
+
+			/* swap metrics */
+			var metrics=mem.res["link.profile."+pf_a+".defaultroutemetric"];
+			mem.res["link.profile."+pf_a+".defaultroutemetric"]=mem.res["link.profile."+pf_b+".defaultroutemetric"];
+			mem.res["link.profile."+pf_b+".defaultroutemetric"]=metrics;
+
+			draw_wan_summary();
+		});
+
+		$("#tbody_wan_summary a[title=Edit]").click(function(){
+
+			var pf_idx_a=parseInt($(this).attr("pf_idx"));
+
+			profile_idx_in_page_2=pf_idx_a;
+			var pf=res_profiles[profile_idx_in_page_2].pf;
+
+			/* exchange mem.res to controls */
+			load_values_to_elements({
+				"#metric":mem.res["link.profile."+pf+".defaultroutemetric"],
+				"#mon_types":mem.res["service.failover."+pf+".monitor_type"],
+				"input:radio.access[name=verbose_logging]":mem.res["link.profile."+pf+".verbose_logging"],
+				"#pingdst":mem.res["service.failover."+pf+".destaddress"],
+				"#pingdst2":mem.res["service.failover."+pf+".destaddress2"],
+				"input:radio.access[name=cons_mon_enable]":mem.res["service.failover."+pf+".cons_mon_enable"],
+				"#pingfailcnt":mem.res["service.failover."+pf+".failcount"],
+				"#pingsucccnt":mem.res["service.failover."+pf+".succcount"],
+				"#pingtimer":mem.res["service.failover."+pf+".periodicpingtimer"],
+				"#pingacctmr":mem.res["service.failover."+pf+".pingacceleratedtimer"],
+				"input:radio.access[name=rand_mon_enable]":mem.res["service.failover."+pf+".rand_mon_enable"],
+				"#randerrtotalcnt":mem.res["service.failover."+pf+".randerrtotalcount"],
+				"#randerrfailcnt":mem.res["service.failover."+pf+".randerrfailcount"],
+				"#randerrsucccnt":mem.res["service.failover."+pf+".randerrsucccount"],
+			});
+
+			/* perform change */
+			$("#mon_types").trigger("change");
+			if(res_profiles[profile_idx_in_page_2].disp_name.indexOf("(")<0)
+				$("#h2_fail_over_title").html(_("fail over configuration")+" - ("+res_profiles[profile_idx_in_page_2].disp_name+")");
+			else
+				$("#h2_fail_over_title").html(_("fail over configuration") + " - " + res_profiles[profile_idx_in_page_2].disp_name);
+
+			$("input:radio.access[name=cons_mon_enable]").trigger("change");
+			$("input:radio.access[name=rand_mon_enable]").trigger("change");
+
+			/* draw page 2 */
+			show_page(2);
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+			var ethWan=-1;
+			if (ethwan_if != "")
+				ethWan=res_profiles[profile_idx_in_page_2].disp_name.search(ethwan_if);
+			if (ethWan != -1) {
+				if ($("#mon_types").val() == 'phy' && $("#ioPinTriggerEn").val() == '1') {
+					validate_alert( "", _("ioPinModeWarning3-1")+" "+_("ioPinModeWarning3-2"));
+					$("#div_ioPinTriggerMenu").toggle(true);
+				} else if ($("#mon_types").val() == 'ping') {
+					$("#div_ioPinTriggerMenu").toggle(true);
+				} else {
+					$("#div_ioPinTriggerMenu").toggle(false);
+				}
+			} else {
+				$("#div_ioPinTriggerMenu").toggle(false);
+			}
+#endif
+
+		});
+	}
+
+	function commitAll() {
+		var pf=res_profiles[profile_idx_in_page_2].pf;
+
+		var res=load_values_from_elements({
+			"#metric":"link.profile."+pf+".defaultroutemetric",
+			"#mon_types":"service.failover."+pf+".monitor_type",
+			"input:radio.access[name=verbose_logging]":"link.profile."+pf+".verbose_logging",
+			"#pingdst":"service.failover."+pf+".destaddress",
+			"#pingdst2":"service.failover."+pf+".destaddress2",
+			"input:radio.access[name=cons_mon_enable]":"service.failover."+pf+".cons_mon_enable",
+			"#pingfailcnt":"service.failover."+pf+".failcount",
+			"#pingsucccnt":"service.failover."+pf+".succcount",
+			"#pingtimer":"service.failover."+pf+".periodicpingtimer",
+			"#pingacctmr":"service.failover."+pf+".pingacceleratedtimer",
+			"input:radio.access[name=rand_mon_enable]":"service.failover."+pf+".rand_mon_enable",
+			"#randerrtotalcnt":"service.failover."+pf+".randerrtotalcount",
+			"#randerrfailcnt":"service.failover."+pf+".randerrfailcount",
+			"#randerrsucccnt":"service.failover."+pf+".randerrsucccount",
+		});
+
+		/* update rdbs */
+		mem.add_rdbs(res);
+		draw_wan_summary();
+		show_page(1);
+		saveall(pf);
+	}
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	var io_pin_mode=[];
+
+	function ioPinModeValidation() {
+		var pin = $("#ioPinNumber").val();
+		var io_pin = parseInt(pin)+1;
+		var en = $("#ioPinTriggerEn").val();
+		if (io_pin_mode[pin] != "digital_output" && en == "1") {
+			validate_alert("", "IO pin #"+io_pin+_("ioPinModeWarning1-1")+"<a href=IO_configuration.html>"+_("ioPinModeWarning1-2")+"</a>"+_("ioPinModeWarning1-3"));
+			return false;
+		} else {
+			return true;
+		}
+	}
+
+	function ioTrigModeGetCgi(io_mode) {
+		for (i=0; i<lastPin; i++)
+			io_pin_mode[i] = io_mode[i].mode;
+		ioPinModeValidation();
+	}
+
+	function ioTrigSubmitCgi() {
+		var arg_en=$("#ioPinTriggerEn").val();
+		var arg_delay=$("#ioPinDelay").val();
+		var arg_pin=parseInt($("#ioPinNumber").val())+1;
+		var arg_level=$("#ioPinLevel").val();
+		var arg_duration=$("#ioPinDuration").val();
+		var arg_profile=res_profiles[profile_idx_in_page_2].pf;
+		$.ajax({
+			type: 'POST',
+			url: 'cgi-bin/io_trig.cgi?<%appendCsrfTokenToQueryString();%>',
+			data: {
+				reqtype: "write_io_trig",
+				trig_en: arg_en,
+				trig_delay: arg_delay,
+				trig_pin: arg_pin,
+				trig_level: arg_level,
+				trig_duration: arg_duration,
+				trig_profile: arg_profile
+			},
+			dataType:'json',
+			success: function () {commitAll();}
+		});
+	}
+#endif
+
+	$("#button_save2").click(function() {
+#ifdef V_WEBIF_SPEC_vdf
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			return;
+		}
+#endif
+
+		if($("#mon_types").val() == 'ping' && $("#cons_mon_enable-1").is(":checked") == true && $("#rand_mon_enable-1").is(":checked") == true) {
+			validate_alert( "", _("all monitors disabled"));
+			return;
+
+		}
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		var ethWan=-1;
+		if (ethwan_if != "")
+			ethWan=res_profiles[profile_idx_in_page_2].disp_name.search(ethwan_if);
+		if (ethWan != -1) {
+			if ($("#mon_types").val() == 'phy' && $("#ioPinTriggerEn").val() == '1') {
+				validate_alert( "", _("ioPinModeWarning3-1"));
+				return;
+			}
+
+			if (!ioPinModeValidation()) {
+				return;
+			}
+
+			var pin = $("#ioPinNumber").val();
+			var io_pin = parseInt(pin)+1;
+			var en = $("#ioPinTriggerEn").val();
+			var level = $("#ioPinLevel").val();
+			var dura = $("#ioPinDuration").val();
+			if (en == "1") {
+#if (0)
+				// IO pin triggering warning message :
+				// IO pin trigger is enabled and trigger level is set to High.
+				// That means IO pin #pin will automatically be configured to digital output mode and set to low.
+				// The output will transit to high for 1 second(s) when failover occurs then return to low again.
+#endif
+				var msg=_("ioPinModeWarning5-1");
+				msg+=((level==1? _("ioHigh"):_("ioLow"))+".");
+				msg+=(_("ioPinModeWarning5-2")+"# "+io_pin+_("ioPinModeWarning5-3"));
+				msg+=((level==1? _("ioPinTrigLow"):_("ioPinTrigHigh"))+". "+_("ioPinModeWarning5-4"));
+				msg+=((level==1? _("ioPinTrigHigh"):_("ioPinTrigLow"))+_("ioPinModeWarning5-5"));
+				msg+=(dura+_("ioPinModeWarning5-6"));
+				msg+=((level==1? _("ioPinTrigLow"):_("ioPinTrigHigh"))+_("ioPinModeWarning5-7"));
+				blockUI_confirm(msg, function(){ioTrigSubmitCgi();});
+			} else {
+				ioTrigSubmitCgi();
+			}
+		} else {
+			commitAll();
+		}
+#else
+		commitAll();
+#endif
+	});
+
+	var ping_info=[
+		{pinging:false,server:""},
+		{pinging:false,server:""},
+	];
+
+	// set element activation
+	$("#pingdst,#pingdst2").keyup(function(e) {
+
+#if 0 // temporarily removed, because the behavior is not fully defined, yet.
+		var len1;
+		var len2;
+
+		len1=$("#pingdst").val().length>0;
+		len2=$("#pingdst2").val().length>0;
+
+		if(!len1) {
+			$("#pingdst2").val("");
+			$("#pingdst2").attr("disabled",true);
+		}
+		if(($("#pingdst2").is(":disabled") && len1) || (!$("#pingdst2").is(":disabled") && !len1)) {
+			$("#pingdst2").attr("disabled",!len1 && !len2);
+		}
+
+		$("#pingtimer").attr("disabled",!len1 && !len2);
+		$("#pingacctmr").attr("disabled",!len1 && !len2);
+		$("#pingfailcnt").attr("disabled",!len1 && !len2);
+		$("#randerrtotalcnt").attr("disabled",!len1 && !len2);
+		$("#randerrfailcnt").attr("disabled",!len1 && !len2);
+		$("#randerrsucccnt").attr("disabled",!len1 && !len2);
+#endif
+
+		var el;
+		var el_array=["pingdst","pingdst2"];
+		var idx;
+		var server;
+		var el_id;
+
+		// get current el info
+		el=$(this);
+		el_id=el.attr("id");
+		idx=$.inArray(el_id,el_array);
+
+		// get peripheral elements
+		var el_wait=$("#"+el_id+"_wait");
+		var el_stat=$("#"+el_id+"_stat");
+
+		server=el.val();
+
+		// bypass if no server is available
+		if(server.length==0) {
+			// hide pinging icon
+			el_wait.hide();
+			el_stat.hide();
+			return;
+		}
+
+		// bypass if we have no change in the server
+		if(ping_info[idx].server==server)
+			return;
+
+		// when the server changed from blank to something while pinging
+		el_wait.toggle(ping_info[idx].pinging);
+
+		// bypass if currently pinging or already pinged
+		if(ping_info[idx].pinging)
+			return;
+
+		// update ping info
+		ping_info[idx].pinging=true;
+		ping_info[idx].server=server;
+
+		// show pinging icon
+		el_wait.toggle(ping_info[idx].pinging);
+		el_stat.toggle(!ping_info[idx].pinging);
+
+		$.getJSON (
+			"./cgi-bin/ltph.cgi",
+			{reqtype:"ping",reqparam:server},
+			function(res){
+				el_stat.html( (res.cgiresult==0)?_("succ"):_("fail"));
+
+				// udpate ping info
+				ping_info[idx].pinging=false;
+
+				// hide pinging icon
+				el_wait.toggle(ping_info[idx].pinging);
+				el_stat.toggle(!ping_info[idx].pinging);
+
+				// trigger keyup if we have a new server
+				if(ping_info[idx].server!=el.val()) {
+					el.trigger("keyup");
+				}
+			}
+		);
+		return;
+	});
+
+	// trigger events
+	$("#pingdst,#pingdst2").trigger("keyup");
+
+	function button_load() {
+		show_page(1);
+
+		/* disable UI */
+		enable_elements(false);
+		$("#div_warning #div_wan_summary").toggle(false);
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		$("#div_ioPinTriggerMenu").toggle(false);
+#endif
+
+		eth.reset();
+		eth.run("info_profile",function(res){
+
+			var wan_profiles="";
+			var wan_configable;
+			var profiles=null;
+
+			res_profiles=res["profiles"];
+			wan_configable=res_profiles.length>0;
+
+			/* bypass if no wan interface found */
+			if(!wan_configable) {
+				$("#div_warning").toggle(true);
+				enable_elements(true);
+				return;
+			}
+
+			/* init. mem */
+			mem.reset();
+			$.each(res_profiles,function(i,o){
+				var pf=o["pf"];
+				var rdbs={};
+
+				rdbs["link.profile."+pf+".name"]="";
+				rdbs["link.profile."+pf+".defaultroutemetric"]="";
+				rdbs["service.failover."+pf+".monitor_type"]="";
+				rdbs["link.profile."+pf+".verbose_logging"]="0";
+				rdbs["service.failover."+pf+".destaddress"]="";
+				rdbs["service.failover."+pf+".destaddress2"]="";
+				rdbs["service.failover."+pf+".cons_mon_enable"]="1";
+				rdbs["service.failover."+pf+".failcount"]="";
+				rdbs["service.failover."+pf+".succcount"]="";
+				rdbs["service.failover."+pf+".periodicpingtimer"]="";
+				rdbs["service.failover."+pf+".pingacceleratedtimer"]="";
+				rdbs["service.failover."+pf+".rand_mon_enable"]="1";
+				rdbs["service.failover."+pf+".randerrtotalcount"]="";
+				rdbs["service.failover."+pf+".randerrfailcount"]="";
+				rdbs["service.failover."+pf+".randerrsucccount"]="";
+				rdbs["link.profile."+pf+".defaultroutemetric_rdbname"]="";
+
+				mem.add_rdbs(rdbs);
+			});
+
+			/* build rdb to mget */
+			rdb.reset();
+			mem.pour_to_mget();
+
+			rdb.mget(function(res){
+
+				/* update mem */
+				mem.update(res);
+
+				/* set default */
+				$.each(res_profiles,function(n,o){
+					var pf=o["pf"];
+
+					/* apply default configuration - monitor_type=phy */
+					if(mem.res["service.failover."+pf+".monitor_type"]=="")
+						mem.res["service.failover."+pf+".monitor_type"]="phy"
+					/* apply default configuration - name=dev */
+					if(mem.res["link.profile."+pf+".name"]=="")
+						mem.res["link.profile."+pf+".name"]=o["dev"];
+					/* apply default configuration - name=metric */
+					if(mem.res["link.profile."+pf+".defaultroutemetric"]=="")
+						mem.res["link.profile."+pf+".defaultroutemetric"]="20";
+					if(mem.res["service.failover."+pf+".cons_mon_enable"]=="")
+						mem.res["service.failover."+pf+".cons_mon_enable"]="1"
+					if(mem.res["service.failover."+pf+".rand_mon_enable"]=="")
+						mem.res["service.failover."+pf+".rand_mon_enable"]="1"
+				});
+
+				/* draw wan summary */
+				draw_wan_summary();
+
+				/* restore ui */
+				enable_elements(true);
+				$("#div_wan_summary").toggle(true);
+			});
+		});
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		eth.reset();
+		eth.run("info_wan",function(res){
+
+			var wan_interfaces="";
+			var wan_configable;
+
+			wan_configable=res["interfaces"].length>0;
+
+			/* bypass if no wan interface found */
+			if(!wan_configable) {
+				ethwan_if = "";
+				return;
+			}
+
+			$.each(res["interfaces"],function(n,o){
+				var val=o["desc"];
+				if (val == "LAN/WAN" || val == "System Ethernet port")
+					ethwan_if = o["hwclass"];
+			});
+		});
+
+		load_value_to_element("input:radio.access[name=ioPinTrigger]",$("#ioPinTriggerEn").val()!="0");
+		$("#ioPinTriggerConfig").css("display", $("#ioPinTriggerEn").val()=="0"?"none":"");
+
+		$("#ioPinTrigger-0").click(function() {
+			clear_alert();
+			$("#ioPinTriggerEn").val($("input:radio.access[name=ioPinTrigger]:checked").val());
+			$("#ioPinTriggerConfig").css("display","");
+		});
+		$("#ioPinTrigger-1").click(function() {
+			clear_alert();
+			$("#ioPinTriggerEn").val($("input:radio.access[name=ioPinTrigger]:checked").val());
+			$("#ioPinTriggerConfig").css("display","none");
+		});
+		$("#ioPinNumber").val("@@form['ioPinNumber']"-1);
+
+		load_value_to_element("input:radio.access[name=ioPinLevel]",$("#ioPinLevel").val()!="0");
+		$("#ioPinLevel-0").click(function() {
+			$("#ioPinLevel").val($("input:radio.access[name=ioPinLevel]:checked").val());
+		});
+		$("#ioPinLevel-1").click(function() {
+			$("#ioPinLevel").val($("input:radio.access[name=ioPinLevel]:checked").val());
+		});
+
+		$.ajax({
+			type: 'POST',
+			url: 'cgi-bin/io_trig.cgi?<%appendCsrfTokenToQueryString();%>',
+			data: { reqtype: "read_io_mode" },
+			dataType:'json',
+			success: function (res) { ioTrigModeGetCgi(res); }
+		});
+#endif
+
+	}
+
+	button_load();
+});
+
+</script>
+
+<!-- UI  style -->
+
+<style type="text/css">
+	table#table_wan_summary td,table#table_wan_summary th {
+		text-align: left;
+		padding-left: 10px;
+	}
+
+	.icon-arrow-up{
+		background-image:url('/img/sprite.png');
+		background-repeat:no-repeat;
+		float:left;
+		width:24px;
+		height:24px;
+		background-position:-60px -254px
+	}
+
+	.icon-arrow-dn{
+		background-image:url('/img/sprite.png');
+		background-repeat:no-repeat;
+		float:left;
+		width:24px;
+		height:24px;
+		background-position:-96px -254px;
+	}
+
+	table#table_wan_summary a[title="Up"],table#table_wan_summary a[title="Down"] {
+		padding:1px;
+		margin: 0 10px 0 0;
+	}
+#ifndef V_WEBIF_SPEC_vdf
+	table#table_wan_summary a[title="Edit"] {
+		padding:0px;
+		border:0;
+		margin: 0 10px 0 0;
+	}
+#endif
+	div#div_links a {
+		color:blue;
+	}
+</style>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" novalidate="novalidate">
+		<div class="right-column white-box">
+			<div class="pad" id="div_main">
+				<div id="div_warning" style="display:none">
+					<h2><script language=Javascript>document.write(_("wan summary"))</script></h2>
+					<p>
+						<script language=JavaScript>document.write(_("no wan interface is configured"))</script>
+					</p>
+				</div>
+
+				<div id="div_page_2" style="display:none">
+					<div id="div_fail_over">
+						<h2 id="h2_fail_over_title"></h2>
+						<div class="grey-box">
+							<div class="form-row">
+								<label for="metric"><script language=Javascript>document.write(_("metrics"))</script></label>
+								<div class="field" style="inline">
+									<input type="text" name="metric" class="validate[required,funcCall[validate_metric]] required metric large" id="metric" maxLength="5" onKeyUp="NumfieldEntry(this);">
+								</div>
+								<div>
+									<span class="normal-text">&nbsp;(0-65535)</span>
+								</div>
+							</div>
+
+							<div class="form-row no-bg-form">
+								<fieldset>
+									<label for=""><script language=Javascript>document.write(_("monitoring method"))</script></label>
+									<div class="field">
+										<select id="mon_types">
+											<option value="phy"><script language=Javascript>document.write(_("physical link"))</script></option>
+											<option value="ping"><script language=Javascript>document.write(_("ping"))</script></option>
+										</select>
+									</div>
+								</fieldset>
+							</div>
+
+							<div class="form-row no-bg-form">
+								<label><script language=Javascript>document.write(_("verbose logging"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch">
+											<input type="radio" class="access" value="1" name='verbose_logging' id='verbose_logging-0'>
+											<label for="verbose_logging-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" class="access" value="0" name='verbose_logging' id='verbose_logging-1'>
+											<label for="verbose_logging-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div id="div_settings_ping" style="display:none">
+								<div class="form-row">
+									<label for="pingdst"><script language=Javascript>document.write(_("monitor destinationAddress"))</script></label>
+									<div class="field" style="inline">
+										<input type="text" class="validate[required] required large" name="pingdst" id="pingdst">
+									</div>
+									<div style="inline">
+										&nbsp;
+										<i style="display:none" id="pingdst_wait" class="progress-sml"></i>
+										<label id="pingdst_stat" style="width:40px"></label>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="pingdst2"><script language=Javascript>document.write(_("monitor secondAddress"))</script></label>
+									<div class="field">
+									<input type="text" class="large" name="pingdst2" id="pingdst2">
+									</div>
+									<div style="inline">
+										&nbsp;
+										<i style="display:none" id="pingdst2_wait" class="progress-sml"></i>
+										<label id="pingdst2_stat" style="width:40px"></label>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="pingtimer"><script language=Javascript>document.write(_("monitor pingTimer"))</script></label>
+									<div class="field">
+										<input type="text" name="pingtimer" id="pingtimer" class="validate[required,custom[integer],min[3],max[65535]] required field3and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover period"))</script></span>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="pingacctmr"><script language=Javascript>document.write(_("retry timer"))</script></label>
+									<div class="field">
+										<input type="text" name="pingacctmr" id="pingacctmr" class="validate[required,custom[integer],min[2],max[65535]] required field2and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover period2"))</script></span>
+									</div>
+								</div>
+								<div class="hr"></div>
+#ifndef V_WEBIF_SPEC_vdf
+								<div>
+									<h2><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></h2>
+								</div>
+#else
+								<div class="p-des-full-width" style="padding:0 0 0 20px;">
+									<h4 style="color:#000;"><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></h4>
+								</div>
+#endif
+								<div class="form-row">
+									<label><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></label>
+									<div class="field">
+										<div class="location-settings">
+											<div class="radio-switch">
+												<input type="radio" class="access" value="1" name='cons_mon_enable' id='cons_mon_enable-0'>
+												<label for="cons_mon_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+												<input type="radio" class="access" value="0" name='cons_mon_enable' id='cons_mon_enable-1'>
+												<label for="cons_mon_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div id="cons_mon_enable-toggle-div">
+								<div class="form-row">
+									<label for="pingfailcnt"><script language=Javascript>document.write(_("failover monitor failCount"))</script></label>
+									<div class="field">
+										<input type="text" name="pingfailcnt" id="pingfailcnt" class="validate[required,funcCall[validate_3and65535]] required field3and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="pingsucccnt"><script language=Javascript>document.write(_("failover monitor succCount"))</script></label>
+									<div class="field">
+										<input type="text" name="pingsucccnt" id="pingsucccnt" class="validate[required,funcCall[validate_3and65535]] required field3and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+									</div>
+								</div>
+								</div>
+								<div class="hr"></div>
+#ifndef V_WEBIF_SPEC_vdf
+								<div>
+									<h2><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></h2>
+								</div>
+#else
+								<div class="p-des-full-width" style="padding:0 0 0 20px;">
+									<h4 style="color:#000;"><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></h4>
+								</div>
+#endif
+								<div class="form-row">
+									<label><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></label>
+									<div class="field">
+										<div class="location-settings">
+											<div class="radio-switch">
+												<input type="radio" class="access" value="1" name='rand_mon_enable' id='rand_mon_enable-0'>
+												<label for="rand_mon_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+												<input type="radio" class="access" value="0" name='rand_mon_enable' id='rand_mon_enable-1'>
+												<label for="rand_mon_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div id="rand_mon_enable-toggle-div">
+								<div class="form-row">
+									<label for="randerrtotalcnt"><script language=Javascript>document.write(_("failover monitor randerr totalCount"))</script></label>
+									<div class="field">
+										<input type="text" name="randerrtotalcnt" id="randerrtotalcnt" class="validate[required,funcCall[validate_randerrTotalCnt]] large required field3and65535 fieldgreaterthanfailcnt fieldgreaterthansucccnt">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="randerrfailcnt"><script language=Javascript>document.write(_("failover monitor failCount"))</script></label>
+									<div class="field">
+										<input type="text" name="randerrfailcnt" id="randerrfailcnt" class="validate[required,funcCall[validate_randerrCnt]] large required field3and65535 fieldlessthantotal">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+									</div>
+								</div>
+								<div class="form-row">
+									<label for="randerrsucccnt"><script language=Javascript>document.write(_("failover monitor succCount"))</script></label>
+									<div class="field">
+										<input type="text" name="randerrsucccnt" id="randerrsucccnt" class="validate[required,funcCall[validate_randerrCnt]] large required field3and65535 fieldlessthantotal">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+									</div>
+								</div>
+								</div>
+							</div>
+						</div>
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+						<div id="div_ioPinTriggerMenu" style="display:none">
+							<!-- When auth is off hide the username and password -->
+							<div class="form-row no-bg-form">
+								<h2><script language=Javascript>document.write(_("ioPinTriggerOnFailover"))</script></h2>
+								<label for="field-0"><script language=Javascript>document.write(_("enableIoPinTrigger"))</script></label>
+								<div class="field">
+									<input type="hidden" name="ioPinTriggerEn" id="ioPinTriggerEn" value="@@form['ioPinTriggerEn']"/>
+									<div class="location-settings">
+										<div class="radio-switch">
+											<input type="radio" id="ioPinTrigger-0" name="ioPinTrigger" class="access" value="1">
+											<label for="ioPinTrigger-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" id="ioPinTrigger-1" name="ioPinTrigger" class="access" value="0">
+											<label for="ioPinTrigger-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="grey-box" id="ioPinTriggerConfig" >
+								<div class="form-row no-bg-form">
+									<fieldset>
+										<label for=""><script language=Javascript>document.write(_("ioPin"))</script></label>
+										<div class="field">
+											<select name="ioPinNumber" id="ioPinNumber">
+											<script language='javascript'>setOption();</script>
+											</select>
+										</div>
+									</fieldset>
+								</div>
+
+								<div class="form-row no-bg-form">
+									<label for="ioPinDelay"><script language=Javascript>document.write(_("ioPinDelay"))</script></label>
+									<div class="field" style="inline">
+										<input type="text" name="ioPinDelay" id="ioPinDelay" class="validate[required,funcCall[validate_ioPinDelay]] required ioPinDelay large" value="@@form['ioPinDelay']" maxLength="4" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("ioPinDelayRange"))</script>)</span>
+									</div>
+								</div>
+
+								<div class="form-row no-bg-form">
+									<label for="ioPinLevel"><script language=Javascript>document.write(_("ioPinTrigLevel"))</script></label>
+									<input type="hidden" name="ioPinLevel" id="ioPinLevel" value="@@form['ioPinLevel']"/>
+									<div class="field">
+										<div class="radio-box-group">
+											<div class="radio-box">
+												<input type="radio" name='ioPinLevel' id='ioPinLevel-0' class="access" value="1">
+												<label for="ioPinLevel-0"><div class="radioText"><script language=Javascript>document.write(_("ioPinTrigHigh"))</script></div></label>
+											</div>
+											<div class="radio-box">
+												<input type="radio" name='ioPinLevel' id='ioPinLevel-1' class="access" value="0">
+												<label for="ioPinLevel-1"><div class="radioText"><script language=Javascript>document.write(_("ioPinTrigLow"))</script></div></label>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<div class="form-row no-bg-form">
+									<label for="ioPinDuration"><script language=Javascript>document.write(_("ioPinTrigDuration"))</script></label>
+									<div class="field" style="inline">
+										<input type="text" name="ioPinDuration" id="ioPinDuration" class="validate[required,funcCall[validate_ioPinDuration]] required ioPinDuration large" value="@@form['ioPinDuration']" maxLength="4" onKeyUp="NumfieldEntry(this);">
+									</div>
+									<div>
+										<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("ioPinDurationRange"))</script>)</span>
+									</div>
+								</div>
+
+							</div>
+						</div>
+#endif
+
+						<div class="submit-row">
+							<button id="button_save2" class="button_save" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+							<button type="button" class="secondary" onClick="window.location='wan_summary.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+						</div>
+					</div>
+				</div>
+
+				<div id="div_page_1" style="display:none">
+					<div id="div_wan_summary" style="display:none">
+						<h2><script language=Javascript>document.write(_("wan summary"))</script></h2>
+						<table id="table_wan_summary">
+							<colgroup>
+								<col width="30px">
+								<col width="80px">
+#ifndef V_WEBIF_SPEC_vdf
+								<col width="70px">
+#endif
+								<col width="100px">
+								<col width="170px">
+								<col width="100px">
+								<col width="100px">
+							</colgroup>
+
+							<thead>
+								<tr>
+									<th><script language=Javascript>document.write(_("mapping no"))</script></th>
+									<th><script language=Javascript>document.write(_("name"))</script></th>
+									<th><script language=Javascript>document.write(_("metrics"))</script></th>
+									<th><script language=Javascript>document.write(_("monitor"))</script></th>
+#ifndef V_WEBIF_SPEC_vdf
+									<th><script language=Javascript>document.write(_("host"))</script></th>
+#endif
+									<th><script language=Javascript>document.write(_("priority"))</script></th>
+									<th></th>
+								</tr>
+							</thead>
+
+							<tbody id="tbody_wan_summary">
+							</tbody>
+						</table>
+
+						<div class="submit-row">
+							<button id="button_save1" class="button_save" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+						</div>
+					</div>
+
+					<div class="pad">
+						<h2 align=left><script language=Javascript>document.write(_("wan configurations"))</script></h2>
+						<div id="div_links">
+							<div class="p-des-full-width">
+							<p>
+							<script language=Javascript>document.write(_("wan configuration info"))</script>
+
+							</p>
+							<p>
+								<a href="/Profile_Name_List.html"><script language=Javascript>document.write(_("wwan data connection"))</script></a>
+							</p>
+#if !defined(V_WIFI_none)
+							<p>
+								<!-- The linux backports driver supports simultaneous AP and
+								STA/Client operation while the ralink driver does not -->
+#ifdef V_WIFI_ralink
+								<a href="/wlanswitch.html">
+#else
+								<a href="/wlan_sta_linux.html">
+#endif
+								<script language=Javascript>document.write(_("wireless client"))</script></a>
+							</p>
+#endif
+#if !defined(V_PRODUCT_ntc_20)
+							<p>
+<!-- enable this feature for Sep 2014 release to see what happens, might need to disable it again plus on nwl12 models -->
+<!-- #if !defined (V_PRODUCT_ntc_30wv) && !defined (V_PRODUCT_ntc_40wv) -->
+								<a href="/ethwan.html"><script language=Javascript>document.write(_("ethernet wan"))</script></a>
+<!-- #endif -->
+							</p>
+#endif
+						</div>
+					</div>
+				</div>
+
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	$.validator.addMethod("metric",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("Msg48"));
+
+	$.validator.addMethod("field2and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 2 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field2and65535"));
+
+	$.validator.addMethod("field3and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 3 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field3and65535"));
+
+	$.validator.addMethod("fieldZ3and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c!=0 && ( c < 3 || c > 65535 ) || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldZ3and65535"));
+
+	$.validator.addMethod("fieldlessthantotal",function(c,a) {
+		var t=parseInt($("#randerrtotalcnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( t != "NaN" && t != 0 && c > t ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldlessthantotal"));
+
+	$.validator.addMethod("fieldgreaterthanfailcnt",function(c,a) {
+		var f=parseInt($("#randerrfailcnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( f != "NaN" && c < f && c != 0 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldgreaterthanfailcnt"));
+
+	$.validator.addMethod("fieldgreaterthansucccnt",function(c,a) {
+		var s=parseInt($("#randerrsucccnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( s != "NaN" && c < s && c != 0 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldgreaterthansucccnt"));
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	$.validator.addMethod("ioPinDelay",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 1440 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field0and1440"));
+
+	$.validator.addMethod("ioPinDuration",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 10 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and10"));
+#endif
+
+#else
+	function validate_metric(field, rules, i, options) {
+		if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+			return _("Msg48");
+		}
+	}
+	function validate_3and65535(field, rules, i, options) {
+		if( field.val() < 3 || field.val() > 65535 || !isAllNum(field.val()) ) {
+			return _("field3and65535");
+		}
+	}
+	function validate_randerrTotalCnt(field, rules, i, options) {
+		var f=parseInt($("#randerrfailcnt").val());
+		var s=parseInt($("#randerrsucccnt").val());
+
+		if( field.val() < 3 || field.val() > 65535 || !isAllNum(field.val()) ) {
+			return _("field3and65535");
+		}
+		else if( f != "NaN" && field.val() < f && field.val() != 0 ) {
+			return _("fieldgreaterthanfailcnt");
+		}
+		else if( s != "NaN" && field.val() < s && field.val() != 0 ) {
+			return _("fieldgreaterthansucccnt");
+		}
+	}
+	function validate_randerrCnt(field, rules, i, options) {
+		var t=parseInt($("#randerrtotalcnt").val());
+
+		if((field.val() < 3 || field.val() > 65535) || !isAllNum(field.val()) ) {
+			return _("field3and65535");
+		}
+		else if( t != "NaN" && t != 0 && field.val() > t ) {
+			return _("fieldlessthantotal");
+		}
+	}
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	function validate_ioPinDelay(field, rules, i, options) {
+		if( field.val() < 0 || field.val() > 1440 || !isAllNum(field.val()) ) {
+			return _("field0and1440");
+		}
+	}
+	function validate_ioPinDuration(field, rules, i, options) {
+		if( field.val() < 1 || field.val() > 10 || !isAllNum(field.val()) ) {
+			return _("field1and10");
+		}
+	}
+#endif
+#endif
+</script>
+
+</body>
+</html>

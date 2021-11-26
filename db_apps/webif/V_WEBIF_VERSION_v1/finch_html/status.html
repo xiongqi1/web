@@ -1,0 +1,626 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>system | Status</title>
+</head>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+#ifdef V_SKIN_QEU
+<!--style> #nav li a.top_link#button_1 { color:#d00010;} </style-->
+#endif
+<script language="JavaScript" src="/cgi-bin/vpn.cgi"></script>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language='javascript'>
+Butterlate.setTextDomain("admin");
+imgArray = new Array("csq0.GIF","csq1.GIF","csq2.GIF","csq3.GIF","csq4.GIF","csq5.GIF","csq6.GIF");
+baseDIR = "/images/";
+imagebase = 3;
+imageidx = 0;
+prvbatidx = 1;
+var http_request = 0;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var pincounter = 0;
+var ajaxerror = 0;
+var timezone_offset = <%val=get_single('service.ntp.offset');%>"@@val";
+var show_duration = 0;
+var currentSession = "";
+var usageHistory = "";
+
+function addcomma( myval ) {
+var	retval="";
+var	cm=parseInt((myval.length-1)/3);
+	for( i=0; i<cm; i++ ) retval+=myval.substring( retval.length-i, myval.length-(cm-i)*3)+',';
+		retval+=myval.substring(retval.length-i, myval.length);
+	return retval;	
+}
+
+function toUpTime( uptime ){
+var upday = parseInt(uptime / (24 * 3600));
+var uphr = parseInt((uptime - upday * 24 * 3600) / (3600));
+var upmin = parseInt((uptime - upday * 24 * 3600 - uphr * 3600) / 60);
+var upsec = parseInt(uptime - upday * 24 * 3600 - uphr * 3600 - upmin * 60);
+	uphr=uphr<10?"0"+uphr.toString():uphr.toString();
+	upmin=upmin<10?"0"+upmin.toString():upmin.toString();
+	upsec=upsec<10?"0"+upsec.toString():upsec.toString();
+	if (upday) {
+		var buf2=upday.toString() + " ";
+		if (upday > 1)
+			buf2=buf2+_("days")+" ";
+		else
+			buf2=buf2+_("day")+" ";
+	}
+	else {
+		var buf2="";
+	}
+	return buf2+uphr+":"+upmin+":"+upsec;
+}
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	eval(response);
+	document.getElementById( "simwait" ).style['display']='none';
+	document.form1.uptime.value=toUpTime( uptime );
+	document.form1.coverage.value=coverage;
+	document.form1.imei.value=imei;
+	document.getElementById("version").innerHTML=version;
+	document.getElementById("Fversion").innerHTML=moduleFirmwareVersion.substring(0, moduleFirmwareVersion.indexOf(" ")) 
+	document.getElementById("mac").innerHTML=eth0mac;
+	simStatusID=document.getElementById('simID');
+
+	if( meplockStatus=="locked" ) {
+		simStatus = "MEP Locked";
+		document.form1.simStatus.value = _("mepLocked");
+	}
+	else {
+		switch(simStatus) {
+		case "SIM locked":
+			simStatusID.value = _("SIMlocked");
+		break;
+		case "PUK":
+			simStatusID.value = _("status pukLocked");
+		break;
+		case "SIM OK":
+			simStatusID.value = _("simOK");
+		break;
+		case "SIM not inserted":
+			simStatusID.value = _("sim not inserted");
+		break;
+		default:
+			simStatusID.value = simStatus;
+		break;
+		}
+	}
+	if(simStatus == "SIM OK") {
+		simStatusID.style.color = 'GREEN';
+		document.getElementById( "simwait" ).style['display']='none';
+		csq = csq.substring(0, csq.indexOf("dBm") );		
+		csqstr = _("not available");
+		if(csq == 0)
+			imageidx = 0;	
+		else if(csq >= -86 ) {
+			csqstr = _("strong");
+			if(csq >= -77)
+				imageidx = 6;
+			else
+				imageidx = 5;
+		}
+		else if(csq >= -101 ) {
+			csqstr = _("medium");
+			if(csq >= -92 )
+				imageidx = 4;
+			else
+				imageidx = 3;
+		}
+		else if(csq >= -110 ) {
+			csqstr = _("poor");
+			if(csq >= -108)
+				imageidx = 2;
+			else
+				imageidx = 1;
+		}	
+		else
+			imageidx = 0;
+		document.form1.umtsss.value = csq+" dBm         "+csqstr;
+		document.images[imagebase+3].src = baseDIR + "csq" + (imageidx) + ".GIF"
+		if (typeof(hint) == "undefined" || hint == "N/A" || hint == "") {
+			if (provider.charAt(0) == "%")
+				document.getElementById("provider").innerHTML = UrlDecode(provider);
+			else
+				document.getElementById("provider").innerHTML = provider;
+		} else {
+			document.getElementById("provider").innerHTML = UrlDecode(hint);
+		}
+		document.form1.connType.value = connType;
+		if(current_session=='wwan down') {
+			for( i=0; i<6; i++ ) 
+				document.getElementById( 'ppp'+i ).style['display'] = 'none';
+		}
+		for( i=0; i<st.length && i<6; i++ ) {
+			document.getElementById( 'ppp'+i ).style['display'] = '';
+			document.getElementById( 'profile'+i ).innerHTML = st[i].name;
+			if( st[i].pppStatus!="up" && st[i].enable == 1 ) {
+				document.getElementById( 'status'+i ).innerHTML = _("connecting");
+				document.getElementById( 'pppwait' ).style['display'] = '';
+			}
+			else {
+				document.getElementById( 'interface'+i ).innerHTML = "  "+st[i].interface;
+				document.getElementById( 'status'+i ).innerHTML = _("connected");
+				document.getElementById( 'local'+i ).innerHTML = st[i].iplocal;
+				document.getElementById( 'pppwait' ).style['display'] = 'none';
+			}
+            autoapn=<%_m=get_single('webinterface.autoapn'); %>"@@_m";
+            if( st[i].apn == "" || st[i].apn == "N/A" || 
+               (autoapn == "1" && current_apn != "" && current_apn != "N/A") )
+				document.getElementById( 'apn'+i ).innerHTML = current_apn;
+			else
+				document.getElementById( 'apn'+i ).innerHTML = st[i].apn;
+		}
+	}
+	else if(document.form1.simStatus.value == "N/A") {
+		document.form1.simStatus.value = _("negotiating");
+		simStatusID.style.color = 'Orange'
+		document.getElementById( "simwait" ).style['display']='';
+	}
+	else {
+		simStatusID.style.color = "RED";
+		if( prvSimStatus != simStatus ) {
+			if( ++ pincounter >= 2 ) {
+				prvSimStatus = simStatus;
+				switch(simStatus)
+				{
+				case "SIM not inserted":
+					alert( _("admin warningMsg1") );
+					break;//Please insert an active SIM card in order to connect to the internet. Please wait around 60 seconds for the MyZone to restart after inserting your SIM card.
+				case "SIM general failure":
+					alert( _("admin warningMsg2") );//SIM general failure
+					break;
+				case "SIM locked":
+					alert( _("admin warningMsg3") );//You need to enter the PIN code to unlock the SIM before use
+					break;		
+				case "SIM CHV1 blocked":
+					alert( _("admin warningMsg4") );//You need to enter the PUK code to unlock the SIM before use
+					break;
+				case "MEP locked":
+					alert( _("mepLocked") );//MEP locked
+					break;
+				case "Network reject - Account":
+					alert( _("admin warningMsg6") );//Network reject - Account
+					break;
+				case "Network reject":
+					alert( _("admin warningMsg7") );//Network reject
+					break;
+				case "MEP Locked":
+					if(confirm(_("mep warningMsg1")+" "+_("mep warningMsg2")))
+					{
+						http_request.responseText.clear;
+						http_request.close;	 
+						http_request=0;
+						window.location=('mepUnlocking.html');
+						return;
+					}
+					break;
+				default:
+					pincounter = 0;	
+				break;
+				}
+			}
+		}
+		document.getElementById("provider").innerHTML = "";
+		document.form1.connType.value = "";
+		document.form1.coverage.value = "";
+	}					
+	document.form1.voltage.value = parseInt(capacity)+"  %    ( "+(parseInt(voltage)/1000).toFixed(2)+"  V )";	
+	if(charge=="c")
+		document.form1.charge.value = _("on");
+	else
+		document.form1.charge.value = _("off");
+	if( usbonline=="1" )
+		document.form1.usbonline.value = _("connected");
+	else
+		document.form1.usbonline.value = _("disconnected");
+	if(charge=="c")
+		imageidx = 0;
+	else if(capacity >= 80 )
+		imageidx = 5;
+	else if(capacity >= 60 )
+		imageidx = 4;
+	else if(capacity >= 40 )
+		imageidx = 3;
+	else if(capacity >= 20 )
+		imageidx = 2;
+	else
+		imageidx = 1;
+	if( imageidx != prvbatidx ) {
+		prvbatidx = imageidx;
+		document.images[imagebase+5].src = baseDIR + "bat" + (imageidx) + ".GIF"
+	}
+	currentSession=current_session;
+	usageHistory=usage_history;
+	updata_usage();
+}
+
+function updata_usage() {
+	var ray = new Array();
+	ray = currentSession.split(",");
+	if(ray.length == 4 ) {
+		document.getElementById( "usage_current" ).style['display']='';
+		startDate = new Date(ray[0]*1000);
+		document.getElementById("usage_current_0").innerHTML = startDate.toLocaleString();
+		if(show_duration)
+			document.getElementById("usage_current_1").innerHTML = toUpTime( ray[1]*1-ray[0]*1 );
+		else
+			document.getElementById("usage_current_1").innerHTML = _("currentSession");
+		document.getElementById("usage_current_2").innerHTML = addcomma(ray[2]);
+		document.getElementById("usage_current_3").innerHTML = addcomma(ray[3]);
+		var total = parseInt(ray[2])+parseInt(ray[3]);
+		document.getElementById("usage_current_4").innerHTML = addcomma(total.toString());
+	}
+	else {
+		document.getElementById( "usage_current" ).style['display']='none';
+	}
+	var history = new Array();
+	history = usageHistory.split("&");
+	for( var i=0; i<5; i++) {
+		if( i < history.length ) {
+			document.getElementById( "usage"+i ).style['display']='';
+			ray = history[i].split(",");
+			if(ray.length == 4 ) {
+				startDate = new Date(ray[0]*1000); 
+				eval('document.getElementById(\"usage'+i+'_0\").innerHTML=\"'+startDate.toLocaleString()+'\"');
+				if(show_duration) {
+					eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+toUpTime( ray[1]*1-ray[0]*1 )+'\"');
+				}
+				else {
+					/*if(ray[1]*1<1234567890)
+					{
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"System Up time:  '+toUpTime( ray[1]*1 )+'\"');
+					}
+					else*/
+					{
+						endDate = new Date(ray[1]*1000);
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+endDate.toLocaleString()+'\"');
+					}
+				}	
+				eval('document.getElementById(\"usage'+i+'_2\").innerHTML=\"'+addcomma(ray[2])+'\"');
+				eval('document.getElementById(\"usage'+i+'_3\").innerHTML=\"'+addcomma(ray[3])+'\"');
+				total = parseInt(ray[2])+parseInt(ray[3]);
+				eval('document.getElementById(\"usage'+i+'_4\").innerHTML=\"'+addcomma(total.toString())+'\"');
+			}
+			else {
+				document.getElementById( "usage"+i ).style['display']='none';
+			}
+		}
+		else {
+			document.getElementById( "usage"+i ).style['display']='none';
+		}
+	}
+}
+
+var hideItems = 0;
+function hideItem( itemID, action ) {
+	if( action==1 ) {
+		if(--hideItems==0) {
+			document.getElementById( "alldiv" ).style['display']='none';
+			document.getElementById( "statusdiv" ).style['display']='';
+		}
+		document.getElementById( itemID+"0" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='';
+	}
+	else if( hideItems < 6 ) {
+		++hideItems;
+		document.getElementById( "alldiv" ).style['display']='';
+		document.getElementById( "statusdiv" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='none';
+		document.getElementById( itemID+"0" ).style['display']='';
+	}
+}
+function showAllItems() {
+	hideItem('ipdiv', 1);
+	hideItem('sysInfodiv', 1);
+	hideItem('pppdiv', 1);
+	hideItem('connectiondiv', 1);
+	hideItems = 0;
+}
+function showDefaultItems() {
+	hideItem('ipdiv', 0);
+	//if(pppoeStatus!='DISABLED')
+	//	hideItem('pppdiv', 0);
+
+}
+function switchItem( action ) {
+	if( action ) {
+		document.getElementById("usageDiv0").innerHTML="&nbsp;&nbsp;"+_("wwan3g")+'<a href=javascript:switchItem(0); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;'+_("hideDataUsage")+"</a>";
+		document.getElementById( "usageDiv1" ).style['display']='';
+	}
+	else {
+		document.getElementById("usageDiv0").innerHTML="&nbsp;&nbsp;"+_("wwan3g")+'<a href=javascript:switchItem(1); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;'+_("showDataUsage")+"</a>";
+		document.getElementById( "usageDiv1" ).style['display']='none';
+	}
+   
+}
+function switchDuration( action ) {
+	if( action ) {
+		document.getElementById("Session_End").innerHTML=_("sessionDuration")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(0);>'+_("showEndTime")+'</a>';	
+	}
+	else {
+		document.getElementById("Session_End").innerHTML=_("sessionEnd")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(1);>'+_("showDuration")+'</a>';
+	}
+	show_duration=action;
+	updata_usage();
+}
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi',ajaxUpdate );
+	showDefaultItems();
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 3000);	
+});
+</script>
+
+<form class="content" name="form1" >
+<h3 id="statusdiv"><script language="JavaScript">document.write(_("status allstatus"));</script></h3>
+<p style="font-size:12px">
+<a id="alldiv" style="display:none" href="javascript:showAllItems();">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status allstatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="sysInfodiv0" style="display:none" href="javascript:hideItem('sysInfodiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("sysInfo"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="ipdiv0" style="display:none" href="javascript:hideItem('ipdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wlan"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="portstadiv0" style="display:none" href="javascript:hideItem('portstadiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("portStatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="pppdiv0" style="display:none" href="javascript:hideItem('pppdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wwan3g"));</script>&nbsp;&nbsp;&nbsp;</a>
+<!--a id="pppoediv0" style="display:none" href="javascript:hideItem('pppoediv', 1);">&nbsp;&nbsp;&nbsp;PPPoE&nbsp;&nbsp;&nbsp;</a>
+<a id="pptpdiv0" style="display:none" href="javascript:hideItem('pptpdiv', 1);">&nbsp;&nbsp;&nbsp;PPTP&nbsp;&nbsp;&nbsp;</a-->
+<a id="connectiondiv0" style="display:none" href="javascript:hideItem('connectiondiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status connection"));</script>&nbsp;&nbsp;&nbsp;</a></p>
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('sysInfodiv', 0);" ><img src="images/close_0.gif"  alt="-" /></a>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("sysInfo"));</script></th></td>
+	</tr>
+</table>
+<table width="92%">
+<tr> 
+    <td width="22%"><script language="JavaScript">document.write(_("status system up time"));</script></td>
+    <td><input type="text" name="uptime"  size="40" class='cdcsAjax' width="25%"  readonly/> </td>
+</tr>
+<tr> 
+    <td><script language="JavaScript">document.write(_("routerVersion"));</script></td>
+    <td>
+    <script language="JavaScript">document.write(_("hardware"));</script>:&nbsp;<%val=get_single('hw.version');%>@@val&nbsp;&nbsp;
+    &nbsp;&nbsp;<script language="JavaScript">document.write(_("software"));</script>:&nbsp;<font id="version"></font>
+    </td>
+</tr>
+<tr> 
+    <td><script language="JavaScript">document.write(_("advStatus phoneModule"));</script></td>
+    <td>
+	<script language="JavaScript">document.write(_("firmware"));</script>:&nbsp;<font id="Fversion"></font>
+    </td>
+</tr>
+</table>
+</div>
+<div id="ipdiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+    <tr><td style="padding:0px 0px"><a href="javascript:hideItem('ipdiv', 0);" ><img src="images/close_0.gif"  alt="-" /></a>
+    <th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("wlan"));</script></th></td>
+    </tr>
+</table>
+<table width="92%">
+<tr> 
+    <td width="22%"><script language="JavaScript">document.write(_("IP"));</script></td>
+    <td >
+    <%val=get_single('link.profile.0.address');%>@@val
+    &nbsp;&nbsp;/&nbsp;&nbsp;
+    <%val=get_single('link.profile.0.netmask');%>@@val</td>
+</tr> 
+<tr>
+    <td><script language="JavaScript">document.write(_("macAddress"));</script></td>
+    <td class="td_ltr" id="mac"></td>
+</tr>
+</table>
+</div>
+
+<div id="pppdiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+    <tr><td style="padding:0px 0px"><a href="javascript:hideItem('pppdiv', 0);switchItem(0)" ><img src="images/close_0.gif"  alt="-" /></a>
+	<th width="100%" id="usageDiv0">
+&nbsp;&nbsp;<script language="JavaScript">document.write(_("wwan3g"));</script><a href=javascript:switchItem(1); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;<script language="JavaScript">document.write(_("showDataUsage"));</script></a>
+	</th></td>
+    </tr>
+</table>
+<div>
+
+<table width="92%">
+<tr>
+<td width="20%"><b><script language="JavaScript">document.write(_("profileName"));</script></b></td>
+<td width="8%"><b><script language="JavaScript">document.write(_("interface"));</script></b></td>
+<td width="26%"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="pppwait" style="display:none"/></td>
+<td width="26%"><b><script language="JavaScript">document.write(_("apn"));</script></b></td>
+<td width="20%"><b><script language="JavaScript">document.write(_("ip address"));</script></b></td>
+</tr>
+</table>
+</div>
+
+<table width="92%" id="ppp0" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile0"></td>
+<td width="8%" id="interface0"></td>
+<td width="26%" id="status0"></td>
+<td width="26%" id="apn0"></td>
+<td width="20%" id="local0"></td>
+</tr>
+</table>
+<table width="92%" id="ppp1" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile1"></td>
+<td width="8%" id="interface1"></td>
+<td width="26%" id="status1"></td>
+<td width="26%" id="apn1"></td>
+<td width="20%" id="local1"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp2" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile2"></td>
+<td width="8%" id="interface2"></td>
+<td width="26%" id="status2"></td>
+<td width="26%" id="apn2"></td>
+<td width="20%" id="local2"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp3" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile3"></td>
+<td width="8%" id="interface3"></td>
+<td width="26%" id="status3"></td>
+<td width="26%" id="apn3"></td>
+<td width="20%" id="local3"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp4" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile4"></td>
+<td width="8%" id="interface4"></td>
+<td width="26%" id="status4"></td>
+<td width="26%" id="apn4"></td>
+<td width="20%" id="local4"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp5" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile5"></td>
+<td width="8%" id="interface5"></td>
+<td width="26%" id="status5"></td>
+<td width="26%" id="apn5"></td>
+<td width="20%" id="local5"></td>
+</tr>
+</table>
+</div>
+
+<div id="usageDiv1" style="display:none">
+<table width="92%" cols="5">
+<tr style="font-weight:bold">
+    <td width="24%" style="font-size:11px"><script language="JavaScript">document.write(_("sessionStart"));</script></td>
+    <td id="Session_End" width="24%" style="font-size:11px"><script language="JavaScript">document.write(_("sessionEnd"));</script>&nbsp;&nbsp;<a style='font-size:11px; text-decoration:underline;' href=javascript:switchDuration(1);><script language="JavaScript">document.write(_("showDuration"));</script></a></td>
+    <td width="13%" style="font-size:11px"><script language="JavaScript">document.write(_("dataReceived"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+    <td width="13%" style="font-size:11px"><script language="JavaScript">document.write(_("dataSent"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+    <td width="18%" style="font-size:11px"><script language="JavaScript">document.write(_("totalData"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+</tr>
+<tr id="usage_current" style="display:none">
+    <td id="usage_current_0" style="font-size:9px"></td>
+    <td id="usage_current_1" style="font-size:9px; color:GREEN"><script language="JavaScript">document.write(_("currentSession"));</script></td>
+    <td id="usage_current_2" style="font-size:10px"></td>
+    <td id="usage_current_3" style="font-size:10px"></td>
+    <td id="usage_current_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage0" style="display:none">
+    <td id="usage0_0" style="font-size:9px"></td>
+    <td id="usage0_1" style="font-size:9px"></td>
+    <td id="usage0_2" style="font-size:10px"></td>
+    <td id="usage0_3" style="font-size:10px"></td>
+    <td id="usage0_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage1" style="display:none">
+    <td id="usage1_0" style="font-size:9px"></td>
+    <td id="usage1_1" style="font-size:9px"></td>
+    <td id="usage1_2" style="font-size:10px"></td>
+    <td id="usage1_3" style="font-size:10px"></td>
+    <td id="usage1_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage2" style="display:none">
+    <td id="usage2_0" style="font-size:9px"></td>
+    <td id="usage2_1" style="font-size:9px"></td>
+    <td id="usage2_2" style="font-size:10px"></td>
+    <td id="usage2_3" style="font-size:10px"></td>
+    <td id="usage2_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage3" style="display:none">
+    <td id="usage3_0" style="font-size:9px"></td>
+    <td id="usage3_1" style="font-size:9px"></td>
+    <td id="usage3_2" style="font-size:10px"></td>
+    <td id="usage3_3" style="font-size:10px"></td>
+    <td id="usage3_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage4" style="display:none">
+    <td id="usage4_0" style="font-size:9px"></td>
+    <td id="usage4_1" style="font-size:9px"></td>
+    <td id="usage4_2" style="font-size:10px"></td>
+    <td id="usage4_3" style="font-size:10px"></td>
+    <td id="usage4_4" style="font-size:10px"></td>
+</tr>
+</table>
+</div>
+
+<div id="connectiondiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+    <tr><td style="padding:0px 0px"><a href="javascript:hideItem('connectiondiv', 0);" ><img src="images/close_0.gif"  alt="-" /></a>
+    <th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("status connection"));</script></th></td>
+    </tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("provider"));</script></td>
+    <td id="provider" style="color:#000000"></td>
+</tr>
+<tr>
+    <td><script language="JavaScript">document.write(_("service type"));</script></font></td>
+    <td><input type="text" name="connType" size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+    <td><script language="JavaScript">document.write(_("status CScoverage"));</script></td>
+    <td><input type="text" name="coverage" size="40" class='cdcsAjax'  readonly/></td>
+</tr>
+<tr>
+    <td><script language="JavaScript">document.write(_("status CSimei"));</script></td>
+    <td><input type="text" name="imei" size='40' class='cdcsAjax'  readonly/></td>
+</tr>
+<tr> 
+    <td><script language="JavaScript">document.write(_("signal strength"));</script></td>
+    <td><input type="text" name="umtsss" class='cdcsAjax' width="25%"  readonly size="40"/><img src="images/csq0.GIF" width="67" height="20" alt="csq" /></td>
+</tr>
+<tr>
+    <td><script language="JavaScript">document.write(_("simStatus"));</script></td>
+    <td><input type="text" name="simStatus" id="simID" size="40" style="border-style:none; background:#F0EFEB" />
+      <img src="images/waiting.gif" width="24" height="24" id="simwait" style="display:none" /></td>
+    </tr>
+</table>
+</div>
+
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+    <tr><td style="padding:0px 0px">
+    <th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("batteryStatus"));</script></th></td>
+    </tr>
+</table>
+<table width="92%">
+<tr> 
+    <td width="22%"><script language="JavaScript">document.write(_("capacity"));</script></td>
+    <td><input type="text" name="voltage" class='cdcsAjax' size="40"  readonly/><img src="images/bat1.GIF" alt="bat" /></td>
+</tr> 
+<tr>
+    <td width="22%"><script language="JavaScript">document.write(_("charge"));</script></td>
+    <td><input type="text" name="charge" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+    <td width="22%"><script language="JavaScript">document.write(_("externalPower"));</script></td>
+    <td><input type="text" name="usbonline" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<?xml version="1.0" ?>
+<PROJECT Generator="ProSLIC_API_Config_Tool" ToolVersion="4.2.1" XML_VERSION="15">
+    <PROSLIC_GENERAL_PARAMETERS>
+        <Si3217x part_num="6" dcdcBomOpt="2" pwr_range="2" batt_type="0" vbatr_requested="138.000000" vbath_requested="60.000000" ac_sense_opt="0" irq1="80" irq2="19" irq3="3" irq4="0" pwr_thresh="2000.000000" thermal_tau="2000.000000" low_power_ckbx="1" gpio="0" gpioCfg1="96" gpioCfg2="0" gpioCfg3="0" coarse_sensor_ckbx="1" daaEnabled="0" vdc_range_opt="0" gate_drive="0" zcal_en_opt="1" enable_preset_enum="0" num_presets="0" />
+    </PROSLIC_GENERAL_PARAMETERS>
+    <VDAA_GENERAL_PARAMETERS>
+        <Si3217x inte="0" intp="0" rcald="0" hssm="0" foh="1" lvfd="0" cvs="0" cvp="1" gce="0" iire="0" full="0" full2="1" filt="1" rg1="0" pwmm="0" pwme="0" spim="0" />
+    </VDAA_GENERAL_PARAMETERS>
+    <DEFAULTS />
+    <Ringing>
+        <RING_MAX_VBAT_PROVISIONING ring_type="2" ring_waveshape="0" crest_factor="1.414000" amp="63.880000" offset="0.000000" freq="20.000000" r_ring="100.000000" ta_en="y" ti_en="y" time_on="2.000000" time_off="4.000000" cadstate="n" l_loop="500.000000" r_wire="0.044000" max_ren="3.000000" r_cpe_max="600.000000" r_prot="54.000000" loop_units="0" />
+        <RING_F20_45VRMS_0VDC_LPR ring_type="2" ring_waveshape="0" crest_factor="1.414000" amp="45.000000" offset="0.000000" freq="20.000000" r_ring="100.000000" ta_en="y" ti_en="y" time_on="2.000000" time_off="4.000000" cadstate="n" l_loop="500.000000" r_wire="0.044000" max_ren="5.000000" r_cpe_max="600.000000" r_prot="54.000000" loop_units="0" />
+        <RING_F20_45VRMS_0VDC_BAL ring_type="0" ring_waveshape="0" crest_factor="1.414000" amp="45.000000" offset="0.000000" freq="20.000000" r_ring="100.000000" ta_en="y" ti_en="y" time_on="2.000000" time_off="4.000000" cadstate="n" l_loop="500.000000" r_wire="0.044000" max_ren="5.000000" r_cpe_max="600.000000" r_prot="54.000000" loop_units="0" />
+        <RING_F25_45VRMS_0VDC_LPR ring_type="2" ring_waveshape="0" crest_factor="1.414000" amp="45.000000" offset="0.000000" freq="25.000000" r_ring="100.000000" ta_en="y" ti_en="y" time_on="2.000000" time_off="4.000000" cadstate="n" l_loop="500.000000" r_wire="0.044000" max_ren="5.000000" r_cpe_max="600.000000" r_prot="54.000000" loop_units="0" />
+        <RING_F20_45VRMS_0VDC_2S_2S ring_type="2" ring_waveshape="0" crest_factor="1.414000" amp="45.000000" offset="0.000000" freq="20.000000" r_ring="100.000000" ta_en="y" ti_en="y" time_on="2.000000" time_off="2.000000" cadstate="n" l_loop="500.000000" r_wire="0.044000" max_ren="5.000000" r_cpe_max="600.000000" r_prot="54.000000" loop_units="0" />
+    </Ringing>
+    <DC_Feed>
+        <DCFEED_48V_20MA v_vlim="48.000000" v_rfeed="43.000000" v_ilim="34.000000" i_rfeed="15.000000" i_ilim="20.000000" vov_bat="5.000000" vov_gnd="4.000000" vcm_oh="27.000000" lcronhk="10.000000" lcroffhk="12.000000" lcrdbi="5.000000" longhith="8.000000" longloth="7.000000" longdbi="5.000000" lcrmask="150.000000" lcrmask_polrev="80.000000" lcrmask_state="200.000000" lcrmask_linecap="200.000000" i_vlim="0.000000" />
+        <DCFEED_48V_25MA v_vlim="48.000000" v_rfeed="43.000000" v_ilim="34.000000" i_rfeed="15.000000" i_ilim="25.000000" vov_bat="5.000000" vov_gnd="4.000000" vcm_oh="27.000000" lcronhk="10.000000" lcroffhk="12.000000" lcrdbi="5.000000" longhith="8.000000" longloth="7.000000" longdbi="5.000000" lcrmask="150.000000" lcrmask_polrev="80.000000" lcrmask_state="200.000000" lcrmask_linecap="200.000000" i_vlim="0.000000" />
+        <DCFEED_PSTN_DET_1 v_vlim="48.000000" v_rfeed="36.000000" v_ilim="20.000000" i_rfeed="18.000000" i_ilim="20.000000" vov_bat="5.000000" vov_gnd="4.000000" vcm_oh="27.000000" lcronhk="10.000000" lcroffhk="12.000000" lcrdbi="5.000000" longhith="8.000000" longloth="7.000000" longdbi="5.000000" lcrmask="150.000000" lcrmask_polrev="80.000000" lcrmask_state="200.000000" lcrmask_linecap="200.000000" i_vlim="0.000000" />
+        <DCFEED_PSTN_DET_2 v_vlim="35.000000" v_rfeed="33.000000" v_ilim="30.000000" i_rfeed="10.000000" i_ilim="20.000000" vov_bat="5.000000" vov_gnd="4.000000" vcm_oh="27.000000" lcronhk="10.000000" lcroffhk="12.000000" lcrdbi="5.000000" longhith="8.000000" longloth="7.000000" longdbi="5.000000" lcrmask="150.000000" lcrmask_polrev="80.000000" lcrmask_state="200.000000" lcrmask_linecap="200.000000" i_vlim="0.000000" />
+    </DC_Feed>
+    <Tone>
+        <TONEGEN_FCC_DIAL amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="0" ta_2="0" ti_1="0" ti_2="0" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_BUSY amp_1="-18.000000" amp_2="-18.000000" freq_1="480.000000" freq_2="620.000000" ta_1="500" ta_2="500" ti_1="500" ti_2="500" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_RINGBACK amp_1="-18.000000" amp_2="-18.000000" freq_1="480.000000" freq_2="440.000000" ta_1="2000" ta_2="2000" ti_1="4000" ti_2="4000" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_REORDER amp_1="-18.000000" amp_2="-18.000000" freq_1="480.000000" freq_2="620.000000" ta_1="300" ta_2="300" ti_1="300" ti_2="200" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CONGESTION amp_1="-18.000000" amp_2="-18.000000" freq_1="480.000000" freq_2="620.000000" ta_1="200" ta_2="200" ti_1="200" ti_2="200" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CAS amp_1="-18.000000" amp_2="-18.000000" freq_1="2130.000000" freq_2="2750.000000" ta_1="80" ta_2="80" ti_1="80" ti_2="1000" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_SAS amp_1="-18.000000" amp_2="-18.000000" freq_1="440.000000" freq_2="2750.000000" ta_1="300" ta_2="2000" ti_1="8000" ti_2="4000" routing_1="2" routing_2="0" zero_1="1" zero_2="0" />
+        <TONEGEN_ETSI_DTAS amp_1="-5.000000" amp_2="-5.000000" freq_1="2130.000000" freq_2="2750.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_1004 amp_1="-10.000000" amp_2="-18.000000" freq_1="1004.000000" freq_2="440.000000" ta_1="8000" ta_2="2000" ti_1="8000" ti_2="4000" routing_1="3" routing_2="0" zero_1="1" zero_2="1" />
+    </Tone>
+    <Impedance>
+        <ZSYN_600_0_0_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="600_0_0" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_270_750_150_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="270_750_150" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_370_620_310_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="370_620_310" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_220_820_120_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="220_820_120" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_600_0_1000_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="600_0_0" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_200_680_100_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="200_680_100" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <ZSYN_220_820_115_30_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="220_820_115" rprot="30" rfuse="24" emi_cap="10" is_wideband="0" />
+        <WB_ZSYN_600_0_0_20_0 file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="600_0_0" rprot="30" rfuse="24" emi_cap="0" is_wideband="1" />
+    </Impedance>
+    <FSK>
+        <DEFAULT_FSK amp="0.080000" mark_freq="1200.000000" space_freq="2200.000000" baud="1200.000000" depth="0.000000" startStopBits="n" />
+        <ETSI_FSK amp="0.080000" mark_freq="1300.000000" space_freq="2100.000000" baud="1200.000000" depth="0.000000" startStopBits="n" />
+    </FSK>
+    <PCM>
+        <PCM_8ULAW format="1.000000" alaw="0.000000" tristate="n" en="n" tx_edge="n" tx_both="n" tx_hwy="n" rx_hwy="n" widebandEn="n" />
+        <PCM_8ALAW format="0.000000" alaw="0.000000" tristate="n" en="n" tx_edge="n" tx_both="n" tx_hwy="n" rx_hwy="n" widebandEn="n" />
+        <PCM_16LIN format="3.000000" alaw="0.000000" tristate="n" en="n" tx_edge="n" tx_both="n" tx_hwy="n" rx_hwy="n" widebandEn="n" />
+        <PCM_16LIN_WB format="3.000000" alaw="0.000000" tristate="n" en="n" tx_edge="n" tx_both="n" tx_hwy="n" rx_hwy="n" widebandEn="y" />
+    </PCM>
+    <Pulse_Metering>
+        <DEFAULT_PULSE_METERING freq="0" amp="1.000000" cal="0" ramp="0" power="0" auto="0" active_time="2000" inactive_time="2000" />
+    </Pulse_Metering>
+    <Vdaa_Country />
+    <Vdaa_Audio_Gain />
+    <Vdaa_Ring_Validation />
+    <Vdaa_PCM />
+    <Vdaa_Hybrid />
+</PROJECT>

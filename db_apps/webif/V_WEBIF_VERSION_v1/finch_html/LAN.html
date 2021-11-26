@@ -1,0 +1,218 @@
+﻿<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>NetComm</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="JavaScript">
+function submitF()
+{
+    try
+	{
+		var f = document.form;
+		
+		<% if(request['QUERY_STRING']=='pass'){%>  
+		if (document.form.remAdmin[0].checked == true)
+		{
+		    if ( (document.form.incomingPort.value < 1) || (document.form.incomingPort.value > 65534)  || (document.form.incomingPort.value == "") ) 
+		    {
+		        alert("Cannot enter this port value since it is invalid")
+
+				return;
+			}
+		}
+		
+		if (document.form.adminPass.value != document.form.adminPassConf.value)
+		{
+		    alert("passwords do not match");
+		    return;
+		}
+		<%}else if( request['QUERY_STRING'] == 'ipsetup'){%>
+		document.form.LANIP.value = document.form.LANEtherIP1.value + "."  + document.form.LANEtherIP2.value + "." + document.form.LANEtherIP3.value + "." + document.form.LANEtherIP4.value;
+		document.form.LANSubIP.value = document.form.LANEtherMask1.value + "."  + document.form.LANEtherMask2.value + "." + document.form.LANEtherMask3.value + "." + document.form.LANEtherMask4.value;
+		<%}%>
+	
+	//	f.submit();
+		/*if(document.form.LANIP.value != location.href.substring( 7, document.form.LANIP.value.length+7 ) )
+		{
+        	setTimeout( location.href=+document.form.LANIP.value+'/#', 0 );
+			
+		}*/
+    }
+    catch(e)
+	{
+		alert(e.message);
+	}
+}
+
+
+function greyOutPortField()
+{
+    try
+    {
+        // if the remote admin button is disabled then grey out the port field 
+		document.form.incomingPort.disabled = true;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+
+function ungreyOutPortField()
+{
+    try
+    {
+        // if the remote admin button is enabled then un-grey out the port field 
+		document.form.incomingPort.disabled = false;
+		
+		if ( (document.form.incomingPort.value < 1) || (document.form.incomingPort.value > 65534) )
+		{
+		    document.form.incomingPort.value = "8080";
+		}
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+
+function CheckRemAdminEnable()
+{
+    try
+	{
+		if (document.form.remAdmin[0].checked == true)
+		{
+		     document.form.incomingPort.disabled = false;
+		}
+		else
+		{
+		     document.form.incomingPort.disabled = true;
+		}
+	}
+	catch (e)
+	{
+		alert(e.message);
+	}
+}
+</script>
+
+</head>
+<%
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		if(request['QUERY_STRING']=='ipsetup')
+		{        
+			mydata="link.profile.0.address="+form['LANIP']+
+			"&link.profile.0.netmask="+form['LANSubIP']+
+			"&service.dns.masquerade="+form['dnsMasq'];
+			set_list( mydata ); 
+	//set_single( 'xxx='+mydata );      
+			if(headers['HOST'] != form['LANIP'])
+			redirect('http://'+form['LANIP']+'/#');
+		}
+		else if(request['QUERY_STRING']=='pppoe')
+		{
+			tempval = form['APNName'];
+			retval=set_single( 'service.pppoe.server.0.apn='+tempval ); 
+			tempval = form['ServiceName'];
+			retval = set_single( 'service.pppoe.server.0.service='+tempval ); 
+			tempval = form['pppoe'];
+			retval=set_single( 'service.pppoe.server.0.enable='+tempval ); 
+		}
+	} 
+	else /*GET*/
+	{
+		i = get_single( 'link.profile.profilenum' );
+		if( (i == "N/A") || ( i == "") ) i = '0';    
+		form['gascEnable'] = get_single( 'link.profile.'+(i+1)+'.enable'); 
+		if(request['QUERY_STRING']=='ipsetup')
+		{
+			myip = get_single( 'link.profile.0.address' );
+			form['LANIP'] = myip;
+			mymask = get_single( 'link.profile.0.netmask' );
+			form['LANSubIP'] = mymask;
+			masq = get_single( 'service.dns.masquerade' );
+			form['dnsMasq'] = masq;
+		}
+		else if(request['QUERY_STRING']=='pppoe')
+		{
+			temp = get_single( 'service.pppoe.server.0.apn' );
+			form['APNName'] = temp; 
+			temp = get_single( 'service.pppoe.server.0.service' );
+			form['ServiceName'] = temp;
+			temp = get_single( 'service.pppoe.server.0.enable' );
+			form['pppoe'] = temp;  
+		}
+	}
+%>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>   
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="pppoe" value="@@form['pppoe']"/>
+<input type="hidden" name="gascEnable" value="@@form['gascEnable']">
+
+<%if( request['QUERY_STRING'] == 'pppoe'){%>
+<h3>&nbsp;&nbsp;WWAN (3G) > PPPoE</h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+
+<table width="80%">
+    <tr><th>PPPoE Setup</th></tr>
+</table>
+
+<table width="80%">
+<tr> 
+    <td width="30%">PPPoE</td>
+    <td> <input type=radio name='LANpppoe' onClick="javascript:checkGascenable()">&nbsp;Enable &nbsp;&nbsp;
+    	 <input type=radio name='LANpppoe' onClick="javascript:document.form.pppoe.value='0'">&nbsp;Disable</td>
+</tr>
+
+<script type="text/javascript">   
+if( parseInt(document.form.pppoe.value)==1  )
+	document.form.LANpppoe[0].checked=true;
+else
+	document.form.LANpppoe[1].checked=true;
+function checkGascenable()
+{
+	if( parseInt(document.form.gascEnable.value) == 1 )
+	{
+		alert("Please disable the \"Auto Connect\" frist!");
+		document.form.LANpppoe[1].checked=true;
+	}
+	else
+	{
+		document.form.pppoe.value='1';
+	}
+}
+</script>    
+<tr> 
+    <td>APN Name</td>
+    <td><input type=text name='APNName' size=32 maxlength=128 value="@@form['APNName']"></td>
+</tr>
+
+<tr> 
+    <td>Service Name</td>
+    <td><input type=text name='ServiceName' size=32 maxlength=128 value="@@form['ServiceName']"></td>
+</tr>
+</table>
+<%}%>
+<div align="right" style="margin-right:20% ">
+<p></p>
+<INPUT TYPE="submit" VALUE="Save" name="ok" id="bottomButton" onClick="javascript:submitF()">&nbsp;&nbsp;
+</div>
+</form>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

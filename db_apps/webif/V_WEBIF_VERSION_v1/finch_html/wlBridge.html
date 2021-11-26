@@ -1,0 +1,309 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Wireless Bridge</title>
+</head>
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{	
+ 		mydata="wlan.bridge.ap_mode="+form['wlMode']+
+        "&wlan.bridge.restrict="+form['wllazywds']+
+        "&wlan.bridge.mac.1="+form['wlwds0']+
+        "&wlan.bridge.mac.2="+form['wlwds1']+
+        "&wlan.bridge.mac.3="+form['wlwds2']+
+        "&wlan.bridge.mac.4="+form['wlwds3'];
+        set_list( mydata );
+	} 
+	else /*GET*/
+	{
+        
+        form['wlwds0']=get_single('wlan.bridge.mac.1');
+        form['wlwds1']=get_single('wlan.bridge.mac.2');
+        form['wlwds2']=get_single('wlan.bridge.mac.3'); 
+        form['wlwds3']=get_single('wlan.bridge.mac.4');
+	}
+%>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />  
+<body onLoad="frmLoad()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="javascript">
+//var wds = new Array( '', '', '', '' );
+var afterburneren = 'off' ; 
+var  wlmode = <%val=get_single('wlan.bridge.ap_mode');%>"@@val";
+if( wlmode != 'wds' )
+	wlmode = 'ap';
+var parseRestrictIdx = <%val=get_single('wlan.bridge.restrict');%>"@@val";
+if((parseRestrictIdx!='1')&&(parseRestrictIdx!='2')&&(parseRestrictIdx!='0'))
+	parseRestrictIdx = '1';
+
+function hideStaticWds(hide) {
+   var status = 'visible';
+   if ( hide == 1 )
+      status = 'hidden';
+   if (document.getElementById)
+      document.getElementById('staticWds').style.visibility = status;
+   else {
+      if (document.layers) {
+       /*  with ( document.forms[0] ) {
+            if ( hide == 1 ) {
+                  wlwds0.value = '';
+				  wlwds1.value = '';
+				  wlwds2.value = '';
+				  wlwds3.value = '';
+            } else {
+                  wlwds0.value = wds[0];
+				  wlwds1.value = wds[1];
+				  wlwds2.value = wds[2];
+				  wlwds3.value = wds[3];
+            }
+         }*/
+      } else
+         document.all.staticWds.style.visibility = status;
+   }
+}
+
+function hideDynamicWds(hide) {
+   var status = 'visible';
+   if ( hide == 1 )
+      status = 'hidden';
+   if (document.getElementById)
+      document.getElementById('dynamicWds').style.visibility = status;
+   else {
+      if (document.layers) {
+      } else
+         document.all.dynamicWds.style.visibility = status;
+   }
+}
+
+function refreshClick() {
+   var lst = '';
+   with ( document.forms[0] ) {
+      var idx = wllazywds.selectedIndex
+      var restrict = wllazywds[idx].value;
+      if (restrict != '2') {
+         alert('Refresh only allowed when Bridge Restrict has "Enabled(Scan)" selected.');
+         return;
+      }
+      lst += '&wlMode=' + wlMode.options[wlMode.selectedIndex].value;
+      lst += '&wlLazyWds=' + restrict;
+   }
+   var loc = 'wlwds.cmd?action=scan' + lst;
+
+   var code = 'location="' + loc + '"';
+  // eval(code);
+}
+
+function wl_recalc(OnPageLoad) {
+   var ret=true;
+   with ( document.forms[0] ) {
+       if(OnPageLoad==0) {
+       }
+   }
+   return ret;
+}
+
+function BridgeRestrictChange(OnPageLoad) {
+   with ( document.forms[0] ) {
+      var restrict = wllazywds[wllazywds.selectedIndex].value;
+      if ( wl_recalc(OnPageLoad) == false) return; 
+
+      switch ( restrict ) {
+      case '0':
+         hideDynamicWds(1);
+         hideStaticWds(0);
+         break;
+      case '1':
+         hideDynamicWds(1);
+         hideStaticWds(1);
+         break;
+      case '2':
+         refreshClick();
+         break;
+      }
+   }
+}
+
+function parseRestrictIndex(restrict) {
+   var ret;
+      switch(restrict) {
+      case '0':
+         ret = 0;
+         break;
+      case '2':
+         ret = 1;
+         break;
+      default:
+         ret = 2;
+         break;
+   }
+   return ret;
+}
+
+
+function frmLoad() {
+   with ( document.forms[0] ) {
+      if ( wlmode == 'ap' )
+         wlMode.selectedIndex = 0;
+      else
+         wlMode.selectedIndex = 1;
+	  if( wlwds0.value == 'N/A' )
+	  	wlwds0.value = '';
+	  if( wlwds1.value == 'N/A' )
+	  	wlwds1.value = '';
+	  if( wlwds2.value == 'N/A' )
+	  	wlwds2.value = '';
+	  if( wlwds3.value == 'N/A' )
+	  	wlwds3.value = '';
+    /*  wlwds0.value = wds[0];
+	  wlwds1.value = wds[1];
+	  wlwds2.value = wds[2];
+	  wlwds3.value = wds[3];*/
+	  wllazywds.selectedIndex = parseRestrictIndex(parseRestrictIdx);
+      if (wllazywds.selectedIndex == 1) {
+         hideDynamicWds(0);
+         hideStaticWds(1);
+      } else
+         BridgeRestrictChange(1);
+   }
+}
+
+function btnApply() {
+   var loc = 'wlwds.cmd?action=save';
+
+   var idx;
+
+   if ( '1' == '0' ) {
+      alert('Cannot apply the change since wireless is currently disabled.');
+      return;
+   }
+
+   with ( document.forms[0] ) {
+      var idx;
+      var restrict;
+      idx = wlMode.selectedIndex;
+      loc += '&wlMode=' + wlMode.options[idx].value;
+      idx = wllazywds.selectedIndex;
+      loc += '&wlLazyWds=' + wllazywds.options[idx].value;
+      restrict = wllazywds.options[idx].value;
+      switch ( restrict ) {
+      case '0':
+		if (( wlwds0.value != '' && isValidMacAddress(wlwds0.value) == false )||( wlwds1.value != '' && isValidMacAddress(wlwds1.value) == false )||( wlwds2.value != '' && isValidMacAddress(wlwds2.value) == false )||( wlwds3.value != '' && isValidMacAddress(wlwds3.value) == false ))
+		{
+               msg = 'Invalid MAC address.';
+               alert(msg);
+               return;
+            loc += '&wlWds' + i + '=';
+            loc += wlwds0.value;
+			loc += wlwds1.value;
+			loc += wlwds2.value;
+			loc += wlwds3.value;
+         }
+         break;
+      case '2':
+         var lst = '';
+         if (scanwds.length > 0)
+            for (i = 0; i < scanwds.length; i++) {
+               if ( scanwds[i].checked == true )
+                  lst += scanwds[i].value + ', ';
+            }
+         else if ( scanwds.checked == true )
+            lst = scanwds.value;
+         loc += '&wdsLst=' + lst;
+
+         break;
+      case '1':
+         break;
+      }
+   }
+
+   var code = 'location="' + loc + '"';
+ //  eval(code);
+
+}
+</script>
+
+<form name="form" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<h3>Wireless > Bridge</h3>
+<table width="80%">
+    <tr><th>Wireless Bridge</th></tr>
+</table>
+<table width="80%" >
+<tr>
+      <td width="200">AP Mode:</td>
+      <td><select name="wlMode" size="1" onChange="wl_recalc(0);">
+            <option value="ap">Access Point</option>
+            <option value="wds">Wireless Bridge</option>
+      </select></td>
+</tr>
+<tr>
+      <td>Bridge Restrict:</td>
+      <td><select name="wllazywds" size="1" onChange="BridgeRestrictChange(0);">
+            <option value="0">Enabled</option>
+            <option value="2">Enabled(Scan)</option>
+            <option value="1">Disabled</option>
+      </select></td>
+</tr>
+</table>
+
+<div style="visibility: hidden;" id="staticWds">
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%"  border="0" cellspacing="0">
+<tr>
+         <td width="200">Remote Bridges MAC Address:</td> 
+         <td><input name="wlwds0" onChange="wl_recalc(0);" type="text" value="@@form['wlwds0']"></td>
+</tr><tr>
+         <td></td>
+         <td><input name="wlwds1" onChange="wl_recalc(0);" type="text" value="@@form['wlwds1']"></td>
+</tr><tr>
+         <td></td>
+         <td><input name="wlwds2" onChange="wl_recalc(0);" type="text" value="@@form['wlwds2']"></td>
+</tr><tr>
+         <td></td>        
+         <td><input name="wlwds3" onChange="wl_recalc(0);" type="text" value="@@form['wlwds3']"></td>
+</tr>
+</table>
+</div>
+<div style="visibility: hidden;" id="dynamicWds">
+<table width="80%">
+<tr>
+      <td valign="top" width="200">Remote Bridges MAC Address:</td>
+      <td>
+         <table>
+            <tbody><tr>
+               <td class="hd">&nbsp;</td>
+               <td class="hd"> SSID </td>
+               <td class="hd"> BSSID </td>
+            </tr>
+         </tbody></table>
+      </td>
+</tr>
+</table>
+</div>
+<p></p>
+<div align="center" style="margin-right:20%">
+<input onClick="refreshClick()" value="Refresh" type="button">
+<input onClick="btnApply()" value="Save" type="submit">
+<!--input onClick="alert('This page allows you to configure wireless bridge features of the wireless LAN\
+interface.\nYou can select Wireless Bridge (also known as Wireless Distribution\
+System) to disables acess point functionality.\nSelecting Acess Point enables\
+access point functionality.\nWireless bridge functionality will still be\
+available and wireless stations will be able to associate to the AP.\nSelect\
+Disabled in Bridge Restrict which disables wireless bridge restriction.\n\
+Any wireless bridge will be granted access.\nSelecting Enabled or Enabled(Scan)\
+enables wireless bridge restriction.\nOnly those bridges selected in\
+Remote Bridges will be granted access.\n\
+Click Refresh to update the remote bridges. Wait for few seconds to update.\n\
+Click Save button to configure the wireless bridge options.')" value="Help" type="button"-->
+</div><p></p>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

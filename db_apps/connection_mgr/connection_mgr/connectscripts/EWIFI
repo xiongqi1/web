@@ -1,0 +1,11 @@
+#!/bin/sh
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+"/etc/cdcs/connectscripts/EETH" "$@"
+
+# FIXME: migrant these RDBs to profile RDBs
+rdb_set "$CONNECTION_MGR_DEV.ip" ""
+rdb_set "$CONNECTION_MGR_DEV.sta.connStatus" "down"
+
+log "done."

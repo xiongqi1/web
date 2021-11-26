@@ -1,0 +1,1100 @@
+
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>MAC/IP/Port Filtering</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+
+<%
+
+var rule_rdb_max_count=10; /* 20 rdb variables are used */
+var rule_rdb_max_len=2048; /* 512 bytes each rdb */
+var rule_count_limit=100;
+# if 0
+// This function validates given string representing list of rules
+// A rule format: source ip address,,source port range (from),source port range (to),destination ip address,,desination port range (from),desination port range (to),protocol,action,comment,source mac address,bound
+// IP address: X.X.X.X or X.X.X.X/Mask or can be blank
+// Ports are number 1-65535 and may be blank
+// MAC address: may be blank
+// Protocol: number 1,2,4,5,6
+// bound: "inbound", "outbound", "forward", or may be blank
+// comment: max length is 32, filtered by function isNameUnsafe and extraCommentFilter (i.e permits !()*-/0123456789?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz), may be blank
+// action: "0" or "1"
+//
+// Whether a field may be blank or IP addresses have mask depends on other fields. This function only validates valid characters.
+// TODO: validate "required" and range of values of fields.
+//
+// (Reference: function serialize_rule, deserialize_rule, and other client-side code/functions)
+// Parameter
+//     ruleStrings: List of rules delimited by ";"
+#endif
+function validateRules(ruleStrings) {
+	var validIpNumber = "([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])";
+	var validIpMask = "(/([1-9]|[1-2][0-9]|3[0-2]))?";
+	var validIpAddress = "((" + validIpNumber + "\\.){3}" + validIpNumber + validIpMask + ")";
+	var validMacAddressPattern = "(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})";
+	var validPort = "([0-9]{1,5})";
+	var protocol = "(1|2|4|5|6)";
+	var action = "(0|1)";
+	var comment = "([!()*/0-9?A-Z_a-z-]{1,32})";
+	var bound = "(inbound|outbound|forward)?";
+	var validRule = validIpAddress + "?,," + validPort + "?," + validPort + "?," + validIpAddress + "?,," + validPort + "?," + validPort + "?," + protocol + "," + action + "," + comment + "?," + validMacAddressPattern + "?," + bound;
+	var validRuleList = "^" + validRule + "(;" + validRule + ")*$";
+	if (string_regex_match(ruleStrings, validRuleList) == false) {
+		onBadRequest();
+	}
+}
+
+if (request["REQUEST_METHOD"] == "POST") {
+
+	if(form['form_action']=="filter_settings") {
+
+		// validate input
+		if (form['defaultFirewallPolicy'] != "0" && form['defaultFirewallPolicy'] != "1") {
+			onBadRequest();
+		}
+		validateOnOffRadio(form['portFilterEnabled'])
+
+		set_single_direct("-p","service.firewall.DefaultFirewallPolicy",form['defaultFirewallPolicy']);
+		set_single_direct("-p","service.firewall.IPPortFilterEnable",form['portFilterEnabled']);
+		set_single_direct("","service.firewall.trigger","1");
+		redirect('/port_filtering.html?success');
+	}
+	else if(form['form_action']=="rule_settings") {
+
+		var i;
+
+		// validate input
+		if (form['merged_filter_rules'] != "") {
+			validateRules(form['merged_filter_rules']);
+		}
+		for(i=0;i < rule_rdb_max_count;i++) {
+			if (form['merged_filter_rule'+i] != "") {
+				validateRules(form['merged_filter_rule'+i]);
+			}
+		}
+
+		/* write rules into multiple rdb variables */
+		syslog(3,"port_filtering.html: write RDB ('" + form['merged_filter_rules'] + "' ==> service.firewall.IPPortFilterRules)");
+		set_single_direct("-p","service.firewall.IPPortFilterRules",form['merged_filter_rules']);
+		for(i=0;i < rule_rdb_max_count;i++) {
+			syslog(3,"port_filtering.html: write RDB ('" + form['merged_filter_rule'+i] + "' ==> service.firewall.IPPortFilterRule"+i+")");
+			set_single_direct("-p","service.firewall.IPPortFilterRule"+i,form['merged_filter_rule'+i]);
+		}
+
+		/* trigger port filter template */
+		set_single_direct("","service.firewall.trigger","1");
+		redirect('/port_filtering.html?success');
+	}
+	else {
+		syslog(5,"port_filtering.html: unknown form action specified (form_action=" + form['form_action'] + "'");
+	}
+
+}
+%>
+
+<style type="text/css">
+.field-right-desc {
+	display: inline;
+	margin-left: 0px;
+	width: auto;
+	font-weight:normal;
+}
+</style>
+
+<script language="JavaScript" type="text/javascript">
+
+#include "net_util.js"
+
+var filtering_rules = new Array();
+var selected_rule=0;
+
+function parse_ip_into_fields(ipaddr, name) {
+	var i;
+	var ip_array;
+	// put ip address fields
+	ip_array=ipaddr.split(".");
+	for(i=0;i<4;i++) {
+		//$("input[name="+name+(i+1)+"]").val(ip_array[i]||"0");
+		$("input[name="+name+(i+1)+"]").val(ip_array[i]);
+	}
+}
+
+function get_network_addr(netaddrbit) {
+	var array=netaddrbit.split("/");
+	return array[0] || "";
+}
+
+function get_network_bit(netaddrbit) {
+	var array=netaddrbit.split("/");
+	return array[1] || "";
+}
+
+function show_edit_mode(edit_mode) {
+	// hide edit mode. otherwise show
+	$("#filter_setup").toggle(edit_mode);
+	$("#filter_list").toggle(!edit_mode);
+}
+
+function init_firewall_rule(idx) {
+	var rule;
+	if(filtering_rules[idx]!==undefined) {
+		rule=deserialize_rule(filtering_rules[idx]);
+	}
+	else {
+		rule={
+			src_mac:"",
+			src_ipaddr:"",
+			src_ipaddr_size:"",
+			src_port_from:"",
+			src_port_to:"",
+			dst_ipaddr:"",
+			dst_ipaddr_size:"",
+			dst_port_from:"",
+			dst_port_to:"",
+			proto:5,
+			act:0,
+			comment:"",
+			bound:"forward"
+		};
+	}
+
+	$("#mac_address").val(rule.src_mac);
+	parse_ip_into_fields(rule.src_ipaddr,"sip_address");
+	$("#sip_address_size").val(rule.src_ipaddr_size==""?32:rule.src_ipaddr_size);
+	$("#sFromPort").val(rule.src_port_from);
+	$("#sToPort").val(rule.src_port_to);
+	$("#protocol").val(rule.proto);
+	parse_ip_into_fields(rule.dst_ipaddr,"dip_address");
+	$("#dip_address_size").val(rule.dst_ipaddr_size==""?32:rule.dst_ipaddr_size);
+	$("#dFromPort").val(rule.dst_port_from);
+	$("#dToPort").val(rule.dst_port_to);
+	$("#action").val(rule.act);
+	$("#bound").val(rule.bound);
+	$("#comment").val(rule.comment);
+	// trigger handler
+	$("#bound").trigger("change");
+	$("#protocol").trigger("change");
+}
+
+function show_current_firewall_rule() {
+	var edit_mode;
+	var idx=parseInt($("#editindex").val());
+<%	if(request['QUERY_STRING']!="success") {%>
+		clear_alert();
+<%	}%>
+	$(".enable-div").css("display","none");
+	// idx has to be bigger than 0 (all extra profile start from 4)
+	edit_mode=!isNaN(idx);
+	if(edit_mode) {
+		init_firewall_rule(idx);
+	}
+	show_edit_mode(edit_mode);
+}
+
+function delete_firewall_rule(idx) {
+	filtering_rules.splice(idx,1);
+	update_firewall_rule_list(true);
+//	$("#portApply").trigger("click");
+}
+
+function show_firewall_rule(idx) {
+	$("#editindex").val((idx===undefined)?"":idx);
+	show_current_firewall_rule();
+}
+
+function add_new_firewall_rule() {
+	$("#editindex").val(filtering_rules.length);
+	show_current_firewall_rule();
+}
+
+function convert_to_action_str(act) {
+	return (act=="1")?_("port filter action accept"):_("port filter action drop");
+}
+
+function convert_to_dir_str(bound) {
+	var dir_str;
+
+	if(bound=="inbound") {
+		dir_str=_("inbound");
+	}
+	else if(bound=="outbound") {
+		dir_str=_("outbound");
+	}
+	else if(bound=="forward") {
+		dir_str=_("forward");
+	}
+	else if(bound=="") {
+		dir_str=_("inboundForward");
+	}
+	else {
+		dir_str="";
+	}
+	return dir_str;
+}
+
+function convert_to_proto_str(proto) {
+	var protocol_names=new Array();
+	protocol_names[1]=_("rtcp");
+	protocol_names[2]=_("UDP");
+	protocol_names[4]=_("ICMP");
+	protocol_names[5]=_("all");
+	protocol_names[6]=_("UDP")+"/"+_("rtcp");
+	return protocol_names[proto]||_("all");
+}
+
+function serialize_rule(rule) {
+	var cols=new Array();
+	cols[11]=rule.src_mac;
+	cols[0]=rule.src_ipaddr;
+	if(rule.src_ipaddr_size!="") {
+		cols[0]+="/"+rule.src_ipaddr_size;
+	}
+	cols[2]=rule.src_port_from;
+	cols[3]=rule.src_port_to;
+	cols[4]=rule.dst_ipaddr;
+	if(rule.dst_ipaddr_size!="") {
+		cols[4]+="/"+rule.dst_ipaddr_size;
+	}
+	cols[6]=rule.dst_port_from;
+	cols[7]=rule.dst_port_to;
+	cols[8]=rule.proto;
+	cols[9]=rule.act;
+	cols[10]=rule.comment;
+	cols[12]=rule.bound;
+	return cols.join(",");
+}
+
+function deserialize_rule(rule_str) {
+	/*
+		0 source ip address,,
+		2 source port range (from),
+		3 source port range (to),
+		4 destination ip address,,
+		6 desination port range (from),
+		7 desination port range (to),
+		8 protocol,
+		9 action,
+		10 comment,
+		11 source mac address,
+		12 inbound/outbound/forward
+	*/
+	var cols=rule_str.split(",");
+	return {
+		src_mac:cols[11].toUpperCase(),
+		src_ipaddr:get_network_addr(cols[0]),
+		src_ipaddr_size:get_network_bit(cols[0]),
+		src_port_from:cols[2],
+		src_port_to:cols[3],
+		dst_ipaddr:get_network_addr(cols[4]),
+		dst_ipaddr_size:get_network_bit(cols[4]),
+		dst_port_from:cols[6],
+		dst_port_to:cols[7],
+		proto:cols[8],
+		act:cols[9],
+		comment:cols[10],
+		bound:(cols[12]||""),
+	};
+}
+
+function convert_to_port_range(port_from,port_to) {
+	// use the same port number if it is empty
+	if(port_from=="") {
+		port_from=port_to;
+	}
+	if(port_to=="") {
+		port_to=port_from;
+	}
+	if(port_from!="") {
+		return port_from=port_to?port_from+'-'+port_to:port_from;
+	}
+	return "";
+}
+
+function update_firewall_rule_list(changed) {
+	var h="";
+
+	if(filtering_rules=="") {
+		$("#RulesList").css("text-align","center");
+		$("#RulesList").html( "<tr><th colspan='7'><div align='center'>"+_("filteringRuleEmpty")+"</div></th></tr>" );
+		if(!changed) {
+			$("#submit-list-div").css("display", "none");
+		}
+		else {
+			$("#submit-list-div").css("display", "");
+		}
+		return;
+	}
+	else {
+		$("#RulesList").css("text-align","left");
+		if(filtering_rules.length==1 && !changed) {
+			$("#submit-list-div").css("display", "none");
+		}
+		else {
+			$("#submit-list-div").css("display", "");
+		}
+	}
+	$.each(filtering_rules,function(idx,rule_str) {
+		var rule=deserialize_rule(rule_str);
+		h+="<tr>\
+				<td class='radio-box'><input type='radio' class='access' name='selected_rule' id='selected_rule"+idx+"' value='"+idx+"'/><label for='selected_rule"+idx+"'>&nbsp;</label></td>\
+				<td>"+(idx+1)+"</td>\
+				<td>"+convert_to_dir_str(rule.bound)+"</td>\
+				<td>"+convert_to_action_str(rule.act)+"</td>\
+				<td>"+rule.comment+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+				h+="<td class='last'><a href='javascript:show_firewall_rule("+idx+")' class='secondary sml'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+				h+="<td class='last'><a href='javascript:show_firewall_rule("+idx+")' class='secondary sml' style='padding:0;border:0;' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+				h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:delete_firewall_rule("+idx+")' title='"+_("delete")+"'><i class='icon close'></i></a></td>\
+			</tr>";
+	});
+
+	$("#RulesList").html(h);
+
+	// handler - select radio button
+	$("input:radio[name=selected_rule]").click(function(){
+		selected_rule=parseInt($(this).val()) || 0;
+		$("#move_up").attr("disabled",selected_rule==0);
+		$("#move_dn").attr("disabled",selected_rule==filtering_rules.length-1);
+	});
+
+	// disable move up and down buttons
+	$("#move_up,#move_dn").attr("disabled",true);
+	// select the selected rule
+	$("input:radio[name=selected_rule][value=" + selected_rule + "]").trigger("click");
+	// select the first if we have no checked one
+	if(!$("input:radio[name=selected_rule]").is(":checked")) {
+		if(selected_rule>=filtering_rules.length) {
+			$("input:radio[name=selected_rule]:last").trigger("click");
+		}
+		else {
+			$("input:radio[name=selected_rule]:first").trigger("click");
+		}
+	}
+}
+
+function is_valid_port_number(port) {
+	return !isNaN(parseInt(port)) && (0<port) && (port<=65535);
+}
+
+$(function() {
+
+	/* submit form with form action - server script differently handles submission */
+	function submit_form_with_action(form_action) {
+		blockUI_wait(_("GUI pleaseWait"));
+		$("#form_action").val(form_action);
+		$("#form").submit();
+	}
+
+	/* write to hidden elements */
+	function update_merged_filter_rules() {
+
+		var i;1
+		var el;
+		var len;
+		var ei;
+
+		var els=new Array();
+
+		/* build array of elements */
+		els.push("#merged_filter_rules");
+		for(i=0;i<@@rule_rdb_max_count;i++) {
+			els.push("#merged_filter_rule"+i.toString());
+		}
+
+		/* clear values of elements */
+		$.each(els,function(i,v){
+			$(v).val("");
+		});
+
+		ei=0;
+		for(i=0;i<filtering_rules.length;i++) {
+
+			/* calc. new size */
+			el=els[ei];
+			len=$(el).val().length+filtering_rules[i].length;
+
+			/* use next element if current is big enough */
+			if(!(len<@@rule_rdb_max_len)) {
+				ei++;
+			}
+
+			/* error if we have more rules */
+			if(!(ei<@@rule_rdb_max_count) || !(i<@@rule_count_limit)) {
+				return i;
+			}
+
+			/* append rules */
+			el=els[ei];
+			var str=new Array();
+			if($(el).val()!="")
+				str.push($(el).val());
+			str.push(filtering_rules[i]);
+
+			$(el).val(str.join(";"));
+		}
+
+		return 0;
+	}
+
+	// handler for message box
+	$("#submitForm").click(function() {
+
+		// show the confirm box if drop mode is selected
+		if( $("#defaultFirewallPolicy").val()=="1" ) {
+			blockUI_confirm_l(_("port filter warningMsg11"), function() {
+				$("#defaultFirewallPolicy").val("1");
+				submit_form_with_action("filter_settings");
+			});
+			$("#defaultFirewallPolicy").val("0");
+			return;
+		}
+
+		submit_form_with_action("filter_settings");
+	});
+
+	// handler - turn on or off all del buttons
+	$("#delRuleAll").click(function() {
+		var all_del_checked;
+		clear_alert();
+		all_del_checked=$(this).is(":checked");
+		$("input:checkbox[id^=delRule][id!=delRuleAll]").attr("checked",all_del_checked);
+	});
+
+	// handler - change the delRuleAll
+	$("input:checkbox[id!=delRuleAll][id^=delRule]").click(function() {
+		var any_del_checked;
+		clear_alert();
+		// checked if any del button is checked
+		any_del_checked=$("input:checkbox[id^=delRule][id!=delRuleAll]").is(":checked");
+		$("#delRuleAll").attr("checked",any_del_checked);
+	});
+
+	// handler - exit button
+	$("#portFilterExit").click(function() {
+<%		if(request['QUERY_STRING']!="success") {%>
+			clear_alert();
+<%		}%>
+		show_firewall_rule();
+		$(".enable-div").css("display","");
+	});
+
+	// handler - reset button
+	$("#portCurrentFilterReset").click(function() {
+
+		// load values
+<%		if(request['QUERY_STRING']!="success") {%>
+			clear_alert();
+<%		}%>
+
+		$("#portFilterExit").trigger("click");
+		load_values_to_elements({
+			"input:radio.access[name=portFilterEnabled]":"<% get_single_direct('service.firewall.IPPortFilterEnable'); %>"=="1",
+			"#defaultFirewallPolicy":"<% get_single_direct('service.firewall.DefaultFirewallPolicy'); %>",
+		});
+
+		// trigger - filter enable radio-switch
+		$("input:radio.access[name=portFilterEnabled]").trigger("change");
+		// put on the progress icon
+		$("#RulesList").html("<i class='progress-sml'></i>");
+
+		/* build filter rule array */
+		var concat_filter_rules=new Array();
+		concat_filter_rules.push("<% get_single_direct('service.firewall.IPPortFilterRules'); %>");
+		<%
+			var i;
+			for(i=0;i<rule_rdb_max_count;i++) {
+				%>
+					concat_filter_rules.push("<%
+						if(rdb_exists('service.firewall.IPPortFilterRule'+i))
+							get_single_direct('service.firewall.IPPortFilterRule'+i);
+					%>");
+				<%
+			}
+		%>
+
+		/* create a big concat filter rules */
+		var big_concat_filter_rules=concat_filter_rules.join(";");
+
+		filtering_rules=$.grep(big_concat_filter_rules.split(";"),function(rule_str) {
+			update_firewall_rule_list(false);
+			return rule_str.match(/^\s*$/)==null;
+		});
+		update_firewall_rule_list(false);
+	});
+
+	$("#protocol").change(function() {
+		var val=$(this).val();
+		$("#src_port_cfg_div,#dst_port_cfg_div").toggle(val==1 || val==2 || val==6);
+	});
+
+	// handler - save button
+	$("#portApply").click(function() {
+	/******************************************/
+		clear_alert();
+		// move source of "from" to "to" if from does not exist
+		if($("#sFromPort").val()=="") {
+			$("#sFromPort").val($("#sToPort").val());
+			$("#sToPort").val("");
+		}
+
+		// move destination of "from" to "to" if from does not exist
+		if($("#dFromPort").val()=="") {
+			$("#dFromPort").val($("#dToPort").val());
+			$("#dToPort").val("");
+		}
+
+		var bound_str=new Array();
+		// build rule object
+		var rule={
+			src_mac:$("#mac_address").val(),
+			src_ipaddr:parse_ip_from_fields("sip_address"),
+			src_ipaddr_size:$("#sip_address_size").val(),
+			src_port_from:$("#sFromPort").val(),
+			src_port_to:$("#sToPort").val(),
+
+			dst_ipaddr:parse_ip_from_fields("dip_address"),
+			dst_ipaddr_size:$("#dip_address_size").val(),
+			dst_port_from:$("#dFromPort").val(),
+			dst_port_to:$("#dToPort").val(),
+			proto:$("#protocol").val(),
+			act:$("#action").val(),
+			comment:$("#comment").val(),
+			bound:$("#bound").val(),
+		};
+
+		// clear port configuration if protocol is not TCP or not UDP
+		if(rule.proto!=1 && rule.proto!=2 && rule.proto!=6) {
+			rule.src_port_from="";
+			rule.src_port_to="";
+			rule.dst_port_from="";
+			rule.dst_port_to="";
+		}
+
+		// clear destination configuration if inbound
+		if(rule.bound=="inbound") {
+			rule.dst_ipaddr="";
+			rule.dst_ipaddr_size="";
+		}
+
+		// clear source configuration if outbound
+		if(rule.bound=="outbound") {
+			rule.src_mac="";
+			rule.src_ipaddr="";
+			rule.src_ipaddr_size="";
+		}
+
+		// remove src and dst ip address if not assigned
+	/*	if(rule.src_ipaddr=="0.0.0.0") {
+			rule.src_ipaddr="";
+		}
+		if(rule.dst_ipaddr=="0.0.0.0") {
+			rule.dst_ipaddr="";
+		}*/
+
+		// remove size if not assigned
+		if(rule.src_ipaddr_size=="32") {
+			rule.src_ipaddr_size="";
+		}
+		if(rule.dst_ipaddr_size=="32") {
+			rule.dst_ipaddr_size="";
+		}
+
+		// validation check
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+		// check if all empty
+		var blank;
+		$.each([rule.src_ipaddr,rule.src_port_from,rule.src_port_to,rule.dst_ipaddr,rule.dst_port_from,rule.dst_port_to],function(idx,str){
+			return (blank=(str==""||str=="..."));
+		});
+
+		if(blank && (rule.bound!="outbound" && rule.src_mac=="")) {
+			validate_alert( "", _("port filter warningMsg2"));
+			if(rule.bound=="outbound") {
+				$("input:text[name^=dip_address]:first").focus();
+			}
+			else {
+				$("#mac_address").focus();
+			}
+			return;
+		}
+
+		// mac address
+		if(rule.src_mac!="" && !isValidMacAddress(rule.src_mac)) {
+			validate_alert( "", _("warningMsg11"));
+			$("#mac_address").focus();
+			return;
+		}
+		var invalid_el;
+		// check ports
+		invalid_el=undefined;
+		$.each({
+				"#sFromPort":rule.src_port_from,
+				"#sToPort":rule.src_port_to,
+				"#dFromPort":rule.dst_port_from,
+				"#dToPort":rule.dst_port_to
+			},
+			function(el,val) {
+				if( (val!="") && !is_valid_port_number(val) ) {
+					invalid_el=el;
+					return false;
+				}
+				return true;
+			}
+		);
+
+		if(invalid_el!==undefined) {
+			validate_alert( "", _("port filter warningMsg3"));
+			$(invalid_el).focus();
+			return;
+		}
+
+		// check network size
+		invalid_el=undefined;
+		$.each({
+				"#sip_address_size":rule.src_ipaddr_size,
+				"#dip_address_size":rule.dst_ipaddr_size,
+			},
+			function(el,val) {
+				var port_no;
+				if(val=="") {
+					return true;
+				}
+				if( isNaN(port_no=parseInt(val)) || (port_no<0) || (port_no>32) ) {
+					invalid_el=el;
+					return false;
+				}
+				return true;
+			}
+		);
+
+		if(invalid_el!==undefined) {
+			validate_alert( "", _("port filter warningMsg12"));
+			$(invalid_el).focus();
+			return;
+		}
+		// serialize rule to str
+		var rule_str=serialize_rule(rule);
+		// update the current entry in filtering rules
+		var idx=parseInt($("#editindex").val());
+
+		// check if the rule already exists
+		var idx2;
+		$.each(filtering_rules,function(idx3,rule_str2){
+			if( (idx3!=idx) && (rule_str==rule_str2) )
+				idx2=idx3;
+
+			return idx2==undefined;
+		});
+
+		if(idx2!==undefined) {
+			validate_alert( "", _("port filter warningMsg10"));
+			return;
+		}
+		filtering_rules[idx]=rule_str;
+		// update rule list and go back to the list
+		update_firewall_rule_list(false);
+		show_firewall_rule();
+
+		/* submit form */
+		var max_allowed_rules=update_merged_filter_rules();
+		if(max_allowed_rules>0) {
+			blockUI_alert(_("port filter warningMsg13")+max_allowed_rules);
+			return;
+		}
+
+/******************************************/
+		$("#portApply").attr("disabled",true);
+
+		submit_form_with_action("rule_settings");
+	});
+
+	$("#listApply").click(function() {
+		/* submit form */
+		var max_allowed_rules=update_merged_filter_rules();
+		if(max_allowed_rules>0) {
+			blockUI_alert(_("port filter warningMsg13")+max_allowed_rules);
+			return;
+		}
+
+		$("#listApply").attr("disabled",true);
+
+		submit_form_with_action("rule_settings");
+	});
+
+	// handler - delete all button
+	$("#portCurrentFilterDel").click(function() {
+		clear_alert();
+		filtering_rules=new Array();
+		update_firewall_rule_list(true);
+	});
+
+	// handler - inbound, outbound and forward button
+	$("#bound").change(function() {
+		var val=$(this).val();
+		var all=val=="";
+		var bound_in=val=="inbound";
+		var bound_out=val=="outbound";
+		var bound_forward=val=="forward";
+
+		$("#src_cfg_div").toggle(bound_in || bound_forward || all);
+		$("#dst_cfg_div").toggle(bound_out || bound_forward);
+	});
+
+	// handler - filtering enable button
+	$("input:radio.access[name=portFilterEnabled]").change(function() {
+		if(!$(this).is(":checked")) {
+			return;
+		}
+		var en=$(this).val()=="1";
+		$('#defaultPolicy').toggle(en);
+		$('#filter_list').toggle(en);
+	});
+
+	// handler - action select
+	$("#action").change(function() {
+		if( $(this).val()!=$("#defaultFirewallPolicy").val()) {
+			blockUI_alert(_("port filter warningMsg9"));
+		}
+	});
+
+	// handler - move up and down buttons
+	$("#move_dn,#move_up").click(function() {
+		var diff;
+		clear_alert();
+		if($(this).attr("id")=="move_dn") {
+			diff=+1;
+		}
+		else {
+			diff=-1;
+		}
+		var src=selected_rule;
+		var dst=selected_rule+diff;
+
+		// bypass if anythong goes wrong
+		if(filtering_rules[dst]===undefined || filtering_rules[src]===undefined) {
+			return;
+		}
+		var tmp=filtering_rules[dst];
+		filtering_rules[dst]=filtering_rules[src];
+		filtering_rules[src]=tmp;
+		selected_rule=dst;
+		// update list
+		update_firewall_rule_list(false);
+	});
+
+	$("#portCurrentFilterReset").trigger("click");
+});
+
+#if 0
+// ";" must not be permmited as it is used as the delimiter of list of rules
+#endif
+function extraCommentFilter(comment) {
+	var commentStr = comment.value;
+	if (commentStr.indexOf(";") != -1) {
+		comment.value = commentStr.replace(/;/g,"");
+	}
+}
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega""><!-- style="overflow-x:scroll;-->
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form  class="validate" novalidate="novalidate" id="form" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box hide_for_pppoe_en">
+			<div class="pad">
+				<!-- ====================   BASIC  form  ==================== -->
+				<input type="hidden" id="editindex" name="editindex" value="@@form['editindex']">
+				<input type='hidden' id='newRule' name='newRule' maxlength="2048" value="@@form['newRule']">
+				<input type='hidden' id='newRule1' name='newRule1' maxlength="2048" value="@@form['newRule']">
+				<input type="hidden" name="sip_address" id="sip_address" value="@@form['sip_address']"/>
+				<input type="hidden" name="dip_address" id="dip_address" value="@@form['dip_address']"/>
+				<div class="form-row no-bg-form enable-div">
+				<h2><script language=Javascript>document.write(_("port basic filter"))</script></h2>
+					<label for="portFilterEnabled"><script language=Javascript>document.write(_("port basic filter"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="portFilterEnabled-0" name="portFilterEnabled" class="access" value=1 />
+								<label for='portFilterEnabled-0' class='on'><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="portFilterEnabled-1" name="portFilterEnabled" class="access" value=0 />
+								<label for='portFilterEnabled-1' class='off'><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-row enable-div" id="defaultPolicy" style="display:none">
+					<label for="defaultFirewallPolicy"><script language=Javascript>document.write(_("default rule"))</script></label>
+					<div class="field">
+						<select id="defaultFirewallPolicy" name="defaultFirewallPolicy">
+							<option value=0><script>document.write(_("port basic default policy accepted"))</script></option>
+							<option value=1><script>document.write(_("port basic default policy dropped"))</script></option>
+						</select>
+					</div>
+				</div>
+				<div class="submit-row enable-div">
+					<button type="button" id="submitForm" name="submitForm"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+				<br/>
+				<div id="filter_setup" style="display:none">
+					<!-- ====================   MAC/IP/Port form   ==================== -->
+					<h2 style="padding-left:30px"><script language=Javascript>document.write(_("port filter setting"))</script></h2>
+					<div class="grey-box">
+						<div class="form-row">
+							<fieldset>
+								<label for="bound"><script language=Javascript>document.write(_("bound"))</script></label>
+								<div class="field">
+									<select name="bound" id="bound">
+										<option value=""><script>document.write(_("inboundForward"))</script></option>
+										<option value="inbound"><script>document.write(_("inbound"))</script></option>
+										<option value="outbound"><script>document.write(_("outbound"))</script></option>
+										<option value="forward"><script>document.write(_("forward"))</script></option>
+									</select>
+								</div>
+							</fieldset>
+						</div>
+						<div class="form-row">
+							<fieldset>
+								<label for="protocol"><script language=Javascript>document.write(_("protocol"))</script></label>
+								<div class="field">
+									<select name="protocol" id="protocol">
+										<option value="5"><script>document.write(_("all"))</script></option>
+										<option value="6"><script>document.write(_("UDP")+"/"+_("rtcp"))</script></option>
+										<option value="1"><script>document.write(_("rtcp"))</script></option>
+										<option value="2"><script>document.write(_("UDP"))</script></option>
+										<option value="4"><script>document.write(_("ICMP"))</script></option>
+									</select>
+								</div>
+							</fieldset>
+						</div>
+						<div id="src_cfg_div">
+							<div class="form-row">
+								<label for="mac_address"><script language=Javascript>document.write(_("port filter macaddr"))</script></label>
+								<div class="field">
+									<input type="text" class="large validate[condRequired[mac_address],funcCall[validate_mac]] mac_address" name="mac_address" id="mac_address">
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="sip_address"><script language=Javascript>document.write(_("port filter source ipaddr"))</script></label>
+								<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("sip_address");</script>
+								<span class='input-connect-dot' for='sip_address_size'>&nbsp;/&nbsp;</span>
+								<label class='input-connect-dot' for='sip_address_size'></label>
+								<div class='field'><input type='text' class='ip-adress ip_address_size validate[condRequired[sip_address1,sip_address2,sip_address3,sip_address4],funcCall[validate_IPsize]]' maxLength='2' name='sip_address_size' id='sip_address_size' onKeyUp="NumfieldEntry(this);"></div>
+							</div>
+						</div>
+						<div id="src_port_cfg_div">
+							<div class="form-row">
+								<label for="sFromPort"><script language=Javascript>document.write(_("port filter source port range")+" ("+_("from")+")")</script></label>
+								<div class="field">
+									<input type="text" class="sml validate[condRequired[sFromPort,sToPort],funcCall[validate_port]]" size="5" name="sFromPort" id="sFromPort" onKeyUp="NumfieldEntry(this);">
+								</div>
+								<label class="field-right-desc"><script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+								<label for="sToPort" style="width:auto">(<script language=Javascript>document.write(_("to"))</script>)</label>
+								<div class="field">
+									<input type="text" class="sml validate[condRequired[sFromPort,sToPort],funcCall[validate_port]]" size="5" name="sToPort" id="sToPort" onKeyUp="NumfieldEntry(this);">
+								</div>
+								<label class="field-right-desc"><script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+							</div>
+						</div>
+						<div id="dst_cfg_div">
+							<div class="form-row">
+								<label for="dip_address"><script language=Javascript>document.write(_("port filter dest ipaddr"))</script></label>
+								<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("dip_address");</script>
+								<span class='input-connect-dot' for='dip_address_size'>&nbsp;/&nbsp;</span>
+								<label class='input-connect-dot' for='dip_address_size'></label>
+								<div class='field'><input type='text' class='ip-adress ip_address_size validate[condRequired[dip_address1,dip_address2,dip_address3,dip_address4],funcCall[validate_IPsize]]' maxLength='2' name='dip_address_size' id='dip_address_size' onKeyUp="NumfieldEntry(this);"></div>
+							</div>
+						</div>
+						<div id="dst_port_cfg_div">
+							<div class="form-row">
+								<label for="dFromPort"><script language=Javascript>document.write(_("port filter dest port range")+" ("+_("from")+")")</script></label>
+								<div class="field">
+									<input type="text" class="sml validate[condRequired[dFromPort,dToPort],funcCall[validate_port]]" size="5" name="dFromPort" id="dFromPort" onKeyUp="NumfieldEntry(this);">
+								</div>
+								<label class="field-right-desc" ><script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+
+								<label for="dToPort" style="width:auto">(<script language=Javascript>document.write(_("to"))</script>)</label>
+								<div class="field" style="display:inline">
+									<input type="text" class="sml validate[condRequired[dFromPort,dToPort],funcCall[validate_port]]" size="5" name="dToPort" id="dToPort" onKeyUp="NumfieldEntry(this);">
+								</div>
+								<label class="field-right-desc"><script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="action"><script language=Javascript>document.write(_("action"))</script></label>
+							<div class="field">
+								<select name="action" id="action">
+									<option value="0" id="portFilterActionDrop"><script language="JavaScript">document.write(_("port filter action drop"))</script></option>
+									<option value="1" id="portFilterActionAccept"><script language="JavaScript">document.write(_("port filter action accept"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="comment"><script language=Javascript>document.write(_("comment"))</script></label>
+							<div class="field">
+								<input type="text" class="large" id="comment" name="comment" maxlength="32" onKeyUp="nameFilter(this);extraCommentFilter(this);">
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button type="button" id="portApply" name="portApply"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						<button type="button" class="secondary" id="portFilterExit" name="portFilterExit"><script language=Javascript>document.write(_("cancel"))</script></button>
+					</div>
+					<br/>
+				</div>
+			</div>
+			<div class="pad" id="filter_list" style="display:none">
+				<!-- =========================  delete rules  ========================= -->
+				<div class="form-row">
+					<h2><script language=Javascript>document.write(_("currentFilteringRulesInSystem"))</script></h2>
+					<button type="button" class="secondary sml fr" onclick="add_new_firewall_rule()" style="margin-left:0"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+					<button type="button" id="move_dn" class="secondary sml fr" style="margin-left:0"><script language=Javascript>document.write(_("move down"))</script></button>
+					<button type="button" id="move_up" class="secondary sml fr" style="margin-left:0"><script language=Javascript>document.write(_("move up"))</script></button>
+				</div>
+				<div class="form-row">
+					<table>
+						<colgroup>
+							<col width="100px">
+							<col width="100px">
+							<col width="150px">
+							<col width="130px">
+							<col width="130px">
+							<col width="auto">
+							<col width="auto">
+						</colgroup>
+						<thead id="title-head">
+						<tr>\
+							<th>&nbsp;</th>
+							<th class="align10"><script language=Javascript>document.write(_("index"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("bound"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("action"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("comment"))</script></th>
+							<th>&nbsp;</th>
+							<th>&nbsp;</th>
+						</tr>
+						<tbody id="RulesList"></tbody>
+						</thead>
+					</table>
+				</div>
+				<script type="text/javascript">
+				var IPForward=<%val='\"'+get_single('service.bridge.3GIPForward')+'\"';%>@@val;
+				if(IPForward == "1") {
+					blockUI_alert(_("transparent bridge warnMsg3"));
+					window.location="/LAN.html?ipsetup";
+				}
+				</script>
+
+
+				<input type="hidden" id="form_action" name="form_action">
+
+				<!-- elements of filter_rules and filter_rule#x -->
+				<input type="hidden" id="merged_filter_rules" name="merged_filter_rules">
+				<%
+					var i;
+
+					for(i=0;i < rule_rdb_max_count;i++) {
+						%>
+							<input type="hidden" id="merged_filter_rule@@i" name="merged_filter_rule@@i">
+						<%
+					}
+				%>
+
+				<div class="submit-row" id="submit-list-div">
+					<button type="button" id="listApply" name="listApply"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" name="reset" class="secondary" value="Reset" id="portCurrentFilterReset"><script language=Javascript>document.write(_("reset"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "PORT_FILTER", <%_val = session["user"];%>"@@_val");
+
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('portFilteringSubmitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["ip_address_size"]=_("port filter warningMsg12");
+	$.validator.addMethod("ip_address_size",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return true;
+			}
+			if( c < 0 || c > 32 || !isAllNum(c)) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.ip_address_size);
+
+	VALIDATOR.config.errors["mac_address"]=_("warningMsg11");
+	$.validator.addMethod("mac_address",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return true;
+			}
+			if( !isValidMacAddress(c) ) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.mac_address);
+#else
+/********* NTC ValidationEngine **********/
+function validate_IPsize(field) {
+	if( field.val() < 0 || field.val() > 32 ) {
+		return _("port filter warningMsg12");
+	}
+}
+
+function validate_mac(field) {
+	if( !isValidMacAddress(field.val()) ) {
+		return _("warningMsg11");
+	}
+}
+function validate_port(field) {
+	if( !is_valid_port_number(field.val()) ) {
+		return _("port filter warningMsg3");
+	}
+}
+#endif
+</script>
+</body>
+</html>

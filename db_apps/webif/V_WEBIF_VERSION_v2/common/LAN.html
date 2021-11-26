@@ -1,0 +1,389 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>LAN</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<%
+function validateInput() {
+#ifdef V_IP_HANDOVER_wwan_local
+	if (form['ip_handover'] != "1") {
+#endif
+	validateIpAddress(form['lan_addr'], "", "");
+	validateNetmask(form['mask']);
+	if (form['hostname'] != "") {
+		if (string_regex_match(form['hostname'], "^[.0-9A-Z_a-z-]+$") == false) {
+			onBadRequest();
+		}
+	}
+	validateOnOffRadio(form['dns_enable']);
+	validateIpAddress(form['DHCPrange'], ",", "{1}");
+#ifdef V_IP_HANDOVER_wwan_local
+	}
+#endif
+#ifdef V_ALIAS_IP_y
+	if (form['alias_ip_address'] != "") {
+		validateIpAddress(form['alias_ip_address'], "", "");
+	}
+#endif
+}
+
+cur_lan_addr = get_single('link.profile.0.address');
+
+if ( request['REQUEST_METHOD'] == "POST" ) {
+
+	validateInput();
+
+#ifdef V_IP_HANDOVER_wwan_local
+	if (form['ip_handover'] != "1") {
+#endif
+	tempval = form['lan_addr'];
+	set_single('link.profile.0.address='+tempval, '-p');
+	tempval = form['mask'];
+	set_single('link.profile.0.netmask='+tempval, '-p');
+	tempval = form['hostname'];
+	set_single('link.profile.0.hostname='+tempval, '-p');
+	tempval = form['dns_enable'];
+	set_single('service.dns.masquerade='+tempval, '-p');
+	tempval = form['DHCPrange'];
+	set_single('service.dhcp.range.0='+tempval, '-p');
+#ifdef V_IP_HANDOVER_wwan_local
+	}
+#endif
+
+#ifdef V_ALIAS_IP_y
+	tempval = form['alias_ip_address'];
+	set_single('service.alias_ip_address='+tempval, '-p');
+#endif
+
+	if((headers['HOST'] != form['lan_addr']) && (cur_lan_addr == headers['HOST'])) {
+		redirect(request["REQUEST_TRANSPORT"]+'://'+form['lan_addr']+'/LAN.html?success');
+	}
+	else {
+		redirect('/LAN.html?success');
+	}
+}
+else { /*GET*/
+	if (cur_lan_addr == headers['HOST']) {
+		_wwan_acc=0;
+	}
+	else {
+		_wwan_acc=1;
+	}
+#ifdef V_IP_HANDOVER_wwan_local
+#ifdef V_CBRS_SAS_y
+	form['ip_handover'] = get_single('sas.config.ip_handover');
+#else
+	form['ip_handover'] = get_single('service.ip_handover.enable');
+#endif
+#endif
+	form['lan_addr'] = get_single('link.profile.0.address');
+	form['mask'] = get_single('link.profile.0.netmask');
+	form['hostname'] = get_single('link.profile.0.hostname');
+	form['dns_enable'] = get_single('service.dns.masquerade');
+	form['DHCPrange'] = get_single( 'service.dhcp.range.0' );
+#ifdef V_ALIAS_IP_y
+	form['alias_ip_address'] = get_single( 'service.alias_ip_address' );
+	// wwan_acc is a total hack. But it also makes the server think access is from wan side when it is accessed at LAN alias address.
+	if (form['alias_ip_address'] == headers['HOST']) {
+		_wwan_acc=0;
+	}
+#endif
+}
+%>
+<script language="JavaScript">
+
+#include "net_util.js"
+
+var ray_dhcp_start = new Array();
+var ray_dhcp_end = new Array();
+var ray_dhcp_mask = new Array();
+var wwan_acc="@@_wwan_acc";
+
+function submitF() {
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		validate_group("lan_addr");
+		validate_group("mask");
+		return;
+	}
+#endif
+	var f = document.form;
+	f.lan_addr.value = parse_ip_from_fields("lan_addr");
+	f.mask.value = parse_ip_from_fields("mask");
+#ifdef V_ALIAS_IP_y
+	f.alias_ip_address.value = parse_ip_from_fields("alias_ip_address");
+#endif
+
+	clear_alert();
+	switch(isValidSubnetMask(f.mask.value)) {
+		case -1:
+			validate_alert("", _("invalidSubnetMask"));
+			return;
+		break;
+		case -2:
+			validate_alert("", _("wlan warningMsg16"));//The subnet mask has to be contiguous. Please enter a valid mask
+			return;
+		break;
+	}
+
+	var myip=f.lan_addr.value;
+	var mymask=f.mask.value;
+	var ipAr = new Array();
+	var maskAr = new Array();
+	ipAr = myip.split('.');
+	maskAr = mymask.split('.');
+
+	var firstAr = new Array(), negAr = new Array(), lastAr = new Array();
+	var DHCPfirstAr = new Array(), DHCPnegAr = new Array(), DHCPlastAr = new Array();
+	var same_subnet = 1;
+	for (i = 0; i < 4; i++) {
+		firstAr[i] = ipAr[i] & maskAr[i]; negAr[i] = 255 - maskAr[i]; lastAr[i] = firstAr[i] | negAr[i];
+		DHCPfirstAr[i] = ray_dhcp_start[i] & ray_dhcp_mask[i]; DHCPnegAr[i] = 255 - ray_dhcp_mask[i]; DHCPlastAr[i] = DHCPfirstAr[i] | DHCPnegAr[i];
+		if (firstAr[i] != DHCPfirstAr[i] || lastAr[i] != DHCPlastAr[i]) {
+			same_subnet = 0;
+		}
+	}
+	firstAr[3] += 1; lastAr[3] -= 1;
+	DHCPfirstAr[3] += 1; DHCPlastAr[3] -= 1;
+
+	// check ip address validity after subnet mask changed
+	if (!(is_large(ipAr, firstAr) && is_large(lastAr, ipAr))) {
+		validate_alert("", _("invalidIPaddress"));
+		return;
+	}
+
+#ifdef V_ALIAS_IP_y
+	// Alias IP has to be on a different subnet to make any sense
+	if (isSameSubNet(f.lan_addr.value, f.mask.value, f.alias_ip_address.value, f.mask.value)) {
+		validate_alert("", _("invalidAliasIPaddress"));
+		return;
+	}
+#endif
+
+	if(ray_dhcp_start[0]&&ray_dhcp_start[1]&&ray_dhcp_start[2]&&ray_dhcp_start[3]&&ray_dhcp_end[0]&&ray_dhcp_end[1]&&ray_dhcp_end[2]&&ray_dhcp_end[3]) {
+		var dhcp_range_size, ip_range_size;
+		ip_range_size = ip_gap(lastAr, firstAr);
+
+		// if DHCP address has different subnet from IP address, reset DHCP address into same subnet before calculation
+		if (same_subnet == 0) {
+			for (i = 0; i < 3; i++) {
+				ray_dhcp_start[i] = ray_dhcp_end[i] = ipAr[i];
+			}
+		}
+
+		dhcp_range_size = ip_gap(ray_dhcp_end, ray_dhcp_start);
+
+		// if dhcp range is outside of possble ip address range, adjust dhcp range
+		if (is_large(firstAr, ray_dhcp_start) || is_large(ray_dhcp_start, lastAr) || is_large(firstAr, ray_dhcp_end)) {
+			for (i = 0; i < 4; ray_dhcp_start[i] = firstAr[i], i++);
+			ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+		}
+		if (is_large(ray_dhcp_end, lastAr)) {
+			for (i = 0; i < 4; ray_dhcp_end[i] = lastAr[i], i++);
+		}
+
+		dhcp_range_size = ip_gap(ray_dhcp_end, ray_dhcp_start);
+		/* deleted, since the dhcp range will be adjusted
+		if (dhcp_range_size <= 0) {
+			validate_alert("", _("dhcp warningMsg16")); //The IP address must be inside the IP subnet range
+			return;
+		}*/
+
+		// if ip address is within dhcp range, check if need to adjust dhcp range
+		if (is_large(ipAr, ray_dhcp_start) && is_large(ray_dhcp_end, ipAr)) {
+			// if there is enough gap for dhcp range, locate ip addr out side of dhcp range
+			if (ip_gap(ipAr, lastAr) >= dhcp_range_size) {
+				for (i = 0; i < 3; ray_dhcp_start[i] = ipAr[i], i++);
+				ray_dhcp_start[3] = parseInt(ipAr[3])+1;
+				ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+			} else if (ip_gap(ipAr, firstAr) >= dhcp_range_size) {
+				for (i = 0; i < 4; ray_dhcp_start[i] = firstAr[i], i++);
+				ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+			}
+		}
+		if (is_large(ray_dhcp_end, lastAr)) {
+			for (i = 0; i < 4; ray_dhcp_end[i] = lastAr[i], i++);
+		}
+
+		f.DHCPrange.value=ray_dhcp_start[0]+"."+ray_dhcp_start[1]+"."+ray_dhcp_start[2]+"."+ray_dhcp_start[3]+","+
+			ray_dhcp_end[0]+"."+ray_dhcp_end[1]+"."+ray_dhcp_end[2]+"." +ray_dhcp_end[3];
+	}
+	$("#saveButton").attr("disabled", true);
+	if( wwan_acc=="1" ) {
+		$.ajax({
+			type: 'POST',
+			url: '/cgi-bin/lan_configuration.cgi?<%appendCsrfTokenToQueryString();%>',
+			data: {
+				lanAction: "configure",
+				lanAddress: $("#lan_addr").val(),
+				lanNetmask: $("#mask").val(),
+				lanHostName: $("#hostname").val(),
+				lanDnsMasquerade: $("#dns_enable").val(),
+				lanDhcpRange: $("#DHCPrange").val()
+#ifdef V_IP_HANDOVER_wwan_local
+				,ipHandover: $("#ip_handover").val()
+#endif
+#ifdef V_ALIAS_IP_y
+				,aliasIp: $("#alias_ip_address").val()
+#endif
+			},
+			dataType: 'json'
+#if 0
+			// Ideally setInterval for check_connection should be called in success callback. However the current code
+			// just setInterval after querying CGI file, so leave the process as it is.
+#endif
+		});
+		var counter=0;
+		function check_connection() {
+			if( ++counter<10 ) {
+				$.get("/cgi-bin/ajax.cgi", function(){ window.location.href="/LAN.html?success";});
+			}
+			else {
+				clearInterval(check_connection);
+				window.location.href="/LAN.html?success";
+			}
+		}
+		setInterval(check_connection, 3000);
+	}
+	else {
+		$(".submit-row").css("display", "none");
+		blockUI_wait(_("GUI pleaseWait"));
+		f.submit();
+	}
+}
+
+#ifdef V_IP_HANDOVER_wwan_local
+function disable(id){
+	document.getElementById(id).disabled = true;
+	var nodes = document.getElementById(id).getElementsByTagName('*');
+	for(var i = 0; i < nodes.length; i++){ nodes[i].disabled = true; }
+}
+#endif
+
+var ray_dhcp_mask = new Array();
+$(document).ready(function() {
+	var f = document.form;
+
+	if (f.dns_enable.value=='1') {
+		$('#radio-1').attr("checked","checked");
+	} else {
+		$('#radio-2').attr("checked","checked");
+	}
+
+	/* Parse the IP address for display */
+	parse_ip_into_fields(f.lan_addr.value, "lan_addr");
+
+	/* Parse the Subnet Mask for display */
+	parse_ip_into_fields(f.mask.value, "mask");
+
+	/* Parse the alias IP address for display */
+#ifdef V_ALIAS_IP_y
+	parse_ip_into_fields(f.alias_ip_address.value, "alias_ip_address");
+#endif
+
+	ray_dhcp_start = document.form.DHCPrange.value.split(",")[0].split(".");
+	if(ray_dhcp_start.length != 4 ){ray_dhcp_start[0]='0'; ray_dhcp_start[1]='0';ray_dhcp_start[2]='0'; ray_dhcp_start[3]='0';}
+	ray_dhcp_end = document.form.DHCPrange.value.split(",")[1].split(".");
+	if(ray_dhcp_end.length != 4 ){ray_dhcp_end[0]='0'; ray_dhcp_end[1]='0';ray_dhcp_end[2]='0'; ray_dhcp_end[3]='0';}
+#ifdef V_IP_HANDOVER_wwan_local
+	if (f.ip_handover.value == "1") {
+		disable("lan_addr_row");
+		disable("mask_row");
+		disable("hostname_row");
+		disable("dnsmasq_row");
+	}
+#endif
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("lanConfiguration"))</script></h2>
+#ifdef V_IP_HANDOVER_wwan_local
+				<input type="hidden" name="ip_handover" id="ip_handover" value="@@form['ip_handover']"/>
+#endif
+				<input type="hidden" name="lan_addr" id="lan_addr" value="@@form['lan_addr']"/>
+				<input type="hidden" name="mask" id="mask" value="@@form['mask']"/>
+				<input type="hidden" name="dns_enable" id="dns_enable" value="@@form['dns_enable']"/>
+				<input type="hidden" name="DHCPrange" id="DHCPrange" value="@@form['DHCPrange']">
+#ifdef V_ALIAS_IP_y
+				<input type="hidden" name="alias_ip_address" id="alias_ip_address" value="@@form['alias_ip_address']">
+#endif
+				<div id="box_2144_pin">
+					<div class="form-row" id="lan_addr_row">
+						<label for="lan_addr"><script language=Javascript>document.write(_("ip address"))</script></label>
+						<script language=javascript>htmlGenIpBlocks("lan_addr");</script>
+					</div>
+					<div class="form-row" id="mask_row">
+						<label for="mask"><script language=Javascript>document.write(_("subnet mask"))</script></label>
+						<script language=javascript>htmlGenMaskBlocks("mask");</script>
+						<a href="javascript:netInfo();" id="info" style="background-color:transparent;"><i id="net-info"></i></a>
+					</div>
+#ifdef V_ALIAS_IP_y
+					<div class="form-row">
+						<label for="alias_ip_address"><script language=Javascript>document.write(_("aliasIP"))</script></label>
+						<script language=javascript>htmlGenIpBlocksWithoutRequired("alias_ip_address");</script>
+					</div>
+#endif
+					<div class="form-row" id="hostname_row">
+						<label for="hostname"><script language=Javascript>document.write(_("host name"))</script></label>
+						<div class="field">
+							<input type=text id="hostname" class="large" name="hostname" maxLength="256" value="@@form['hostname']" onKeyUp="hostNameFilter(this);">
+						</div>
+					</div>
+					<div class="form-row no-bg-form" id="dnsmasq_row">
+						<label for="masq_enable"><script language=Javascript>document.write(_("local dns server"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div id="masq_enable" class="radio-switch">
+									<input type="radio" id="radio-1" name="radio-1" class="access" onClick="javascript:document.form.dns_enable.value=1">
+									<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="radio-2" name="radio-1" class="access" onClick="javascript:document.form.dns_enable.value=0">
+									<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" name="saveButton" id="saveButton" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "LAN", <%_val = session["user"];%>"@@_val");
+<%	if (request['QUERY_STRING']=="success") {%>
+		success_alert("",_('lanSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

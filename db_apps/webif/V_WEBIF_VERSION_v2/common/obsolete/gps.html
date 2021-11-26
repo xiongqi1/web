@@ -1,0 +1,694 @@
+<%
+function getGpsRdb(varName) {
+	var val=get_single('sensors.gps.0.'+varName);
+	if ( val == "" )
+		return "N/A";
+	return val;
+}
+
+if ( request['QUERY_STRING'] == "gpsdata") {
+
+	function createBrowserVarFromRdbVar(varName, rdbName) {
+		var val=getGpsRdb(rdbName);
+		write('var '+varName+'="'+val+'";\n');
+	}
+
+	createBrowserVarFromRdbVar('gps_enable','enable');
+	createBrowserVarFromRdbVar('gps_source','source'); /* ex) standalone/agps/historical */
+	createBrowserVarFromRdbVar('gps_standalone_valid','standalone.valid');
+	createBrowserVarFromRdbVar('gps_assisted_valid','assisted.valid');
+	createBrowserVarFromRdbVar('gps_common_date','common.date');
+	createBrowserVarFromRdbVar('gps_common_time','common.time');
+	createBrowserVarFromRdbVar('latitude_direction','common.latitude_direction');
+	createBrowserVarFromRdbVar('latitude','common.latitude');
+	createBrowserVarFromRdbVar('longitude_direction','common.longitude_direction');
+	createBrowserVarFromRdbVar('longitude','common.longitude');
+	createBrowserVarFromRdbVar('altitude','standalone.altitude');
+	createBrowserVarFromRdbVar('height_of_geoid','common.height_of_geoid');
+	createBrowserVarFromRdbVar('ground_speed_kph','standalone.ground_speed_kph');
+	createBrowserVarFromRdbVar('ground_speed_knots','standalone.ground_speed_knots');
+	createBrowserVarFromRdbVar('pdop','standalone.pdop');
+	createBrowserVarFromRdbVar('hdop','standalone.hdop');
+	createBrowserVarFromRdbVar('vdop','standalone.vdop');
+	createBrowserVarFromRdbVar('number_of_satellites','standalone.number_of_satellites');
+	createBrowserVarFromRdbVar('allsatellitedata','standalone.satellitedata');
+	exit(200);
+}
+%>
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>GPS</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tmp = form['gps_enable'];
+	tmp2 = get_single('sensors.gps.0.enable');
+	if (tmp != tmp2 && (tmp == '0' || tmp == '1')) {
+		retval = set_single( 'sensors.gps.0.enable='+tmp );
+	}
+	tmp = form['agps_int'];
+	tmp2 = get_single('sensors.gps.0.assisted.updateinterval');
+	if (tmp != tmp2) {
+		if (tmp >= 60 && tmp < 65535) {
+			retval = set_single( 'sensors.gps.0.assisted.updateinterval='+tmp );
+		}
+		else {
+			form['agps_int'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+		}
+	}
+	redirect('/gps.html?success');
+}
+else { /*GET*/
+	form['gps_enable'] = get_single( 'sensors.gps.0.enable' );
+	form['agps_int'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+}
+%>
+<!-- ================================================================================================ -->
+<script language="JavaScript">
+imgArray = new Array("csq0.GIF","csq1.GIF","csq2.GIF","csq3.GIF","csq4.GIF","csq5.GIF","csq6.GIF");
+baseDIR = "/img/";
+imagebase = 1;
+imageidx = 0;
+var ajaxerror = 0;
+var xmlHttp = 0;
+var temp_val;
+
+function translate_unit(val) {
+	if (isNaN(val)==true) {
+		val = 0;
+	}
+	if (disp_miles=="1") {
+		val*=meter_to_miles;
+		if( val<1 ) {
+			return parseInt(val*mile_to_feet+0.5)+"&nbsp;&nbsp;"+_("feet");
+		}
+		return val.toFixed(1)+"&nbsp;&nbsp;"+_("miles");
+	} else {
+		if(val>1000) {
+			return (val/1000).toFixed(1)+"&nbsp;&nbsp;"+_("kilometer");
+		}
+		return parseInt(val)+"&nbsp;&nbsp;"+_("meter");
+	}
+}
+
+function ajaxFunction() {
+	var i;
+	var datear = new Array();
+	var xmlHttp = $.ajax({
+		url: "@@request['SCRIPT_NAME']?gpsdata",
+		success: function(responseText) {
+			ajaxerror = 0;
+			eval( responseText );
+
+			function get_historical_source(source)
+			{
+				if (source == "historical-standalone")
+					return _("Previously Stored GPS Data (Standalone)");
+				if (source == "historical-agps")
+					return _("Previously Stored GPS Data (Mobile Assisted)");
+				return _("Previously Stored GPS Data (N/A)");
+			}
+
+			var datasource="";
+			if (gps_enable == "1") {
+				if (gps_source == "agps"){
+					datasource=_("MS Assisted GPS");
+				} else if (gps_source == "standalone"){
+					datasource=_("Stand-alone GPS");
+				} else {
+					datasource=get_historical_source(gps_source);
+				}
+			} else {
+				if (gps_source == "agps"){
+					datasource= _("Previously Stored GPS Data (Mobile Assisted)");
+				} else if (gps_source == "standalone"){
+					datasource=_("Previously Stored GPS Data (Standalone)");
+				} else {
+					datasource=get_historical_source(gps_source);
+				}
+			}
+			$("#datasource").html(datasource);
+
+			var sgps_valid = 0;
+			var sgps_status;
+			if (gps_standalone_valid =="N/A"){
+				sgps_status="N/A";
+			} else if (gps_standalone_valid == "valid"){
+				sgps_status="Normal";
+				sgps_valid = 1;
+			} else {
+				sgps_status="Invalid";
+			}
+			$("#sgps_status").html(sgps_status);
+
+			var agps_status;
+			if (gps_assisted_valid == "N/A")
+				agps_status="N/A";
+			else if (gps_assisted_valid == "valid")
+				if(sgps_valid == 1)
+					agps_status="Normal (Not In Use)";
+				else
+					agps_status="Normal";
+			else
+				agps_status="Invalid";
+			$("#agps_status").html(agps_status);
+
+			//gps_common_date= "230394";
+			//gps_common_time= "123519"
+			if (gps_common_date == 'N/A' || gps_common_time == 'N/A') {
+				$("#date").html("N/A");
+			} else {
+				var myDate = new Date();
+				myDate.setUTCDate(gps_common_date.substring(0,2));
+				myDate.setUTCMonth(gps_common_date.substring(2,4)-1);
+				var year=parseInt(gps_common_date.substring(4,6));
+				if (year>=80)
+					year+=1900;
+				else
+					year+=2000;
+				myDate.setUTCFullYear(year);
+				myDate.setUTCHours(gps_common_time.substring(0,2));
+				myDate.setUTCMinutes(gps_common_time.substring(2,4));
+				myDate.setUTCSeconds(gps_common_time.substring(4,6));
+
+				dateval = myDate.toLocaleString();
+				utcoffset=-myDate.getTimezoneOffset();
+				datear = dateval.split(" ");
+				// if datear[2] is invalid which means this date format only has two fields
+				if (typeof(datear[2]) == "undefined" || datear[2].search('undefined') != -1 ||
+					datear[2] == "") {
+					$("#date").html(datear[0]+',  '+datear[1]);
+				} else {
+					if (typeof(datear[3]) == "undefined" || datear[3].search('undefined') != -1 ||
+						datear[3] == "") {
+						$("#date").html(datear[0]+' '+datear[1]+' '+datear[2]+' '+"(UTC + "+utcoffset/60+")"+' ');
+					} else {
+						$("#date").html(datear[0]+' '+datear[1]+' '+datear[2]+' '+datear[3]+',  ');
+					}
+					for (i = 4; i < 12; i++) {
+						if (typeof(datear[i]) == "undefined" || datear[i].search('undefined') != -1) {
+							break;
+						}
+						$("#date").html($("#date").html()+ datear[i]+' ');
+					}
+				}
+			}
+
+			temp_val=latitude;
+			$("#latitude_direction").val(latitude_direction);
+			if ($("#latitude_direction").val()=="S")
+				$("#latitude2").val("-"+change2degree(temp_val,1));
+			else
+				$("#latitude2").val("+"+change2degree(temp_val,1));
+			if (isNaN(parseInt(temp_val))==false) {
+				$("#latitude").html(change2degree(temp_val,0)+latitude_direction);
+			}
+			else {
+				$("#latitude").html(temp_val);
+			}
+			temp_val=longitude;
+			$("#longitude_direction").val(longitude_direction);
+			if ($("#longitude_direction").val()=="W") {
+				$("#longitude2").val("-"+change2degree(temp_val,1));
+			} else {
+				$("#longitude2").val("+"+change2degree(temp_val,1));
+			}
+			if (isNaN(parseInt(temp_val))==false) {
+				$("#longitude").html(change2degree(temp_val,0)+longitude_direction);
+			} else {
+				$("#longitude").html(temp_val);
+			}
+			$("#altitude").html(altitude+" m");
+			$("#geoid").html(height_of_geoid+" m");
+			temp_val = $("#geoid").html();
+			if ( typeof(temp_val)=="undefined" || temp_val.substr(0,3) == 'N/A') {
+				$("#geoid").css("display", "none");
+				$("#sepa_2").css("display", "none");
+				$("#altitude_geoid").html(_("altitude"));
+			} else {
+				$("#geoid").css("display", "");
+				$("#sepa_2").css("display", "");
+				$("#altitude_geoid").html(_("altitude height"));
+			}
+			$("#ground_speed_kph").html(ground_speed_kph+" km/h");
+			$("#ground_speed_knots").html(ground_speed_knots+" knots");
+			$("#pdop").html(pdop);
+			$("#hdop").html(hdop);
+			$("#vdop").html(vdop);
+			$("#number_of_satellites").html(number_of_satellites);
+
+			var num_of_fixed_list = 12;
+			var satellitedata=allsatellitedata.split(";");
+			for (i=0; i<num_of_fixed_list; i++) {
+				var satellite_prn_for_fix='N/A';
+				var satellite_prn='N/A';
+				var satellite_snr=0;
+				var elevation='N/A';
+				var azimuth='N/A';
+				if (i<satellitedata.length ) {
+					var satFields=satellitedata[i].split(",");
+					if (satFields.length>=5) {
+						satellite_prn_for_fix=satFields[0];
+						satellite_prn=satFields[1];
+						satellite_snr=satFields[2];
+						elevation=satFields[3];
+						azimuth=satFields[4];
+					}
+				}
+				if( satellite_prn_for_fix == "1" ) {
+#ifdef V_WEBIF_SPEC_vdf
+					$("#prnfiximg"+i).html("<img src="+baseDIR+"UP.gif width=\"15\" height=\"15\" align=\"center\">");
+#else
+					$("#prnfiximg"+i).html("<img src="+baseDIR+"up.gif width=\"15\" height=\"15\" align=\"center\">");
+#endif
+				}
+				else {
+					$("#prnfiximg"+i).html("<img src="+baseDIR+"down.gif width=\"15\" height=\"15\" align=\"center\">");
+				}
+				$("#satellite_prn"+i).html(satellite_prn);
+				$("#snrimg"+i).html("<img src="+baseDIR+"csq"+(displayicon(satellite_snr))+".GIF width=\"40\" height=\"15\">\
+				<span class=\"normal-text\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+satellite_snr+"<\/span>");
+				$("#elevation"+i).html(elevation);
+				$("#azimuth"+i).html(azimuth);
+			}
+
+// extended satellites list
+			var h="";
+			for (i=num_of_fixed_list; i<number_of_satellites; i++) {
+				var satellite_prn_for_fix='N/A';
+				var satellite_prn='N/A';
+				var satellite_snr=0;
+				var elevation='N/A';
+				var azimuth='N/A';
+				if (i<satellitedata.length ) {
+					var satFields=satellitedata[i].split(",");
+					if (satFields.length>=5) {
+						satellite_prn_for_fix=satFields[0];
+						satellite_prn=satFields[1];
+						satellite_snr=satFields[2];
+						elevation=satFields[3];
+						azimuth=satFields[4];
+					}
+				}
+				h+="<tr>";
+				h+="<td style=\"width:62px;\">"+(i+1)+"</td>";
+				if( satellite_prn_for_fix == "1" ) {
+#ifdef V_WEBIF_SPEC_vdf
+					h+="<td style=\"width:105px;\"><img src=\"img/UP.gif\" width=\"15\" height=\"15\" align=\"center\"\/></td>";
+#else
+					h+="<td style=\"width:105px;\"><img src=\"img/up.gif\" width=\"15\" height=\"15\" align=\"center\"\/></td>";
+#endif
+				} else {
+					h+="<td style=\"width:105px;\"><img src=\"img/down.gif\" width=\"15\" height=\"15\" align=\"center\"\/></td>";
+				}
+				h+="<td style=\"width:62px;\"><span class=\"normal-text\">"+satellite_prn+"</span><\/td>";
+				h+="<td style=\"width:185px;\"><img src=\"img/csq"+(displayicon(satellite_snr))+".GIF\" width=\"40\" height=\"15\"\/><span class=\"normal-text\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+satellite_snr+"</span></td>";
+				h+="<td style=\"width:145px;\"><span class=\"normal-text\">"+elevation+"</span></td>";
+				h+="<td><span class=\"normal-text\">"+azimuth+"<\/span></td>";
+				h+="</tr>";
+			}
+			$("#extsatlist").html(h);
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	});
+}
+
+function syncCLock() {
+	var xmlHttp = $.ajax({
+		url: "/cgi-bin/gps_clksync.cgi",
+		success: function() {
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+			blockUI_alert(_("gps time sync result")+"\n\r\n\r"+$("#date").html()+"\n\r");
+		}
+	});
+}
+
+
+function form_second(str) {
+	sec_int=str.substr(0,2);
+	sec_fra=str.substr(2,3);
+	result=sec_int+"."+sec_fra;
+	return result;
+}
+
+function change2degree(str, map) {
+	/* get degree minute */
+	var degree = parseFloat(str) || 0;
+	var degree_only = Math.floor(degree/100);
+	var min = degree % 100;
+
+	/* no conversion required for map - google understands degree minute */
+	/* 6 fractional digits - more than 1 cm accuracy = log ( 4,000,000,000 cm / 360 / 60 ) */
+	if(map)
+		return degree_only.toString() + " " +min.toFixed(6).toString();
+
+	/* convert min to second */
+	var min_only = Math.floor(min);
+	var sec = (min%1)*60;
+
+	/* 4 fractional digits - more than 1 cm accuracy = log ( 4,000,000,000 cm / 360 / 60 / 60 ) */
+	return degree_only.toString() + " " + min_only.toString() + "' " + sec.toFixed(4) + "\" ";
+}
+
+var THRESHOLD_0=20;
+var THRESHOLD_1=25;
+var THRESHOLD_2=30;
+var THRESHOLD_3=35;
+var THRESHOLD_4=40;
+var THRESHOLD_5=45;
+function displayicon(snr_value) {
+	if ( isNaN(parseInt(snr_value))==true) {
+		return 0;
+	}
+	if (snr_value >= THRESHOLD_5) {
+		return 6;
+	}
+	else if (snr_value < THRESHOLD_5 && snr_value >= THRESHOLD_4) {
+		return 5;
+	}
+	else if (snr_value < THRESHOLD_4 && snr_value >= THRESHOLD_3) {
+		return 4;
+	}
+	else if (snr_value < THRESHOLD_3 && snr_value >= THRESHOLD_2) {
+		return 3;
+	}
+	else if (snr_value < THRESHOLD_2 && snr_value >= THRESHOLD_1) {
+		return 2;
+	}
+	else if (snr_value < THRESHOLD_1 && snr_value >= THRESHOLD_0) {
+		return 1;
+	}
+	else if (snr_value < THRESHOLD_0) {
+		return 0;
+	}
+}
+
+function openGoogleMapWindow() {
+	var lat_val=$("#latitude2").val();
+	var lon_val=$("#longitude2").val();
+	if( lat_val.indexOf("N/A")!=-1 || lon_val.indexOf("N/A")!=-1 ) {
+		blockUI_alert(_("invalidGPSposition"));//Invalid GPS position!
+		return;
+	}
+	address="http://maps.google.com.au/maps?q="+lat_val+","+lon_val+"+(You+are+here)\&iwloc=A\&hl=en";
+	mapWindow=window.open(address);
+	mapWindow.focus();
+}
+
+$(document).ready(function() {
+	if ($("#gps_enable").val() == '1') {
+		$("#gps_enable_0").attr("checked", "checked");
+	} else {
+		$("#gps_enable_1").attr("checked", "checked");
+	}
+
+	setInterval("ajaxFunction()", 1000);
+
+	/* update last xtra updated time */
+	function update_last_xtra_updated_time(updated_time,valid_time,gnss_time) {
+		/* since the Epoch, 1970-01-01 00:00:00 +0000 (UTC) */
+		var rdb_updated_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.updated_time');%>";
+		var rdb_valid_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.info.valid_time');%>";
+		var rdb_gnss_time="<%get_single_direct('sensors.gps.0.gpsone.xtra.info.gnss_time');%>";
+
+		/* use rdb variables */
+		if($.type(updated_time)=="undefined") {
+			updated_time=rdb_updated_time;
+			valid_time=rdb_valid_time;
+			gnss_time=rdb_gnss_time;
+		}
+
+		var epoch1970=new Date(Date.UTC(1970,0,1,0,0,0,0));
+
+		var valid_time_date=new Date();
+		valid_time_date.setTime(epoch1970.getTime() + valid_time*1000);
+
+		var gnss_time_date=new Date();
+		gnss_time_date.setTime(epoch1970.getTime() + gnss_time*1000);
+
+		var updated_date=new Date();
+		updated_date.setTime(epoch1970.getTime() + updated_time*1000);
+
+		/* set updated time */
+		$("#msb_last_updated_time").html(updated_date.toLocaleString());
+		$("#msb_valid_time").html(valid_time_date.toLocaleString());
+		$("#msb_gnss_time").html(gnss_time_date.toLocaleString());
+	}
+
+
+	/* load gps msb configuraiton */
+	load_values_to_elements( {
+		"input:radio.access[name=msb_enable]":"<%get_single_direct('sensors.gps.0.gpsone.enable');%>"==1,
+		"#msb_max_retry":"<%get_single_direct('sensors.gps.0.gpsone.auto_update.max_retry_count');%>",
+		"#msb_retry_delay":Math.round((parseInt("<%get_single_direct('sensors.gps.0.gpsone.auto_update.retry_delay');%>")||(60*5))/60),
+		"#msb_update_period":Math.round((parseInt("<%get_single_direct('sensors.gps.0.gpsone.auto_update.update_period');%>")||5*24*60)/(24*60)),
+	});
+
+	/* triggers */
+	$("input:radio.access[name=msb_enable]").trigger("change");
+
+	/* get gps one */
+	var gpsone_cap="<%get_single_direct('sensors.gps.0.gpsone.cap');%>"=="1";
+	var gps_en="<%get_single_direct('sensors.gps.0.enable');%>"=="1";
+
+	/* update xtra information */
+	update_last_xtra_updated_time();
+
+	$("input:radio.access[name=gps_enable_radio]").change(function() {
+		$("#gps-toggle-div").css("display", $("#gps_enable_0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=gps_enable_radio]").trigger("change");
+})
+
+</script>
+<!-- ================================================================================================ -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="gps_config" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" nonvalidate="novalidate">
+			<%appendCsrfToken();%>
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("gps configuration"))</script></h2>
+				<input type="hidden" name="gps_enable" id="gps_enable" value="@@form['gps_enable']"/>
+				<div id="gps_operation" class="form-row no-bg-form">
+					<label for="field-0"><script language=Javascript>document.write(_("gps operation"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="gps_enable_0" name="gps_enable_radio" class="access" value="1" onClick="javascript:document.gps_config.gps_enable.value='1';">
+								<label for="gps_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="gps_enable_1" name="gps_enable_radio" class="access" value="0" onClick="javascript:document.gps_config.gps_enable.value='0';">
+								<label for="gps_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="gps_operation" -->
+				<!-- AGPS update interval -->
+
+#if (defined V_HAS_AGPS_y)
+				<div class="form-row" id="agps_update_interval">
+#else
+				<div style="display:none">
+#endif
+					<label for="agps_int"><script language=Javascript>document.write(_("agpsUpdateInterval"))</script></label>
+					<div class="field">
+						<input type="text" name="agps_int" id="agps_int" class="validate[required,funcCall[validate_agps_int]] required agps_int med" maxlength=5 value="@@form['agps_int']" onkeyup="NumfieldEntry(this)">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("Msg107"))</script></span>	<!-- (60 - 65534 seconds) -->
+					</div>
+				</div>	<!-- div id="agps_update_interval" -->
+				<div class="submit-row">
+					<button type="submit" onClick='$("button").attr("disabled",true);'><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>	<!-- div class="pad" -->
+			</form>
+			<div id="gps-toggle-div">
+				<br/>
+				<form name="gps_applications" id="gps_applications">
+				<div class="pad" id="gps_appl_block">
+					<h2><script language=Javascript>document.write(_("gps applications"))</script></h2>
+					<!-- gps applications -->
+					<div class="submit-row" id="gps_appl">
+						<button type="button" id="googlemap" class="secondary" onClick="openGoogleMapWindow()" style="width:auto"><script language=Javascript>document.write(_("googlemap"))</script></button>
+						<button type="button" id="clocksync" class="secondary" onClick="syncCLock()" style="display:none"><script language=Javascript>document.write(_("clockSync"))</script></button>
+					</div>	<!-- div id="gps_appl" -->
+				</div>		<!-- div class="pad" id="gps_appl_block" -->
+				</form>
+				<br/><br/>
+				<form name="gps_status" id="gps_status">
+				<div class="pad" id="gps_status_block">
+					<h2><script language=Javascript>document.write(_("gpsStatus"))</script></h2>
+					<input type="hidden" id="latitude2" value="@@form['latitude2']"/>
+					<input type="hidden" id="latitude_direction" value="@@form['latitude_direction']"/>
+					<input type="hidden" id="longitude2" value="@@form['longitude2']"/>
+					<input type="hidden" id="longitude_direction" value="@@form['longitude_direction']"/>
+					<!-- gps status -->
+					<div id="gps_data_src" class="form-row">
+						<label for="datasource"><script language=Javascript>document.write(_("positioningDataSource"))</script></label>
+						<span class="normal-text" id="datasource"></span>
+					</div>
+					<div id="gps_date_time" class="form-row">
+						<label for="date"><script language=Javascript>document.write(_("date time"))</script></label>
+						<span class="normal-text" id="date"></span>
+					</div>
+					<div id="gps_lat_long" class="form-row">
+						<label for="latitude_longitude"><script language=Javascript>document.write(_("latitude longitude"))</script></label>
+						<span class="normal-text" id="latitude"></span>
+						<span class="normal-text" id="sepa_1">,&nbsp;</span>
+						<span class="normal-text" id="longitude"></span>
+					</div>
+#ifdef V_HAS_SGPS
+					<div id="gps_alt_geoid" class="form-row">
+#else
+					<div id="gps_alt_geoid" class="form-row" style="display:none">
+#endif
+						<label for="altitude_geoid" id="altitude_geoid"><script language=Javascript>document.write(_("altitude height"))</script></label>
+						<span class="normal-text" id="altitude"></span>
+						<span class="normal-text" id="sepa_2">,&nbsp;</span>
+						<span class="normal-text" id="geoid"></span>
+					</div>
+#ifdef V_HAS_SGPS
+					<div id="gps_gnd_speed" class="form-row">
+#else
+					<div id="gps_gnd_speed" class="form-row" style="display:none">
+#endif
+						<label for="ground_speed"><script language=Javascript>document.write(_("ground speed"))</script></label>
+						<span class="normal-text" id="ground_speed_kph"></span>
+						<span class="normal-text" id="sepa_3">,&nbsp;</span>
+						<span class="normal-text" id="ground_speed_knots"></span>
+					</div>
+#ifdef V_HAS_SGPS
+					<div id="gps_pdop" class="form-row">
+#else
+					<div id="gps_pdop" class="form-row" style="display:none">
+#endif
+						<label for="pdop_hdop_vdop">PDOP &amp; HDOP &amp; VDOP</label>
+						<span class="normal-text" id="pdop"></span>
+						<span class="normal-text" id="sepa_4">,&nbsp;&nbsp;</span>
+						<span class="normal-text" id="hdop">,&nbsp;</span>
+						<span class="normal-text" id="sepa_5">,&nbsp;&nbsp;</span>
+						<span class="normal-text" id="vdop"></span>
+					</div>
+#ifdef V_HAS_SGPS
+					<div id="sgps_device_status" class="form-row">
+#else
+					<div id="sgps_device_status" class="form-row" style="display:none">
+#endif
+						<label for="sgps_device_status"><script language=Javascript>document.write(_("standalone"))</script>&nbsp;<script language=Javascript>document.write(_("gps device status"))</script></label>
+						<span class="normal-text" id="sgps_status"></span>
+					</div>
+#ifdef V_HAS_AGPS_y
+					<div id="agps_device_status" class="form-row">
+#else
+					<div id="agps_device_status" style="display:none">
+#endif
+						<label for="agps_device_status"><script language=Javascript>document.write(_("mobile assisted"))</script>&nbsp;<script language=Javascript>document.write(_("gps device status"))</script></label>
+						<span class="normal-text" id="agps_status"></span>
+					</div>
+#ifdef V_HAS_SGPS
+					<div id="gps_st_no" class="form-row">
+#else
+					<div id="gps_st_no" class="form-row" style="display:none">
+#endif
+						<label for="num_of_sat"><script language=Javascript>document.write(_("number of satellites"))</script></label>
+						<span class="normal-text" id="number_of_satellites"></span>
+					</div>
+				</div>	<!-- div class="pad" id="gps_status_block" -->
+				</form>
+				<br/><br/>
+
+				<form name="satellites_status" id="satellites_status">
+#ifdef V_HAS_SGPS
+				<div class="pad" id="satellites_status_block">
+#else
+				<div class="pad" id="satellites_status_block" style="display:none">
+#endif
+					<h2><script language=Javascript>document.write(_("satellites status"))</script></h2>
+					<table width="80%" style="text-align:center;" class="no-border">
+					<tr>
+						<th style="width:62px;"><script language=Javascript>document.write(_("index"))</script></th>
+						<th style="width:105px;"><script language=Javascript>document.write(_("in use"))</script></th>
+						<th style="width:62px;">PRN</th>
+						<th style="width:185px;">SNR</th>
+						<th style="width:145px;"><script language=Javascript>document.write(_("elevation"))</script></th>
+						<th><script language=Javascript>document.write(_("azimuth"))</script></th>
+					</tr>
+
+					<script type="text/javascript">
+					var num_of_fixed_list = 12;
+					var i;
+					for (i=0; i<num_of_fixed_list; i++) {
+						document.write("<tr>");
+						document.write("<td>"+(i+1)+"<\/td>");
+						document.write("<td id=\"prnfiximg"+i+"\"><img src=\"img/down.gif\" width=\"15\" height=\"15\" align=\"center\"\/><\/td>");
+						document.write("<td><span class=\"normal-text\" id=\"satellite_prn"+i+"\"><\/span><\/td>");
+						document.write("<td id=\"snrimg"+i+"\"><img src=\"img/csq0.GIF\" width=\"40\" height=\"15\"\/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+						document.write("<span class=\"normal-text\"><\/span><\/td>");
+						document.write("<td><span class=\"normal-text\" id=\"elevation"+i+"\"><\/span><\/td>");
+						document.write("<td><span class=\"normal-text\" id=\"azimuth"+i+"\"><\/span><\/td>");
+						document.write("<\/tr>");
+					}
+					</script>
+					<!-- extended satellites list -->
+					<tbody id="extsatlist"></tbody>
+				</table>
+				</div><!-- div class="pad" id="satellites_status_block" -->
+				</form>
+			</div>
+		</div>	<!-- div class="right-column white-box -->
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "GPS", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["agps_int"]=_("Msg106");		// Entered interval value is out of range!
+	$.validator.addMethod("agps_int",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 60) || (c > 65534) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.agps_int);
+
+#else
+function validate_agps_int(field) {
+	if( (field.val() < 60) || (field.val() > 65534) ) {
+		return _("Msg106");		// Entered interval value is out of range!
+	}
+}
+#endif
+</script>
+</body>
+</html>

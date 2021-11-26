@@ -1,0 +1,223 @@
+#!/usr/bin/awk -f
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+function set_prev (mode, plmn) {
+	if (mode=="Manual") {
+		system("rdb_set wwan.0.PLMN.cmd.status && rdb_set wwan.0.PLMN_select "plmn" && rdb_set wwan.0.PLMN_command_state 5");
+	}
+	else {
+		system("rdb_set wwan.0.PLMN.cmd.status && rdb_set wwan.0.PLMN_select 0,0,0 && rdb_set wwan.0.PLMN_command_state 5");
+	}
+}
+
+function fini(en_cmd, dodStatus, error) {
+	# Re-enable the profile
+	if (en_cmd != "") {
+		exec(en_cmd " 1");
+	}
+	if ( dodStatus=="1" ) {
+		system("sleep 2");
+		for( i=0; i<5; i++) {
+			system("diald-ctrl.sh up && sleep 5");
+			if ( exec("rdb_get dialondemand.status")=="1" ) {
+				break;
+			}
+		}
+	}
+	exit (error);
+}
+
+BEGIN {
+
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "This AWK script file is for internal system use only."
+		print "It is used for SMS Force PLMN functions."
+        print "Please do not run this script manually."
+		exit (0);
+	}
+
+	if( ARGC != 2 ) {
+		print "Parameter ERROR:" ARGC;
+		exit (255);
+	}
+	FS = ",";
+	TIMER_VAR=5;
+	timeout=2*60;
+	timer=0;
+	ret_result=0;
+
+	sim_status=exec("rdb_get wwan.0.sim.status.status");
+	if(sim_status!="SIM OK") {
+		print "SIM status error! "sim_status;
+		exit (255);
+	}
+
+	prev_Mode=exec("rdb_get wwan.0.PLMN_selectionMode");
+	prev_PLMN=exec("rdb_get wwan.0.PLMN_select");
+
+	len=split(ARGV[1], a, ",");
+	if(a[1]=="0") { // Automatic
+		select="0,0,0";
+	}
+	else if( len==2 ) { // Manual MCC MNC, Automatic Network Type
+		select="255," a[1] "," a[2]
+	}
+	else if( len==3 ) {
+		select=a[3] "," a[1] "," a[2]
+	}
+	else {
+		print "Parameter format ERROR: " len
+		exit (255);
+	}
+
+	dodStatus = exec("rdb_get dialondemand.status");
+
+	# Disable any profile if it is enabled
+	en_cmd="";
+	for (i=1; i<=6; i++) {
+		cmd="rdb_get link.profile."i".enable"
+		if(exec(cmd)=="1") {
+			en_cmd="rdb_set link.profile."i".enable"
+			exec(en_cmd " 0");
+			system("sleep 5");
+			break;
+		}
+	}
+
+	system("rdb_set wwan.0.PLMN.cmd.status && rdb_set wwan.0.PLMN.cmd.status && rdb_set wwan.0.PLMN_select " select " && rdb_set wwan.0.PLMN_command_state 5");
+
+	retvar = "Time out - "
+	while( timer < timeout ) {
+		system ( "sleep "TIMER_VAR );
+		timer+=TIMER_VAR;
+
+		select=exec("rdb_get wwan.0.PLMN_select");
+		len=split(select, a, ",");
+		if(a[1]=="0") {
+			select="0";
+		}
+		else if( a[1]=="255" ) {
+			select=a[2] "," a[3];
+		}
+		else {
+			select=a[2] "," a[3] "," a[1];
+		}
+
+		cmd_status=exec("rdb_get wwan.0.PLMN.cmd.status");
+		if(cmd_status=="[DONE]" || cmd_status=="[done]") {
+			retvar = "";
+			break;
+		}
+		else if(index(cmd_status, "error")>0) {
+			# Successsive COPS command could cause error return. Need some delay.
+			system ( "sleep "TIMER_VAR );
+			set_prev ( prev_Mode, prev_PLMN );
+			retvar = ARGV[1]" Command has failed - ";
+			break;
+		}
+	}
+
+	timer=0;
+	system ( "sleep "TIMER_VAR*2 );
+	while( timer < timeout ) {
+		system ( "sleep "TIMER_VAR );
+		timer+=TIMER_VAR;
+		cmd_status=exec("rdb_get wwan.0.PLMN.cmd.status");
+		provider=exec("rdb_get wwan.0.system_network_status.network");
+		coverage=exec("rdb_get wwan.0.system_network_status.system_mode");
+
+		# make sure the network is registed
+
+		if (cmd_status!="" && provider!="" && coverage!="" && coverage!="None") {
+			if(retvar=="" && a[1]=="0" && (exec("rdb_get wwan.0.PLMN_selectionMode")=="Automatic")) {
+				msg = ARGV[1] " successfully applied.";
+			}
+			else if( retvar=="" && a[2]==exec("rdb_get wwan.0.system_network_status.MCC") && a[3]*1==exec("rdb_get wwan.0.system_network_status.MNC") ) {
+				msg = ARGV[1] " Successfully Applied.";
+			}
+			else {
+				ret_result=1;
+				retvar = ARGV[1]" Command has failed - ";
+				if(prev_Mode=="Manual") {
+					len=split(prev_PLMN, a, ",");
+					if( a[1]=="255" ) {
+						formatted_PLMN=a[2] "," a[3];
+					}
+					else {
+						formatted_PLMN=a[2] "," a[3] "," a[1];
+					}
+					msg = retvar "Reset PLMN to Manual mode "formatted_PLMN
+				}
+				else {
+					msg = retvar "Reset PLMN to Automatic mode."
+				}
+			}
+			system( "logger '"msg"'");
+			print msg;
+			fini(en_cmd, dodStatus, ret_result);
+		}
+	}
+
+	if(retvar == "") { # This is the case of the AT command did not feedback an error.
+		ret_result=1;
+		retvar = ARGV[1]" Command has failed - ";
+		set_prev ( prev_Mode, prev_PLMN );
+
+		timer=0;
+		while( timer < timeout ) {
+			system ( "sleep "TIMER_VAR );
+			timer+=TIMER_VAR;
+			cmd_status=exec("rdb_get wwan.0.PLMN.cmd.status");
+			provider=exec("rdb_get wwan.0.system_network_status.network");
+			coverage=exec("rdb_get wwan.0.system_network_status.system_mode");
+			# make sure the network is registed
+			if (cmd_status!="" && provider!="" && coverage!="" && coverage!="None") {
+				if(prev_Mode=="Manual") {
+					len=split(prev_PLMN, a, ",");
+					if( a[1]=="255" ) {
+						formatted_PLMN=a[2] "," a[3];
+					}
+					else {
+						formatted_PLMN=a[2] "," a[3] "," a[1];
+					}
+					msg = retvar "Reset PLMN to Manual mode "formatted_PLMN
+				}
+				else {
+					msg = retvar "Reset PLMN to Automatic mode."
+				}
+				system( "logger '"msg"'");
+				print msg;
+				fini(en_cmd, dodStatus, ret_result);
+			}
+		}
+	}
+
+	# Command has failed and can't back to the previous network. Reset the module.
+	ret_result=1;
+	system("reboot_module.sh");
+	timer=0;
+	while( timer < timeout ) {
+		system ( "sleep "TIMER_VAR );
+		timer+=TIMER_VAR;
+		provider=exec("rdb_get wwan.0.system_network_status.network");
+		coverage=exec("rdb_get wwan.0.system_network_status.system_mode");
+		if (provider!="" && coverage!="" && coverage!="None") {
+			system("rdb_set wwan.0.PLMN.cmd.status && rdb_set wwan.0.PLMN_select 0,0,0 && rdb_set wwan.0.PLMN_command_state 5");
+			msg = " Change PLMN has failed. Reset PLMN to Automatic mode."
+			system( "logger '"msg"'");
+			print msg;
+			fini(en_cmd, dodStatus, ret_result);
+		}
+	}
+	msg= "Fatal error: Reset module timed out!"
+	system( "logger '"msg"'" );
+	fini(en_cmd, dodStatus, ret_result);
+}

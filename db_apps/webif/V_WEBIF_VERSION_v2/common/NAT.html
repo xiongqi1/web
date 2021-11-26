@@ -1,0 +1,496 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>NAT</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/nat.cgi"></script>
+<%
+function validatePort(portAsString) {
+	var port = string_to_number(portAsString);
+	if (port < 1 || port > 65535) {
+		onBadRequest();
+	}
+}
+
+if (request['REQUEST_METHOD'] == "POST" ) {
+	rdbBase="service.firewall.dnat.";
+	idx=form['editIdx'];
+	if ( idx != '-1' ) {
+		srcIP=form['ipMapSrcIP1']+'.'+form['ipMapSrcIP2']+'.'+form['ipMapSrcIP3']+'.'+form['ipMapSrcIP4'];
+		dstIP=form['ipMapDstIP1']+'.'+form['ipMapDstIP2']+'.'+form['ipMapDstIP3']+'.'+form['ipMapDstIP4'];
+
+		// validate input
+		validateIpAddress(srcIP, "", "");
+		validateIpAddress(dstIP, "", "");
+		if (form['ipmapprot'] != "tcp" && form['ipmapprot'] != "udp" && form['ipmapprot'] != "all") {
+			onBadRequest();
+		}
+		validatePort(form['ipmapsrcport']);
+		validatePort(form['ipmapsrcport2']);
+		validatePort(form['ipmapdstport']);
+		validatePort(form['ipmapdstport2']);
+#if 0
+		// TODO: validate relation between ports
+#endif
+
+		cmd = "\"-p "+form['ipmapprot'];
+		if(srcIP !="0.0.0.0")
+			cmd = cmd+" -s "+srcIP;
+		cmd = cmd+" --dport "+form['ipmapsrcport']+":"+form['ipmapsrcport2']+" -i [wanport] -j DNAT --to-destination "+dstIP+":"+form['ipmapdstport']+"-"+form['ipmapdstport2']+" \"";
+		set_single_direct("-p",rdbBase+idx,cmd);
+	}
+	idx=form['delIdx'];
+	if ( idx != '-1' ) {
+		max=50;
+		startIdx=idx-0; // convert string to int
+		// delete entry by moving successive entries up
+		for ( i=startIdx;i<max;i++ ) {
+			entry = get_single(rdbBase+(i+1));
+			if ( entry == 'N/A' ) entry = '';
+			set_single_direct("-p",rdbBase+i, entry);
+			if ( entry == '' ) break;
+		}
+	}
+
+	set_single_direct("-p",rdbBase+form['clrEndIdx'],""); // Clear the last entry
+	set_single_direct("-p",rdbBase+"trigger","1");
+	redirect('/NAT.html?success');
+}
+%>
+<style type="text/css">
+.field-right-desc {
+	display: inline;
+	margin-left: 0px;
+	width: auto;
+	font-weight:normal;
+}
+</style>
+<script language="JavaScript">
+#include "net_util.js"
+
+
+function submitF() {
+var f = document.formS;
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		validate_group("ipMapSrcIP");
+		validate_group("ipMapDstIP");
+		return;
+	}
+#endif
+	if(f.ipmapnum.value=="") {
+		greyOutMappingFields();
+	}
+	else {
+		if( (f.ipmapsrcport.value == "")||( (parseInt(f.ipmapsrcport2.value)-parseInt(f.ipmapsrcport.value)) < 0 ) ) {
+			validate_alert("", _("nat warningMsg01"));
+			f.editindex.value = '-1';
+			return;
+		}
+		if( (f.ipmapdstport.value == "")||( (parseInt(f.ipmapdstport2.value)-parseInt(f.ipmapdstport.value)) < 0 ) ) {
+			validate_alert("", _("nat warningMsg02"));
+			f.editindex.value = '-1';
+			return;
+		}
+		if ( (f.ipMapSrcIP1.value == "") || (f.ipMapSrcIP2.value == "")
+			|| (f.ipMapSrcIP3.value == "") || (f.ipMapSrcIP4.value == "") ) {
+			validate_alert("", _("nat warningMsg03_alt")); /* note alternative wording */
+			f.editindex.value = '-1';
+			return;
+		}
+		if ( (f.ipMapDstIP1.value == "") || (f.ipMapDstIP2.value == "")
+			|| (f.ipMapDstIP3.value == "") || (f.ipMapDstIP4.value == "") ) {
+			validate_alert("", _("nat warningMsg04"));
+			f.editindex.value = '-1';
+			return;
+		}
+	}
+
+	caldstport2();
+	f.ipmapdstport.disabled = false;
+	f.ipmapsrcip.value = f.ipMapSrcIP1.value + "."  + f.ipMapSrcIP2.value + "." + f.ipMapSrcIP3.value + "." + f.ipMapSrcIP4.value;
+
+	f.ipmapdstip.value = f.ipMapDstIP1.value + "."  + f.ipMapDstIP2.value + "." + f.ipMapDstIP3.value + "." + f.ipMapDstIP4.value;
+	f.ipmapdstport2.disabled = false;
+	f.ProtocolText.value = f.ipmapprot.value;
+	if(!checkIpAddr(f.ipmapdstip, false)) {
+            return false;
+        }
+	value = parseInt(f.ipmapnum.value);
+	if( isNaN(value)==true || value < 0 || value > st_nat.length ) {
+		//f.editindex.value = st_nat.length+1;
+		i=st_nat.length;
+		f.clrEndIdx.value = st_nat.length;
+
+		if(f.clrEndIdx.value>=50) {
+			validate_alert("", _("nat warningMsg07"));
+			return;
+		}
+
+		f.clrEndIdx.value = i+1;
+	}
+	else {
+		if (value < 1 || value > 65535) {
+			validate_alert("", _("nat warningMsg06"));
+			f.editindex.value = '-1';
+			return;
+		}
+		i=f.ipmapnum.value - 1;
+		st_nat[i].protocol = f.ProtocolText.value;
+		st_nat[i].sourceIP = f.ipmapsrcip.value;
+		st_nat[i].incomingPortStart = f.ipmapsrcport.value;
+		st_nat[i].incomingPortEnd = f.ipmapsrcport2.value;
+		st_nat[i].destinationIP = f.ipmapdstip.value;
+		st_nat[i].destinationPortStart = f.ipmapdstport.value;
+		st_nat[i].destinationPortEnd = f.ipmapdstport2.value;
+	}
+	f.clrEndIdx.value = st_nat.length;
+	f.submitForm.disabled=true;
+	f.BtDel.disabled=true;
+	f.BtCancel.disabled=true;
+	f.submit();
+}
+
+function delentry( idx ) {
+var f = document.formS;
+	if(idx<0) { //delete current
+		idx=parseInt(f.ipmapnum.value)>0?parseInt(f.ipmapnum.value)-1:0;
+	}
+	try {
+		st_nat[idx].protocol = "";
+		f.clrEndIdx.value = st_nat.length;
+		f.submitForm.disabled=true;
+		f.BtDel.disabled=true;
+		f.BtCancel.disabled=true;
+		f.editIdx.value = -1;
+		f.delIdx.value = idx;
+		f.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+// If NAT is disabled then we need to grey out these fields
+function setMappingFields(val) {
+var f = document.formS;
+	try {
+		f.ipmapnum.disabled = val;
+		f.ipmapprot.disabled = val;
+
+		f.ipMapSrcIP1.disabled = val;
+		f.ipMapSrcIP2.disabled = val;
+		f.ipMapSrcIP3.disabled = val;
+		f.ipMapSrcIP4.disabled = val;
+
+		f.ipMapDstIP1.disabled = val;
+		f.ipMapDstIP2.disabled = val;
+		f.ipMapDstIP3.disabled = val;
+		f.ipMapDstIP4.disabled = val;
+
+		f.ipmapdstport.disabled = val;
+		f.ipmapsrcport.disabled = val;
+		f.ipmapsrcport2.disabled = val;
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+
+function unGreyOutMappingFields() {
+	setMappingFields(false);
+}
+
+// If NAT is disabled then we need to grey out these fields
+function greyOutMappingFields() {
+	setMappingFields(true);
+}
+
+function caldstport2() {
+	var f = document.formS;
+	if( parseInt(f.ipmapsrcport2.value) != parseInt(f.ipmapsrcport.value) ) {
+		f.ipmapdstport.value = f.ipmapsrcport.value;
+		f.ipmapdstport2.value = f.ipmapsrcport2.value;
+		f.ipmapdstport.disabled = true;
+		return;
+	}
+	f.ipmapdstport.disabled = false;
+	if( (parseInt(f.ipmapdstport.value)>0)&&(parseInt(f.ipmapsrcport2.value)>0)&&(parseInt(f.ipmapsrcport.value)>0)&&(( parseInt(f.ipmapsrcport2.value)-parseInt(f.ipmapsrcport.value))>=0) ) {
+		f.ipmapdstport2.value = parseInt(f.ipmapdstport.value) + parseInt(f.ipmapsrcport2.value) - parseInt(f.ipmapsrcport.value)
+	}
+	else {
+		f.ipmapdstport2.value = "";
+	}
+}
+
+function checkIPAddr(field) {
+	if(field.value == "") {
+		validate_alert("", _("warningMsg01"));
+		field.value = field.defaultValue;
+		field.focus();
+		return false;
+	}
+	var ray = new Array();
+	ray = field.value.split(".");
+	if(ray.length != 4 || IpCheck(ray[0],ray[1],ray[2],ray[3])==false)  {
+		validate_alert("", _("nat warningMsg05"));
+		field.focus();
+		return false;
+	}
+	return true;
+}
+
+function disableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = true;
+	else {
+		field.oldOnFocus = field.onfocus;
+		field.onfocus = skip;
+	}
+}
+
+function enableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = false;
+	else {
+		field.onfocus = field.oldOnFocus;
+	}
+}
+
+function add_edit(idx) {
+var f=document.formS;
+
+	if(idx<0) { //add
+		idx=st_nat.length;
+		st_nat.push("dummy"); // This is to increase the array length. Array gets read from network
+	}
+	else {
+		f.ipmapprot.value=st_nat[idx].protocol.toLowerCase();
+		RevIpBlocks(st_nat[idx].sourceIP, "document.formS.ipMapSrcIP");
+		f.ipmapsrcport.value=st_nat[idx].incomingPortStart;
+		f.ipmapsrcport2.value=st_nat[idx].incomingPortEnd;
+		RevIpBlocks(st_nat[idx].destinationIP, "document.formS.ipMapDstIP");
+		f.ipmapdstport.value=st_nat[idx].destinationPortStart;
+		f.ipmapdstport2.value=st_nat[idx].destinationPortEnd;
+	}
+	f.editIdx.value = idx;
+	f.delIdx.value = -1;
+	f.ipmapnum.value=idx+1;
+	clear_alert();
+	$("#nat_list").css("display", "none");
+	$("#nat_setup").css("display", "");
+	if(st_nat.length) {
+		$("#list-head").css("display","");
+	}
+	else {
+		$("#list-head").css("display","none");
+	}
+}
+
+function protocoltotext(i) {
+	document.formS.ProtocolText.value=st_nat[i].protocol;
+}
+
+$(document).ready(function() {
+var h="";
+	if (st_nat.length == 0) {
+		$("#list-head").css("display","none");
+		$("#RulesList").html( "<tr><th colspan='7'><div align='center'>"+_("portForwardingListEmpty")+"</div></th></tr>" );
+		return;
+	}
+	//document.formS.stlength.value = st_nat.length;
+	for (var i = 0; i < st_nat.length; i++) {
+		protocoltotext(i);
+		h+="<tr>\
+		<td>"+document.formS.ProtocolText.value+"</td>\
+		<td>"+st_nat[i].sourceIP+"</td>\
+		<td>"+st_nat[i].incomingPortStart+"&nbsp;-&nbsp;"+st_nat[i].incomingPortEnd+"</td>\
+		<td>"+st_nat[i].destinationIP+"</td>\
+		<td>"+st_nat[i].destinationPortStart+"&nbsp;-&nbsp;"+st_nat[i].destinationPortEnd+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+		h+="<td class='last'><a class='secondary sml' href='javascript:add_edit("+i+")'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+		h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:add_edit("+i+")' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+		h+="<td class='last'><a href='javascript:delentry("+i+")' class=\"secondary sml\" style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close sml'></i></a></td>\
+		</tr>";
+	}
+	$("#RulesList").html(h);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box hide_for_pppoe_en">
+			<form name="formS" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<div class="pad" id="nat_setup" style="display:none">
+				<input type="hidden" name="editindex" value="@@form['editindex']"/>
+				<input type="hidden" name="ipmapsrcip" value="@@form['ipmapsrcip']"/>
+				<input type="hidden" name="ipmapdstip" value="@@form['ipmapdstip']"/>
+				<input type="hidden" name="ProtocolText" value="@@form['ProtocolText']"/>
+				<input type="hidden" name="ipmapnum"/>
+
+				<input type="hidden" name="clrEndIdx" value="@@form['clrEndIdx']"/>
+				<input type="hidden" name="delIdx" value="@@form['delIdx']"/>
+				<input type="hidden" name="editIdx" value="@@form['editIdx']"/>
+
+				<h2><script language=Javascript>document.write(_("portForwardingSettings"))</script></h2>
+				<div class="grey-box">
+					<div class="form-row">
+						<fieldset>
+							<label for="ipmapprot"><script language=Javascript>document.write(_("protocol"))</script></label>
+							<div class="field">
+								<select name="ipmapprot" size="1" >
+									<option value="tcp"><script>document.write(_("rtcp"))</script></option>
+									<option value="udp"><script>document.write(_("UDP"))</script></option>
+									<option value="all"><script>document.write(_("log all"))</script></option>
+								</select>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row">
+						<label for="ipMapSrcIP"><script language=Javascript>document.write(_("port forward orig ipaddr"))</script></label>
+						<script language=javascript>htmlGenIpBlocks0("ipMapSrcIP");</script>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="ipmapsrcport"><script language=Javascript>document.write(_("port forward orig port range")+" ("+_("from")+")")</script></label>
+						<div class="field">
+							<input type="text" name="ipmapsrcport" id="ipmapsrcport" class="validate[required,funcCall[validate_port]] required port sml" maxLength="5" onKeyUp="NumfieldEntry(this);document.formS.ipmapsrcport2.value=this.value;caldstport2();">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+						</div>
+						<label for="ipmapsrcport2" style="width:auto">&nbsp;(<script language=Javascript>document.write(_("to"))</script>)</label>
+						<div class="field">
+							<input type="text" name="ipmapsrcport2" id="ipmapsrcport2" class="validate[required,funcCall[validate_port]] required port sml" maxLength="5" onKeyUp="NumfieldEntry(this);caldstport2()">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ipMapDstIP"><script language=Javascript>document.write(_("port forward dest ipaddr"))</script></label>
+						<script language=javascript>htmlGenIpBlocks("ipMapDstIP");</script>
+					</div>
+					<div class="form-row no-bg-form">
+						<label for="ipmapdstport"><script language=Javascript>document.write(_("port forward dest port range")+" ("+_("from")+")")</script></label>
+						<div class="field">
+							<input type="text" name="ipmapdstport" id="ipmapdstport" class="validate[required,funcCall[validate_port]] required port sml" maxLength="5" onKeyUp="NumfieldEntry(this);caldstport2()" onBlur="NumfieldEntry(this);caldstport2()">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+						</div>
+						<label for="ipmapdstport2" style="width:auto">&nbsp;(<script language=Javascript>document.write(_("to"))</script>)</label>
+						<div class="field">
+							<input type="text" name="ipmapdstport2" id="ipmapdstport2" class="validate[required,funcCall[validate_port]] required port sml" maxLength="5" onKeyUp="NumfieldEntry(this);caldstport2()">
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></label>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row multi-button">
+					<button type="button" name="submitForm" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="reset" class="secondary" name='BtDel'><script language=Javascript>document.write(_("reset"))</script></button>
+					<button type="button" name='BtCancel' class="secondary" onClick="location.href='NAT.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+			<br/>
+			<div class="pad" id="nat_list">
+			<form class="validate" action="#" novalidate="novalidate">
+				<div class="grid-33">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("portForwardingList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-66">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="add_edit(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<table class="above-5-column">
+					<colgroup>
+						<col width="80px">
+						<col width="100px">
+						<col width="150px">
+						<col width="130px">
+						<col width="130px">
+						<col width="100px">
+						<col width="50px">
+					</colgroup>
+					<thead id="list-head">
+						<tr>
+							<th class="align10"><script language=Javascript>document.write(_("protocol"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("port forward orig ipaddr"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("port forward orig port range"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("port forward dest ipaddr"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("port forward dest port range"))</script></th>
+							<th>&nbsp;</th>
+							<th >&nbsp;</th>
+						</tr>
+					<thead>
+					<tbody id="RulesList"></tbody>
+				</table>
+			</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "NAT", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('natSubmitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["port"]=_("Msg126"); //Port number must have a value between 1 and 65535.
+	$.validator.addMethod("port",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.port);
+#else
+/********* for NTC ValidationEngine **********/
+function validate_port(field, rules, i, options) {
+	if( field.val() < 1 || field.val() > 65535 ) {
+		return _("Msg126");
+	}
+}
+#endif
+</script>
+</body>
+</html>

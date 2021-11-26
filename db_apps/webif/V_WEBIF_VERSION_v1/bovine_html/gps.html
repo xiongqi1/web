@@ -1,0 +1,523 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="-1"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>GPS</title>
+<script type="text/javascript" src="util.js"></script>
+<!-- <script type="text/javascript" src="stdlibjs.htm"></script> -->
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tmp = form['GPSenable'];
+	tmp2 = get_single('sensors.gps.0.enable');
+	if (tmp != tmp2 && (tmp == '0' || tmp == '1')) {
+		retval = set_single( 'sensors.gps.0.enable='+tmp );
+	}
+	tmp = form['AGPSinterval'];
+	tmp2 = get_single('sensors.gps.0.assisted.updateinterval');
+	if (tmp != tmp2) {
+		if (tmp >= 60 && tmp < 65535) {
+			retval = set_single( 'sensors.gps.0.assisted.updateinterval='+tmp );
+		}
+		else {
+			form['AGPSinterval'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+		}
+	}
+}
+else { /*GET*/
+	form['GPSenable'] = get_single( 'sensors.gps.0.enable' );
+	form['AGPSinterval'] = get_single( 'sensors.gps.0.assisted.updateinterval' );
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script type="text/javascript">
+Butterlate.setTextDomain("gps");
+imgArray = new Array("csq0.GIF","csq1.GIF","csq2.GIF","csq3.GIF","csq4.GIF","csq5.GIF","csq6.GIF");
+baseDIR = "/images/";
+imagebase = 1;
+imageidx = 0;
+var ajaxerror = 0;
+var xmlHttp = 0;
+var temp_val;
+function ajaxFunction() {
+	var i;
+	var datear = new Array();
+	try {
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+			}
+			catch (e) {
+				//alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	xmlHttp.open("GET","/cgi-bin/gps.cgi",true);
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function() {
+		if(xmlHttp.readyState == 4  && xmlHttp.responseText.length > 0) {
+			ajaxerror = 0;
+			eval( xmlHttp.responseText );
+			document.GPS.datasource.value = datasource;
+			document.GPS.sgps_status.value = sgps_status;
+			document.GPS.agps_status.value = agps_status;
+
+			var myDate = new Date();
+			myDate.setUTCDate(date.substr(0,2));
+			myDate.setUTCMonth(date.substr(3,2)-1);
+			myDate.setUTCFullYear(date.substr(6,4));
+			myDate.setUTCHours(time.substr(0,2));
+			myDate.setUTCMinutes(time.substr(3,2));
+			myDate.setUTCSeconds(time.substr(6,2));
+			if (date == 'N/A' || time == 'N/A') {
+				document.GPS.date.value = 'N/A';
+			} else {
+				dateval = myDate.toLocaleString();
+				datear = dateval.split(" ");
+				// if datear[2] is invalid which means this date format only has two fields
+				if (typeof(datear[2]) == "undefined" || datear[2].search('undefined') != -1 ||
+				    datear[2] == "") {
+					document.GPS.date.value = datear[0]+',  '+datear[1];
+				} else {
+					if (typeof(datear[3]) == "undefined" || datear[3].search('undefined') != -1 ||
+						datear[3] == "") {
+						document.GPS.date.value = datear[0]+' '+datear[1]+' '+datear[2]+' ';
+					} else {
+						document.GPS.date.value = datear[0]+' '+datear[1]+' '+datear[2]+' '+datear[3]+',  ';
+					}
+					for (i = 4; i < 12; i++) {
+						if (typeof(datear[i]) == "undefined" || datear[i].search('undefined') != -1) {
+							break;
+						}
+						document.GPS.date.value += datear[i]+' ';
+					}
+				}
+			}
+
+			temp_val=latitude;
+			document.GPS.latitude_direction.value=latitude_direction;
+			if (document.GPS.latitude_direction.value=="S")
+				document.GPS.latitude2.value="-"+change2degree(temp_val,1);
+			else
+				document.GPS.latitude2.value="+"+change2degree(temp_val,1);
+			if (isNaN(parseInt(temp_val))==false)
+				document.GPS.latitude.value=change2degree(temp_val,0)+latitude_direction;
+			else
+				document.GPS.latitude.value=temp_val;
+
+			temp_val=longitude;
+			document.GPS.longitude_direction.value=longitude_direction;
+			if (document.GPS.longitude_direction.value=="W")
+				document.GPS.longitude2.value="-"+change2degree(temp_val,1);
+			else
+				document.GPS.longitude2.value="+"+change2degree(temp_val,1);
+			if (isNaN(parseInt(temp_val))==false)
+				document.GPS.longitude.value=change2degree(temp_val,0)+longitude_direction;
+			else
+				document.GPS.longitude.value=temp_val;
+
+			document.GPS.altitude.value = altitude;
+			document.GPS.height_of_geoid.value = height_of_geoid;
+			temp_val = document.GPS.height_of_geoid.value;
+			if (temp_val.substr(0,3) == 'N/A') {
+				document.getElementById("geoid").style.display='none';
+				$("#altitude_geoid").html(_("altitude"));
+			} else {
+				document.getElementById("geoid").style.display='';
+				$("#altitude_geoid").html(_("altitude height"));
+			}
+
+			document.GPS.ground_speed_kph.value = ground_speed_kph;
+			document.GPS.ground_speed_knots.value = ground_speed_knots;
+			document.GPS.pdop.value = pdop;
+			document.GPS.hdop.value = hdop;
+			document.GPS.vdop.value = vdop;
+			document.GPS.number_of_satellites.value = number_of_satellites;
+
+			for (i=0; i<12; i++)
+				document.GPS.satellite_prn_for_fix[i].value = satellite_prn_for_fix[i];
+
+			for (i=0; i<12; i++) {
+				if( document.GPS.satellite_prn_for_fix[i].value == "1" )
+					document.getElementById( "prnfiximg"+i ).src = baseDIR + "up.gif";
+				else
+					document.getElementById( "prnfiximg"+i ).src = baseDIR + "down.gif";
+				document.GPS.satellite_prn[i].value = satellite_prn[i];
+				document.getElementById( "snrimg"+i ).src = baseDIR + "csq" + (displayicon(snr[i])) + ".GIF";
+				document.GPS.snr[i].value = snr[i];
+				document.GPS.elevation[i].value = elevation[i];
+				document.GPS.azimuth[i].value = azimuth[i];
+			}
+
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+		else if (0) {
+			if(xmlHttp.responseText.length <= 0) {
+				;//alert("xmlHttp.responseText.length <= 0");
+			}
+			else if(xmlHttp.readyState != 4) {
+				;//alert("xmlHttp.readyState!=4");
+			}
+		}
+	}
+}
+
+var xmlHttp2 = 0;
+function syncCLock() {
+	try {
+		xmlHttp2=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			xmlHttp2=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp2=new XMLHttpRequest();
+			}
+			catch (e) {
+				//alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	xmlHttp2.open("GET","/cgi-bin/gps_clksync.cgi",true);
+	xmlHttp2.send('a');
+	xmlHttp2.onreadystatechange=function() {
+		if(xmlHttp2.readyState == 4  && xmlHttp2.responseText.length > 0) {
+			xmlHttp2.responseText.clear;
+			xmlHttp2.close;
+			xmlHttp2=0;
+			alert("System time was set to\n\r\n\r"+document.GPS.date.value+"\n\r");
+		}
+		else if (0) {
+			if(xmlHttp2.responseText.length <= 0) {
+				;//alert("xmlHttp.responseText.length <= 0");
+			}
+			else if(xmlHttp2.readyState != 4) {
+				;//alert("xmlHttp.readyState!=4");
+			}
+		}
+	}
+}
+
+function reload_timer() {
+	ajaxFunction();
+	if( ++ajaxerror<=5) {
+		setTimeout("reload_timer()", 1000);
+	}
+	else {
+		location.reload();
+	}
+}
+
+function submitF() {
+	try {
+		if (document.GPS.AGPSinterval.value < 60 || document.GPS.AGPSinterval.value >= 65535) {
+			alert(_("Msg106"));//Entered interval value is out of range!
+			return;
+		}
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function form_second(str) {
+	sec_int=str.substr(0,2);
+	sec_fra=str.substr(2,3);
+	result=sec_int+"."+sec_fra;
+	return result;
+}
+
+function change2degree(str, map) {
+	// The standand format of str should be like 3348.001, but there are cases
+	// that the latitude or longitude is 3348.000, cnsmgr just write rdb variable
+	// to be 3348, so the str passed in here is 3348, without .000. We should check
+	// here to identify it is this case, then we add .000 to make the below parsing correct.
+
+	var dotloc=str.indexOf(".");
+	if( dotloc < 0)  // no .000
+	{
+		if(isNaN(parseInt(temp_val))==false) // It is an integer
+			str=str+".000";
+	}
+
+	var temparray=new Array();
+	temp1=str.substring(str.indexOf(".")-2);
+	temp_hour=(str-temp1)/100;
+	temparray=temp1.split(".",2);
+	temp_min=temparray.shift();
+	if (map) {
+		temp_sec=temparray[0];
+		result=temp_hour+"\ "+temp_min+"."+temp_sec;
+	}
+	else {
+		temp_sec=form_second(temparray[0]);
+		result=temp_hour+"\  "+temp_min+"'  "+temp_sec+"\"  ";
+	}
+	return(result);
+}
+
+var THRESHOLD_0=20;
+var THRESHOLD_1=25;
+var THRESHOLD_2=30;
+var THRESHOLD_3=35;
+var THRESHOLD_4=40;
+var THRESHOLD_5=45;
+function displayicon(snr_value) {
+	if ( isNaN(parseInt(snr_value))==true) {
+		return 0;
+	}
+	if (snr_value >= THRESHOLD_5) {
+		return 6;
+	}
+	else if (snr_value < THRESHOLD_5 && snr_value >= THRESHOLD_4) {
+		return 5;
+	}
+	else if (snr_value < THRESHOLD_4 && snr_value >= THRESHOLD_3) {
+		return 4;
+	}
+	else if (snr_value < THRESHOLD_3 && snr_value >= THRESHOLD_2) {
+		return 3;
+	}
+	else if (snr_value < THRESHOLD_2 && snr_value >= THRESHOLD_1) {
+		return 2;
+	}
+	else if (snr_value < THRESHOLD_1 && snr_value >= THRESHOLD_0) {
+		return 1;
+	}
+	else if (snr_value < THRESHOLD_0) {
+		return 0;
+	}
+}
+
+function openGoogleMapWindow() {
+	if( document.GPS.latitude2.value.indexOf("N/A")!=-1 || document.GPS.longitude2.value.indexOf("N/A")!=-1 ) {
+		alert(_("invalidGPSposition"));//Invalid GPS position!
+		return;
+	}
+	address="http://maps.google.com.au/maps?q="+document.GPS.latitude2.value+","+document.GPS.longitude2.value+"+(You+are+here)\&iwloc=A\&hl=en"
+	mapWindow=window.open(address);
+	mapWindow.focus();
+}
+
+$(document).ready(function() {
+	$("#save").val(" "+_("CSsave")+" ");
+	$("#googlemap").val(" "+_("googlemap")+" ");
+	$("#clocksync").val(" "+_("clockSync")+" ");
+	$("#altitude_geoid").html(_("altitude height"));
+})
+</script>
+
+<form class="content" name="GPS"  method="post" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > GPS");</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="GPSenable" value="@@form['GPSenable']"/>
+<input type="hidden" name="latitude2" value="@@form['latitude2']"/>
+<input type="hidden" name="latitude_direction" value="@@form['latitude_direction']"/>
+<input type="hidden" name="longitude2" value="@@form['longitude2']"/>
+<input type="hidden" name="longitude_direction" value="@@form['longitude_direction']"/>
+<script type="text/javascript">
+var i;
+for(i=0; i<12; i++){
+//document.write("<input type=\"hidden\" name=\"satellite_prn_for_fix\" value=\"@@form['satellite_prn_for_fix']\"/>");
+	document.write("<input type=\"hidden\" name=\"satellite_prn_for_fix\" value=\"\"\/>");
+}
+</script>
+
+<%
+	gps_port = get_single( 'wwan.0.gps_if' );
+	if (gps_port != '') {
+%>
+
+<table width="80%">
+<tr>
+	<th><script language="JavaScript">document.write(_("gps configuration"));</script></th>
+</tr>
+</table>
+
+<table width="80%">
+<tr>
+	<td style="width:210px"><script language="JavaScript">document.write(_("gps operation"));</script></td>
+	<td style="width:150px;text-align:center"><input type=radio name='GPSEnabled' onClick="javascript:document.GPS.GPSenable.value='1';"/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+	<input type=radio name='GPSEnabled' onClick="javascript:document.GPS.GPSenable.value='0';"/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>&nbsp;
+	<td style="width:150px"><script language="JavaScript">document.write(_("agpsUpdateInterval"));</script></td>
+	<td style="text-align:center">
+	<input type="text" name="AGPSinterval" size="8" maxLength="5" value="@@form['AGPSinterval']" /> &nbsp;<script language="JavaScript">document.write(_("Msg107"));</script></td><!--(60 - 65534 seconds)-->
+</tr>
+</table>
+<table width="80%">
+<tr>
+	<td style="width:260px;text-align:center">
+	<input type="submit" value="  Save  " id="save" onClick="javascript:submitF()"/></td>
+	<td style="width:260px;text-align:center">
+	<input type="button" value="  Googlemap  " id="googlemap" onClick="openGoogleMapWindow()"/></td>
+		<td style="text-align:center;display:none">
+	<input type="button" value="  Clock Sync  " id="clocksync" onClick="syncCLock()"/></td>
+</tr>
+</table>
+
+<script type="text/javascript">
+if(document.GPS.GPSenable.value=='1') {
+	document.GPS.GPSEnabled[0].checked=true;
+}
+else {
+	document.GPS.GPSEnabled[1].checked=true;
+}
+</script>
+
+<table width="80%">
+	<tr>
+		<th><script language="JavaScript">document.write(_("gpsStatus"));</script></th>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr>
+		<td style="width:210px"><script language="JavaScript">document.write(_("positioningDataSource"));</script></td>
+		<td><input type="text" size="50" name="datasource" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+<table width="80%" style="display:none">
+	<tr>
+		<td style="width:210px"><script language="JavaScript">document.write(_("date time"));</script></td>
+		<td><input type="text" size="65" name="date" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr>
+		<td style="width:210px" ><script language="JavaScript">document.write(_("latitude longitude"));</script></td>
+		<td><input type="text" size="18" name="latitude" class='cdcsAjax'  readonly="readonly"/></td>
+		<td><input type="text" size="18" name="longitude" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+#ifdef V_HAS_SGPS
+<table width="80%">
+#else
+<table width="80%" style="display:none">
+#endif
+	<tr>
+		<td style="width:210px"><span id="altitude_geoid"></span></td>
+		<td><input type="text" size="12" name="altitude" class='cdcsAjax'  readonly="readonly"/></td>
+		<td id="geoid"><input type="text" size="12" name="height_of_geoid" id="height_of_geoid" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+#ifdef V_HAS_SGPS
+<table width="80%">
+#else
+<table width="80%" style="display:none">
+#endif
+	<tr>
+		<td style="width:210px"><script language="JavaScript">document.write(_("ground speed"));</script></td>
+		<td><input type="text" size="12" name="ground_speed_kph" class='cdcsAjax'  readonly="readonly"/></td>
+		<td><input type="text" size="12" name="ground_speed_knots" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+#ifdef V_HAS_SGPS
+<table width="80%">
+#else
+<table width="80%" style="display:none">
+#endif
+	<tr>
+		<td style="width:210px">PDOP &amp; HDOP &amp; VDOP</td>
+		<td style="width:180px"><input type="text" size="12" name="pdop" class='cdcsAjax'  readonly="readonly"/></td>
+		<td style="width:180px"><input type="text" size="12" name="hdop" class='cdcsAjax'  readonly="readonly"/></td>
+		<td><input type="text" size="12" name="vdop" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+<table width="80%">
+	<tr>
+		<td style="width:210px"><script language="JavaScript">document.write(_("gps device status"));</script></td>
+#ifdef V_HAS_SGPS
+		<td style="width:20px"><script language="JavaScript">document.write(_("standalone"));</script></td>
+		<td style="width:20px"><input type="text" size="7" name="sgps_status" class='cdcsAjax'  readonly="readonly"/></td>
+		<td style="width:95px"><script language="JavaScript">document.write(_("mobile assisted"));</script></td>
+#else
+		<td style="width:20px;display:none"><script language="JavaScript">document.write(_("standalone"));</script></td>
+		<td style="width:20px;display:none"><input type="text" size="7" name="sgps_status" class='cdcsAjax'  readonly="readonly"/></td>
+		<td style="width:95px;display:none"><script language="JavaScript">document.write(_("mobile assisted"));</script></td>
+#endif
+		<td><input type="text" size="25" name="agps_status" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+#ifdef V_HAS_SGPS
+<table width="80%">
+#else
+<table width="80%" style="display:none">
+#endif
+	<tr>
+		<td style="width:210px"><script language="JavaScript">document.write(_("number of satellites"));</script></td>
+		<td><input type="text" size="12" name="number_of_satellites" class='cdcsAjax'  readonly="readonly"/></td>
+	</tr>
+</table>
+
+#ifdef V_HAS_SGPS
+<table width="80%" style="text-align:center">
+#else
+<table width="80%" style="text-align:center;display:none">
+#endif
+	<tr>
+		<td style="width:62px;  background:#808080; color:#ffffff;"><script language="JavaScript">document.write(_("index"));</script></td>
+		<td style="width:105px; background:#808080; color:#ffffff;"><script language="JavaScript">document.write(_("in use"));</script></td>
+		<td style="width:62px;  background:#808080; color:#ffffff;">PRN</td>
+		<td style="width:185px; background:#808080; color:#ffffff;">SNR</td>
+		<td style="width:145px; background:#808080; color:#ffffff;"><script language="JavaScript">document.write(_("elevation"));</script></td>
+		<td style="             background:#808080; color:#ffffff;"><script language="JavaScript">document.write(_("azimuth"));</script></td>
+	</tr>
+
+<script type="text/javascript">
+var i;
+for (i=0; i<12; i++) {
+	document.write("<tr>");
+	document.write("<td>"+(i+1)+"<\/div><\/td>");
+	document.write("<td><img src=\"images/down.gif\" width=\"15\" height=\"15\" aligh=\"center\" id=\"prnfiximg"+i+"\"\/><\/td>");
+	document.write("<td><input type=\"text\" size=\"3\" name=\"satellite_prn\" class='cdcsAjax' readonly=\"readonly\"\/><\/td>");
+	document.write("<td><img src=\"images/csq0.GIF\" width=\"40\" height=\"15\" id=\"snrimg"+i+"\"\/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+	document.write("<input type=\"text\" size=\"3\" name=\"snr\" class='cdcsAjax' readonly=\"readonly\"\/><\/td>");
+	document.write("<td><input type=\"text\" size=\"3\" name=\"elevation\" class='cdcsAjax' readonly=\"readonly\"\/><\/td>");
+	document.write("<td><input type=\"text\" size=\"3\" name=\"azimuth\" class='cdcsAjax' readonly=\"readonly\"\/><\/td>");
+	document.write("<\/tr>");
+}
+</script>
+
+</table>
+<script type="text/javascript">setTimeout("reload_timer()", 1000);</script>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+
+<%} else {%>
+<table width="80%">
+	<tr>
+		<th><script language="JavaScript">document.write(_("gps not activated"));</script></th>
+	</tr>
+</table>
+<%}%>
+</body>	
+</html>

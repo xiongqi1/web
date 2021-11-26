@@ -1,0 +1,4 @@
+.site-content {padding-top:30px !important;}
+.grid-9 {overflow:hidden !important;}
+table td.last a.sml, table td.last button.sml, table td.last button.minimum {width:auto;}
+button.sml, .button.sml, .secondary.sml, .tertiary.sml {width:auto;}

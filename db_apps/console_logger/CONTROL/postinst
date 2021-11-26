@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Picking the correct binary
+. /etc/variant.sh
+if [[ $V_PROCESSOR == am335 ]]; then
+	echo "Using CortexA8 binary"
+	rm -f /bin/loggerdump.arm9
+	ln -s /bin/loggerdump.cortexA8 /etc/init.d/rc2.d/S102loggerdump
+else
+	echo "Using ARM9 binary"
+	rm -f /bin/loggerdump.cortexA8
+	ln -s /bin/loggerdump.arm9 /etc/init.d/rc2.d/S102loggerdump
+fi

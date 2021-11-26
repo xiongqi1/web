@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# Copyright (C) 2020 Casa Systems.
+#
+
+nof=${0##*/}                        # Name of file/script.
+source /lib/utils.sh
+source /etc/variant.sh
+
+usage() {
+	cat <<EOM
+
+Usage: dbcfg_default [-f] [-r] [-l <level>]
+
+	Resets system to factory defaults and (optionally) reboots it.
+
+	-f = Force operation. Won't do anything without this option.
+	-r = Reboot after factory reset.
+	-l <level> = Factory reset level: factory, carrier (default) or installer
+EOM
+	exit 1
+}
+
+FORCE=''
+REBOOT=''
+MODEM=''
+FULL=''
+LEVEL='carrier'
+while [ $# -gt 0 ]; do
+	case "$1" in
+	'-f') FORCE=1; ;;
+	'-r') REBOOT=1; ;;
+	'-l')
+		shift
+		LEVEL="$1"
+		;;
+	*) usage; ;;
+	esac
+	shift
+done
+
+if [ -z "$FORCE" ]; then usage; fi
+
+logNotice "factory reset..."
+
+if [ -x /usr/bin/multilevel_factory_reset.sh ]; then
+	/usr/bin/multilevel_factory_reset.sh $LEVEL
+fi
+
+# In Fisher, restore module profile with default config file when factory reset.
+if [ "$V_RESTORE_MODULE_PROFILE" = "fisher" ]; then
+	DEF_CONF="/etc/cdcs/conf/default.conf"
+	/usr/bin/module_profile_restore "$DEF_CONF" default 2>/dev/null
+	# Restore module settings : band, RAT, network selection mode, cell lock
+	/usr/bin/module_settings_restore.sh "default"
+	[ $? -ne 0 ] && logErr "failed to restore module setting but continue..."
+fi
+
+if [ -x /bin/schedule_at_startup_factoryreset_reason_restore.sh ]; then
+	/bin/schedule_at_startup_factoryreset_reason_restore.sh
+fi
+
+# Delete syslog files
+MSG_FILE=$(rdb_get service.syslog.option.logfile)
+test -n "$MSG_FILE" && rm -f "$MSG_FILE"*
+
+# Factory reset actions are maintained in /sbin/init-overlay
+# Set the trigger now to perform the factory reset on next
+# reboot
+environment -w FACTORY_RESET PENDING
+
+if [ -n "$REBOOT" ]; then
+	if [ "$LEVEL" = "factory" ]; then
+		rdb_set service.system.reset_reason "Factory Reset"
+	else
+		rdb_set service.system.reset_reason "Factory Reset - $LEVEL"
+	fi
+	rdb_set service.system.reset 1
+fi

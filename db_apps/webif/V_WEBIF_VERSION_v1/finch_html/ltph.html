@@ -1,0 +1,180 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>System Monitor</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<div id="contentWrapper" >
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+
+function submitF()
+{       
+    var f=document.form;
+
+    try
+	{
+		if ( (f.pingtimer.value < 0) ||  (f.pingtimer.value!=0 && f.pingtimer.value < 300) || (f.pingtimer.value > 65535) )
+		{
+			alert(_("monitor warningMsg1"));
+			f.pingtimer.select();
+			return;
+		}
+		if ( (f.pingacctmr.value < 0) || (f.pingacctmr.value!=0 && f.pingacctmr.value<60) || (f.pingacctmr.value > 65535) )
+		{
+			alert(_("log Error")+": "+_("monitor warningMsg2"));
+			f.pingacctmr.select();
+			return;
+		}
+		if ( (f.pingfailcnt.value < 0) || (f.pingfailcnt.value!=0 && f.pingfailcnt.value<1) || (f.pingfailcnt.value > 65535) )
+		{
+			alert(_("monitor warningMeg10"));
+			f.pingfailcnt.select();
+			return;
+		}
+		if ( (f.resetAnyway.value < 0) || (f.resetAnyway.value!=0 && f.resetAnyway.value<5) || (f.resetAnyway.value > 65535))
+		{
+			alert(_("monitor warningMsg4"));
+			f.resetAnyway.select();
+			return;
+		} 
+		document.form.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+} 
+
+function switchItem( action )
+{
+	if( action )
+	{
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(0); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("close introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='';
+	}
+	else
+	{
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(1); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("display introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='none';
+	}  
+}
+</script>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+        tempval = form['pingdst'];
+        retval = set_single( 'service.systemmonitor.destaddress='+tempval );
+        tempval = form['pingdst2'];
+        retval = set_single( 'service.systemmonitor.destaddress2='+tempval ); 
+        tempval = form['pingtimer'];
+        retval = set_single( 'service.systemmonitor.periodicpingtimer='+tempval ); 
+        tempval = form['pingacctmr'];
+        retval = set_single( 'service.systemmonitor.pingacceleratedtimer='+tempval ); 
+        tempval = form['pingfailcnt'];
+        retval = set_single( 'service.systemmonitor.failcount='+tempval ); 
+        tempval = form['resetAnyway'];
+        retval = set_single( 'service.systemmonitor.forcereset='+tempval ); 
+	} 
+	else /*GET*/
+	{
+        temp = get_single( 'service.systemmonitor.destaddress' ); 
+        form['pingdst'] = temp;
+        temp = get_single( 'service.systemmonitor.destaddress2' ); 
+        form['pingdst2'] = temp;
+        temp = get_single( 'service.systemmonitor.periodicpingtimer' ); 
+        form['pingtimer'] = temp;
+        temp = get_single( 'service.systemmonitor.pingacceleratedtimer' ); 
+        form['pingacctmr'] = temp;
+        temp = get_single( 'service.systemmonitor.failcount' ); 
+        form['pingfailcnt'] = temp;
+        temp = get_single( 'service.systemmonitor.forcereset' ); 
+        form['resetAnyway'] = temp;
+	}
+%>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<!--<h3>Services > System Monitor</h3>-->
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("treeapp sysMonitor"));</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+    <tr><th id="introduction0"><script language="JavaScript">document.write(_("periodic ping settings"));</script>
+	<a href=javascript:switchItem(1); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("display introduction"));</script></a>
+    </th></tr>
+</table>
+
+<table id="introduction1" style="display:none">
+<tr><td>
+<script language="JavaScript">document.write(_("ping instruction01"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction02"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction03"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction04"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction05"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction06"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction07"));</script><br/>
+<br/>
+<script language="JavaScript">document.write(_("ping instruction08"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction09"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction10"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction11"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction12"));</script><br/>
+</td></tr>
+</table>
+
+
+<table width="75%">
+<tr> 
+<td width="38%"><script language="JavaScript">document.write(_("monitor destinationAddress"));</script></td>
+<td><input type=text name='pingdst' size=32 maxlength=64 value="@@form['pingdst']">&nbsp;</td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("monitor secondAddress"));</script></td>
+<td><input type=text name='pingdst2' size=32 maxlength=64 value="@@form['pingdst2']">&nbsp;</td>
+</tr>
+
+<tr>
+<td><script language="JavaScript">document.write(_("monitor pingTimer"));</script></td>
+<td> <input type=text name='pingtimer' size=8 maxLength=5 value="@@form['pingtimer']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period300"));</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("monitor acceleratedTimer"));</script></td>
+<td><input type=text name='pingacctmr' size=8 maxLength=5 value="@@form['pingacctmr']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period60"));</script></td>
+</tr>
+
+<tr>
+<td><script language="JavaScript">document.write(_("monitor failCount"));</script></td>
+<td> <input type=text name='pingfailcnt' size=8 maxLength=5 value="@@form['pingfailcnt']" onkeyup=NumfieldEntry(this); ID="Text1"> &nbsp;<script language="JavaScript">document.write(_("count"));</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("force reset"));</script></td>
+<td><input type=text name='resetAnyway' size=8 maxLength=5 value="@@form['resetAnyway']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period5min"));</script></td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="right" style="margin-right:25% ">
+<p></p>
+<INPUT TYPE="Button" VALUE="Save" id="bottomButton" onClick="javascript:submitF()">&nbsp;&nbsp;
+<!--INPUT TYPE="Button" VALUE="Help" id="Button1" onClick="window.open('help.htm#status')"-->
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+document.form.pingdst.focus();
+CopyRight();
+document.getElementById("bottomButton").value="   "+_("CSsave")+"   ";
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+digraph "Si3219x_audioEQ_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3219x_audioEQ_Cfg\n|+ txaceq_c0\l+ txaceq_c1\l+ txaceq_c2\l+ txaceq_c3\l+ rxaceq_c0\l+ rxaceq_c1\l+ rxaceq_c2\l+ rxaceq_c3\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

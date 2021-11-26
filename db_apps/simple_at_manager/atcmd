@@ -1,0 +1,35 @@
+#!/bin/sh
+DB_CMD="wwan.0.umts.services.command"
+DB_CMD_ST="wwan.0.umts.services.command.status"
+DB_RESULT="wwan.0.umts.services.command.response"
+echo "================================================ "
+echo "               CAUTION !!!                       "
+echo " This script is used for testing AT commands."
+echo " It sends commands to the phone module via the"
+echo " simple_at_manager.  It should not be used on"
+echo " a live system, as it may interfere with normal"
+echo " operation of the device."
+echo ""
+echo " Use for debugging purposes only."
+echo ""
+echo "================================================"
+if [ "$1" = "" -o "$1" = "--help" -o "$1" = "-h" ]; then
+  echo "Usage:"
+  echo "     atcmd <AT command>"
+  echo ""
+  exit
+fi
+echo "AT command : '$1'"
+
+rdb_set $DB_RESULT
+rdb_set $DB_CMD_ST
+rdb_set $DB_CMD "$1"
+while true;do
+  st=`rdb_get $DB_CMD_ST`
+  test -n "$st" && break
+  sleep 1
+done
+result=`rdb_get $DB_RESULT`
+echo "$result"
+echo "================================================"
+exit 0

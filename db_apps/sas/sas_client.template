@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+# Start SAS client
+#
+# Copyright (C) 2019 NetComm Wireless Limited.
+#
+nof=${0##*/}                        # Name of file/script.
+nof=${nof%-*}                       # Remove mangled suffix
+source /lib/utils.sh
+
+enabled="?<service.sas_client.enable>;"
+en_ia="?<service.sas_client.enabled_by_ia>;"
+op_mode="?<wwan.0.operating_mode>;"
+ptcrb=$(rdb_get sw.ptcrb)
+
+if [ "$ptcrb" == "1" ]; then
+  logNotice "ptrcb mode, disable SAS client, enable user traffic"
+  rdb_set sas.transmit_enabled 1
+  enabled=0
+elif [ "$enabled" != "$en_ia" ]; then
+  rdb_set service.sas_client.enable "$en_ia"
+  logNotice "aligning rdb value, resume on next trigger. sas.transmit_enabled:$(rdb_get sas.transmit_enabled)"
+  rdb_set sas.transmit_enabled 0
+  exit 0
+fi
+
+TXCTRL_NAME="qdiagtxctrl"
+PIDFILE="/var/run/$TXCTRL_NAME.pid"
+
+start_txctrl() {
+  if pidof "qdiagtxctrl" 2> /dev/null > /dev/null; then
+    logNotice "qdiagtxctrl is already running"
+  else
+    if [ "$(rdb_get service.wmmd.enable)" = "0" ]; then
+      logNotice "NOT starting $TXCTRL_NAME due to wmmd disabled"
+      return
+    fi
+    logNotice "starting $TXCTRL_NAME"
+    # kernel memory issue:
+    # user.warn kernel: [ 4084.855476] qdiagtxctrl: page allocation failure: order:4, mode:0x2040d0
+    # work-around is to stop wmmd so kernel can restore some memory
+    logNotice "stop wmmd for qdiagtxctrl to successfuly run"
+    /etc/init.d/rc.d/wmmd stop
+    start-stop-daemon -S -b -m -p $PIDFILE -x "/bin/qdiagtxctrl"
+    # delay 2 seconds to ensure qdiagtxctrl is fully started
+    sleep 2
+    logNotice "restarting wmmd"
+    /etc/init.d/rc.d/wmmd start
+    logNotice "$TXCTRL_NAME started."
+  fi
+}
+
+get_monotonic_msec() {
+  awk '/^now/ {print substr($3, 1, length($3) - 6); exit}' /proc/timer_list
+}
+
+stop_txctrl() {
+  # stop daemon
+  logNotice ": stop $TXCTRL_NAME"
+  local PID=$(cat $PIDFILE 2>/dev/null)
+  start-stop-daemon -K -q -p $PIDFILE 2> /dev/null
+
+  start=$(get_monotonic_msec)
+  while pgrep -P $PID >&/dev/null; do
+    sleep 0.1
+
+    cur=$(get_monotonic_msec)
+    runtime=$((cur-start))
+    if [ $runtime -gt 5 ]; then
+      break;
+    fi
+  done
+
+  if pgrep -P $PID >&/dev/null; then
+    start-stop-daemon -K -q -p $PIDFILE -s SIGKILL 2> /dev/null
+  fi
+
+  rm -f $PIDFILE
+
+  logNotice "$TXCTRL_NAME stopped."
+}
+
+if [ "$enabled" = "0" -o "$op_mode" = "factory test mode" ]; then
+  logNotice "Stop SAS client and $TXCTRL_NAME, enabled:$enabled, op_mode:$op_mode"
+  stop_txctrl
+  /etc/init.d/rc.d/sas_client stop
+
+  # restore modem power to max in case SAS client has reduced it
+  rdb_set service.luaqmi.command "setTxPower,48,23,0"
+  qmisys attach
+  exit 0
+fi
+
+SASC_PID=$(pidof sas_client_launcher)
+TXCTRL_PID=$(pidof $TXCTRL_NAME)
+if [ -z "$SASC_PID" -o -z "$TXCTRL_PID" ]; then
+  logNotice "Start SAS client and $TXCTRL_NAME, op_mode:$op_mode"
+  start_txctrl
+  /etc/init.d/rc.d/sas_client start
+
+  # trigger other templates to update route/iptables
+  rdb_set sas.ip_state "$(rdb_get sas.ip_state)"
+fi
+

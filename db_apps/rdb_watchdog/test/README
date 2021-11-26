@@ -1,0 +1,19 @@
+How to test RDB watchdog
+=========================================================
+
+Copy the rdb_watchdog_test.sh to the router.
+Suppose you copy it to /opt/rdb_watchdog_test.sh
+
+There are two test cases available in the script.
+The first case is intended to test whether the system reboots when the sys.watchdog.timeToReboot is set to 30.
+It also checks whether the reboot request can be cancelled if the sys.watchdog.timeToReboot is set to -1.
+Run the following command
+$ /opt/rdb_watchdog_test.sh system 5 15
+where 5 specifies how often the watchdog is kicked and 15 specifies how soon the watchdog timer expires if it's not kicked.
+
+The second case is intended to test whether the system reboot when the registered variables don't change their value.
+$ /opt/rdb_watchdog_test.sh app 5 15
+
+Each test takes a few minutes to complete and shows the result.
+If the test is successful, you can see the result message and the system will reboot.
+If the system doesn't reboot, it means the actual test fails.

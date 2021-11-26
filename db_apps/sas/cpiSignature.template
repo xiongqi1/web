@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# generate or remove the cpi signature data
+#
+# Copyright (C) 2019 NetComm Wireless Limited.
+#
+nof=${0##*/}                        # Name of file/script.
+nof=${nof%-*}                       # Remove mangled suffix
+source /lib/utils.sh
+
+action="?<sas.registration.action>;"
+logNotice "start"
+/bin/sasCpiSignature.sh $action
+logNotice "done."
+

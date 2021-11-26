@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rdb_tool", "rdb_tool.vcproj", "{1849A032-A590-432B-8FDE-21B2B144ECBD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1849A032-A590-432B-8FDE-21B2B144ECBD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1849A032-A590-432B-8FDE-21B2B144ECBD}.Debug|Win32.Build.0 = Debug|Win32
+		{1849A032-A590-432B-8FDE-21B2B144ECBD}.Release|Win32.ActiveCfg = Release|Win32
+		{1849A032-A590-432B-8FDE-21B2B144ECBD}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

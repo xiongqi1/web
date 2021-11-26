@@ -1,0 +1,85 @@
+#!/bin/sh
+# scan sys.hw.class.eth variables to count active eth devices
+# and notify the event when the count changes
+
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is sending a event notification to"
+	echo "event notification clients like SMS, Email, TR069 etcs."
+    echo ""
+	exit 0
+fi
+
+log()
+{
+	logger "event `basename ${0}`: ${1}"
+	echo "event `basename ${0}`: ${1}"
+}
+
+DEV_CNT_RDB_NAME="service.eventnoti.info.eth_dev_cnt"
+# count active eth devices
+count_active_eth_device_number() {
+	old_dev_cnt=`rdb_get $DEV_CNT_RDB_NAME`
+	test -z "$old_dev_cnt" && old_dev_cnt=0
+	let "dev_cnt=0"
+	eth_list=`rdb_get -L "sys.hw.class.eth." | sed -n 's/^sys\.hw\.class\.\(eth\.[0-9]\+\).enable 1$/\1/p'`
+	for eth in $eth_list; do
+		eth_name=$(rdb_get "sys.hw.class.$eth.name")
+		eth_loc=$(rdb_get "sys.hw.class.$eth.location")
+
+		wan_link="0"
+		if [ -n "$eth_name" ]; then
+			eth_mac=$(ifconfig "$eth_name" | sed -rn 's/.* HWaddr ([0-9a-fA-F]+)/\1/p')
+
+			if [ "$eth_loc" = "gadget" ]; then
+				# do not include UNKNOWN state - ntc-140wx initially has UNKNOWN state.
+				if ip link show "$eth_name" | grep -q ' state UP'; then
+					wan_link="1"
+				fi
+			else	let "test_cnt=0"
+
+				if ifconfig "$eth_name" | grep -q 'RUNNING.* MTU:'; then
+					wan_link="1"
+				fi
+			fi
+		else
+			wan_link=""
+		fi
+		
+		# use hardware switch link status instead for cpsw (ntc-140wx)
+		id=$(rdb_get "sys.hw.class.$eth.id")
+		if [ "$id" = 'platform-cpsw-1' -o "$id" = 'platform-cpsw-2' -o "$id" = 'platform-800f0000.ethernet' ]; then
+
+			local st
+			
+			if [ "$id" = 'platform-cpsw-1' -o "$id" = 'platform-800f0000.ethernet' ]; then
+				st=$(rdb_get "hw.switch.port.0.status")
+			else
+				st=$(rdb_get "hw.switch.port.1.status")
+			fi
+
+			if [ -n "$st" ]; then
+				if [ -z "${st/ur*/}" ]; then
+					wan_link="1"
+				else
+					wan_link="0"
+				fi
+			fi
+		fi
+		test "$wan_link" = "1" && let "dev_cnt+=1"
+	done
+	
+	if [ $old_dev_cnt -ne $dev_cnt ]; then
+		rdb_set $DEV_CNT_RDB_NAME "$dev_cnt"
+		elogger 8 "Ethernet device number changed : $old_dev_cnt --> $dev_cnt"
+	fi
+}
+
+log "start..."
+while true; do
+	count_active_eth_device_number
+	sleep 60
+done
+log "exit..."
+
+exit 0

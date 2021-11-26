@@ -1,0 +1,7 @@
+{
+    "id": "GattServer",
+    "title": "Aurora app (BT) server",
+    "url": "/gatt_server.html",
+    "path": ["Services"],
+    "position": 15
+}

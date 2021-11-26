@@ -1,0 +1,126 @@
+<!-- ================= port_status.htm ================= -->
+<div id="portstadiv1" class="show_hide">
+<table border="0" cellpadding="0" cellspacing="0">
+#if (defined MODE_recovery)
+	<tr><th width="100%">&nbsp;&nbsp;Ethernet Port Status</th>
+#else
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('portstadiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("ethernet port status"));</script></th>
+#endif
+	</tr>
+</table>
+<table style="direction:ltr;">
+
+#if (defined V_ETH_PORT_8plllllllw_l)
+<tr>
+	<td class="port_status" id="port1" width="105px" height='30px'>LAN 1</td>
+	<td class="port_status" id="port2" width="105px">LAN 2</td>
+	<td class="port_status" id="port3" width="105px">LAN 3</td>
+	<td class="port_status" id="port4" width="105px">LAN 4</td>
+	<td class="port_status" id="port5" width="105px">LAN 5</td>
+	<td class="port_status" id="port6" width="105px">LAN 6</td>
+	<td class="port_status" id="port7" width="105px">LAN 7</td>
+	<td class="port_status" id="port8" width="105px">LAN 8</td>
+</tr>
+<tr>
+	<td class="port_status" id="port1_text"></td>
+	<td class="port_status" id="port2_text"></td>
+	<td class="port_status" id="port3_text"></td>
+	<td class="port_status" id="port4_text"></td>
+	<td class="port_status" id="port5_text"></td>
+	<td class="port_status" id="port6_text"></td>
+	<td class="port_status" id="port7_text"></td>
+	<td class="port_status" id="port8_text"></td>
+</tr>
+#elif (defined V_ETH_PORT_1pl || defined V_ETH_PORT_1)
+<tr>
+	<td width="22%" id="port1">LAN: &nbsp; &nbsp; <img src="/images/down.gif" width="15" height="15" alt="LAN"/></td>
+	<td class="port_status" id="port1_text" style="font-size:12px;"></td>
+</tr>
+
+#elif (defined V_ETH_PORT_4pw_llll)
+<tr>
+	<td colspan="5">
+		<p style="font-weight:bolder"><script language="JavaScript">document.write(_("wan lan help 1"))</script>
+		<%if( session["sessionid"] != request["SESSION_ID"] ){%><span style="color:#FF0000">&nbsp;<script language="JavaScript">document.write(_("login required"))</script></span><%}%>
+		</p>
+		<script language="JavaScript">document.write(_("wan lan help 4")+"<br/>"+_("wan lan help 2"))</script>
+	</td>
+</tr>
+<tr>
+	<td>
+	<select name="selWanatp6" size="1" onChange="wanatp6OnSwitch();">
+		<option value="CUR" name="cur" id="selWanatp6C"><script language="JavaScript">document.write(_("current"))</script></option>
+		<option value="LAN" name="lan" id="selWanatp6L"><script language="JavaScript">document.write(_("lan"))</script></option>
+		<option value="WAN" name="wan" id="selWanatp6W"><script language="JavaScript">document.write(_("wan"))</script></option>
+	</select>
+	</td>
+	<td class="port_status" id="port1" width='20%'></td>
+	<td class="port_status" id="port2" width='20%'></td>
+	<td class="port_status" id="port3" width='20%'></td>
+	<td class="port_status" id="port4" width='20%'></td>
+</tr>
+<tr>
+	<td class="port_status" width='15%'>&nbsp;</td>
+	<td class="port_status" id="portwan" width='25%'></td>
+	<td class="port_status" width='20%'>&nbsp;LAN 2</td>
+	<td class="port_status" width='20%'>&nbsp;LAN 3</td>
+	<td class="port_status" width='20%'>&nbsp;LAN 4</td>
+</tr>
+#elif (defined V_ETH_PORT_4plllw_l)
+<tr>
+	<td colspan="5">
+		<p style="font-weight:bolder"><script language="JavaScript">document.write(_("wan lan help 1"))</script>
+		<%if( session["sessionid"] != request["SESSION_ID"] ){%><span style="color:#FF0000">&nbsp;<script language="JavaScript">document.write(_("login required"))</script></span><%}%>
+		</p>
+		<script language="JavaScript">document.write(_("wan lan help 4")+"<br/>"+_("wan lan help 2"))</script>
+	</td>
+</tr>
+<tr>
+	<td class="port_status" id="port1" width='20%'></td>
+	<td class="port_status" id="port2" width='20%'></td>
+	<td class="port_status" id="port3" width='20%'></td>
+	<td class="port_status" id="port4" width='25%'></td>
+	<td>
+	<select name="selWanatp6" size="1" onChange="wanatp6OnSwitch();">
+		<option value="CUR" name="cur" id="selWanatp6C"><script language="JavaScript">document.write(_("current"))</script></option>
+		<option value="LAN" name="lan" id="selWanatp6L"><script language="JavaScript">document.write(_("lan"))</script></option>
+		<option value="WAN" name="wan" id="selWanatp6W"><script language="JavaScript">document.write(_("wan"))</script></option>
+	</select>
+	</td>
+</tr>
+<tr>
+	<td class="port_status" width='20%'>&nbsp;LAN 4</td>
+	<td class="port_status" width='20%'>&nbsp;LAN 3</td>
+	<td class="port_status" width='20%'>&nbsp;LAN 2</td>
+	<td class="port_status" id="portwan" width='25%'></td>
+	<td class="port_status" width='15%'>&nbsp;</td>
+</tr>
+#elif (defined V_ETH_PORT_2plw_l)
+<tr>
+#ifdef V_WEBIF_SPEC_vdf
+	<td class="port_status" id="port1" width="105px">LAN</td>
+	<td class="port_status" id="port2" width="105px" height='30px'>WAN/LAN</td>
+#else
+	<td class="port_status" id="port1" width="105px" height='30px'>LAN 1</td>
+	<td class="port_status" id="port2" width="105px">LAN 2</td>
+#endif
+</tr>
+<tr>
+#ifdef V_WEBIF_SPEC_vdf
+	<td class="port_status" id="port2_text"></td>
+	<td class="port_status" id="port1_text"></td>
+#else
+	<td class="port_status" id="port1_text"></td>
+	<td class="port_status" id="port2_text"></td>
+#endif
+</tr>
+#elif (defined V_ETH_PORT_2pll)
+<tr style="height: 35px;">
+	<td width='50%' id="port1" style="padding-left:88px;"></td>
+	<td width='50%' id="port2" style="padding-left:88px;" ></td>
+</tr>
+#endif
+</table>
+</div>
+<!-- ================= end of port_status.htm ================= -->

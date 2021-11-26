@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/login.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>User Interface Utility</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("UIU");
+var f_uploaded="<%v=get_single('upload.target_filename');%>@@v";
+if(f_uploaded=="N/A")
+	f_uploaded="";
+
+function uiu_action(f) {
+	$.get('/cgi-bin/webif_tools.cgi?'+f, function (v) {
+			$("#webFileDetail").html(v);
+		}
+	);
+}
+
+function submitF1() {
+var f = document.form1;
+	if(f.uploadFile1.value.length == 0){ alert(_("system warningMsg02")); return;}//"Please enter a file"
+	var f1=f.uploadFile1.value;
+	f.btWebImport.disabled=true;
+	f.submit();
+}
+
+$(document).ready(function() {
+	if(f_uploaded!="") {
+		$.get("/cgi-bin/webif_tools.cgi?I&"+f_uploaded);
+	}
+	$("#compressWeb").val(_("archiveWeb"));
+	$("#compressLang").val(_("archiveLang"));
+	$("#convertCsv").val(_("convertCsv"));
+	$("#openSmBt").val(_("open edit tool"));
+	$("#btWebImport").val(_("upload"));
+	uiu_action('getWebFiles');
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("ui utility"));</script></h3>
+<br/>
+
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?form1" encType="multipart/form-data">
+<table>
+	<tr><th><script language="JavaScript">document.write(_("upload web files"));</script></th></tr>
+</table>
+
+<table>
+<tr>
+<td width="15%" align="center" height="40px"><script language="JavaScript">document.write(_("upload web files"));</script></td>
+<td width="40%"> <input type=file height="40" size="35" name="uploadFile1"> </td>
+<td width="30%" align="center" ><input type="button" name="btWebImport" id="btWebImport" onclick="javascript:submitF1();" value="Upload"></input></td>
+</tr>
+</table>
+</form>
+
+<form name="form2" method="POST" action="@@request['SCRIPT_NAME']?form2" encType="multipart/form-data">
+	<table width="100%">
+		<tr>
+			<td width="33%"><input type="button" id="compressWeb" style="width:auto;" onClick="uiu_action('compressWeb')"></td>
+			<td width="33%"><div align="center"><input type="button" id="compressLang" style="width:auto;" onClick="uiu_action('compressLang')"></div></td>
+			<td width="33%"><div align="right"><input type="button" id="convertCsv" style="width:auto;" onClick="uiu_action('convertCsv')"></div></td>
+		</tr>
+	</table>
+	<table id="webFileDetail"></table>
+</form>
+
+<form name="form3" method="POST" action="@@request['SCRIPT_NAME']?form3" encType="multipart/form-data">
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("string management"));</script></th></tr>
+</table>
+<table width="85%">
+<td align="center" ><input type="button" name="openSmBt" id="openSmBt" style="width:auto" onclick="javascript:window.open('/StringManagement.html')" value="Open String Edit Tool"></input></td>
+</tr>
+</table>
+</form>
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if( request["QUERY_STRING"]=='form1' ) {
+		session['filename'] = files['uploadFile1'].CLIENT_FILENAME;
+		for (f in files) {
+			var filename = files[f].FILENAME;
+			target = '/opt/cdcs/upload/' + session["filename"];
+			set_single( 'upload.target_filename=' + session["filename"] );
+			rename(files['uploadFile1'].FILENAME, target);
+		}
+	}
+	redirect('/UIU.html');
+}
+else { //GET
+	;
+}
+%>
+</html>

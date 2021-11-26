@@ -1,0 +1,168 @@
+<%
+
+if( request['SESSION_ID']==session["sessionid"] )
+{%>
+<script src="stuHover.js" type="text/javascript"></script>
+<div id="header">	 
+	<div id="logo"><img src="/images/call_direct_logo.gif" alt="Call Direct" width="157" height="71" /></div>
+	<div id="mainMenu"><h1><%val=get_single('system.product.title');%>@@val</h1> </div>		
+</div>
+<div class="sideNav">
+	<h1><a style="color:#FFFFFF; margin-left: 8px;" href="/login.html">&nbsp;&nbsp;Status</a></h1>
+    <div class="columnInner">	
+    <ul id="nav">
+    	<%
+    	//val=get_single('system.product.title');
+        if( session["user"]=='hotspot-admin' )
+        {%>
+        	<li class="top"><a href="/usage.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Data Usage</span></a></li>
+		<%}%>      
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;WWAN (3G)</span></a>
+		<ul class="sub">
+			<li><a href="/3gwan.html">Connection</a></li>
+			<li><a href="/LAN.html?pppoe">PPPoE</a></li>
+		  <li><a href="/setband.html">Band/Provider</a></li>
+            <li><a href="/pinsettings.html">SIM Security</a></li>
+		</ul>
+		</li>
+        <% 
+		val=get_single('system.product.title');
+        if( val != "CDCS CDR-6908 Cellular Router" && val != "NetComm NTC-6908 Cellular Router")
+        {
+        %>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;Wireless LAN</span></a>
+		<ul class="sub">
+			<li><a href="/wlan.html">Configuration</a></li>
+			<!--li><a href="/wlConfiguration.html">Advanced</a></li-->
+			<!--li><a href="/wlBridge.html">Wireless Bridge</a></li-->
+            <li><a href="/wlstationlist.html">Station Info</a></li>       
+		</ul>
+		</li>
+        <%}%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;Routing</span></a>
+		<ul class="sub">
+       		<li><a href="/routing.html?Static">Static</a></li>
+			<li><a href="/routing.html?Rip">RIP</a></li>
+            <li><a href="/nat.html">NAT</a></li>
+		</ul>
+		</li>
+        
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;Firewall</span></a>
+		<ul class="sub">
+       		<li><a href="/dmz.html">DMZ</a></li>
+			<!--li><a href="/firewall.html">Firewall</a></li-->
+		</ul>
+		</li>
+        <!--li class="top"><a href="/VPN.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;VPN</span></a></li-->
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;Services</span></a>
+		<ul class="sub">
+        	<li><a href="/dhcp.html">DHCP</a></li>
+       		<li><a href="/ddns.html">DDNS</a></li>
+            <li><a href="/NTP.html">NTP</a></li>
+			<li><a href="/ltph.html">System Monitor</a></li>
+
+	    <li><a href="" class="fly" style="height:18px;padding:4px 0px 4px 0px;">&nbsp;<script language="JavaScript">document.write(_("sms title"));</script>&nbsp;</a>
+	    <ul>
+                <li><a href="/sms.html?config"><script language="JavaScript">document.write(_("setup"));</script></a></li>
+                <li><a href="/sms.html?newmsg"><script language="JavaScript">document.write(_("newmsg"));</script></a></li>
+                <li><a href="/sms.html?inbox"><script language="JavaScript">document.write(_("inbox"));</script></a></li>
+                <li><a href="/sms.html?outbox"><script language="JavaScript">document.write(_("outbox"));</script></a></li>
+                <!--<li><a href="/sms.html?diag"><script language="JavaScript">document.write(_("diag"));</script></a></li>-->
+	    </ul>
+	    </li>  
+
+		</ul>
+		</li>
+        <% 
+      //  maxnode = get_single( "menu.maxNode" );
+      //  if( maxnode == "N/A" )
+        {
+        //	maxnode = 20;
+            maxnode = 0;
+        }
+        for(i = 0; i<maxnode; i++)
+        {
+            myurl = "menu.nodeURL"+i;
+            nodeURL = get_single( myurl );
+            mynodeName = "menu.nodeName"+i;
+            nodeName = get_single( mynodeName );  
+            if( nodeURL != "N/A" )
+            {
+                %><li><a href='@@nodeURL' target="main">@@nodeName</a></li><%
+            }
+        }
+        %> 
+        <%if( session["userlevel"] == '0' )
+		{%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;System</span></a>
+		<ul class="sub">
+       		<li><a href="/logfile.html">Log</a></li>
+			<li><a href="" class="fly">Load / Save</a>
+				<ul>
+					<li><a href="/SaveLoadSettings.html">Settings</a></li>
+					<!--li><a href="/AppUpload.html">Upload</a></li-->
+					<li><a href="pkManager.html">Package Manager</a></li>
+				</ul>
+			</li>
+            <li><a href="/LAN.html?pass">Administration</a></li>
+            <li><a href="/login.html?logoff">Logoff</a></li>
+            <li><a href="/system_reset.html">Reboot</a></li>
+		</ul>
+		</li>
+        <%}else{%>
+        <li class="top"><a class="top_link"><span class="down">&nbsp;&nbsp;&nbsp;&nbsp;System</span></a>
+		<ul class="sub">
+       		<li><a href="/logfile.html">Log</a></li>
+            <li><a href="/LAN.html?pass">Administration</a></li>
+            <li><a href="/login.html?logoff">Logoff</a></li>
+            <!--li><a href="/system_reset.html">Reboot</a></li-->
+		</ul>
+		</li>     
+        <!--li class="top"><a href="/logfile.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Log</span></a></li> 
+        <li class="top"><a href="/LAN.html?pass" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Administration</span></a></li>
+        <li class="top"><a href="/system_reset.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Reboot</span></a></li-->
+        <%}%>
+	</ul>
+    </div>
+</div>
+
+<%}else{%>
+<div id="header">	 
+	<div id="logo"><img src="/images/call_direct_logo.gif" alt="Call Direct" width="157" height="71" /></div>
+	<div id="mainMenu"><h1><%val=get_single('system.product.title');%>@@val</h1> </div>		
+</div>
+<div class="sideNav">
+	<h1><a style="color:#FFFFFF; margin-left: 8px;" href="/status.html">&nbsp;&nbsp;Status</a></h1>
+    <div class="columnInner">	
+    <ul id="nav">
+    	<%
+    	//val=get_single('system.product.title');
+        if( session["user"]=='hotspot-admin' )
+        {%>
+        	<li class="top"><a href="/usage.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Data Usage</span></a></li>
+		<%}else{%> 
+            <li class="top"><a href="/login.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Login</span></a></li> 
+            <li class="top"><a href="/logfile.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Log</span></a></li> 
+        <%}%> 
+        <li class="top"><a href="/system_reset.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Reboot</span></a></li> 
+	</ul>
+	</div>
+</div>
+<%}%>
+<script type="text/javascript">
+function setCopyRight()
+{
+	document.getElementById('copyRight').innerHTML="Copyright &copy; 2008-2009 Call Direct&nbsp;&nbsp;|&nbsp;&nbsp;All Rights Reserved";
+}
+</script>
+<script>
+var myLinks = document.getElementsByTagName('a');
+for(var i = 0; i < myLinks.length; i++){
+  myLinks[i].addEventListener('click', function() {
+   if( this.className.search(/.* iehover$/) >=0 )
+    this.className=this.className.replace(new RegExp(" iehover\\b"), "");
+   else
+    this.className+=" iehover";
+  }, false);
+}
+</script>

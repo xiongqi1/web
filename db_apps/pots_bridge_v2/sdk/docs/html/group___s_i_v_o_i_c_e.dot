@@ -1,0 +1,23 @@
+digraph "SiVoice definitions"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node5 [label="Debug",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___d_e_b_u_g.html"];
+  Node0 [label="SiVoice definitions",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node6 [label="Return code functions",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___e_r_r_o_r.html"];
+  Node4 [label="Initialization routines",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___i_n_i_t.html"];
+  Node3 [label="SiVoice System control\l interface functions",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___i_f___c_f_g.html"];
+  Node8 [label="Other functions that\l don't fit into other\l categories",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___m_i_s_c.html"];
+  Node2 [label="Board design settings",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_l_s_i_c___b_r_d___d_e_s_i_g_n.html"];
+  Node1 [label="Chip family definitions",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___c_h_i_p_f_a_m.html"];
+  Node7 [label="Enable/disable channels\l (for init)",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___e_n_a_b_l_e.html"];
+  Node0->Node1 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node6 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node7 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node8 [shape=plaintext, dir="back", style="solid"];
+}

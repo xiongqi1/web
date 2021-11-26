@@ -1,0 +1,94 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<title>Web Error Capture</title>
+</head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<meta http-equiv="Pragma" content="no-cache">
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+
+function disableFormFields(disable) {
+	document.form.wecAddress.disabled = disable;
+}
+
+function checkFormEnable() {
+	if (document.form.wecEnable[1].checked) {
+		disableFormFields(true);
+	} else if (document.form.wecEnable[0].checked) {
+		disableFormFields(false);
+	}
+}
+
+function isValidIP4(str) {
+	return /^(25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})([.](25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})){3}$/.test(str);
+}
+
+function validate() {
+	if(document.form.wecEnable[0].checked && !isValidIP4(document.form.wecAddress.value)) {
+		alert('A valid IP address must be provided if the service is enabled.');
+		return false;
+	}
+	return true;
+}
+</script>
+<%
+	if (request['REQUEST_METHOD'] == 'POST') {
+		var enable = form['wecEnable'];
+		if(enable == '1') {
+			set_single('service.cportal.enable=1');
+			set_single('service.cportal.address=' + form['wecAddress']);
+			set_single("cportal_enable=1");
+			set_single("cportal_address="+form['wecAddress']);
+		} else {
+			set_single('service.cportal.enable=0');
+			set_single("cportal_enable=0");
+		}
+	} else {
+	}
+	
+	var currentEnable = get_single('service.cportal.enable');
+	var currentAddress = get_single('service.cportal.address');
+
+	// if only this version of ESP supported ternary...
+	var enableHTML, disableHTML, disable2HTML;
+	if(currentEnable == '1') {
+		enableHTML = ' checked="checked"';
+	} else {
+		disableHTML = ' checked="checked"';
+		disable2HTML = ' disabled="disabled"';
+	}
+%>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3>Web Error Capture</h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%">
+<tr><th colspan="2">Web Error Capture</th></tr>
+<tr> 
+    <td width="38%">Enable Web Error Capture</td>
+    <td><input type="radio" name='wecEnable' value="1" onChange="checkFormEnable();"<%= enableHTML %>/>&nbsp;Enable &nbsp;&nbsp;
+    <input type="radio" name='wecEnable' value="0" onChange="checkFormEnable();"<%= disableHTML %>/>&nbsp;Disable</td>
+</tr>
+<tr>
+    <td>Error Capture IP Address</td>
+    <td>
+    	<input name='wecAddress' size="20" maxlength="15" value="@@currentAddress"<%= disable2HTML %>/>
+    </td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="center" style="margin-right:25% ">
+<p></p>
+<input type="submit" value="Save" onclick="return validate();"/>&nbsp;&nbsp;
+</div>
+</form>
+</div>
+</body>
+</html>

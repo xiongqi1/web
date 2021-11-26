@@ -1,0 +1,267 @@
+#!/bin/sh -f
+#
+# Connect script for Sierra Wireless USBNET modules
+#
+# This script is called by connection_mgr as follows:-
+#
+# SSierraUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+BIN=$0
+PROFILE=$1
+INSTANCE=$2
+ACTION=$3
+
+test -z "$ACTION" && ACTION="start"
+
+# defines - database variable names
+dbVarName_ModuleLock="module.lock"
+dbVarName_ModuleLockResult="module.lock_result"
+dbVarName_Prefix="wwan.${INSTANCE}."
+
+dbVarName_AtPort="module.at_port"
+dbVarName_PPPPort="module.ppp_port"
+dbVarName_ModuleName="module.name"
+dbVarName_CtrlType="module.control_type"
+
+# defines - binary names
+binName_atcmdmgr="atportmgr"
+
+# defines - commands
+rdb_get=/usr/bin/rdb_get
+rdb_set=/usr/bin/rdb_set
+rdb_wait=/usr/bin/rdb_wait
+
+log() {
+	logger SUSBNET_AT "$@"
+}
+
+rdbDirectGet() {
+	${rdb_get} "$1"
+	return $?
+}
+
+rdbGet() {
+	${rdb_get} "${dbVarName_Prefix}$1"
+	return $?
+}
+
+rdbDirectSet() {
+	${rdb_set} "$1" "$2"
+	return $?
+}
+
+rdbSet() {
+	${rdb_set} "${dbVarName_Prefix}$1" "$2"
+	return $?
+}
+
+rdbWait() {
+	${rdb_wait} "${dbVarName_Prefix}$1" "$2"
+	return $?
+}
+
+beginWaitLockResult() {
+	rdbSet ${dbVarName_ModuleLockResult} "0"
+	rdbWait ${dbVarName_ModuleLockResult} 5 &
+}
+
+endWaitLockResult() {
+	wait $1
+
+	if [ "`rdbGet ${dbVarName_ModuleLockResult}`" == "0" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+stopMgr() {
+	rdbSet "module.lock_result" "0"
+
+	rdbWait "module.lock_result" 5 &
+	rdbSet "module.lock" "1"
+	wait $!
+}
+
+startMgr() {
+	rdbSet "module.lock_result" "0"
+
+	rdbWait "module.lock_result" 5 &
+	rdbSet "module.lock" "0"
+	wait $!
+}
+
+startUsbNet() {
+	# load environment variables
+	. `dirname $0`/Env $INSTANCE
+
+	# enable the profile
+	rdbDirectSet "link.profile.$PROFILE.enable" 1
+	
+	# get unit
+	UNIT=$(( ($PROFILE-1)*4 +$INSTANCE +1 ))
+	
+	# build cmd
+#	test "$DEBUG" = "1"		&& CMD="$CMD debug"
+#	test -n "$DEFAULTROUTE"		&& CMD="$CMD defaultroute"
+#	test -n  "$DNS"			&& CMD="$CMD usepeerdns"
+#	test "$WWAN_AUTH_TYPE" = "pap"	&& CMD="$CMD refuse-chap refuse-mschap-v2 refuse-mschap refuse-eap"
+	test -n "$WWAN_USER"		&& CMD="$CMD user $WWAN_USER"
+	test -n "$WWAN_PASS"		&& CMD="$CMD password $WWAN_PASS"
+	
+	# build chat param
+	APNCMD="'AT+CGDCONT=1,\\\"IP\\\",\\\"$WWAN_APN\\\"'"
+
+	log "stopping usbnet if online"
+	stopUsbNet
+
+	# build usbnet_start
+	cat << EOF > /tmp/chat_usbnet_start
+ABORT ERROR
+ABORT 'NO CARRIER'
+'' +++\c
+'' ATH0
+OK \U
+TIMEOUT 30
+OK AT!SCACT=1,1
+OK
+EOF
+
+	if ! redirect "$AT_TTY" /bin/chat -v -f /tmp/chat_usbnet_start -U "$APNCMD"; then
+		log "start-up chat script abnormally terminated"
+		return 1
+	fi
+	
+	# usb0 up
+	if ! ifconfig usb0 up; then
+		log "failed to make usb0 interface up"
+		return 1
+	fi
+
+	sleep 1
+
+	if ! ifconfig usb0 | grep -q "RUNNING"; then
+		log "interface is not in running"
+		return 1
+	fi
+	
+	# get ip address from the driver - fake dhcp server
+	if ! udhcpc -f -q -i usb0 -s /sbin/udhcpc.sh; then
+		log "failed to get ip address in udhcpc"
+		return 1
+	fi
+
+	return 0
+}
+
+isUsbNetOffline() {
+	# build usbnet_query
+	cat << EOF > /tmp/chat_usbnet_query
+ABORT ERROR
+ABORT 'NO CARRIER'
+'' +++\c
+'' ATH0
+OK AT!SCACT?1
+TIMEOUT 3
+'!SCACT: 1,0'
+EOF
+
+	if redirect "$AT_TTY" /bin/chat -v -f /tmp/chat_usbnet_query; then
+		return 0
+	fi
+
+	return 1
+}
+
+stopUsbNet() {
+
+	if ! isUsbNetOffline; then
+
+		# build usbnet_start
+		cat << EOF > /tmp/chat_usbnet_stop
+ABORT ERROR
+ABORT 'NO CARRIER'
+'' +++\c
+'' ATH0
+TIMEOUT 30
+OK AT!SCACT=0,1
+OK
+EOF
+	
+		# go offline
+		if ! redirect "$AT_TTY" /bin/chat -v -f /tmp/chat_usbnet_stop; then
+			log "stop-down chat script abnormally terminated"
+		fi
+	
+		# get the interface down
+		if ! ifconfig usb0 down; then
+			log "ifconfig failed - having the interface down"
+		fi
+	fi
+	
+	return 0
+}
+
+getUsbNetIp() {
+	LINE=`ifconfig usb0 | grep "inet addr"`
+	LINE=${LINE##*addr:}
+	echo ${LINE%% Bcast*}
+}
+
+# get tty port
+AT_TTY=`rdbDirectGet "module.at_port" || echo /dev/ttyUSB0`
+	
+case $ACTION in
+	'start')
+		# start usb net
+		log "starting usbnet connection"
+		stopMgr
+
+		if startUsbNet; then
+			startMgr
+			log "usbnet connection up"
+
+			# build environment variables for ip-up script 
+			PPP_IFACE="usb0"
+			PPP_TTY=""
+			PPP_SPEED=""
+			PPP_LOCAL=`getUsbNetIp`
+			PPP_REMOTE="0.0.0.0"
+			PPP_IPPARAM="$PROFILE"
+		
+			/etc_ro/ppp/ip-up "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+			log "ip-up script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+
+			# stopusbNet on term signal
+			exec runonterm "$BIN $PROFILE $INSTANCE stop"
+		else
+			startMgr
+
+			log "failed to go online"
+		fi
+		;;
+
+	'stop')
+		log "stopping usbnet connection"
+		stopMgr
+		stopUsbNet
+		startMgr
+		log "usbnet connection down"
+
+		# build environment variables for ip-up script 
+		PPP_IFACE="usb0"
+		PPP_TTY=""
+		PPP_SPEED=""
+		PPP_LOCAL=`getUsbNetIp`
+		PPP_REMOTE="0.0.0.0"
+		PPP_IPPARAM="$PROFILE"
+	
+		/etc_ro/ppp/ip-down "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+	
+		log "ip-down script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+		;;
+esac

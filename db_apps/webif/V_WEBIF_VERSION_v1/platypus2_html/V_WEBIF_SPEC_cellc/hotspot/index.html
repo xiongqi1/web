@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<head>
+<title>HotSpot -- Login</title>
+</head>
+<link href="BovineStyle.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language='JavaScript' src='/hotspotInit.cgi'></script>
+<script language='JavaScript'>
+document.cookie='language='+<%lang=get_single('webinterface.language');%>"@@lang";
+Butterlate.setTextDomain("admin");
+	function checkRadio()
+	{
+			if(document.form.checkMe.value=='true' )
+			{
+				document.form.RememberMe.checked=true;
+			}
+			else
+			{
+				document.form.RememberMe.checked=false;
+			}
+			//alert(document.form.RememberMe.value+"  "+document.form.RememberMe.checked+"  "+document.form.checkMe.value)	
+	}
+</script>    
+
+<% 
+	if (request['QUERY_STRING'] == "" )
+	{
+		redirect(request['REQUEST_URI']+'?'+get_rand() );
+	}
+	url=request['REMOTE_ADDR'];
+	mac = get_single( url ); 
+	//  form['myurl'] = url;
+%>
+	<script language="javascript" type="text/javascript">
+	var pinError = <%val=get_single('hotspot.pin_error'+mac);%>"@@val";	
+	if (pinError=="N/A") pinError = 1;
+	</script><%
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+	// Post-back. Process user data.
+		mypassword = form['password'];
+		retval=set_single( mac+'='+mypassword );
+		form['password'] = mypassword;
+		hotspot_pin_error = get_single( 'hotspot.pin_error'+mac );
+		if(hotspot_pin_error=='N/A')
+		{
+			hotspot_pin_error=1;
+		}
+		else
+		{
+			hotspot_pin_error=hotspot_pin_error+1; 
+		}
+		retval=set_single( 'hotspot.pin_error'+mac+'='+hotspot_pin_error );
+		DDpassword = get_single( 'hotspot.user.password' );
+		AdminPassword = get_single( 'admin.user.admin' );
+		if(DDpassword=='N/A')
+		{
+%>
+		<script language="javascript" type="text/javascript">
+		alert( _("Msg53") );//'The password is not initialized! Please contact administrator.'
+		</script>    
+		<%}
+		else if(( mypassword == DDpassword ) || ( mypassword == AdminPassword )) {
+			retval=set_single( 'hotspot.pin_error'+mac+'=1' );
+			retval=set_single( mac+'='+mypassword );
+			if( mypassword != DDpassword ) {
+				session["sessionid"] = request["SESSION_ID"];
+				session["user"] = "admin";
+				session["userlevel"] = '1';
+			} %>
+			<script language='JavaScript' type="text/javascript" src='/hotspotWiFi.cgi'></script>
+			<script language="javascript" type="text/javascript">
+			var locationstring = window.location.toString();	
+			var mystring = locationstring.substring(0,  locationstring.indexOf("/index.html") ); 
+			if( newurl.indexOf( mystring ) == -1 )
+			{
+				//window.open( mystring );
+				//setTimeout("window.location.replace( newurl );", 2000);
+				//setTimeout("window.location.href=mystring;", 2000);
+				setTimeout("window.location.replace( mystring );", 2000);
+			}
+			else
+			{
+				window.location.replace( newurl );
+			}
+			//	setTimeout("window.location.replace('/status.html');", 1000);	
+			</script>
+		<% } else { %>
+			<script language="javascript" type="text/javascript">
+			if( parseInt(pinError)<5 )
+				alert( _("incorrectPassword")+",  "+_("wan attempts")+": "+(5-parseInt(pinError)) );
+			</script>
+		<%
+		}
+	}
+%>
+<body> 
+<div id="contentWrapper">  
+<div id="logo"><img src="/images/NetComm_GUI_banner.jpg" width="840" height="92" usemap="#netcomm"/>
+<map name="netcomm"><area shape="rect" coords="16,18,167,74" href="http://www.cellc.co.za/" alt="www.cellc.co.za" target="_blank"/></map>
+</div>
+<!--div id="productTitle"><h4>HotSpot Login</h4> </div-->
+<form name="form" method="POST" action="@@requst['SCRIPT_NAME']">
+<br></br>
+<div id="mainbody" style="padding-bottom:40px; padding-right:0px" >
+<table>
+	<tr><th colspan="2">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("hotspotLogin"))</script></th></tr>
+	<tr><td colspan="2">&nbsp;</td></tr>					
+	<tr>
+		<td width="40%">&nbsp;&nbsp;&nbsp;<b><script language="JavaScript">document.write(_("pleaseEnterPassword"))</script></b></td>
+		<td><input type="password" name="password" maxlength="20" size="20" value="@@form['password']"></td>
+	</tr>
+	<tr>
+		<td colspan="2">
+		<br><br><div align="center" style="margin-right:5%"><input type="button" name="submitForm" onClick='document.form.submit();;' value="Submit"></div>
+	</td>
+	</tr>
+	<tr><td colspan="2">&nbsp;</td></tr>
+</table> 
+<script language='JavaScript'>
+	document.form.submitForm.value = "   "+_("submit")+"   ";
+</script>  
+
+<!--div width="80%" style="margin-right:20%"  ><br><br/><br/></div-->
+</div>
+<script language="javascript" type="text/javascript">
+	if(parseInt(pinError)>=5)
+		document.getElementById("mainbody").innerHTML = "<h2 align='center'>"+_("Msg54")+"</h2>";
+//Please power cycle the device physically and restart the browser to try again
+</script>
+</form>
+</div>
+</body>
+</html>

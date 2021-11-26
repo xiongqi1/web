@@ -1,0 +1,819 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<%if(request['QUERY_STRING']=='advsetup') {%>
+<title>LAN Advanced Setup</title>
+<%} else if(request['QUERY_STRING']=='ipsetup') {%>
+<title>Router’s IP Setup</title>
+<%} else if(request['QUERY_STRING']=='pppoe') {%>
+<title>PPPoE Setup</title>
+<%} else if(request['QUERY_STRING']=='pass') {%>
+<title>Administration</title>
+<%}else{%>
+<title>Router’s IP Setup</title>
+<%}%>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<%if(request['QUERY_STRING']=='pppoe') {%>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<%}%>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+</head>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("LAN");
+
+function ip_to_decimal(addr) {
+	var deci;
+	deci = parseInt(addr[0])*16777216 + parseInt(addr[1])*65536 + parseInt(addr[2])*256 + parseInt(addr[3]);
+	return deci;
+}
+
+function decimal_to_ip(deci) {
+	var addr = new Array();
+	deci_int = deci - (deci % 16777216);
+	addr[0] = deci_int / 16777216;
+	addr[1] = (deci & 0x00ff0000) >> 16;
+	addr[2] = (deci & 0x0000ff00) >> 8;
+	addr[3] = deci & 0x000000ff;
+	return addr;
+}
+
+function is_large(addr1, addr2) {
+	var gap;
+	gap = ip_to_decimal(addr1) - ip_to_decimal(addr2);
+	if (gap >=0 )
+		return 1;
+	else
+		return 0;
+}
+
+function ip_gap(addr1, addr2) {
+	var gap;
+	if (is_large(addr1, addr2))
+		gap = ip_to_decimal(addr1) - ip_to_decimal(addr2);
+	else
+		gap = ip_to_decimal(addr2) - ip_to_decimal(addr1);
+	return gap;
+}
+
+
+function submitF() {
+	var f = document.form;
+	<% if(request['QUERY_STRING']=='pass'){%>
+	if (f.firewallradio[0].checked == true) {
+		if(document.getElementById("webbrowser_ID").checked == true) {
+			if ( (f.incomingPort.value < 1) || (f.incomingPort.value > 65534)  || (f.incomingPort.value == "") ) {
+				alert("warningMsg07");
+				return;
+			}
+		}
+	}
+	else {
+		if ( (f.rmthttpport.value < 1) || (f.rmthttpport.value > 65534)  || (f.rmthttpport.value == "") ) {
+			alert("warningMsg07");
+			return;
+		}
+	}
+	if (f.Pass.value != f.PassConf.value) {
+		alert(_("wwan warningMsg2"));//passwords do not match
+		return;
+	}
+	<%if(session["user"]=="root"){%>
+	if(f.userName.value=="root")
+		f.rootPass.value=f.Pass.value;
+	else
+		f.adminPass.value=f.Pass.value;
+	<%}else{%>
+	f.adminPass.value=f.Pass.value;
+	<%}%>
+
+	<%}else if( request['QUERY_STRING'] == 'ipsetup'){%>
+	f.LANIP.value=f.LANEtherIP1.value+"."+f.LANEtherIP2.value+"."+f.LANEtherIP3.value+"."+f.LANEtherIP4.value;
+	if( f.LANIP.value != orgLANIP )
+		alert(_("ipChangMsg"));//The IP address is changed, you may need to update the client IP address
+	f.LANSubIP.value=f.LANEtherMask1.value+"."+f.LANEtherMask2.value+"."+f.LANEtherMask3.value+"."+f.LANEtherMask4.value;
+	switch(isValidSubnetMask(f.LANSubIP.value)) {
+		case -1:
+			alert(_("invalidSubnetMask"));
+			return;
+		break;
+		case -2:
+			alert(_("wlan warningMsg16"));//The subnet mask has to be contiguous. Please enter a valid mask
+			return;
+		break;
+	}
+
+	var myip=f.LANIP.value;
+	var mymask=f.LANSubIP.value;
+	var ipAr = new Array();
+	var maskAr = new Array();
+	ipAr = myip.split('.');
+	maskAr = mymask.split('.');
+
+	var firstAr = new Array(), negAr = new Array(), lastAr = new Array();
+	var DHCPfirstAr = new Array(), DHCPnegAr = new Array(), DHCPlastAr = new Array();
+	var same_subnet = 1;
+	for (i = 0; i < 4; i++) {
+		firstAr[i] = ipAr[i] & maskAr[i]; negAr[i] = 255 - maskAr[i]; lastAr[i] = firstAr[i] | negAr[i];
+		DHCPfirstAr[i] = ray_dhcp_start[i] & ray_dhcp_mask[i]; DHCPnegAr[i] = 255 - ray_dhcp_mask[i]; DHCPlastAr[i] = DHCPfirstAr[i] | DHCPnegAr[i];
+		if (firstAr[i] != DHCPfirstAr[i] || lastAr[i] != DHCPlastAr[i]) {
+			same_subnet = 0;
+		}
+	}
+	firstAr[3] += 1; lastAr[3] -= 1;
+	DHCPfirstAr[3] += 1; DHCPlastAr[3] -= 1;
+
+	// check ip address validity after subnet mask changed
+	if (!(is_large(ipAr, firstAr) && is_large(lastAr, ipAr))) {
+		alert(_("invalidSubnetMask"));
+		return;
+	}
+
+	if(ray_dhcp_start[0]&&ray_dhcp_start[1]&&ray_dhcp_start[2]&&ray_dhcp_start[3]&&ray_dhcp_end[0]&&ray_dhcp_end[1]&&ray_dhcp_end[2]&&ray_dhcp_end[3]) {
+		var dhcp_range_size, ip_range_size;
+		ip_range_size = ip_gap(lastAr, firstAr);
+
+		// if DHCP address has different subnet from IP address, reset DHCP address into same subnet before calculation
+		if (same_subnet == 0) {
+			for (i = 0; i < 3; i++) {
+				ray_dhcp_start[i] = ray_dhcp_end[i] = ipAr[i];
+			}
+		}
+
+		dhcp_range_size = ip_gap(ray_dhcp_end, ray_dhcp_start);
+
+		// if dhcp range is outside of possble ip address range, adjust dhcp range
+		if (is_large(firstAr, ray_dhcp_start) || is_large(ray_dhcp_start, lastAr) || is_large(firstAr, ray_dhcp_end)) {
+			for (i = 0; i < 4; ray_dhcp_start[i] = firstAr[i], i++);
+			ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+		}
+		if (is_large(ray_dhcp_end, lastAr)) {
+			for (i = 0; i < 4; ray_dhcp_end[i] = lastAr[i], i++);
+		}
+
+		dhcp_range_size = ip_gap(ray_dhcp_end, ray_dhcp_start);
+		// the following check makes no sense as DHCP range can be as little as one address
+		// if (dhcp_range_size <= 0) {
+		//	alert(_("dhcp warningMsg16")); //The IP address must be inside the IP subnet range
+		//	return;
+		// }
+
+		// if ip address is within dhcp range, check if need to adjust dhcp range
+		if (is_large(ipAr, ray_dhcp_start) && is_large(ray_dhcp_end, ipAr)) {
+			// if there is enough gap for dhcp range, locate ip addr out side of dhcp range
+			if (ip_gap(ipAr, lastAr) >= dhcp_range_size) {
+				for (i = 0; i < 3; ray_dhcp_start[i] = ipAr[i], i++);
+				ray_dhcp_start[3] = parseInt(ipAr[3])+1;
+				ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+			} else if (ip_gap(ipAr, firstAr) >= dhcp_range_size) {
+				for (i = 0; i < 4; ray_dhcp_start[i] = firstAr[i], i++);
+				ray_dhcp_end = decimal_to_ip(ip_to_decimal(ray_dhcp_start)+dhcp_range_size);
+			}
+		}
+		if (is_large(ray_dhcp_end, lastAr)) {
+			for (i = 0; i < 4; ray_dhcp_end[i] = lastAr[i], i++);
+		}
+
+		// test code for DHCP range adjustment
+		//alert("IP addr   : "+ipAr+"\n"+"subnet mask : "+maskAr+"\n"+"first addr : //"+firstAr+"\n"+"last addr : "+lastAr+"\n"+
+		//"new DHCP range = " + ray_dhcp_start  + " ~ " + ray_dhcp_end);
+
+		f.DHCPrange.value=ray_dhcp_start[0]+"."+ray_dhcp_start[1]+"."+ray_dhcp_start[2]+"."+ray_dhcp_start[3]+","+
+							ray_dhcp_end[0]+"."+ray_dhcp_end[1]+"."+ray_dhcp_end[2]+"." +ray_dhcp_end[3];
+
+	}
+	if(f.matchDNS1.value=="1") {
+		f.DNS1.value=f.LANIP.value;
+	}
+	f.ip3gforward.value=f.ipforward3gEnbl.value;
+	<%}else if( request['QUERY_STRING'] == 'advsetup'){%>
+		f.stpEnabled.value=f.stpEnbl.value;
+		f.igmpEnabled.value=f.igmpEnbl.value;
+		f.upnpEnabled.value=f.upnpEnbl.value;
+		f.radvdEnabled.value=f.radvdEnbl.value;
+		f.pppoeREnabled.value=f.pppoeREnbl.value;
+		f.lltdEnabled.value=f.lltdEnbl.value;
+	<%}%>
+	f.submit();
+}
+
+function showHideRows(ids, show) {
+	for(idx in ids) {
+		var element = document.getElementById(ids[idx]);
+		if(!element) {
+			alert('No such element "' + ids[idx] + '".');
+			continue;
+		}
+		element.style.display = ((show)?"":('none'));
+	}
+}
+
+function ipForwardToggle(selectElement) {
+	var rows = [
+		'DNSMasqDiv'
+	];
+
+	if(selectElement.options.selectedIndex == 1)
+		showHideRows(rows, false);
+	else
+		showHideRows(rows, true);
+}
+
+function greyOutPortField() {
+	try {
+		// if the remote admin button is disabled then grey out the port field
+		document.form.incomingPort.disabled = true;
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function ungreyOutPortField() {
+	try {
+		// if the remote admin button is enabled then un-grey out the port field
+		document.form.incomingPort.disabled = false;
+		if ( (document.form.incomingPort.value < 1) || (document.form.incomingPort.value > 65534) )
+			document.form.incomingPort.value = "8080";
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function showitems() {
+	document.getElementById("webbrowser_trID").style['display']='';
+	document.getElementById("telnet_trID").style['display']='';
+	document.getElementById("ping_trID").style['display']='';
+	webbrowserclick();
+	telnetclick();
+	pingclick();
+}
+
+function hiddenitems() {
+	document.getElementById("webbrowser_trID").style['display']='none';
+	document.getElementById("telnet_trID").style['display']='none';
+	document.getElementById("ping_trID").style['display']='none';
+}
+
+function firewall_enabled() {
+	document.getElementById("webbrowser_trID").style['display']='';
+	document.getElementById("telnet_trID").style['display']='';
+	document.getElementById("ping_trID").style['display']='';
+	webbrowserclick();
+	telnetclick();
+	pingclick();
+	document.getElementById("remwanaccess_trID").style['display']='none';
+}
+
+function firewall_disabled() {
+	document.getElementById("webbrowser_trID").style['display']='none';
+	document.getElementById("telnet_trID").style['display']='none';
+	document.getElementById("ping_trID").style['display']='none';
+	document.getElementById("remwanaccess_trID").style['display']='';
+	if ( (document.form.rmthttpport.value < 1) || (document.form.rmthttpport.value > 65534) )
+		document.form.rmthttpport.value = "8080";
+}
+
+function webbrowserclick() {
+	element=document.getElementById("webbrowser_ID")
+	if(element.checked == true) {
+		ungreyOutPortField()
+		document.form.webenable.value = 1;
+	}
+	else {
+		greyOutPortField()
+		document.form.webenable.value = 0;
+	}
+}
+
+function telnetclick() {
+	element=document.getElementById("telnet_ID")
+	if(element.checked == true)
+		document.form.telnetenable.value = 1;
+	else
+		document.form.telnetenable.value = 0;
+}
+
+function pingclick() {
+	element=document.getElementById("ping_ID")
+	if(element.checked == true)
+		document.form.pingenable.value = 1;
+	else
+		document.form.pingenable.value = 0;
+}
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(request['QUERY_STRING']=='ipsetup') {
+		mydata="link.profile.0.address="+form['LANIP']+
+			"&service.dhcp.gateway.0="+form['LANIP']+
+			"&link.profile.0.netmask="+form['LANSubIP']+
+			"&service.dhcp.range.0="+form['DHCPrange']+
+			"&service.dhcp.dns1.0="+form['DNS1']+
+			"&service.dns.masquerade="+form['dnsMasq']+
+#if !(defined V_PRODUCT_ntc_3g41wt)
+			"&link.profile.0.hostname="+form['hostname']+
+#endif
+			"&service.bridge.3GIPForward="+form['ip3gforward'];
+		set_list( mydata );
+		if(headers['HOST'] != form['LANIP']) {
+			esp_sleep(500);
+			redirect('http://'+form['LANIP']+'/#');
+		}
+	}
+	else if(request['QUERY_STRING']=='advsetup') {
+		tempval=form['stpEnabled'];
+		set_single( 'service.lanadv.stpEnabled='+tempval );
+
+		tempval=form['lltdEnabled'];
+		set_single( 'service.lanadv.lltdEnabled='+tempval );
+
+		tempval=form['igmpEnabled'];
+		set_single( 'service.lanadv.igmpEnabled='+tempval );
+
+		tempval=form['radvdEnabled'];
+		set_single( 'service.lanadv.radvdEnabled='+tempval );
+
+		tempval=form['pppoeREnabled'];
+		set_single( 'service.lanadv.pppoeREnabled='+tempval );
+
+		tempval=form['upnpEnabled'];
+		set_single( 'service.lanadv.upnpEnabled='+tempval );
+
+	}
+	else if(request['QUERY_STRING']=='pppoe') {
+		tempval=form['APNName'];
+		set_single( 'service.pppoe.server.0.apn='+tempval );
+		tempval=form['ServiceName'];
+		set_single( 'service.pppoe.server.0.service='+tempval );
+		tempval=form['PPPoe'];
+		set_single( 'service.pppoe.server.0.enable='+tempval);
+	}
+	else if(request['QUERY_STRING']=='pass') {
+		if(form['Pass']==form['PassConf']) {
+			tempval = form['firewall'];
+			set_single( 'admin.firewall.enable='+tempval);
+
+			tempval = form['webenable'];
+			set_single( 'admin.remote.webenable='+tempval);
+			set_single( 'admin.remote.port='+form['incomingPort']);
+
+			tempval = form['telnetenable'];
+			set_single( 'admin.remote.telnetenable='+tempval);
+
+			tempval = form['pingenable'];
+			set_single( 'admin.remote.pingenable='+tempval);
+
+			tempval = form['adminPass'];
+			set_single( 'admin.user.admin'+'='+tempval );
+			if(session["user"]=="root") {
+				tempval = form['rootPass'];
+				set_single( 'admin.user.root'+'='+tempval );
+			}
+		}
+		else {
+			form['firewall'] = get_single( 'admin.firewall.enable' );
+			form['webenable']=get_single( 'admin.remote.webenable');
+			form['incomingPort'] = get_single( 'admin.remote.port' );
+			form['telnetenable']=get_single( 'admin.remote.telnetenable');
+			form['pingenable']=get_single( 'admin.remote.pingenable');
+			form['rmthttpport']=get_single( 'admin.remote.port');
+
+			temp = get_single( 'admin.user.admin' );
+			form['adminPass'] = temp;
+			if(session["user"]=="root") {
+				temp = get_single( 'admin.user.root' );
+				form['rootPass'] = temp;
+			}
+			form['Pass'] = temp;
+			form['PassConf'] = temp;
+		}
+	}
+}
+else {/*GET*/
+	if(request['QUERY_STRING']=='ipsetup') {
+		myip = get_single( 'link.profile.0.address' );
+		form['LANIP'] = myip;
+		mymask = get_single( 'link.profile.0.netmask' );
+		form['LANSubIP'] = mymask;
+		masq = get_single( 'service.dns.masquerade' );
+		form['dnsMasq'] = masq;
+		form['DHCPrange'] = get_single( 'service.dhcp.range.0' );
+		form['DNS1'] = get_single( 'service.dhcp.dns1.0' );
+		if(form['LANIP']==form['DNS1'])
+			form['matchDNS1'] = "1";
+		else
+			form['matchDNS1'] = "0";
+		form['ip3gforward'] = get_single( 'service.bridge.3GIPForward' );
+#if !(defined V_PRODUCT_ntc_3g41wt)
+		form['hostname']=get_single('link.profile.0.hostname');
+#endif
+	}
+	else if(request['QUERY_STRING']=='advsetup') {
+
+		form['stpEnabled']=get_single( 'service.lanadv.stpEnabled' );
+		form['lltdEnabled']=get_single( 'service.lanadv.lltdEnabled' );
+		form['igmpEnabled']=get_single( 'service.lanadv.igmpEnabled' );
+		form['upnpEnabled']=get_single( 'service.lanadv.upnpEnabled' );
+		form['radvdEnabled']=get_single( 'service.lanadv.radvdEnabled' );
+		form['pppoeREnabled']=get_single( 'service.lanadv.pppoeREnabled' );
+	}
+	else if(request['QUERY_STRING']=='pppoe') {
+		temp=get_single( 'service.pppoe.server.0.apn' );
+		form['APNName'] = temp;
+		temp=get_single( 'service.pppoe.server.0.service' );
+		form['ServiceName']=temp;
+		form['PPPoe']=get_single( 'service.pppoe.server.0.enable' );
+	}
+	else if(request['QUERY_STRING']=='pass') {
+		form['firewall'] = get_single( 'admin.firewall.enable' );
+		form['webenable']=get_single( 'admin.remote.webenable');
+		form['incomingPort'] = get_single( 'admin.remote.port' );
+		form['telnetenable']=get_single( 'admin.remote.telnetenable');
+		form['pingenable']=get_single( 'admin.remote.pingenable');
+		form['rmthttpport']=get_single( 'admin.remote.port');
+
+		temp = get_single( 'admin.user.admin' );
+		form['adminPass'] =temp;
+		if(session["user"]=="root") {
+			temp = get_single( 'admin.user.root' );
+			form['rootPass'] =temp;
+		}
+		form['Pass'] =temp;
+		form['PassConf'] =temp;
+	}
+}
+%>
+
+<% if(request['QUERY_STRING']=='ipsetup'){%>
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?ipsetup">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("lan")+" > "+_("ipSetup"))</script></h3>
+
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<input type="hidden" name="LANIP" value="@@form['LANIP']"/>
+<input type="hidden" name="LANSubIP" value="@@form['LANSubIP']"/>
+<input type="hidden" name="dnsMasq" value="@@form['dnsMasq']"/>
+<input type="hidden" name="DHCPrange" value="@@form['DHCPrange']">
+<input type="hidden" name="DNS1" value="@@form['DNS1']">
+<input type="hidden" name="matchDNS1" value="@@form['matchDNS1']">
+<input type="hidden" name="ip3gforward" value="@@form['ip3gforward']">
+<input type="hidden" name="greyedout" >
+
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("lanConfiguration"))</script></th></tr>
+</table>
+
+<table width="80%">
+<tr>
+<td width="30%"><script language="JavaScript">document.write(_("ip address"))</script></td>
+	<td><script language=javascript>htmlGenIpBlocks("LANEtherIP")</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("subnet mask"))</script></td>
+	<td><script language=javascript>htmlGenMaskBlocks("LANEtherMask")</script></td>
+</tr>
+#if !(defined V_PRODUCT_ntc_3g41wt)
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("inet hostname"))</script></td>
+	<td><input type=text name="hostname" size=28 maxlength=32 value="@@form['hostname']"></td>
+</tr>
+#endif
+<script type="text/javascript">
+var ray = new Array();
+var orgLANIP=document.form.LANIP.value;
+	ray = document.form.LANIP.value.split(".");
+	if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+	document.form.LANEtherIP1.value=ray[0];document.form.LANEtherIP2.value=ray[1];
+	document.form.LANEtherIP3.value=ray[2];document.form.LANEtherIP4.value=ray[3];
+
+var ray_dhcp_start = new Array();
+var ray_dhcp_end = new Array();
+	ray_dhcp_start = document.form.DHCPrange.value.split(",")[0].split(".");
+	if(ray_dhcp_start.length != 4 ){ray_dhcp_start[0]='0'; ray_dhcp_start[1]='0';ray_dhcp_start[2]='0'; ray_dhcp_start[3]='0';}
+	ray_dhcp_end = document.form.DHCPrange.value.split(",")[1].split(".");
+	if(ray_dhcp_end.length != 4 ){ray_dhcp_end[0]='0'; ray_dhcp_end[1]='0';ray_dhcp_end[2]='0'; ray_dhcp_end[3]='0';}
+</script>
+
+<script type="text/javascript">
+var ray = new Array();
+var ray_dhcp_mask = new Array();
+	ray = document.form.LANSubIP.value.split(".");
+	if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+	document.form.LANEtherMask1.value=ray_dhcp_mask[0]=ray[0];document.form.LANEtherMask2.value=ray_dhcp_mask[1]=ray[1];
+	document.form.LANEtherMask3.value=ray_dhcp_mask[2]=ray[2];document.form.LANEtherMask4.value=ray_dhcp_mask[3]=ray[3];
+</script>
+</table>
+#if (defined PLATFORM_Bovine)
+<div style="display:none">
+#else
+<div>
+#endif
+<table width="80%">
+<tr id="r3gipforward">
+	<td class="head" id="3gipforward2" width="30%"><script language="JavaScript">document.write(_("trans bridge"))</script></td>
+	<td>
+		<select name="ipforward3gEnbl" id="ipforward3gEnbl" onchange="ipForwardToggle(this);" >
+		<option value="0" id="wFWDisable">Disable</option>
+		<option value="1" id="wFWEnable" >Enable</option>
+		</select>
+	</td>
+</tr>
+</table>
+</div>
+<div id="DNSMasqDiv">
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("dnsMasq"))</script></th></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("dnsMasq"))</script></td>
+	<td>
+		<input type=radio name='DNSMasq' onClick="javascript:document.form.dnsMasq.value='1'" >&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+		<input type=radio name='DNSMasq' onClick="javascript:document.form.dnsMasq.value='0'" >&nbsp;<script language="JavaScript">document.write(_("disable"))</script>
+	</td>
+</tr>
+</table>
+<script type="text/javascript">
+if(parseInt(document.form.dnsMasq.value)==1)
+	document.form.DNSMasq[0].checked=true;
+else
+	document.form.DNSMasq[1].checked=true;
+
+if(parseInt(document.form.ip3gforward.value)==1) {
+	document.getElementById("ipforward3gEnbl").value="1";
+	document.getElementById("DNSMasqDiv").style['display']='none';
+}
+else {
+	document.getElementById("ipforward3gEnbl").value="0";
+	document.getElementById("DNSMasqDiv").style['display']='';
+}
+</script>
+</div>
+
+<%}else if( request['QUERY_STRING'] == 'advsetup'){%>
+<% if(get_single("service.bridge.3GIPForward") == "1") redirect('/3gipfw-mode.html');%>
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?advsetup">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("lan")+" > "+_("lanAdvSetup"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<input type="hidden" name="stpEnabled" value="@@form['stpEnabled']"/>
+<input type="hidden" name="lltdEnabled" value="@@form['lltdEnabled']"/>
+<input type="hidden" name="igmpEnabled" value="@@form['igmpEnabled']"/>
+<input type="hidden" name="upnpEnabled" value="@@form['upnpEnabled']"/>
+<input type="hidden" name="radvdEnabled" value="@@form['radvdEnabled']"/>
+<input type="hidden" name="pppoeREnabled" value="@@form['pppoeREnabled']"/>
+
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("lanAdvSetup"))</script></th></tr>
+</table>
+<table width="80%">
+<tr id="rStp">
+	<td class="head" width="37%" id="lStp">802.1d Spanning Tree</td>
+	<td>
+		<select name="stpEnbl" id="stpEnbl" size="1">
+		<option value="0" id="lStpD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lStpE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr id="lltd">
+	<td class="head" width="37%" id="lLltd">LLTD</td>
+	<td>
+		<select name="lltdEnbl" id="lltdEnbl" size="1">
+		<option value="0" id="lLltdD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lLltdE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr id="igmpProxy">
+	<td class="head" width="37%" id="lIgmpp">IGMP Proxy</td>
+	<td>
+		<select name="igmpEnbl" id="igmpEnbl" size="1">
+		<option value="0" id="lIgmppD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lIgmppE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr id="upnp">
+	<td class="head" width="37%" id="lUpnp">UPnP</td>
+	<td>
+		<select name="upnpEnbl" id="upnpEnbl" size="1">
+		<option value="0" id="lUpnpD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lUpnpE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr id="radvd">
+	<td class="head" width="37%" id="lRadvd">Router Advertisement</td>
+	<td>
+		<select name="radvdEnbl" id="radvdEnbl" size="1">
+		<option value="0" id="lRadvdD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lRadvdE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr id="pppoerelay">
+	<td class="head" width="37%" id="lPppoer">PPPoE Relay</td>
+	<td>
+		<select name="pppoeREnbl" id="pppoeREnbl" size="1">
+		<option value="0" id="lPppoerD">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></option>
+		<option value="1" id="lPppoerE">&nbsp;<script language="JavaScript">document.write(_("enable"))</script></option>
+		</select>
+	</td>
+</tr>
+</table>
+
+<script type="text/javascript">
+if (document.form.stpEnabled.value == 1)
+	document.getElementById("stpEnbl").value=1;
+else
+	document.getElementById("stpEnbl").value=0;
+if (document.form.igmpEnabled.value == 1)
+	document.getElementById("igmpEnbl").value=1;
+else
+	document.getElementById("igmpEnbl").value=0;
+if (document.form.upnpEnabled.value == 1)
+    document.getElementById("upnpEnbl").value=1;
+else
+	document.getElementById("upnpEnbl").value=0;
+if (document.form.radvdEnabled.value == 1)
+	document.getElementById("radvdEnbl").value=1;
+else
+	document.getElementById("radvdEnbl").value=0;
+if (document.form.pppoeREnabled.value == 1)
+	document.getElementById("pppoeREnbl").value=1;
+else
+	document.getElementById("pppoeREnbl").value=0;
+if (document.form.lltdEnabled.value == 1)
+	document.getElementById("lltdEnbl").value=1;
+else
+	document.getElementById("lltdEnbl").value=0;
+</script>
+
+<%}else if( request['QUERY_STRING'] == 'pppoe'){%>
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?pppoe">
+<input type="hidden" name="PPPoe" value="@@form['PPPoe']"/>
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("mobile broadband")+" >  PPPoE")</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+	<tr><th>PPPoE Setup</th></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="30%">PPPoE</td>
+	<td>
+		<input type=radio name='LANpppoe' onClick="javascript:checkGascenable()">&nbsp;Enable &nbsp;&nbsp;
+		<input type=radio name='LANpppoe' onClick="javascript:document.form.PPPoe.value=0">&nbsp;Disable
+	</td>
+</tr>
+<script type="text/javascript">
+if( parseInt(document.form.PPPoe.value)==1  )
+	document.form.LANpppoe[0].checked=true;
+else
+	document.form.LANpppoe[1].checked=true;
+function checkGascenable() {
+	for( i=0; i<stpf.length && i<6; i++ ) {
+		if( stpf[i].enable == 1 ) {
+			document.form.LANpppoe[1].checked=true;
+			alert("Please disable and save the profile \""+stpf[i].name+"\" first.");
+			return;
+		}
+	}
+	document.form.PPPoe.value=1;
+}
+</script>
+<tr>
+	<td>APN Name</td>
+	<td><input type=text name='APNName' size=32 maxlength=128 value="@@form['APNName']"></td>
+</tr>
+<tr>
+	<td>Service Name</td>
+	<td><input type=text name='ServiceName' size=32 maxlength=128 value="@@form['ServiceName']"></td>
+</tr>
+</table>
+<%}else if( request['QUERY_STRING'] == 'pass'){%>
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?pass">
+<input type="hidden" name='adminPass' size=32 maxlength=32  value="@@form['adminPass']">
+<input type="hidden" name='rootPass' size=32 maxlength=32  value="@@form['rootPass']">
+<h3>&nbsp;&nbsp;System > Administration</h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<input type="hidden" name="firewall" value="@@form['firewall']"/>
+<input type="hidden" name="webenable" value="@@form['webenable']"/>
+<input type="hidden" name="telnetenable" value="@@form['telnetenable']"/>
+<input type="hidden" name="pingenable" value="@@form['pingenable']"/>
+<table width="80%">
+	<tr><th>Administration</th>
+	</tr>
+</table>
+
+<table width="80%">
+<tr>
+	<td width="30%">Firewall</td>
+	<td><input type=radio onClick="javascript:document.form.firewall.value='1';firewall_enabled()" name='firewallradio'>&nbsp;Enable &nbsp;&nbsp;
+		<input type=radio onClick="javascript:document.form.firewall.value='0';firewall_disabled()" name='firewallradio'>&nbsp;Disable
+	</td>
+</tr>
+
+<tr id="webbrowser_trID">
+	<td>Enable HTTP</td>
+	<td><input type="checkbox" id="webbrowser_ID" onclick=webbrowserclick();></input>
+			&nbsp;&nbsp;Port&nbsp;&nbsp;
+		<input type="text" name="incomingPort" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['incomingPort']">&nbsp;(1 - 65534)
+	</td>
+</tr>
+
+<tr id="telnet_trID">
+	<td width="30%">Enable Telnet</td>
+	<td><input type="checkbox" id="telnet_ID" onclick=telnetclick();></input></td>
+</tr>
+
+<tr  id="ping_trID">
+	<td width="30%">Enable Ping</td>
+	<td><input type="checkbox" id="ping_ID" onclick=pingclick();></input></td>
+</tr>
+
+<tr id="remwanaccess_trID">
+	<td width="30%">Remote HTTP Access Port</td>
+	<td><input type="text" name="rmthttpport" size="8" maxLength="5" onKeyUp="NumfieldEntry(this); document.form.incomingPort.value=this.value" value="@@form['incomingPort']">&nbsp;(1 - 65534)</td>
+</tr>
+
+<tr>
+	<td width="30%">User Name</td>
+	<td>
+	<%if(session["user"]=="root"){%>
+	<select name="userName" size=1 onchange="checkPass(this.value)" >
+	<option value="root">root</option>
+	<option value="admin">admin</option>
+	</select>
+	<%}else{%>
+	admin
+	<%}%>
+	</td>
+</tr>
+<tr>
+	<td>Password</td>
+	<td><input type=password name='Pass' size=32 maxlength=32  value="@@form['Pass']"></td>
+</tr>
+
+<tr>
+	<td>Confirm Password</td>
+	<td><input type=password name='PassConf' size=32 maxlength=32   value="@@form['PassConf']"></td>
+</tr>
+</table>
+<script type="text/javascript">
+
+if (document.form.webenable.value == 1)
+	document.getElementById("webbrowser_ID").checked=true;
+else
+	document.getElementById("webbrowser_ID").checked=false;
+
+if (document.form.telnetenable.value == 1)
+	document.getElementById("telnet_ID").checked=true;
+else
+	document.getElementById("telnet_ID").checked=false;
+
+if (document.form.pingenable.value == 1)
+	document.getElementById("ping_ID").checked=true;
+else
+	document.getElementById("ping_ID").checked=false;
+
+if(parseInt(document.form.firewall.value) == 0) {
+	document.form.firewallradio[1].checked=true;
+	firewall_disabled();
+}
+else {
+	document.form.firewallradio[0].checked=true;
+	firewall_enabled();
+}
+
+<%if(session["user"]=="root"){%>
+function checkPass( val ) {
+	if( val=="root" ) {
+		document.form.Pass.value=document.form.rootPass.value;
+		document.form.PassConf.value=document.form.rootPass.value;
+	}
+	else {
+		document.form.Pass.value=document.form.adminPass.value;
+		document.form.PassConf.value=document.form.adminPass.value;
+	}
+}
+checkPass(document.form.userName.value)
+<%}%>
+</script>
+<%}%>
+<div align="center"><p></p><input type="button" value="Save" name="ok" id="bottomButton" onClick="javascript:submitF()" style="width:120px;"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("bottomButton").value=_("CSsave");
+</script>
+</body>
+</html>

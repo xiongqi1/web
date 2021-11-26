@@ -1,0 +1,186 @@
+#!/bin/sh
+
+# 
+# This connect-script is a main calling pointer of Connection manager
+# Connection manager calls this script when it wants to start a connection 
+# 
+# $1 : index of [link.profile.x]
+# $2 : instance number of dev
+# $3 : action (start=start a connection, stop=stop the connection)
+#
+#
+#
+# Connect-script calling-graph as following
+#
+# * SUSBNET (WWAN)
+# DirectIP: SDEV ===> SUSBNET (udhcpc ==> udhcpc.sh)  +============================> ip-up.d
+# PPP     :       +=> SUMTS ==================> pppd =+
+# * SETH
+# DHCP    : SDEV ==> SETH ==> ifplugd ===> ifplugd.sh =+=> udhcpc =+=> udhcpc.sh ==> ip-up.d =+==============================================+=> upd-pf.rte.sh
+# STATIC  :                                            +===========+                          +==============================================+
+# FO      :                                                                                   +=> netifmon-ctl ==> netifmon ==> netifmon.sh =+
+#
+
+# load v variables
+if [ -e "/etc/variant.sh" ]; then
+	. /etc/variant.sh
+fi
+
+# export initial connect-script env variables
+CONNECTION_MGR_PROFILE="$1"
+CONNECTION_MGR_INSTANCE="$2"
+CONNECTION_MGR_ACTION="$3"
+CONNECTION_MGR_DEV=$(rdb_get "link.profile.$CONNECTION_MGR_PROFILE.dev")
+export CONNECTION_MGR_PROFILE CONNECTION_MGR_INSTANCE CONNECTION_MGR_ACTION CONNECTION_MGR_DEV
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+CONNECTION_MGR_START_SCRIPT=$(rdb_get "${CONNECTION_MGR_DEV/.*/.x}.script")
+if [ -z "$CONNECTION_MGR_START_SCRIPT" ]; then
+	# get dev (wwan.0 or so)
+	# get instance script or main start script
+	CONNECTION_MGR_START_SCRIPT=$(rdb_get "$CONNECTION_MGR_DEV.script.$CONNECTION_MGR_INSTANCE")
+	test -z "$CONNECTION_MGR_START_SCRIPT" && CONNECTION_MGR_START_SCRIPT=$(rdb_get "$CONNECTION_MGR_DEV.script")
+fi
+
+print_stop_script() {
+	local start_script="$1"
+	local dname
+	local bname
+
+	dname=$(dirname "$start_script")
+	bname=$(basename "$start_script")
+
+	echo "${dname}/E${bname:1}"
+}
+
+print_dod_script() {
+	local start_script="$1"
+	local dname
+	local bname
+
+	dname=$(dirname "$start_script")
+	bname=$(basename "$start_script")
+
+	echo "${dname}/SDOD-${bname:1}"
+}
+
+# get end script and dod script
+if [ -z "$CONNECTION_MGR_START_SCRIPT" ]; then
+	CONNECTION_MGR_STOP_SCRIPT=""
+	CONNECTION_MGR_DOD_SCRIPT=""
+else
+	CONNECTION_MGR_STOP_SCRIPT=$(print_stop_script "$CONNECTION_MGR_START_SCRIPT")
+	CONNECTION_MGR_DOD_SCRIPT=$(print_dod_script "$CONNECTION_MGR_START_SCRIPT")
+fi
+
+# get single mode dialondemand 
+dod_en=$(rdb_get "dialondemand.enable")
+dod_pf=$(rdb_get "dialondemand.profile")
+
+# get single mode dod flag
+if [ "$dod_en" = "1" -a "$dod_pf" = "$CONNECTION_MGR_PROFILE" ]; then
+	CONNECTION_MGR_SDOD_ENABLE="1"
+else
+	CONNECTION_MGR_SDOD_ENABLE="0"
+fi
+
+# get multi-failover and multi-dialondemand settings
+CONNECTION_MGR_MDOD_ENABLE=$(rdb_get "dialondemand.${CONNECTION_MGR_PROFILE}.enable")
+test -z "$CONNECTION_MGR_MDOD_ENABLE" && CONNECTION_MGR_MDOD_ENABLE="0"
+
+# export connection manager environmental variables
+export CONNECTION_MGR_START_SCRIPT CONNECTION_MGR_STOP_SCRIPT
+export CONNECTION_MGR_DOD_SCRIPT CONNECTION_MGR_SDOD_ENABLE CONNECTION_MGR_MDOD_ENABLE
+
+log "### export connection manager env variables"
+env | grep '^CONNECTION_MGR_[A-Z]\+' | log
+
+log "### [link.profile.$CONNECTION_MGR_PROFILE] RDBs"
+rdb_get -L "link.profile.$CONNECTION_MGR_PROFILE." | grep -ev 'link.profile.[0-9]+.pass' | log
+
+log "### [service.failover.$CONNECTION_MGR_PROFILE] RDBs"
+rdb_get -L "service.failover.$CONNECTION_MGR_PROFILE." | log
+
+log "### [dialondemand.$CONNECTION_MGR_PROFILE] RDBs"
+rdb_get -L "dialondemand.$CONNECTION_MGR_PROFILE." | log
+
+exec_script() {
+	local prefix="$1"
+	local script="$2"
+
+	# check if script exists
+	if [ ! -e "$script" ]; then
+		log "script not found (script=$script)"
+		return 1
+	fi
+
+	# check if script has correct permission
+	if [ ! -x "$script" ]; then
+		log "incorrect permission (script=$script)"
+		return 1
+	fi
+
+	# exec to script
+	if [ -z "$prefix" ]; then
+		"$script" "$CONNECTION_MGR_PROFILE" "$CONNECTION_MGR_INSTANCE" "$CONNECTION_MGR_ACTION"
+	else
+		"$prefix" "$script" "$CONNECTION_MGR_PROFILE" "$CONNECTION_MGR_INSTANCE" "$CONNECTION_MGR_ACTION"
+	fi
+
+	# error
+	if [ $? -ne 0 ]; then
+		log "failed to exec script (script=$script)"
+		return 1
+	fi
+
+	return 0
+}
+
+# update early link profile RDBs
+rdb_set link.profile.${CONNECTION_MGR_PROFILE}.pid "$$"
+
+case "$CONNECTION_MGR_ACTION" in
+	'start')
+		# start DOD script - vodafone-specific DOD
+		if [ "$CONNECTION_MGR_SDOD_ENABLE" = "1" ]; then
+			log "### start DOD-script (script='$CONNECTION_MGR_DOD_SCRIPT')"
+			exec_script exec "$CONNECTION_MGR_DOD_SCRIPT"
+		fi
+
+		log "### exec S-script('$CONNECTION_MGR_START_SCRIPT')"
+		exec_script exec "$CONNECTION_MGR_START_SCRIPT"
+		;;
+
+	'stop')
+		log "### run E-script('$CONNECTION_MGR_STOP_SCRIPT')"
+		exec_script "" "$CONNECTION_MGR_STOP_SCRIPT"
+
+		log "### finalize RDBs and interface"
+		# apply immediate status
+		rdb_set "link.profile.$CONNECTION_MGR_PROFILE.status" "down"
+		rdb_set "service.failover.$CONNECTION_MGR_PROFILE.status" "down"
+
+		dev=$(rdb_get "link.profile.$CONNECTION_MGR_PROFILE.interface")
+		log "dev='$dev'"
+
+		if [ -z "$dev" ]; then
+			# force down the network interface
+			log "close down the interfae (interface=$dev)"
+			ifconfig "$dev" "0.0.0.0"
+			ifconfig "$dev" "down"
+		fi
+
+		log "### call upd_resolv_conf.sh"
+		upd_resolv_conf.sh
+
+		log "# flush route/conntrack cache"
+		flush_conntrack_cache.sh
+
+		;;
+
+	*)
+		log "unknown action found (action='$CONNECTION_MGR_ACTION')"
+		exit 1
+		;;
+esac

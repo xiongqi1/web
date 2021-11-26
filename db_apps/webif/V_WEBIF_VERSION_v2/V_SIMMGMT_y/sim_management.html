@@ -1,0 +1,356 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SIM Management</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+if (request['REQUEST_METHOD'] == "GET") {
+	form['sim1_failover'] = get_single( 'service.simmgmt.sim1_failover' );
+	form['sim1_failback'] = get_single( 'service.simmgmt.sim1_failback' );
+}
+%>
+<script language="JavaScript">
+var primary;
+var secondary;
+var external_sim_status;
+var embedded_sim_status;
+var external_sim_name=_("simMgmtExtSIMName");
+var embedded_sim_name=_("simMgmtEmbeddedSIMName");
+
+#ifdef V_WEBIF_SPEC_vdf
+var old_mode=false;
+var new_mode=false;
+#endif
+function submitForm() {
+	$("button").attr("disabled",true);
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+	clear_alert();
+	var failback_val=$('#sim1_failback').val();
+	var failover_val=$('#sim1_failover').val();
+
+	if(failback_val!="" || failover_val!="") {
+//		en=$("input:radio.access[name=lpm_enable]:checked").val();
+		rdb.add("service.simmgmt.sim1_failover", failover_val);
+		rdb.add("service.simmgmt.sim1_failback", failback_val);
+	}
+	// If Auto SIM is ON, service.simmgmt.sim1_failback will be set "cdn" and
+	// service.simmgmt.sim1_failover will be set "n_inst" that triggers sim_cdn_failover.template
+	// and sim_status_failover.template which may change service.simmgmt.primary and service.simmgmt.secondary.
+	// Besides when Auto SIM is ON, "#profiles-div" is hidden so primary and secondary are invalid.
+	// Hence this function only needs to write primary and secondary to service.simmgmt.primary and service.simmgmt.secondary
+	// when "#profiles-div" is shown.
+	// Refering to document-ready function and check_toggle(en), "#profiles-div" is shown when:
+	// en=$('#sim1_failback').val()=="cdn" && $('#sim1_failover').val()=="n_inst" != 1
+	// In order to avoid conflicting with the templates, check the condition with "&&"
+	if (failback_val != "cdn" && failover_val != "n_inst") {
+		if(primary==1 && secondary!=0) {
+			rdb.add("service.simmgmt.primary","1");
+			rdb.add("service.simmgmt.secondary","2");
+		}
+		else if(primary==2 && secondary!=0) {
+			rdb.add("service.simmgmt.primary","2");
+			rdb.add("service.simmgmt.secondary","1");
+		}
+		else if(secondary==0) {
+			rdb.add("service.simmgmt.primary","1");
+			rdb.add("service.simmgmt.secondary","0");
+		}
+	}
+
+#ifdef V_WEBIF_SPEC_vdf
+	new_mode=$('#sim1_failback').val()=="cdn" && $('#sim1_failover').val()=="n_inst";
+
+	if (old_mode != new_mode) {
+		rdb.add("manualroam.reset_count","0"); // Manual roaming algorithm back-off timer
+		rdb.add("service.simmgmt.manualroam.switching.modem_power_cycles","0"); // Consecutive modem power cycle counter via IMSI registration failure.
+	}
+#endif
+	rdb.mset(function(res) {
+		window.location="/sim_management.html?success";
+	});
+}
+
+function ManualTrigger(idx) {
+#ifdef V_WEBIF_SPEC_vdf
+	clear_alert();
+	// Switch SIM role whenever this function is invoked.
+	// This function binds with switch arrows which presents
+	// only if primary = 1 or 2 AND secondary != 0.
+	if (primary == 1) {
+		primary = 2;
+		secondary = 1;
+		// first row is for embedded SIM now
+		$("#simName1").html(embedded_sim_name);
+		$("#phystat1").html(_("embedded"));
+		$("#simstat1").html(embedded_sim_status);
+		// second row is for external SIM now
+		$("#simName2").html(external_sim_name);
+		$("#phystat2").html(_("extern"));
+		$("#simstat2").html(external_sim_status);
+	}
+	else if (primary == 2) {
+		primary = 1;
+		secondary = 2;
+		// first row is for external SIM now
+		$("#simName1").html(external_sim_name);
+		$("#phystat1").html(_("extern"));
+		$("#simstat1").html(external_sim_status);
+		// second row is for embedded SIM now
+		$("#simName2").html(embedded_sim_name);
+		$("#phystat2").html(_("embedded"));
+		$("#simstat2").html(embedded_sim_status);
+	}
+	else {
+		// should not come here! do nothing
+	}
+#else
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+	clear_alert();
+
+	if(idx==1) {
+		primary=2;
+		secondary=1;
+		$("#phystat1").html(_("extern"));
+		$("#logistat1").html(_("secondary"));
+		$("#phystat2").html(_("embedded"));
+		$("#logistat2").html(_("primary"));
+		$("#pf_1").css("display", "none");
+		$("#pf_2").css("display", "");
+	}
+	else if(idx==2) {
+		primary=1;
+		secondary=2;
+		$("#phystat1").html(_("extern"));
+		$("#logistat1").html(_("primary"));
+		$("#phystat2").html(_("embedded"));
+		$("#logistat2").html(_("secondary"));
+		$("#pf_1").css("display", "");
+		$("#pf_2").css("display", "none");
+	}
+#endif
+}
+
+function init_list() {
+var h="";
+
+	for( i=1; i<3; i++ ) {
+		h+= "<tr style='height:60px'><td class='first'><span class='normal-text' id='simName"+i+"'></span></td>";
+		h+= "<td><span class='normal-text' id='phystat"+i+"'></span></td>"
+		h+= "<td><span class='normal-text' id='simstat"+i+"'></span></td>"
+		h+= "<td><span class='normal-text' id='logistat"+i+"'></span></td>"
+		h+= "<td>"
+		if(<% get_single_direct('service.simmgmt.secondary'); %>=="0") {
+			h+= "</td></tr>";
+			break;
+		}
+		if(i==1) {
+			h+= "<a title='Down' class='secondary' id='pf_1'> \
+			<i class='icon-arrow-dn' onClick='ManualTrigger("+i+")'></i> \
+			</a> \
+			</td>";
+		}
+		else if(i==2) {
+			h+= "<a title='Up' class='secondary' id='pf_2'> \
+			<i class='icon-arrow-up' onClick='ManualTrigger("+i+")'></i> \
+			</a> \
+			</td>";
+		}
+		h+= "</tr>";
+	}
+	$("#TBlist").html(h);
+
+	$.get("/js/selectivizr.js");
+}
+
+function check_toggle(v) {
+	if(v==1) {
+		$('#sim1_failback').val('cdn');
+		$('#sim1_failover').val('n_inst');
+		$('#profiles-div').css('display', 'none');
+	}
+	else {
+		$('#sim1_failback').val('none');
+		$('#sim1_failover').val('none');
+		$('#profiles-div').css('display', '');
+	}
+}
+
+#ifdef V_WEBIF_SPEC_vdf
+var sim_type_header=_("simMgmtType");
+#else
+var sim_type_header=_("Option");
+#endif
+// we should know current value of primary and secondary at the beginning
+primary=parseInt(<% get_single_direct('service.simmgmt.primary'); %>);
+secondary=parseInt(<% get_single_direct('service.simmgmt.secondary'); %>);
+
+$(document).ready( function() {
+var i;
+var delay=5000;//5 seconds
+	init_list();
+	clear_alert();
+
+	//hiding toggle switch if the rdbs for the failover/failback is empty or not defined
+	$("#toggle-div").css("display", ($('#sim1_failback').val()=="" && $('#sim1_failover').val()=="")?"none":"");
+
+	// stage 1: only handles SIM remove failover and SIM tray cdn failback
+	$("input:radio.access[name=toggleEnable]").change(function(){
+		check_toggle($(this).val());
+	});
+	en=$('#sim1_failback').val()=="cdn" && $('#sim1_failover').val()=="n_inst";
+	load_value_to_element("input:radio[name=toggleEnable]", en);
+#ifdef V_WEBIF_SPEC_vdf
+	old_mode=en;
+#endif
+	check_toggle(en);
+
+	blockUI_wait(_("GUI pleaseWait"));
+	setTimeout(function() {
+		if(secondary==0) {
+			$("#phystat1").html(_("extern"));
+			$("#logistat1").html(_("primary"));
+			if(<% get_single_direct('service.simmgmt.sim_cdn'); %>=="0") {
+				external_sim_status=_("<% get_single_direct('wwan.0.sim.status.status'); %>");
+			}
+			else if(<% get_single_direct('service.simmgmt.sim_cdn'); %>=="1") {
+				external_sim_status=_("notInserted");
+			}
+			embedded_sim_status="";
+			$("#simstat1").html(external_sim_status);
+			$("#simName1").html(external_sim_name);
+			// only first row presents, switch arrows should be hidden
+			$("#pf_1").css("display", "none");
+			$("#pf_2").css("display", "none");
+		}
+		else if(primary==1 && secondary!=0) {
+			$("#phystat1").html(_("extern"));
+			$("#logistat1").html(_("primary"));
+			$("#phystat2").html(_("embedded"));
+			$("#logistat2").html(_("secondary"));
+			if(<% get_single_direct('service.simmgmt.sim_cdn'); %>=="0") {
+				external_sim_status=_("<% get_single_direct('wwan.0.sim.status.status'); %>");
+			}
+			else if(<% get_single_direct('service.simmgmt.sim_cdn'); %>=="1") {
+				external_sim_status=_("notInserted");
+			}
+			embedded_sim_status="";
+			$("#simstat1").html(external_sim_status);
+			$("#simName1").html(external_sim_name);
+			$("#simName2").html(embedded_sim_name);
+#ifndef V_WEBIF_SPEC_vdf
+			$("#pf_2").css("display", "none");
+#endif
+		}
+		else if(primary==2 && secondary!=0) {
+			external_sim_status="";
+			embedded_sim_status=_("<% get_single_direct('wwan.0.sim.status.status'); %>");
+#ifdef V_WEBIF_SPEC_vdf
+			// first row is for primary SIM that is the embedded SIM now
+			$("#simName1").html(embedded_sim_name);
+			$("#phystat1").html(_("embedded"));
+			$("#simstat1").html(embedded_sim_status);
+			$("#logistat1").html(_("primary"));
+			// second row is secondary SIM that is the external SIM now
+			$("#simName2").html(external_sim_name);
+			$("#phystat2").html(_("extern"));
+			// external SIM status is empty now
+			$("#logistat2").html(_("secondary"));
+#else
+			$("#phystat1").html(_("extern"));
+			$("#logistat1").html(_("secondary"));
+			$("#phystat2").html(_("embedded"));
+			$("#logistat2").html(_("primary"));
+			$("#simstat2").html(embedded_sim_status);
+			$("#simName1").html(external_sim_name);
+			$("#simName2").html(embedded_sim_name);
+			$("#pf_1").css("display", "none");
+#endif
+		}
+		$.unblockUI();
+	}, delay);
+});
+</script>
+
+<!-- UI -->
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+		<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+		<div class="grid-9 omega">
+			<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST" >
+			<%appendCsrfToken();%>
+			<input type="hidden" name="sim1_failback" id="sim1_failback" value="@@form['sim1_failback']"/>
+			<input type="hidden" name="sim1_failover" id="sim1_failover" value="@@form['sim1_failover']"/>
+			<div class="right-column white-box">
+				<div class="pad">
+					<h2><script language=Javascript>document.write(_("SimMgmt"))</script></h2>
+					</br><div class="p-des-full-width"></div>
+					<div class="form-row" id="toggle-div">
+						<label for="toggleEnable"><script language=Javascript>document.write(_("autoSim"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="toggleEnable-0" name="toggleEnable" class="access" value=1>
+									<label for="toggleEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="toggleEnable-1" name="toggleEnable" class="access" value=0>
+									<label for="toggleEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div id="profiles-div">
+						<table class="name-list">
+							<colgroup>
+								<col width="20%">
+								<col width="20%">
+								<col width="20%">
+								<col width="20%">
+								<col width=auto>
+							</colgroup>
+							<thead>
+							<tr>
+								<th></th>
+								<th class="align10"><script language=Javascript>document.write(sim_type_header)</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("Status"))</script></th>
+								<th class="align10"><script language=Javascript>document.write(_("preference"))</script></th>
+								<th></th>
+							</tr>
+							</thead>
+							<tbody id="TBlist"></tbody>
+						</table>
+					</div>
+					<div class="submit-row">
+						<button type="button" onClick="submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+					</br>
+					<h2 align=left><script language=Javascript>document.write(_("DataProfConf"))</script></h2>
+					<div class="p-des-full-width">
+						<p><script language=Javascript>document.write(_("DataProfConfDesc"))</script></p>
+						<p><a class="clickMsg" href="/Profile_Name_List.html"><script language=Javascript>document.write(_("dataConnection"))</script></a></p>
+					</div>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Internet", "SIMMGMT", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+</script>
+
+</body>
+</html>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="tr143_ping" />
+		<Option makefile="Makefile.tr143_ping" />
+		<Option makefile_is_custom="1" />
+		<Option execution_dir="/home/leeh/NBN/build/" />
+		<Option pch_mode="2" />
+		<Option compiler="gnu_ubicom32_gcc_compiler" />
+		<Build>
+			<Target title="all">
+				<Option output="tr143_ping" prefix_auto="1" extension_auto="1" />
+				<Option type="1" />
+				<Option compiler="gnu_ubicom32_gcc_compiler" />
+				<Option parameters="tr143.tidalfusion.com.au:5000" />
+				<MakeCommands>
+					<Build command="$make -f $makefile $target" />
+					<CompileFile command="$make -f $makefile $file" />
+					<Clean command="$make -f $makefile clean" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q -f $makefile $target" />
+					<SilentBuild command="$make -s -f $makefile $target" />
+				</MakeCommands>
+			</Target>
+			<Target title="lua">
+				<Option output="tr143_ping" prefix_auto="1" extension_auto="1" />
+				<Option type="0" />
+				<Option compiler="gnu_ubicom32_gcc_compiler" />
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="Makefile" />
+		<Unit filename="comms.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="comms.h" />
+		<Unit filename="getopt.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="luaCall.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="luaCall.h" />
+		<Unit filename="main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="main_loop.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="main_loop.h" />
+		<Unit filename="parameters.h" />
+		<Unit filename="ping.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="ping.h" />
+		<Unit filename="rdb_comms.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="rdb_comms.h" />
+		<Unit filename="rdb_event.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="rdb_event.h" />
+		<Unit filename="tr143_ping_console_test.lua" />
+		<Unit filename="tr143_ping_test.lua" />
+		<Unit filename="udpserver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="utils.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="utils.h" />
+		<Extensions>
+			<envvars />
+			<code_completion>
+				<search_path add="../../staging_l/include" />
+				<search_path add="../../gnu_apps/lua/src" />
+			</code_completion>
+			<debugger>
+				<remote_debugging target="all">
+					<options conn_type="0" serial_baud="115200" ip_address="192.168.0.50" ip_port="90" />
+				</remote_debugging>
+			</debugger>
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

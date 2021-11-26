@@ -1,0 +1,865 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>IO configuration</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+#ifdef V_WEBIF_SPEC_vdf
+<style>.location-settings label{width:36px;}</style>
+#endif
+<script language="JavaScript">
+
+// This number is arbitrary. The loops that use this are usually terminated before by lack of RDB or POST data entries
+#define MAX_PIN 99
+
+#if !defined(V_IOMGR_kudu) && !defined(V_MODCOMMS_y)
+
+#define GLOBAL_PULLUP
+#define IO_PULLUP
+
+#if defined(V_PRODUCT_ntc_140wx) || defined(V_PRODUCT_ntc_140)
+#define LOW_PULLUP_V "3V"
+#else
+#define LOW_PULLUP_V "3.3V"
+#endif
+#define HIGH_PULLUP_V "8.2V"
+
+#endif
+
+#ifdef V_MODCOMMS_y
+var pinLabel=[];
+#endif
+var pinCap=[];
+var pinmode=[];
+var sys_pinmode=[];
+var d_in_threshold=[];
+#ifdef IO_PULLUP
+var pullup_ctl=[];
+#endif
+var d_out=[];
+var periodic=1000;
+var ajaxerror=0;
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+var w1_devname=[];
+var w1_devid=[];
+var w1_devdata=[];
+#endif
+
+<%
+
+function setRdb(rdb, val) {
+	var cur = get_single(rdb);
+	if ( cur != val )
+		set_single_direct("-p",rdb,val);
+}
+
+function setIoRdb( prefix, i, member,val ) {
+	var rdb=prefix+i+member;
+	setRdb( rdb,val );
+}
+
+function setSysIoRdb(i,member,val) {
+	return setIoRdb('sys.sensors.io.xaux',i,member,val);
+}
+
+function getIoRdb( prefix, i, member ) {
+	var rval='';
+	var rdb=prefix+i+member;
+	if(rdb_exists(rdb))
+		rval=get_single(rdb);
+	return rval;
+}
+
+function getSysIoRdb(i,member) {
+	return getIoRdb('sys.sensors.io.xaux',i,member);
+}
+
+lastPin=MAX_PIN;
+lastPinRdb="sys.sensors.info.lastio";
+if(rdb_exists(lastPinRdb)) {
+	var rval=get_single(lastPinRdb);
+	lastPin=rval-0;
+}
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+lastW1Index=0;
+lastW1IndexRdb="sensors.w1.last_index";
+if(rdb_exists(lastW1IndexRdb)) {
+	var rval=get_single(lastW1IndexRdb);
+	lastW1Index=rval-0;
+}
+#endif
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+ioTrigEnRdb="service.failover.x.io_trig.en";
+ioTrigPinRdb="service.failover.x.io_trig.pin";
+if(rdb_exists(ioTrigEnRdb)) {
+	ioTrigEn=string_to_number(get_single(ioTrigEnRdb));
+}
+if(rdb_exists(ioTrigPinRdb)) {
+	ioTrigPin=string_to_number(get_single(ioTrigPinRdb));
+}
+#endif
+
+// This function scans through the RDB entries ui.sensors.io.xauxN.* constructing a number of arrays used by the page
+function enumerateIo(){
+	for(i=1;i<=lastPin;i++) {
+		var pinmode=getIoRdb('ui.sensors.io.xaux',i,'.mode');
+		var sys_pinmode=getSysIoRdb(i,'.mode');
+		if(pinmode!=sys_pinmode) {
+			if(sys_pinmode=="digital_output" || sys_pinmode=="analogue_input") {
+				pinmode=sys_pinmode;
+			}
+			else if(pinmode!="namurInput" && pinmode!="contactClosureInput") {
+				pinmode=sys_pinmode;
+			}
+		} else {
+			if ( pinmode == "" ) { // Both are blank so must be the end of them
+				write( 'var pin_numbers="'+(i-1)+'";\n');
+				return;
+			}
+		}
+		write( 'pinmode['+i+']="'+pinmode+'";\n');
+		write( 'sys_pinmode['+i+']="'+sys_pinmode+'";\n');
+		write( 'd_in_threshold['+i+']="'+getSysIoRdb(i,'.d_in_threshold')+'";\n');
+#ifdef IO_PULLUP
+		write( 'pullup_ctl['+i+']="'+getSysIoRdb(i,'.pull_up_ctl')+'";\n');
+#endif
+		if(pinmode=="analogue_output") {
+			write( 'd_out['+i+']="'+getSysIoRdb(i,'.dac')+'";\n');
+		}
+		else {
+			write( 'd_out['+i+']="'+getSysIoRdb(i,'.d_out')+'";\n');
+		}
+#ifdef V_MODCOMMS_y
+		write( 'pinLabel['+i+']="'+getSysIoRdb(i,'.label')+'";\n');
+#endif
+		write( 'pinCap['+i+']="'+getSysIoRdb(i,'.cap')+'";\n');
+	}
+	write( 'var pin_numbers="'+(lastPin)+'";\n');
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+	write( 'var w1_dev_numbers="'+lastW1Index+'";\n');
+#endif
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	write( 'var ioTrigEn="'+ioTrigEn+'";\n');
+	write( 'var ioTrigPin="'+ioTrigPin+'";\n');
+#endif
+
+}
+
+
+// This function scans through the submitted POST form data seting the RDB entries ui.sensors.io.xauxN.*
+function setIo() {
+	var io_enable = form["io_enable"];
+	for( i=1; i<=lastPin; i++ ) {
+		var ui_md=form["io_type"+i];
+		if (ui_md==undefined)
+			return;
+		var md=ui_md;
+#ifdef IO_PULLUP
+		var io_pullup=form['io_pullup'+i];
+#endif
+		if(ui_md=="namurInput" || ui_md=="contactClosureInput") {
+#ifndef V_MODCOMMS_y
+			md="virtual_digital_input";
+#endif
+#ifdef IO_PULLUP
+			io_pullup="1"; // It's not present in form for these types
+#endif
+			}
+
+		if(ui_md=="digital_output") {
+			setSysIoRdb(i,".d_out", form['output'+i]);
+		}
+		else if(ui_md=="analogue_output") {
+			setSysIoRdb(i,".dac", form['output'+i]);
+		}
+		setRdb("ui.sensors.io.xaux"+i+".mode", ui_md);
+		setSysIoRdb(i,".mode", md);
+#ifdef IO_PULLUP
+		setSysIoRdb(i,".pull_up_ctl", io_pullup);
+#endif
+
+#if defined (V_IOMGR_kudu)
+		if (io_enable=="1") {
+			setSysIoRdb(i,".oe", "1");
+		}
+		else {
+			setSysIoRdb(i,".oe", "0");
+		}
+#endif
+	}
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	setRdb("sys.sensors.iocfg.ui.enable", form["io_enable"]);
+	setRdb("sys.sensors.iocfg.mgr.debug", form["debug_level"]);
+#ifdef GLOBAL_PULLUP
+	setRdb("sys.sensors.iocfg.pull_up_voltage", form["pullUpVoltage"]);
+#endif
+	setIo();
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+	setRdb("service.w1.trigger", '1');
+#endif
+	redirect('/IO_configuration.html?success');
+}
+
+enumerateIo();
+
+%>
+
+function submitForm() {
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	if (ioTrigEn == '1' && $("#pin_mode"+ioTrigPin).val() != 'digital_output') {
+		validate_alert("", "IO pin #"+ioTrigPin+_("ioPinModeWarning2-1")+"<a href=wan_summary.html>"+_("ioPinModeWarning2-2")+"</a>"+_("ioPinModeWarning1-3"));
+		return;
+	}
+#endif
+	$("button").attr("disabled",true);
+	$("#debug_level").val(debugLv_translate[$("#slider-range-max").slider("value")]);
+#ifdef GLOBAL_PULLUP
+	$("#pullUpVoltage").val($("#pullUp_0").is(":checked")?LOW_PULLUP_V:HIGH_PULLUP_V);
+#endif
+	for( i=1; i<=pin_numbers; i++ ) {
+		$("#io_type"+i).val($("#pin_mode"+i).val());
+	}
+	$("#form").submit();
+}
+
+function makePINlist() {
+	var h="";
+	for( i=1; i<=pin_numbers; i++ ) {
+#ifdef IO_PULLUP
+		pullup_0=pullup_ctl[i]=="1"?"checked":"";
+		pullup_1=pullup_ctl[i]!="1"?"checked":"";
+#endif
+		output_0=d_out[i]=="0"?"":"checked";
+		output_1=d_out[i]!="0"?"":"checked";
+		var nameId="io_type"+i;
+		var pin_label=i;
+#ifdef V_MODCOMMS_y
+		pin_label=substMice(pinLabel[i]);
+#endif
+		h+='<input type="hidden" name="'+nameId+'" id="'+nameId+'"/>';
+		h+='<tr>\
+		<td style="padding-left:18px">'+pin_label+'</td>\
+		<td style="padding-left:20px">\
+			<select id="pin_mode'+i+'"></select>\
+		</td>';
+		if (pinmode[i]=="analogue_output"){
+			h+='<td>'
+				+'<div id="slider-io'+i+'"></td><td style="text-align:center">'
+				+'<div id="outputLevel-io'+i+'">'
+				+'</td></tr>'
+				+'<input type="hidden" id="output'+i+'" name="output'+i+'">';
+			continue;
+		}
+#ifndef V_IOMGR_kudu
+#ifdef IO_PULLUP
+		h+='<td>\
+			<div class="field">\
+				<div class="location-settings">\
+					<div class="radio-switch" style="margin-left:60px">\
+						<input type="radio" id="io_pullup'+i+'_0" name="io_pullup'+i+'" class="access" value="1" '+pullup_0+'>\
+						<label for="io_pullup'+i+'_0" class="on">'+_("on")+'</label>\
+						<input type="radio" id="io_pullup'+i+'_1" name="io_pullup'+i+'" class="access" value="0" '+pullup_1+'>\
+						<label for="io_pullup'+i+'_1" class="off">'+_("off")+'</label>\
+					</div>\
+				</div>\
+			</div>\
+		</td>';
+#endif
+		h+='<td style="text-align:center">\
+			<div id="io_threshold'+i+'"></div>\
+			<div id="io_thres'+i+'" class="field">\
+				<div class="location-settings">\
+				</div>\
+			</div>\
+		</td>';
+#endif
+		h+='<td style="text-align:center">\
+			<div id="io_status'+i+'"></div>';
+#ifndef V_IOMGR_kudu
+			h+='<div id="io_output'+i+'" class="field" style="display:none">';
+#else
+			h+='<div id="io_output'+i+'" class="field">';
+#endif
+				h+='<div class="location-settings">';
+#ifndef V_IOMGR_kudu
+					h+='<div class="radio-switch" style="margin-left:20px">';
+#else
+					h+='<div class="radio-switch" style="margin-left:115px">';
+#endif
+						h+='<input type="radio" id="output'+i+'_0" name="output'+i+'" class="access" value="1" '+output_0+'>\
+						<label for="output'+i+'_0" id="labelForOutput'+i+'_0" class="on" style="padding-right:6px;">'+_("ioHigh")+'</label>\
+						<input type="radio" id="output'+i+'_1" name="output'+i+'" class="access" value="0" '+output_1+'>\
+						<label for="output'+i+'_1" id="labelForOutput'+i+'_1" class="off">'+_("ioLow")+'</label>\
+					</div>\
+				</div>\
+			</div>\
+		</td></tr>';
+
+	}
+
+	function modeList(capabilities) {
+		var list = {};
+		if (capabilities.indexOf("virtual_digital_input")>=0)
+			list.virtual_digital_input= _("digitalInput");
+		else if (capabilities.indexOf("digital_input")>=0)
+			list.digital_input= _("digitalInput");
+		if (capabilities.indexOf("digital_output")>=0)
+			list.digital_output= _("digitalOutput");
+		if (capabilities.indexOf("analogue_input")>=0)
+			list.analogue_input= _("analogueInput");
+		if (capabilities.indexOf("analogue_output")>=0)
+			list.analogue_output= _("analogueOutput");
+		if (capabilities.indexOf("namurInput")>=0)
+			list.namurInput= _("namurInput");
+		if (capabilities.indexOf("contactClosureInput")>=0)
+			list.contactClosureInput= _("contactClosureInput");
+		if (capabilities.indexOf("1_wire")>=0)
+			list["1_wire"]= _("one_wire");
+		if (capabilities.indexOf("ctInput")>=0)
+			list.ctInput= _("ctInput");
+		if (capabilities.indexOf("tempInput")>=0)
+			list.tempInput= _("tempInput");
+		if (capabilities.indexOf("current_input")>=0)
+			list.current_input= _("currentInput");
+		return list;
+	}
+
+	$("#PINlist").html(h);
+	for( i=1; i<=pin_numbers; i++ ) {
+		add_options("pin_mode"+i, modeList(pinCap[i]), pinmode[i]);
+	}
+}
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+//		pair[0]				pair[1]
+// -----------------------------------------------
+// sensors_w1_0_sname       Thermometer DS18B20
+// sensors_w1_0_id          28-000006040df0
+// sensors_w1_0_data        24.062 C  75.312 F
+function updateW1DevDb(pair) {
+	var name = pair[0].split("_");
+	var idx = parseInt(name[2]);
+	var field = name[3];
+	var value = pair[1].replace(/\"/g,"").replace(";","");
+
+	// find last index
+	if (pair[0] == 'sensors_w1_last_index') {
+		w1_dev_numbers = parseInt(value);
+		return;
+	}
+
+	// convert special characters to html entity
+    var newStr  = "";
+	var patt=/[a-zA-Z0-9]/
+    for ( i = 0; i < value.length; i++ ) {
+        var nextChar = value.charAt(i);
+		if (patt.test(nextChar))
+			newStr = newStr + nextChar;
+		else
+			newStr = newStr + convertCharToEntity(nextChar);
+    }
+
+	// save to array
+	if (field == 'sname')
+		w1_devname[idx] = newStr;
+	else if (field == 'id')
+		w1_devid[idx] = newStr;
+	else if (field == 'data')
+		w1_devdata[idx] = newStr;
+}
+
+function makeW1DevList() {
+	var h="";
+	for( i=0; i<w1_dev_numbers; i++ ) {
+		h+='<tr>\
+		<td style="padding-left:10px">'+w1_devname[i]+'</td>\
+		<td style="padding-left:10px">'+w1_devid[i]+'</td>\
+		<td style="padding-left:10px">'+w1_devdata[i]+'</td>\
+		</tr>';
+	}
+	$("#deviceList").html(h);
+}
+#endif
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+function w1MonCgiUpdate(r) {
+	ajaxerror=0;
+	var lines = r.split("\n");
+	lines.forEach(function(line){
+		// line is like sensors_w1_1_id="28-000006040fe5";
+		var pair = line.split("=");
+		if (pair.length !== 2) return;
+
+		// find out 1-wire variables
+		if (pair[0].search("^sensors_w1") == 0) {
+			updateW1DevDb(pair);
+		}
+	});
+	makeW1DevList();
+}
+#endif
+
+function cgiUpdate(r) {
+	//ajaxerror=0;
+	var lines = r.split("\n");
+	lines.forEach(function(line){
+		// line is like sys_sensors_io_xaux15_d_in="1";
+		var pair = line.split("=");
+		if (pair.length !== 2) return;
+		var i = parseInt(pair[0].match(/\d/g).join("")); // get the "15" from above
+		var str = pair[1].replace(/\"/g,"").replace(";","");
+		switch($("#pin_mode"+i).val()) {
+			case "namurInput":
+			break;
+			case "virtual_digital_input":
+			case "digital_input":
+			case "contactClosureInput":
+				$("#io_status"+i).html(str=="1"?_("ioHigh"):_("ioLow"));
+				break;
+			case "tempInput":
+				$("#io_status"+i).html(str+" &deg;C");
+				break;
+			case "ctInput":
+				if (!isNaN(str)) {
+					var f = parseFloat(str);
+					f = 0.018973665961 * Math.sqrt(f);
+					str = f.toFixed(2);
+				}
+				$("#io_status"+i).html(str+" A Irms");
+				break;
+			case "current_input":
+				$("#io_status"+i).html(str+" mA");
+				break;
+			case "analogue_input":
+				$("#io_status"+i).html(str+" V");
+				break;
+		}
+	});
+}
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+function w1CgiCmd() {
+	var has_1_wire_pin = 0;
+	var cmd="";
+	for( i=1; i<=pin_numbers; i++ ) {
+		switch($("#pin_mode"+i).val()) {
+		case "1_wire":
+			has_1_wire_pin = 1;
+			break;
+		}
+	}
+	if (has_1_wire_pin) {
+		cmd+="&sensors.w1.last_index";
+		for( i=0; i<w1_dev_numbers; i++ ) {
+			cmd+="&sensors.w1."+i+".sname";
+			cmd+="&sensors.w1."+i+".id";
+			cmd+="&sensors.w1."+i+".data";
+		}
+		$(w1_dev_table).css("display","");
+		$.get("/cgi-bin/w1_mon.cgi?<%appendCsrfTokenToQueryString();%>"+cmd.substring(1), w1MonCgiUpdate ); // substring chops the first &
+	} else {
+		$(w1_dev_table).css("display","none");
+		ajaxerror = 0;
+	}
+}
+#endif
+
+function cgiCmd() {
+	c="";
+	for( i=1; i<=pin_numbers; i++ ) {
+		switch($("#pin_mode"+i).val()) {
+		case "ctInput":
+			c+="&sys.sensors.io.xaux"+i+".adc_raw"; // Get the full resolution
+			break;
+		case "analogue_input":
+		case "namurInput":
+		case "tempInput":
+		case "current_input":
+			c+="&sys.sensors.io.xaux"+i+".adc";
+			break;
+		case "virtual_digital_input":
+		case "digital_input":
+			c+="&sys.sensors.io.xaux"+i+".d_in";
+			break;
+		}
+	}
+
+	if ( c.length > 0 ) {
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+c.substring(1), cgiUpdate ); // substring chops the first &
+	}
+	else {
+		ajaxerror = 0;
+	}
+}
+
+function updateInput() {
+	if( ++ajaxerror <= (3*60*1000/periodic) ) { //3 mins
+		cgiCmd();
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+		w1CgiCmd();
+#endif
+	} else {
+		location.reload();
+	}
+}
+
+var debugLv_translate=[3,5,6,7];
+var slider_translate={3:0,5:1,6:2,7:3};
+var debugLv_text=[_("log Error"),_("log notice"),_("log info"),_("log debug")];
+
+$(document).ready( function() {
+	debugLv="<%get_single_direct("sys.sensors.iocfg.mgr.debug");%>";
+	if(debugLv=="") {
+		debugLv="3";
+	}
+	$( "#slider-range-max" ).slider({
+		range: "max",
+		min: 0,
+		max: 3,
+		value: slider_translate[parseInt(debugLv)],
+		slide: function( event, ui ) {
+			$("#debugLevel").html( debugLv_text[ui.value]+"&nbsp;&nbsp;"+_("ioDefaultDebugLevel") );
+		}
+	});
+	$("#debugLevel").html( debugLv_text[$( "#slider-range-max" ).slider("value")]+"&nbsp;&nbsp;"+_("ioDefaultDebugLevel") );
+	//$("#debugLevel").val(debugLv);
+
+	makePINlist();
+	en="<%if(rdb_exists('sys.sensors.iocfg.ui.enable')) get_single_direct('sys.sensors.iocfg.ui.enable');%>"=="1";
+	load_value_to_element("input:radio.access[name=io_enable]", en);
+#ifdef GLOBAL_PULLUP
+	pullUpVol="<%get_single_direct("sys.sensors.iocfg.pull_up_voltage");%>"!=HIGH_PULLUP_V;
+	load_value_to_element("input:radio.access[name=pullUp]", pullUpVol);
+#endif
+	function setupIOrow( val, i) {
+		var io_output="#io_output"+i;
+		var io_status="#io_status"+i;
+#ifdef IO_PULLUP
+		var io_pullup="input:radio.access[name=io_pullup"+i+"]";
+#endif
+		$("#value_header").css("display", val == "1_wire" ? "none" : "");
+
+		switch (val) {
+			case "digital_input":
+				$(io_output).css("display","none");
+				$(io_status).css("display","");
+#ifdef IO_PULLUP
+				$(io_pullup).attr("disabled", false);
+#endif
+				$("#io_threshold"+i).html("");
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", false);
+#endif
+			break;
+			case "virtual_digital_input":
+				$(io_output).css("display","none");
+				$(io_status).css("display","");
+#ifdef IO_PULLUP
+				$(io_pullup).attr("disabled", false);
+#endif
+				$("#io_threshold"+i).html(Number(d_in_threshold[i]).toFixed(2)+" V");
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", false);
+#endif
+				break;
+			case "digital_output":
+				$(io_output).css("display","");
+				$(io_status).css("display","none");
+#ifdef IO_PULLUP
+				$(io_pullup).attr("disabled", false);
+#endif
+				$("#io_threshold"+i).html("");
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", false);
+#endif
+				break;
+			case "tempInput":
+			case "current_input":
+			case "ctInput":
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", true);
+#endif
+				case "analogue_input":
+				$(io_output).css("display","none");
+				$(io_status).css("display","");
+#ifdef IO_PULLUP
+				$("#pullup").css("display","none");
+				$(io_pullup).attr("disabled", false);
+#endif
+				$("#io_threshold"+i).html("");
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", false);
+#endif
+				break;
+			case "namurInput":
+				$(io_output).css("display","none");
+				$(io_status).css("display","");
+#ifdef IO_PULLUP
+				load_value_to_element(io_pullup, "1");
+				$(io_pullup).attr("disabled", true);
+				$("#pullUp_1").prop("checked", true);
+#endif
+				$("#io_threshold"+i).html("");
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", true);
+#endif
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_IOBOARD_clarke)
+				$(io_status).html('<a class="secondary sml" href="IO_configuration_Namur.html?'+i+'"><i class="icon edit">'+_("edit")+'</i></a>');
+
+#else
+				$(io_status).html('<a class="secondary sml" style="padding:0;border:0;" href="IO_configuration_Namur.html?'+i+'" title="'+_("edit")+'"><i class="icon edit"></i></a>');
+#endif
+			break;
+			case "contactClosureInput":
+				$(io_output).css("display","none");
+				$(io_status).css("display","none");
+#ifdef IO_PULLUP
+				load_value_to_element(io_pullup, "1");
+				$(io_pullup).attr("disabled", true);
+#endif
+#ifdef GLOBAL_PULLUP
+				$("input:radio.access[name=pullUp]").attr("disabled", false);
+#endif
+				$("#io_threshold"+i).html(Number(d_in_threshold[i]).toFixed(2)+" V");
+			break;
+			case "analogue_output":
+			{
+				var minVal = 890;	// TODO This scaling will need to be enhanced, probably taking this info from an Rdb variable
+				var maxVal = 4095;	// that is set up by the IoMgr. For now there is only one analog output
+				var minValDisplayed = 4.0;
+				var maxValDisplayed = 24.0;
+				var units = " mA";
+				var scale = (maxValDisplayed-minValDisplayed)/(maxVal-minVal);
+				function analogueValue(val){
+					val = parseInt(val);
+					if (val<minVal){
+						val=minVal;
+					}
+					if (val>maxVal){
+						val=maxVal;
+					}
+					val = (val-minVal)*scale+minValDisplayed;
+					return val.toFixed(2)+units;
+				}
+
+				var val = d_out[i];
+				$("#slider-io"+i).slider({
+					range: "max",
+					min: minVal,
+					max: maxVal,
+					value: val,
+					slide: function(event, ui){
+						$("#outputLevel-io"+i).html(analogueValue(ui.value));
+						$("#output"+i).val(ui.value);
+					}
+				});
+				$("#output"+i).val(val);
+				$("#outputLevel-io"+i).html(analogueValue(val));
+			}
+			break;
+#if defined (V_IOMGR_kudu)
+			case "digital_input":
+				$(io_output).css("display","none");
+				$(io_status).css("display","");
+			break;
+			case "1_wire":
+				$(io_output).css("display","none");
+				$(io_status).css("display","none");
+			break;
+#endif
+		}
+
+	};
+
+	for( i=1; i<=pin_numbers; i++ ) {
+		$("#pin_mode"+i).change( function() { setupIOrow( this.value, this.id.substring("pin_mode".length))});
+		setupIOrow( $("#pin_mode"+i).val(), i);
+	}
+
+#ifdef GLOBAL_PULLUP
+	$("input:radio.access[name=pullUp]").change(function() {
+#endif
+		for( i=1; i<=pin_numbers; i++ ) {
+#ifdef IO_PULLUP
+			$("input:radio.access[name=io_pullup"+i+"]").trigger("change");
+#endif
+			$("#pin_mode"+i).trigger("change");
+		}
+#ifdef GLOBAL_PULLUP
+	});
+
+	$("input:radio.access[name=pullUp]").trigger("change");
+#endif
+	$("#io-div").toggle(en);
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+	$(w1_dev_table).css("display","none");
+#endif
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+	if (ioTrigEn == '1' && pinmode[ioTrigPin] != 'digital_output') {
+		validate_alert("", "IO pin #"+ioTrigPin+_("ioPinModeWarning2-1")+"<a href=wan_summary.html>"+_("ioPinModeWarning2-2")+"</a>"+_("ioPinModeWarning1-3"));
+	}
+	// disable IO pin mode selection and Value selection menu
+	// when the pin is assigned to WAN failover trigger function
+	if (ioTrigEn == '1') {
+		$("#pin_mode"+ioTrigPin).attr("disabled", true);
+		$("#output"+ioTrigPin+"_0").attr("disabled", true);
+		$("#output"+ioTrigPin+"_1").attr("disabled", true);
+		$("#labelForOutput"+ioTrigPin+"_0").css("backgroundColor", "#f4f4f4");
+		$("#labelForOutput"+ioTrigPin+"_1").css("backgroundColor", "#f4f4f4");
+	}
+#endif
+
+	updateInput();
+	setInterval(updateInput, periodic);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div id="main-content">
+			<form class="validate" name="form" id ="form" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+			<%appendCsrfToken();%>
+			<input type="hidden" name="debug_level" id="debug_level"/>
+#ifdef GLOBAL_PULLUP
+			<input type="hidden" name="pullUpVoltage" id="pullUpVoltage"/>
+#endif
+			<div class="right-column  white-box">
+				<div class="pad">
+					<h2><script language=Javascript>document.write(_("ioConfiguration"))</script></h2>
+					<div id="io_enable" class="form-row no-bg-form">
+						<label for="field-0"><script language=Javascript>document.write(_("ioFunctionality"))</script></label>
+						<div class="field" style="padding-left:5px;">
+							<div class="location-settings">
+								<div class="radio-switch" data-toggle-element="io-div">
+									<input type="radio" id="io_enable_0" name="io_enable" class="access" value="1">
+									<label for="io_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="io_enable_1" name="io_enable" class="access" value="0">
+									<label for="io_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="io-div">
+#ifdef GLOBAL_PULLUP
+						<div class="form-row no-bg-form">
+							<label for="pullUp"><script language=Javascript>document.write(_("pullUpVoltage"))</script></label>
+							<div class="field">
+								<div class="radio-box-group">
+									<div class="radio-box">
+										<input type="radio" class="access" name='pullUp' id='pullUp_0'>
+										<label for="pullUp_0"><div class="radioText"><script language=Javascript>document.write(LOW_PULLUP_V)</script></div></label>
+									</div>
+									<div class="radio-box">
+										<input type="radio" class="access" name='pullUp' id='pullUp_1'>
+										<label for="pullUp_1"><div class="radioText"><script language=Javascript>document.write(HIGH_PULLUP_V)</script></div></label>
+									</div>
+								</div>
+							</div>
+						</div>
+#endif
+						<div class="form-row no-bg-form">
+							<div class="slider-label">
+								<div class="slider-min"><script language=Javascript>document.write(_("min"))</script></div>
+								<div class="slider-max"><script language=Javascript>document.write(_("max"))</script></div>
+							</div>
+							<label for="field-0"><script language=Javascript>document.write(_("ioManagerDebugLevel"))</script></label>
+
+							<div class="slider1-bar">
+								<div id="slider-range-max"></div>
+							</div>
+							<div id="debugLevel" class="slider1-val"></div>
+						</div>
+						<h2><script language=Javascript>document.write(pin_numbers>1?_("perPINconfiguration"):_("PINconfiguration"))</script></h2>
+						<table class="above-5-column name-list grey-box">
+							<colgroup>
+#ifdef V_IOMGR_kudu
+								<col width="10%">
+								<col width="30%">
+								<col width="30%">
+								<col width="auto">
+#else
+								<col width="auto">
+								<col width="auto">
+								<col width="auto">
+								<col width="auto">
+								<col width="auto">
+#endif
+							</colgroup>
+							<thead>
+								<tr>
+									<th class="align10"><script language=Javascript>document.write(_("pin"))</script></th>
+									<th class="align10" style="text-align:center"><script language=Javascript>document.write(_("mode"))</script></th>
+#ifndef V_IOMGR_kudu
+#ifdef IO_PULLUP
+									<th class="align10" style="text-align:center"><script language=Javascript>document.write(_("pullUp"))</script></th>
+#endif
+									<th class="align10" style="text-align:center"><script language=Javascript>document.write(_("threshold"))</script></th>
+#endif
+									<th class="align10" style="text-align:center"><div id="value_header"><script language=Javascript>document.write(_("value"))</script></div></th>
+								</tr>
+							</thead>
+							<tbody id="PINlist"></tbody>
+						</table>
+					</div>
+					<div class="submit-row">
+						<button type="button" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						<button type="button" class="secondary" onClick="window.location='IO_configuration.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+					</div>
+
+#if defined(V_WEBIF_SPEC_vdf) && defined(V_ONE_WIRE)
+					<div id="w1_dev_table">
+					<h2><script language=Javascript>document.write(_("oneWireDeviceList"))</script></h2>
+					<table>
+						<colgroup>
+							<col width="35%">
+							<col width="20%">
+							<col width="45%">
+						</colgroup>
+						<thead>
+							<tr>
+								<th class="align10" style="text-align:left"><script language=Javascript>document.write(_("deviceName"))</script></th>
+								<th class="align10" style="text-align:left"><script language=Javascript>document.write(_("id"))</script></th>
+								<th class="align10" style="text-align:left"><script language=Javascript>document.write(_("data"))</script></th>
+							</tr>
+						</thead>
+						<tbody id="deviceList"></tbody>
+					</table>
+					</div>
+#endif
+
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "IOCONFIG", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+</script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>User Interface Utility</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<style>
+.message_box {padding: 20px 20px 20px 0;}
+
+.file-wrapper {
+	display: inline-block;
+	overflow: hidden;
+	position: relative;
+}
+.file-wrapper input {
+ 	cursor: pointer;
+	font-size: 100px;
+	height: 100%;
+	filter: alpha(opacity=1);
+	-moz-opacity: 0.01;
+	opacity: 0.01;
+	position: absolute;
+	right: 0;
+	top: 0;
+	width:auto;
+}
+.file-holder {
+	display: inline-block;
+	padding-top: 8px;
+}
+</style>
+
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("UIU");
+var f_uploaded="<%v=get_single('upload.target_filename');%>@@v";
+if(f_uploaded=="N/A")
+	f_uploaded="";
+
+function uiu_action(f) {
+	$.get('/cgi-bin/webif_tools.cgi?'+f, function(v) {
+		$("#webFileDetail").html(v);
+	});
+}
+
+function xml_csv_info(v) {
+	$.get('/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>xml_csv_msg', function(v) {
+		eval(v)
+		if(xml_csv_msg.substr(0,7)=="Done = ") {
+			window.location.reload();
+		}
+		$("#message_box_id").html(xml_csv_msg);
+	});
+}
+
+function csv_procedure() {
+	$.get('/cgi-bin/webif_tools.cgi?convertCsv', function(v) {
+		$("#message_box_id").html(v);
+		setInterval(xml_csv_info, 1000);
+	});
+}
+
+function convert_csv() {
+	$.blockUI( {
+	 message: "<div class='message_box' id='message_box_id'>\
+		This procedure may take a long time to complete,</br>do you wish to continue? \
+		<div style='padding:16px 0 30px 35%;'>\
+		<button class='secondary mini' onClick='csv_procedure()'>Yes</button>\
+		<button class='secondary mini' onClick='$.unblockUI();'>No</button>\
+		</div>\
+	</div>"});
+	//uiu_action('convertCsv');
+}
+
+function submitF1() {
+var f = document.form1;
+
+	if(f.uploadFile1.value.length == 0){ alert(_("system warningMsg02")); return;}//"Please enter a file"
+	var f1=f.uploadFile1.value;
+	f.btWebImport.disabled=true;
+	f.submit();
+}
+
+function check_file(file_name) {
+	$("#dest_html").css("display", "none");
+	$("#dest_cgi").css("display", "none");
+	$("#dest_js").css("display", "none");
+	$("#dest_css").css("display", "none");
+	$("#dest_img").css("display", "none");
+	n=file_name.split(".");
+	$("#destDir").val("");
+	if(n.length<2) {
+		return;
+	}
+	switch(n[n.length-1].toLowerCase()) {
+		case "html":
+		case "htm":
+			$("#dest_html").css("display", "");
+			$("#destDir").val("/www")
+		break;
+		case "cgi":
+		case "lua":
+			$("#dest_cgi").css("display", "");
+			$("#destDir").val("/www/cgi-bin")
+		break;
+		case "js":
+			$("#dest_js").css("display", "");
+			document.form1.js_dest.value="/www/js";
+			$("#destDir").val("/www/js")
+		break;
+		case "css":
+			$("#dest_css").css("display", "");
+			document.form1.css_dest.value="/www/css";
+			$("#destDir").val("/www/css")
+		break;
+		case "pdf":
+			$("#dest_pdf").css("display", "");
+			$("#destDir").val("/www")
+		break;
+		case "jpg":
+		case "gif":
+		case "png":
+		case "ico":
+			$("#dest_img").css("display", "");
+			document.form1.img_dest.value="/www/img";
+			$("#destDir").val("/www/img")
+		break;
+		case "xml":
+			$("#dest_xml").css("display", "");
+			$("#destDir").val("/www/lang")
+		break;
+	}
+}
+
+var SITE = SITE || {};
+SITE.fileInputs = function() {
+	var $this = $(this),
+	$val = $this.val(),
+	valArray = $val.split('\\'),
+	newVal = valArray[valArray.length-1],
+	$button = $this.siblings('.button'),
+	$fakeFile = $this.siblings('.file-holder');
+	if(newVal !== '') {
+		$button.text(_("fileChosen"));
+		if($fakeFile.length === 0) {
+			$button.after('<span class="file-holder">' + newVal + '</span>');
+		}
+		else {
+			$fakeFile.text(newVal);
+		}
+	}
+};
+
+$(document).ready(function() {
+	var dest_dir=<%_d=session['destDir'];%>"@@_d";
+
+	if(dest_dir=="") {
+		cmd="/cgi-bin/webif_tools.cgi?I&"+f_uploaded;
+	}
+	else {
+		cmd="/cgi-bin/webif_tools.cgi?I&"+f_uploaded+"&"+dest_dir;
+	}
+
+	if(f_uploaded!="") {
+		$.get(cmd);
+	}
+        set_menu("System", "", <%_val = session["user"];%>"@@_val");
+	uiu_action("getWebFiles");
+	$(".file-wrapper input[type=file]").bind("change focus click", SITE.fileInputs);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Maen--></div>
+<div id="content" class="site-content">
+	<div class="container dashboard white-box">
+		<div class="pad">
+		<h2><script language=Javascript>document.write(_("ui utility"))</script></h2>
+		<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?form1" encType="multipart/form-data">
+			<%appendCsrfToken();%>
+			<input type="hidden" name="destDir" id="destDir" value="@@form['destDir']">
+			<table>
+				<tr><th><script language=Javascript>document.write(_("upload web files"))</script></th></tr>
+			</table>
+			<table>
+				<tr>
+					<td width="20%" height="40px"><script language=Javascript>document.write(_("upload web files"))</script>:</td>
+					<td width="35%">
+						<span class="file-wrapper">
+							<input type="file" name="uploadFile1" onChange="check_file(this.value)">
+							<span class="button secondary" style="width:auto;">&nbsp;&nbsp;<script language=Javascript>document.write(_("chooseFile"))</script>&nbsp;&nbsp;</span>
+						</span>
+					</td>
+					<td width="10%" style="text-align:right"><script language=Javascript>document.write(_("destination"))</script>:</td>
+					<td width="20%">
+						<div id="dest_html">/www/</div>
+						<div id="dest_cgi" style="display:none">/www/cgi-bin/</div>
+						<div id="dest_pdf" style="display:none">/opt/cdcs/doc/</div>
+						<div id="dest_js" style="display:none">
+							<select name="js_dest" style="width:150px" onChange="$('#destDir').val(this.value)">
+								<option value="/www">/www/</option>
+								<option value="/www/js">/www/js/</option>
+	<!-- #ifdef V_WEBIF_SPEC_vdf -->
+								<option value="/www/vdf-lib/js">/www/vdf-lib/js/</option>
+								<option value="/www/vdf-lib/js/lib">/www/vdf-lib/js/lib/</option>
+	<!-- #endif -->
+							</select>
+						</div>
+						<div id="dest_css" style="display:none">
+							<select name="css_dest" style="width:150px" onChange="$('#destDir').val(this.value)">
+								<option value="/www">/www/</option>
+								<option value="/www/css">/www/css/</option>
+	<!-- #ifdef V_WEBIF_SPEC_vdf -->
+								<option value="/www/vdf-lib/css">/www/vdf-lib/css/</option>
+	<!-- #endif -->
+							</select>
+						</div>
+						<div id="dest_img" style="display:none">
+							<select name="img_dest" style="width:150px" onChange="$('#destDir').val(this.value)">
+								<option value="/www/">/www/</option>
+								<option value="/www/img">/www/img/</option>
+								<option value="/www/images">/www/images/</option>
+							</select>
+						</div>
+						<div id="dest_xml" style="display:none">
+							<select name="xml_dest" style="width:150px" onChange="$('#destDir').val(this.value)">
+								<option value="/www/">/www/</option>
+								<option value="/www/lang/en">/www/lang/en/</option>
+								<option value="/www/lang/fr">/www/lang/fr/</option>
+								<option value="/www/lang/ar">/www/lang/ar/</option>
+								<option value="/www/lang/de">/www/lang/de/</option>
+								<option value="/www/lang/jp">/www/lang/jp/</option>
+							</select>
+						</div>
+					</td>
+					<td width="15%" align="center">
+						<button type="button" class="secondary" name="btWebImport" onclick="submitF1();" style="width:auto;"><script language=Javascript>document.write(_("upload"))</script></button>
+					</td>
+				</tr>
+			</table>
+		</form>
+
+		<form name="form2" method="POST" action="@@request['SCRIPT_NAME']?form2" encType="multipart/form-data">
+			<table width="100%">
+				<tr>
+					<td width="33%"><button type="button" class="secondary" style="width:auto;" onClick="uiu_action('compressWeb')"><script language=Javascript>document.write(_("archiveWeb"))</script></botton></td>
+					<td width="33%"><div align="center"><button type="button" class="secondary" style="width:auto;" onClick="uiu_action('compressLang')"><script language=Javascript>document.write(_("archiveLang"))</script></botton></div></td>
+					<td width="33%"><div align="right"><button type="button" class="secondary" style="width:auto;" onClick="convert_csv()"><script language=Javascript>document.write(_("convertCsv"))</script></button></div></td>
+				</tr>
+			</table>
+			<table class="grey-box" id="webFileDetail"></table>
+			<br/>
+		</form>
+
+		<form name="form3" method="POST" action="@@request['SCRIPT_NAME']?form3" encType="multipart/form-data">
+			<table>
+				<tr><th><script language=Javascript>document.write(_("string management"))</script></th></tr>
+			</table>
+			<table>
+				<tr><td align="center"><button type="button" class="secondary" style="width:auto;" onclick="javascript:window.open('/StringManagement.html')"><script language=Javascript>document.write(_("open edit tool"))</script></button></td></tr>
+			</table>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+</body>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if( request["QUERY_STRING"]=='form1' ) {
+		session['destDir'] = form['destDir'];
+		session['filename'] = files['uploadFile1'].CLIENT_FILENAME;
+		for (f in files) {
+			var filename = files[f].FILENAME;
+			target = '/opt/cdcs/upload/' + session["filename"];
+			set_single( 'upload.target_filename=' + session["filename"] );
+			rename(files['uploadFile1'].FILENAME, target);
+		}
+	}
+	redirect('/UIU.html');
+}
+else { //GET
+	session['destDir']="";
+}
+%>
+</html>

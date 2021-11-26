@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+	<Inlcude>
+		<Country country="Canada" mcc="302">
+			<Carrier carrier="Bell Mobility 1" mnc="610">
+				<APN apn="pda2.bell.ca">
+				</APN>
+			</Carrier>
+			<Carrier carrier="Bell Mobility 2" mnc="640">
+				<APN apn="pda2.bell.ca">
+				</APN>
+			</Carrier>
+			<Carrier carrier="Bell Mobility 3" mnc="651">
+				<APN apn="pda2.bell.ca">
+				</APN>
+			</Carrier>
+			<Carrier carrier="Wind Mobile" mnc="490">
+				<APN apn="broadband.windmobile.ca">
+				</APN>
+			</Carrier>
+		</Country>
+	</Include>
+</Rt>

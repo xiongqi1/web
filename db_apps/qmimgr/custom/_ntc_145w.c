@@ -1,0 +1,63 @@
+/*
+ * This is a list of custom band information.
+ * Each entry consists of hex and name.
+ * It provides a means of limiting the available bands and
+ * customising the band names.
+ *
+ * Developers must make sure that name is unique.
+ * It is OK to have entries that are beyond module's band capabilities.
+ * Only the overlap will be used in the system.
+ *
+ * This is the list for ntc_145w.
+ *
+ * Copyright Notice:
+ * Copyright (C) 2016 NetComm Wireless limited.
+ *
+ * This file or portions thereof may not be copied or distributed in any form
+ * (including but not limited to printed or electronic forms and binary or object forms)
+ * without the expressed written consent of NetComm Wireless Ltd.
+ * Copyright laws and International Treaties protect the contents of this file.
+ * Unauthorized use is prohibited.
+ *
+ *
+ * THIS SOFTWARE IS PROVIDED BY NETCOMM WIRELESS ``AS IS''
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL NETCOMM
+ * WIRELESS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+const struct custom_band_t custom_band_qmi[] = {
+    {  80, "WCDMA B1 (2100)"},
+    {  84, "WCDMA B5 (850)"},
+    {  85, "WCDMA B6 (800)"},
+    {  87, "WCDMA B8 (900)"},
+    {  88, "WCDMA B9 (1700)"},
+    {  91, "WCDMA B19 (800)"},
+
+    { 120, "LTE FDD B1 (2100)"},
+    { 122, "LTE FDD B3 (1800)"},
+    { 124, "LTE FDD B5 (850)"},
+    { 126, "LTE FDD B7 (2600)"},
+    { 127, "LTE FDD B8 (900)"},
+    { 143, "LTE FDD B18 (850)"},
+    { 144, "LTE FDD B19 (850)"},
+    { 146, "LTE FDD B21 (1500)"},
+    { 158, "LTE FDD B28 (700)"},
+    { 140, "LTE TDD B38 (2600)"},
+    { 141, "LTE TDD B39 (1900)"},
+    { 142, "LTE TDD B40 (2300)"},
+    { 149, "LTE TDD B41 (2500)"},
+
+    { 250, "WCDMA all"},
+    { 251, "LTE all"},
+    { 253, "All bands"},
+};
+

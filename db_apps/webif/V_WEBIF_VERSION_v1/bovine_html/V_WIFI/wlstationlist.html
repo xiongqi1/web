@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Wireless Station List</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi?wlInfo'></script>
+<body >
+<div id="contentWrapper">
+<% include menu.html %>
+<script language=Javascript>
+function makelist(v) {
+	eval(v)
+	ajaxerror=0;
+	var h="";
+	for(i=0; i<wlst.length; i++) {
+		h+="<tr>";
+		h+="<td width='13%'>"+wlst[i].ssid+"</td>";
+		h+="<td width='15%'>"+wlst[i].mac+"</td>";
+		h+="<td width='15%'>"+wlst[i].ipaddr+"</td>";
+		h+="<td width='18%'>"+wlst[i].host+"</td>";
+		h+="<td width='6%'>" +wlst[i].rssi+"</td>";
+		h+="<td width='12%'>"+wlst[i].psm+"</td>";
+		h+="<td width='6%'>" +wlst[i].bw+"</td>";
+		h+="<td width='15%'>"+wlst[i].uptime+"</td>";
+		h+="</tr>";
+	}
+	$("#wlist").html(h);
+}
+var ajaxerror=0;
+$(document).ready(function() {
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi?wlInfo', makelist);
+		else
+			location.reload();
+	}
+	$.get('/cgi-bin/ajax.cgi?wlInfo', makelist);
+	setInterval(startPoll, 3000);
+});
+</script>
+
+<form name="form" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<h3>Wireless LAN > Station List</h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table>
+    <tr><th>Station List</th></tr>
+</table>
+
+<table id="wlInfo">
+	<tr>
+		<td width="13%"><b>SSID</b></td>
+		<td width="15%"><b>MAC address</b></td>
+		<td width="15%"><b>IP Address</b></td>
+		<td width="18%"><b>Host Name</b></td>
+		<td width="6%"><b>RSSI</b></td>
+		<td width="12%"><b>PSM</b></td>
+		<td width="6%"><b>BW</b></td>
+		<td width="15%"><b>Connected Time</b></td>
+	</tr>
+</table>	
+<table id="wlist"></table>
+</form>
+<p></p>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

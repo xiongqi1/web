@@ -1,0 +1,17 @@
+digraph "General configuration"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node2 [label="Debug",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html"];
+  Node5 [label="GPIO Control",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___g_p_i_o.html"];
+  Node3 [label="Enable/disable channels\l (for init)",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___e_n_a_b_l_e.html"];
+  Node1 [label="ProSLIC API",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___pro_s_l_i_c___a_p_i.html"];
+  Node0 [label="General configuration",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node4 [label="Patch management.",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___p_a_t_c_h.html"];
+  Node1->Node0 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+}

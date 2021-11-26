@@ -1,0 +1,2503 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<%useSession();%>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+#ifdef V_WEBIF_SPEC_vdf
+#ifdef V_PRODUCT_vdf_nwl12
+<title>Vodafone MachineLink 3G Plus</title>
+#elif (defined V_PRODUCT_vdf_nwl22)
+<title>Vodafone MachineLink 4G</title>
+#elif (defined V_PRODUCT_vdf_nwl22w)
+<title>Vodafone MachineLink 4G</title>
+#elif (defined V_PRODUCT_vdf_nwl220)
+<title>Vodafone MachineLink 4G Lite</title>
+#else /* V_PRODUCT_vdf_nwl10 */
+<title>Vodafone MachineLink 3G</title>
+#endif
+#else
+<title>Status</title>
+#endif
+<% include topinc_v2.inc %>
+
+<%
+	var login;
+
+	if( request["SESSION_ID"]!=session["sessionid"] ) {
+		login=0;
+	}
+	else {
+		login=1;
+	}
+%>
+
+#ifdef V_MODCOMMS_y
+<%__rf_mice_ready=get_single_direct('modcomms.rf-mice.1.status');%>
+#endif
+
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<style>
+td {
+	border:0;
+}
+</style>
+<script language='javascript'>
+var status_poll_timer=10000;
+var local_uptime=0;
+var imageidx = 6;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var pincounter = 0;
+var ajaxerror = 0;
+var show_duration = new Array();
+var simStatus = "";
+var currentSession="";
+var currentSession_ltime="";
+var usageHistory="";
+var usageHistory_ltime="";
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+var lan_ip=<%_v=get_single("link.profile.0.address");%>"@@_v";
+var lan_mask=<%_v=get_single("link.profile.0.netmask");%>"@@_v";
+var hw_ver=<%_v=get_single("uboot.hw_ver");%>"@@_v";
+if(hw_ver=="")
+	hw_ver="1.0";
+var user=<%_u=session["user"];%>"@@_u";
+/* Decodes a Unicode string into ASCII ready for printing on status page */
+function UrlDecode(str) {
+	var output = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1, i + 3));
+		output += String.fromCharCode(val);
+	}
+	return output;
+}
+
+function addcomma( myval ) {
+retval="";
+cm=parseInt((myval.length-1)/3);
+	for( xx=0; xx<cm; xx++ ) retval+=myval.substring( retval.length-xx, myval.length-(cm-xx)*3)+',';
+	retval+=myval.substring(retval.length-xx, myval.length);
+	return retval;
+}
+
+function toggle_box_header(ctrl,open) {
+
+	if(open) {
+		ctrl.children(".box-header").removeClass("close");
+		ctrl.children("div").removeClass("hide");
+	}
+	else {
+		ctrl.children(".box-header").addClass("close");
+		ctrl.children("div").addClass("hide");
+	}
+}
+
+function update_ipsec(ipsecSt) {
+	var ipsec_enable=ipsecSt.length>0;
+
+	// show or hide ipsec status
+	$("#ipsec-div").toggle(ipsec_enable);
+
+	var ipsec_status_table;
+	$.each(ipsecSt,function(idx,pf){
+		if(ipsec_status_table===undefined) {
+			ipsec_status_table=$("<table class='above-5-column'> style='margin-bottom:0'").append(
+				"<tr>"
+				+"<th class='align10-2'>#</th>"
+				+"<th class='align10-2'>"+_("name")+"</th>"
+				+"<th class='align10-2'>"+_("interface")+"</th>"
+				+"<th class='align10-2'>"+_("localLAN")+"</th>"
+				+"<th class='align10-2'>"+_("remoteGateway")+"</th>"
+				+"<th class='align10-2'>"+_("remoteLAN")+"</th>"
+				+"<th class='align10-2'>"+_("status")+"</th>"
+				+"</tr>"
+			);
+		}
+
+		// get ipsec online status
+		var ipsec_online=pf.ipsecStatus==1;
+
+		var wan_online=pf.ipsecWanDev.match(/^(wwan|eth|wlan_sta)\.[0-9]+$/)
+
+		// get ipsec online message
+		var ipsec_status;
+		if(wan_online) {
+			if(ipsec_online)
+				ipsec_status=_("connected");
+			else
+				ipsec_status=_("connecting")+"<i class='progress-sml'></i>";
+		}
+		else {
+			ipsec_status=_("waiting");
+		}
+
+		ipsec_status_table.append(
+			"<tr>"
+				+"<td>"+(idx+1)+"</td>"
+				+"<td>"+breakWord(Base64.decode(pf.ipsecProfile), 8, 1)+"</td>"
+				+"<td>"+pf.ipsecWanDev+"</td>"
+				+"<td>"+pf.local_lan+"</td>"
+				+"<td>"+breakWord(Base64.decode(pf.remote_gateway), 18, 1)+"</td>"
+				+"<td>"+pf.remote_lan+"</td>"
+				+"<td>"+ipsec_status+"</td>"
+			+"</tr>"
+		);
+	});
+
+	if(ipsec_status_table!==undefined) {
+		$("#ipsec-status").html(ipsec_status_table);
+	}
+}
+#if defined(V_WIFI)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+
+var wlan_ap_div_user_override=false;
+
+function update_wlan_ap(wlanSt, wdsEnableSt, wdsCliCountSt) {
+
+	var atLeastOneRadioOn = false;
+	$.each(wlanSt,function(idx,pf){
+		if(pf.wlanRadio == "1" ) {
+			atLeastOneRadioOn = true;
+		}
+	});
+
+	// Hide/show the status box if all radios are off, or at least one is on.
+	if (!atLeastOneRadioOn) {
+		$("#wlan-ap-div").hide();
+		return;
+	}
+	$("#wlan-ap-div").show();
+
+	var wlan_status_table;
+	$.each(wlanSt,function(idx,pf){
+		if(wlan_status_table===undefined) {
+			wlan_status_table=$("<table class='above-5-column' style='margin-bottom:0'>").append(
+				"<tr>"
+				+"<th class='align10-2'>"+_("number")+"</th>"
+				+"<th class='align10-2'>"+_("status")+"</th>"
+				+"<th class='align10-2'>"+_("basic ssid")+"</th>"
+				+"<th class='align10-2'>"+_("channel")+"</th>"
+				+"<th class='align10-2'>"+_("netAuth")+"</th>"
+				+"<th class='align10-2'>"+_("stationInfo")+"</th>"
+				+"</tr>"
+			);
+		}
+		if(pf.wlanStatus === "1" ){
+			var wlanStatus="Enabled"
+			wlan_status_table.append(
+				"<tr>"
+					+"<td>"+(idx+1)+"</td>"
+					+"<td>"+wlanStatus+"</td>"
+					+"<td>"+pf.wlanSsid+"</td>"
+					+"<td>"+pf.wlanChannel+"</td>"
+					+"<td>"+pf.wlanNetworkAuth+"</td>"
+					+"<td><A HREF='wlstationlist.html' style='color:BLUE'>"+_("stationInfo")+"</A></td>"
+				+"</tr>"
+			);
+		}
+	});
+
+	if(wlan_status_table!==undefined) {
+		$("#wlanap-status").html(wlan_status_table);
+	}
+	// Are there any clients
+	var anyClients = false;
+	$.each(wlanSt, function(idx, obj) {
+		if (obj.wlanAnyClients == "yes") {
+			anyClients = true;
+			return false;
+		}
+	});
+
+	if(!wlan_ap_div_user_override)
+		toggle_box_header($("#wlan-ap-div"),anyClients);
+
+	// Is WDS enabled? - if so, show the number of connected WDS clients
+	// Otherwise, do not show any WDS-related info as it is irrelevant and confusing
+#if !defined(V_WIFI_qca_soc_lsdk)
+	if (wdsEnableSt == "1") {
+		$("#wds_cli_count_label").show();
+		$("#wds_cli_count").show();
+		$("#wds_cli_count").html(wdsCliCountSt);
+	}
+	else {
+		$("#wds_cli_count_label").hide();
+		$("#wds_cli_count").hide();
+	}
+#else
+		$("#wds_cli_count_label").hide();
+		$("#wds_cli_count").hide();
+#endif
+
+}
+
+$(function(){
+	$("#wlan-ap-div").click(function(){
+		wlan_ap_div_user_override=true;
+	});
+});
+
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+
+#endif
+function update_pptp(pptpSt) {
+var i;
+	$("#pptpProfile").html("");
+	$("#serveraddress").html("");
+	$("#pptpLocal").html("");
+	$("#pptpRemote").html("");
+	if(!pptpSt.length) {
+		$("#pptpStatus").html(_("disconnected"));
+		$("#pptp-div").css("display", "none");
+	}
+	else {
+		$("#pptp-div").css("display", "");
+		for( i=0; i<pptpSt.length; i++ ) {
+			if(pptpSt[i].pptpStatus != "up") {
+				if(simStatus == "SIM OK") {
+					$("#pptpStatus").html(_("connecting"));
+				}
+				else {
+					$("#pptpStatus").html(_("waiting"));
+				}
+			}
+			else {
+				$("#pptpStatus").html(_("connected"));
+				$("#pptpProfile").html(pptpSt[i].pptpProfile);
+				$("#serveraddress").html(htmlNumberEncode(Base64.decode(pptpSt[i].serveraddress)));
+				$("#pptpLocal").html(pptpSt[i].iplocal);
+				$("#pptpRemote").html(pptpSt[i].ipremote);
+				break;
+			}
+		}
+	}
+}
+
+var openvpn_clients=[];
+
+function update_openvpn(st) {
+	// collect openvpn profiles
+	var openvpn_profiles=new Array();
+
+	$.each(st,function(idx,pf){
+		if( pf.type.match(/^openvpn\.[0-9]+$/) && pf.enable ) {
+			openvpn_profiles.push(pf);
+		}
+	});
+
+	var openvpn_enable=openvpn_profiles.length>0;
+
+	if(openvpn_enable) {
+		$("#openvpn-div").css("display","");
+	}
+	else {
+		$("#openvpn-div").css("display","none");
+	}
+
+	// list up openvpn connection
+	var table_openvpn_profiles;
+
+	$.each(openvpn_profiles,function(idx,pf) {
+
+		table_openvpn_profiles="<tr>"
+			+"<th class='align10-2'>"+_("profile name")+"</th>"
+			+"<th class='align10-2'>"+_("status connection")+"</th>"
+			+"<th class='align10-2'>"+_("local IP")+"</th>"
+			+"<th class='align10-2'>"+_("remote IP")+"</th>"
+			//+"<th>"+_("vpnServerIP")+"</th>"
+		+"</tr>";
+
+		// get openvpn progress status
+		var openvpn_connected=$.inArray(pf.pppStatus.toLowerCase(),["up","ready"])>=0;
+
+		// get ppp status
+		var openvpn_status;
+
+		if(openvpn_connected) {
+			if(pf.pppStatus.toLowerCase()=="up") {
+				openvpn_status=_("status up");
+			}
+			else {
+				openvpn_status=_("ready");//pf.pppStatus;
+			}
+		}
+		else {
+			openvpn_status=parseInt(pf.enable)>0?_("connecting")+"<i class='progress-sml'></i>":_("disconnected");
+		}
+
+		table_openvpn_profiles+="<tr>"
+			+"<td>"+pf.name+"</td>"
+			+"<td>"+openvpn_status+"</td>"
+			+"<td>"+(openvpn_connected?pf.iplocal:_("na"))+"</td>"
+			+"<td>"+(openvpn_connected?pf.ipremote:_("na"))+"</td>"
+		+"</tr>";
+	});
+
+	// add client status if the array exists
+	var table_openvpn_clients="";
+	$.each(openvpn_clients,function(idx,row){
+		if(!table_openvpn_clients.length) {
+			table_openvpn_clients+="<tr>"
+			+"<th class='align10-2'>"+_("name")+"</th>"
+			+"<th class='align10-2'>"+_("clientPublicIP")+"</th>"
+			+"<th class='align10-2'>"+_("vpnClientIP")+"</th>"
+			+"<th class='align10-2'>"+_("dataReceived")+"</th>"
+			+"<th class='align10-2'>"+_("dataSent")+"</th>"
+			+"<th class='align10-2'>"+_("sessionStart")+"</th></tr>";
+		}
+		// get cells
+		cells=row.split(",");
+
+		table_openvpn_clients+="<tr>";
+		$.each(cells, function(idx,cell) {
+			// add a new td to the tr
+			if((idx>=1) && (idx<=6))
+				table_openvpn_clients+="<td><font style='font-weight:normal;'>"+cell+"</font></td>";
+		});
+		table_openvpn_clients+="</tr>";
+	});
+
+	$("#vpn-server").html(table_openvpn_profiles);
+	$("#vpn-client").html(table_openvpn_clients);
+}
+
+#if defined(V_WIFI_CLIENT)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+var wlan_sta_div_user_override=false;
+
+function update_wlan_sta(clientSt) {
+
+	// Hide/show the status box if the radio is off/on
+	if (clientSt[0].wlanRadio != "1") {
+		$("#wlan-sta-div").hide();
+		return;
+	}
+	$("#wlan-sta-div").show();
+
+	// Update the status
+	var connected = (clientSt[0].wlanStatus == "up");
+	$("#wrssid").html(htmlNumberEncode(Base64.decode(clientSt[0].wlanRssid)));
+	$("#wbssid").html(clientSt[0].wlanBssid);
+	$("#wsecurity").html(clientSt[0].wlanSecurity);
+	$("#wstatus").html(connected ? _("up"): _("down"));
+	$("#w-wds-status").html(clientSt[0].wlanWdsStatus);
+	$("#wlocalIP").html(connected ? clientSt[0].wlanLocalIP: "");
+
+	// In WDS mode, override description - as we show upstream AP MAC address
+	// instead of router's IP address
+	if (clientSt[0].wlanWdsStatus == "WDS") {
+		$("#waddress_label").html(_("wdsUpstreamApMacAdr"));
+		$("#wlanstaDNSIP").html(_("na"));
+	}
+	else {
+		$("#wlanstaDNSIP").html(connected ? clientSt[0].wlanDNSServerIP.replace(/ /g,"<br/>"): "");
+	}
+	// Show/hide the status box body if connected or not
+	if(!wlan_sta_div_user_override)
+		toggle_box_header($("#wlan-sta-div"),connected);
+}
+
+$(function(){
+	$("#wlan-sta-div").click(function(){
+		wlan_sta_div_user_override=true;
+	});
+});
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+
+#endif
+
+/*
+	a bit of parse for a more friendly version number - due to complexity of Sierra firmware version
+*/
+
+function friendly_name(init_name) {
+
+	var _init_name=init_name;
+	var _name_type;
+
+	/* process functions for each name type */
+	var _process_func={
+		"firmware_version":function() {
+
+			/*
+				SWI9X15C_05.05.26.01 r21583 carmd-fwbuild1 2014/04/22 16:45:22
+			*/
+
+			var sierra_fw_ver=_init_name.match(/SWI9X.*/g);
+			if(sierra_fw_ver) {
+				sierra_fw_ver_dig=sierra_fw_ver[0].match(/([0-9]+\.){1,}[0-9]+/g)
+				if(sierra_fw_ver_dig) {
+					return sierra_fw_ver_dig[0];
+				}
+			}
+
+			return _init_name;
+		}
+	};
+
+	/* set name type */
+	this.set_name_type=function(name_type) {
+		_name_type=name_type;
+	};
+
+	this.toString=function() {
+		return _process_func[_name_type];
+	};
+};
+
+var module_if_type=<%_p=get_single('wwan.0.if');%>"@@_p";
+var autopintried=<%_p=get_single('wwan.0.sim.autopin.tried');%>"@@_p";
+var registrationStr=[
+	_("unregisteredNoSearch"),
+	_("registeredHome"),
+	_("unregisteredSearching"),
+	_("registrationDenied"),
+	_("unknown"),
+	_("registeredRoaming"),
+	_("registeredSMShome"),
+	_("registeredSMSroaming"),
+	_("emergency"),
+	_("na")];
+
+
+function get_user_friendly_pdp_result(pdp_result) {
+
+	/* bypass if no pdp result code */
+	if($.type(pdp_result)=="undefined" || pdp_result=="" || pdp_result=="N/A")
+		return "";
+
+	var pdp_result_to_msgs={
+		"User Authentication failed":_("Authentication failed"),	// [PHS8-P] result from AT+CEER
+		"Authentication failed":_("Authentication failed"),	// [PHS8-] result from QMI
+		"Requested service option not subscribed":_("Failed due to incorrect APN"), // [PHS8-] result from QMI and result from AT+CEER
+		"Connection setup timeout":_("Network timeout"), // [PHS8-P] result from QMI
+		"Network failure":_("Network timeout"), // [PHS8-P] result from AT+CEER
+	};
+
+	var unknown_error=_("Unknown error");
+
+	/* search user friendly pdp result */
+	var user_friendly_pdp_result="";
+	$.each(pdp_result_to_msgs,function(o,v){
+		/* if matching */
+		if(o==pdp_result)
+			user_friendly_pdp_result=v;
+		return user_friendly_pdp_result=="";
+	});
+
+	/* use unknown error if not matching to any */
+	if(user_friendly_pdp_result=="")
+		user_friendly_pdp_result=unknown_error;
+
+	return user_friendly_pdp_result;
+}
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	eval(response);
+
+	csq = csq.substring(0, csq.indexOf("dBm") );
+	csqstr = _("not available");
+
+	#ifdef V_MANUAL_ROAMING_vdfglobal
+	// do not show CSQ when not registered
+	if(networkRegistration==0) {
+		csq=0;
+	}
+	#endif
+	if(connType.substring(0, 3) == "GSM") {
+	  if(csq == 0)
+		imageidx = 6;
+	  else if(csq >= -77 ) {
+		csqstr = _("high");
+		imageidx = 1;
+	  }
+	  else if(csq >= -91 ) {
+		csqstr = _("medium");
+		if(csq >= -85 )
+			imageidx = 2;
+		else
+			imageidx = 3;
+	  }
+	  else if(csq >= -109 ) {
+		csqstr = _("low");
+		if(csq >= -101)
+			imageidx = 4;
+		else
+			imageidx = 5;
+	  }
+	  else {
+		imageidx = 6;
+	  }
+	}
+	else if(connType.substring(0, 3) == "LTE") {
+	  if(csq == 0)
+		imageidx = 6;
+	  else if(csq > -70 ) {
+		csqstr = _("high");
+		imageidx = 1;
+	  }
+	  else if(csq > -90 ) {
+		csqstr = _("medium");
+		if(csq > -80 )
+			imageidx = 2;
+		else
+			imageidx = 3;
+	  }
+	  else if(csq > -120 ) {
+		csqstr = _("low");
+		if(csq > -100)
+			imageidx = 4;
+		else
+			imageidx = 5;
+	  }
+	  else {
+		imageidx = 6;
+	  }
+	}
+	else {
+	  if(csq == 0)
+		imageidx = 6;
+	  else if(csq >= -77 ) {
+		csqstr = _("high");
+		imageidx = 1;
+	  }
+	  else if(csq >= -91 ) {
+		csqstr = _("medium");
+		if(csq >= -85 )
+			imageidx = 2;
+		else
+			imageidx = 3;
+	  }
+	  else if(csq >= -109 ) {
+		csqstr = _("low");
+		if(csq >= -101)
+			imageidx = 4;
+		else
+			imageidx = 5;
+	  }
+	  else {
+		imageidx = 6;
+	  }
+	}
+
+	if(csq=="") {
+		imageidx = 6;
+	}
+	else {
+		$("#umtsss").html( csq+" dBm     "+csqstr);
+	}
+
+	if(imageidx < 6) {
+		$("#csqImg").html("<i class='connection-sml connection-sml-level"+imageidx+"'></i>");
+	}
+	else {
+		$("#umtsss").html("");
+		$("#csqImg").html("");
+	}
+
+	function getEnableStr(str) {
+		if(typeof(str)=="undefined" || str==null || str=="N/A")
+			return str;
+		var enableStr;
+		if(hasSubStr(str,/enable/i))
+			enableStr=_("enabled");
+		else
+			enableStr=_("disabled");
+		var phoneM=str.match(/[\+][0-9]+/);
+		var phoneNo="";
+		if(phoneM!=null)
+			phoneNo=phoneM[0];
+		if(phoneNo=="")
+			return enableStr;
+		return enableStr + "  ( " + phoneNo + " )";
+	}
+
+	//$("#uptime").html(toUpTime( uptime ));
+	$("#pppoeStatus").html(pppoeStatus);
+	if(pppoeStatus=="DISABLED") {
+		$("#pppoeIP").html("");
+		$("#pppoe-div").css("display", "none");
+		#ifdef	V_ROUTER_TERMINATED_PPPOE
+		/* nothnig to do - V_ROUTER_TERMINATED_PPPOE */
+		#else
+		$("#wwan-div").css("display", "");
+		#endif
+	}
+	else {
+		#ifdef	V_ROUTER_TERMINATED_PPPOE
+		toggle_box_header($("#wwan-div"),false);
+		#endif
+
+		$("#pppoeIP").html(pppoeAddress+" / 255.255.255.255");
+		$("#pppoe-div").css("display", "")
+		#ifdef	V_ROUTER_TERMINATED_PPPOE
+		/* nothnig to do - V_ROUTER_TERMINATED_PPPOE */
+		#else
+		$("#wwan-div").css("display", "none");
+		$("#pppoe_apn").html(pppoeapn);
+		if($("#pppoe_apn").html()=="" || $("#pppoe_apn").html()=="N/A") {
+			$("#pppoe_apn").css("fontStyle","italic");
+			$("#pppoe_apn").html(_("blank"));
+		}
+		else {
+			$("#pppoe_apn").css("fontStyle","normal");
+		}
+		#endif
+		$("#pppoe_service").html(htmlNumberEncode(Base64.decode(pppoeService)));
+		if($("#pppoe_service").html()=="" || $("#pppoe_service").html()=="N/A") {
+			$("#pppoe_service").css("fontStyle","italic");
+			$("#pppoe_service").html(_("blank"));
+		}
+		else {
+			$("#pppoe_service").css("fontStyle","normal");
+		}
+	}
+
+	if( typeof(hint)!="undefined" && hint!="N/A" && hint!="" ) {
+		var patt=/%[0-1][0-9a-f]%/gi
+		hint = hint.replace(patt, "%20%") // Some SIM cards have character less than %20. This ruins decoding rules.
+		roaming = UrlDecode(hint);
+	}
+	else {
+		roaming = "";
+	}
+
+	if (provider.charAt(0) == "%") {
+		provider = UrlDecode(provider).replace("&","&#38");
+	}
+
+	if(provider=="Limited Service") {
+		provider=_("limited service");
+	}
+	else if (provider=="N/A") {
+		provider=_("na");
+	}
+	$("#provider").html(provider);
+
+	if(br0mac!="N/A") {
+		$("#ethmac").html(br0mac);
+	}
+	else {
+		$("#ethmac").html(eth0mac);
+	}
+	$("#coverage").html(coverage);
+	$("#imei").html(imei);
+
+#if defined(V_MODULE_MC7354) || defined(V_MODULE_MC7304)
+	/* priid config */
+	var priid_config_existing=typeof(priid_config)!="undefined" && priid_config!="" && priid_config!="N/A";
+	$("#priid_config_div").toggle(priid_config_existing);
+	$("#priid_config").html(priid_config);
+
+	/* priid carrier */
+	var priid_carrier_existing=typeof(priid_carrier)!="undefined" && priid_carrier!="" && priid_carrier!="N/A";
+	$("#priid_carrier_div").toggle(priid_carrier_existing);
+	$("#priid_carrier").html(priid_carrier);
+#endif
+
+	$("#selband").html(current_selband);
+	$("#operatorSelection").html(plmn_selection_mode);
+
+#ifdef V_MANUAL_ROAMING_vdfglobal
+	if( simStatus!="SIM OK" && networkRegistration=="N/A" ) {
+		networkRegistration=9; //N/A
+	}
+#else
+	if( simStatus!="SIM OK" ) {
+		networkRegistration=9; //N/A
+	}
+#endif
+
+#ifdef V_MANUAL_ROAMING_vdfglobal
+	function pad(str, max) {
+		return str.length < max ? pad("0" + str, max) : str;
+	}
+
+	var roaming_algorithm_running;
+
+	if ($.type(mrs_cm_sus) == "undefined" || mrs_cm_sus == "N/A" || mrs_cm_sus == "")
+		mrs_cm_sus = 0
+
+	if(uptime < mrs_cm_sus)
+		networkRegistration=2;
+
+	roaming_algorithm_running=simStatus=="SIM OK" && networkRegistration!=1 && networkRegistration!=5;
+
+	/* roaming registration */
+	var reg_msg="";
+	if( roaming_algorithm_running && $.type(mrs_msg)!="undefined" && mrs_msg!="N/A" ) {
+		var msgs=mrs_msg.split(/,/);
+		if(msgs.length>1 && msgs[0]!=99) {
+
+			/* roaming status messages */
+			var reg_msgs=[
+				_("manual roaming status 0"),
+				_("manual roaming status 1"),
+				_("manual roaming status 2"),
+				_("manual roaming status 3"),
+				_("manual roaming status 4"),
+				_("manual roaming status 5"),
+				_("manual roaming status 6"),
+				_("manual roaming status 7"),
+				_("manual roaming status 8"),
+				null, // 9
+				null, // 10
+				null, // 11
+				_("manual roaming status 12"), // 12
+				_("manual roaming status 13"), // 13
+				null, // 14
+				null, // 15
+				null, // 16
+				null, // 17
+				null, // 18
+				null, // 19
+			];
+
+			/* get tokens */
+			var token_nw=mrs_nw!="N/A"?mrs_nw:"";
+			var token_rssi=token_rssi!="N/A"?mrs_rssi:"";
+			var token_dmin=parseInt(mrs_dmin) || 0;
+			var token_start=parseInt(mrs_start) || 0;
+			var token_now=parseInt(mrs_now) || 0;
+			var token_left=(token_dmin+token_start)-token_now;
+
+			/* get mm:ss format */
+			token_left=(token_left<0)?0:token_left;
+			var token_mm_ss=pad((Math.floor(token_left/60)).toString(),2) + ":" + pad((token_left%60).toString(),2);
+
+			/* get reg msg */
+			var reg_msg_idx=msgs[0];
+
+			/* use a different message when token left is zero */
+			if(!token_left && (reg_msg_idx==2 || reg_msg_idx==3)) {
+				reg_msg_idx=parseInt(reg_msg_idx)+10;
+			}
+			reg_msg=reg_msgs[reg_msg_idx];
+
+			/* replace keys */
+			reg_msg=reg_msg.replace("<provider>",token_nw);
+			reg_msg=reg_msg.replace("<rssi>",token_rssi);
+			reg_msg=reg_msg.replace("<reboot_mm_ss>",token_mm_ss);
+		}
+	}
+
+	/* print registration status - print reg_msg if existing */
+	$("#networkRegistration").html(reg_msg!=""?reg_msg:registrationStr[networkRegistration]);
+
+#else
+	$("#networkRegistration").html(registrationStr[networkRegistration]);
+#endif
+
+	switch(parseInt(networkRegistration)) {
+		case 0:
+		case 2:
+		case 9:
+		freq=_("na");
+		break;
+	}
+
+	$("#freq").html(freq.replace("IMT2000", "WCDMA 2100"));
+
+	// roaming
+	if(typeof(networkRegistration)!="undefined" && (networkRegistration==5)) {
+		if(roaming!="")
+			roaming = roaming+"&nbsp;&nbsp;-&nbsp;&nbsp;";
+		roaming = roaming+"<font style='color:red'>"+_("roaming")+"</font>";
+	}
+	else {
+		roaming = _("not roaming");
+	}
+	$("#roaming_status").html(roaming);
+
+	simStatusID=document.getElementById('simID');
+	simStatusID.style.color = "RED";
+	if( (simStatus.indexOf("SIM locked")!= -1)||(simStatus.indexOf("incorrect SIM")!= -1)||(simStatus.indexOf("SIM PIN")!= -1) ) {
+		simStatus = "SIM locked";
+		simStatusID.style.color = 'Orange';
+		$("#simID").html(_("detectingSIM")+"<i class='progress-sml'></i>");
+	}
+	else if( (simStatus.indexOf("CHV1")!= -1) || (simStatus.indexOf("PUK")!= -1) ) {
+		pincounter=3;
+		if (pukRetries != "0") {
+			simStatus = "SIM PUK locked";
+		}
+		else {
+			simStatus = "SIM invalidated";
+		}
+	}
+	else if( (simStatus.indexOf("MEP")!= -1) ) {
+		simStatus = "MEP locked";
+		pincounter=3;
+	}
+
+	if(simStatus == "SIM OK") {
+		simStatusID.style.color = 'GREEN';
+		$("#simID").html(_("simOK")+"<i class='success-sml'></i>");
+	}
+	else if(simStatus == "N/A" || simStatus == "Negotiating") {
+		MCC=MNC=IMSI=simICCID=_("na");
+		if (pukRetries != "0") {
+			if(manualroamResetting=="1") {
+				simStatusID.style.color = "RED";
+				$("#simID").html(_("resettingModem")+"<i class='progress-sml'></i>");
+			}
+			else {
+				simStatusID.style.color = 'Orange';
+				$("#simID").html(_("detectingSIM")+"<i class='progress-sml'></i>");
+			}
+		}
+		else {
+			simStatusID.style.color = "RED";
+			$("#simID").html(_("puk warningMsg1")+"<i class='warning-sml'></i>");
+		}
+	}
+	else if(simStatus == "SIM not inserted" || simStatus == "SIM removed") {
+		MCC=MNC=IMSI=simICCID=_("na");
+		if (pukRetries != "0") {
+			$("#simID").html(_("simIsNotInserted")+"<i class='warning-sml'></i>");
+		}
+		else {
+			simStatusID.style.color = "RED";
+			$("#simID").html(_("puk warningMsg1")+"<i class='warning-sml'></i>");
+		}
+	}
+	else {
+		if( prvSimStatus != simStatus ) {
+			if( ++ pincounter > 1) {
+				prvSimStatus = simStatus;
+				simStatusID.style.color = "RED";
+				switch(simStatus) {
+				case "SIM removed":
+					blockUI_alert_l( _("admin warningMsg8"), function(){return;});
+					break;
+				case "SIM general failure":
+					$("#simID").html(simStatus);
+					blockUI_alert_l(_("admin warningMsg2"), function(){return;});
+					break;
+				case "SIM locked":
+					/* only when autopin is disabled, we redirect the page */
+					// Beside autopin, extra conditional check is to fix an issue where after the device remembers PIN of any SIM, the status page does not prompt user to unlock SIM
+					// if user inserts another SIM or the same SIM of which PIN has been changed.
+					// This fix depends on wwan_pin and wwan_pin_ccid which are saved after SIM verification is successful by simple_at_manager or qmimgr.
+					// It is applied for wwan.0.if == "atqmi" or "at" because cnsmgr also unlocks SIM but does not process wwan_pin and wwan_pin_cci
+					// while qmimgr does not process autopin.
+					// wwan.0.if "atcns" may work because /usr/bin/cdcs_init_wwan_pm launches simple_at_manager with "-t all -f allcns" i.e including "simcard" feature, but it should be tested.
+					if(autopin=="0" || ((module_if_type == "atqmi" || module_if_type == "at") && ((currentICCID != "N/A" && rememberedICCID != currentICCID)  || rememberedICCID == "N/A"))) {
+						$("#simID").html(_("SIMlocked")+"<i class='warning-sml'></i>");
+						blockUI_alert_l(_("admin warningMsg3"), function(){window.location="/pinsettings.html";});
+					}
+					break;
+				case "SIM PUK locked":
+					$("#simID").html(_("status pukLocked")+"<i class='warning-sml'></i>");
+					blockUI_alert_l(_("admin warningMsg4"), function(){window.location="/pinsettings.html";});
+					break;
+				case "MEP locked":
+					$("#simID").html(simStatus);
+					blockUI_confirm(_("mep warningMsg2"), function(){window.location="/pinsettings.html?%4d%45%50%4c%6f%63%6b";});
+					break;
+				case "PH-NET PIN":
+				case "SIM PH-NET":
+					$("#simID").html(simStatus);
+<% if( request["SESSION_ID"]==session["sessionid"] ) {%>
+					window.location="/pinsettings.html";
+<%}%>
+					break;
+				case "Network reject - Account":
+					$("#simID").html(simStatus);
+					blockUI_alert_l(_("admin warningMsg6"), function(){return;});
+					break;
+				case "Network reject":
+					$("#simID").html(simStatus);
+					blockUI_alert_l(_("admin warningMsg7"), function(){return;});
+					break;
+				case "SIM invalidated":
+					$("#simID").html(_("puk warningMsg1")+"<i class='warning-sml'></i>");
+					blockUI_alert_l(_("puk warningMsg2"), function(){return;});
+					break;
+				default:
+					$("#simID").html(simStatus);
+					pincounter = 0;
+				break;
+				}
+			}
+		}
+	}
+
+	var dataRoamingBlockedStatus=dataRoamingBlocked;  // 1 - connection is blocked due to data roaming. 0 - not blocked
+
+	/* search if any wwan profile is enabled */
+	var wwan_profile_existing=false;
+	$.each(st,function(i,o){
+		/* bypass if disabled */
+		if(o.enable=="0")
+			return
+
+		/* byapass if no wwan profile */
+		if(!o.type.match(/^wwan\.[0-9]+$/))
+			return;
+
+		wwan_profile_existing=true;
+		return false;
+	});
+
+	if(!wwan_profile_existing) {
+
+		$("#none-profile").css("display","");
+		$("#roaming-block").css("display","none");
+		for( i=0; i<max_enabled_profiles; i++ ) {
+			if( i>=st.length || st[i].enable=="0") {
+				$("#wwan-div"+i).css("display","none");
+			}
+		}
+	}
+	else if (dataRoamingBlockedStatus == '1') {
+		$("#none-profile").css("display","none");
+		$("#roaming-block").css("display","");
+		for( i=0; i<max_enabled_profiles; i++ ) {
+			$("#wwan-div"+i).css("display","none");
+		}
+	}
+	else {
+		$("#none-profile").css("display","none");
+		$("#roaming-block").css("display","none");
+
+		/* search default gateway ppp profile */
+		var defgw_pidx=null;
+		for( i=0; i<st.length; i++ ) {
+			if((st[i].enable=="1") && (st[i].defgw=="1") && (st[i].type.match(/^wwan\.[0-9]+$/) != null))
+				defgw_pidx=i;
+		}
+
+		/* override "connecting string" when it is not registered */
+		var wait_for_reg_str="";
+		if($.type(networkRegistration)=="undefined" || networkRegistration=="N/A" || networkRegistration=="1" || networkRegistration=="5" ) {
+			wait_for_reg_str="";
+		}
+		else {
+			wait_for_reg_str=_("Waiting for registration");
+		}
+
+		for(var i=0; i<max_enabled_profiles; i++ ) {
+			// bypass all other types of connection
+			if( i>=st.length || st[i].enable=="0" || !st[i].type.match(/^wwan\.[0-9]+$/)) {
+				$("#wwan-div"+i).css("display","none");
+				continue;
+			}
+			$("#wwan-div"+i).css("display","");
+			if(simStatus=="SIM OK") {
+				$("#wwanProfile"+i).html(st[i].name);
+				if( (st[i].pppStatus!="up" && st[i].pppStatus!="ready") && st[i].enable == 1 ) {
+					if(simStatus == "SIM OK") {
+						if(st[i].pppStatus == "disconnecting" ) {
+							$("#wwanStatus"+i).html(_("disconnecting"));
+						}
+						if(st[i].pppStatus == "waiting" ) {
+							$("#wwanStatus"+i).html(_("waiting"));
+							$("#wwanIP"+i).html("&nbsp;");
+						}
+						else if(st[i].pppStatus == "waiting_dod" ) {
+							$("#wwanStatus"+i).html(_("waitingDemand"));
+							$("#wwanIP"+i).html("<br/>&nbsp;<br/>");
+						}
+						else {
+							var pdp_result="";
+							var pdp_defgw_profile;
+
+							var pdp_result_ready=true;
+
+							#if !defined(V_SUB_NETIF)
+							/* hold until the default profile is up */
+							if((defgw_pidx!=null) && (st[i].type.match(/^wwan\.[0-9]+$/))) {
+								if(defgw_pidx!=i) {
+									pdp_result_ready=st[defgw_pidx].pppStatus=="up";
+								}
+							}
+							#endif
+
+							if(pdp_result_ready) {
+								/* get pdp result msg */
+								pdp_result=get_user_friendly_pdp_result(st[i].pdp_result);
+							}
+							/* use a generic connecting message if no pdp result */
+							if(pdp_result=="")
+								pdp_result=_("connecting");
+
+							if(wait_for_reg_str!="")
+								pdp_result=wait_for_reg_str;
+
+							$("#wwanStatus"+i).html(pdp_result+"&nbsp;&nbsp;<i class='progress-sml'></i>");
+							$("#wwanIP"+i).html("&nbsp;");
+						}
+					}
+					else {
+						$("#wwanStatus"+i).html(_("waiting"));
+					}
+					//break;
+				}
+				else {
+					interface=st[i].interface.replace("usb1", "wwan0");
+					interface=interface.replace("ppp", "wwan");
+
+					if(st[i].pppStatus == "up") {
+						$("#wwanStatus"+i).html(_("connected"));
+						if(st[i].iplocal=="") {
+							$("#wwanIP"+i).html("&nbsp;");
+						}
+						else {
+							$("#wwanIP"+i).html(st[i].iplocal);
+						}
+						ipv6addr=format_ipv6addrs(st[i].ipv6_ipaddr, 120);
+						$("#ipv6addr"+i).html(ipv6addr);
+					}
+					else if(st[i].pppStatus == "down") {
+						$("#wwanStatus"+i).html(_("status down"));
+						$("#wwanIP"+i).html("&nbsp;");
+					}
+					else {
+						$("#wwanStatus"+i).html(st[i].pppStatus);
+						$("#wwanIP"+i).html("&nbsp;");
+					}
+				}
+				if( st[i].autoapn == "1"
+					&& !(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i))
+					&& !(typeof(mrs_custom_roam_simcard)!="undefined" && mrs_custom_roam_simcard == "1")
+				) {
+					if( typeof(st[i].currentapn)!="undefined" && st[i].currentapn != "" && st[i].currentapn != "N/A") {
+						$("#wwanAPN"+i).html(breakWord(st[i].currentapn,25));
+					}
+					else {
+						$("#wwanAPN"+i).html("&nbsp;");
+					}
+				}
+				else {
+					$("#wwanAPN"+i).html(breakWord(st[i].apn,25));
+				}
+				if($("#wwanAPN"+i).html()=="" || $("#wwanAPN"+i).html()=="&nbsp;" || $("#wwanAPN"+i).html().indexOf("N/A")!=-1) {
+					$("#wwanAPN"+i).css("fontStyle","italic");
+					$("#wwanAPN"+i).html(_("blank"));
+				}
+				else {
+					$("#wwanAPN"+i).css("fontStyle","normal");
+				}
+			}
+			else {
+				$("#wwanStatus"+i).html(_("disconnected"));
+			}
+			if(st[i].pppStatus == "up") {
+				dnsServer=st[i].dnsserver.replace(/ /,"<br/>");
+				if( dnsServer=="" ) {
+					dnsServer=_("na");
+				} else if (dnsServer.includes(":")) {
+					dnsServer=format_ipv6addrs(st[i].dnsserver, 30);
+				}
+			}
+			else {
+				dnsServer=_("na");
+			}
+			$("#dnsServer"+i).html(dnsServer);
+
+			if(typeof def_profile !== 'undefined' && def_profile==parseInt(st[i].idx)+1) {
+				$("#dftProfile"+i).html(_("CSyes")+"<br/>&nbsp;");
+			}
+			else {
+				if(dnsServer.indexOf("<br/>")!=-1) {
+					$("#dftProfile"+i).html(_("CSno")+"<br/>&nbsp;");
+				}
+				else {
+					$("#dftProfile"+i).html(_("CSno"));
+				}
+			}
+#ifdef V_MULTIPLE_WWAN_PROFILES_y
+			currentSession=st[i].current_session;
+			currentSession_ltime=st[i].current_session_ltime;
+			usageHistory=st[i].usage_history;
+			usageHistory_ltime=st[i].usage_history_ltime;
+#else
+			currentSession=current_session;
+			currentSession_ltime=current_session_ltime;
+			usageHistory=usage_history;
+			usageHistory_ltime=usage_history_ltime;
+#endif
+			updata_usage(i);
+		}
+	}
+	/* Advanced Status Elements */
+	$("#simICCID").html(simICCID);
+
+	$("#psc_dl").toggle(PSCs0!="N/A");
+	$("#PSC").html(PSCs0.substring(0, 4));
+	$("#LAC").html(LAC);
+	$("#rac_id").toggle(RAC!="N/A");
+	$("#RAC").html(RAC);
+	$("#CellId").html(CellId);
+	if(connType.substring(0, 3) == "GSM" || connType.substring(0, 4) == "EDGE") {
+	    $("#chanNumUarfcn").css("display", "none");
+	    $("#chanNumArfcn").css("display", "");
+	    $("#ChannelNumberArfcn").html(ChannelNumber);
+	}
+	else {
+	    $("#chanNumUarfcn").css("display", "");
+	    $("#chanNumArfcn").css("display", "none");
+	    $("#ChannelNumberUarfcn").html(ChannelNumber);
+	}
+
+	$("#MCC").html(MCC);
+	$("#MNC").html(MNC);
+	$("#IMSI").html(IMSI);
+	$("#moduleModel").html(moduleModel);
+	$("#moduleHardwareVersion").html(moduleHardwareVersion);
+
+	if (module_type == 'sierra')
+		moduleFirmwareVersion = moduleFirmwareVersion.substr(moduleFirmwareVersion.indexOf("_")+1,11);
+
+	if (module_type == '')
+		moduleFirmwareVersion = '';
+
+	$("#moduleFirmwareVersion").html(moduleFirmwareVersion);
+
+#if defined(V_MODULE_MC7304)
+	//temporary patch for unofficial Sierra module firmware
+	if($("#moduleFirmwareVersion").html()=="00.00.00.00") {
+		$("#moduleFirmwareVersion").html("VF GTM Ver. 1.0");
+	}
+#endif
+
+	var fw_ver_ext=$.type(moduleFirmwareVerExt)!="undefined" && moduleFirmwareVerExt!="" && moduleFirmwareVerExt!="N/A";
+
+	// show cid
+	if(fw_ver_ext)
+		$("#moduleFirmwareVersionExt").html(moduleFirmwareVerExt);
+	$("#cid").toggle(fw_ver_ext);
+
+	$("#priid_rev_div").toggle(PRIID_REV!="N/A");
+	$("#PRIID_REV").html(PRIID_REV);
+
+	$("#priid_pn_div").toggle(PRIID_PN!="N/A");
+	$("#PRIID_PN").html(PRIID_PN);
+
+	$("#hwver_div").toggle(moduleHardwareVersion!="N/A");
+	$("#hwver").html(moduleHardwareVersion);
+
+
+	//$("#hsupa_dl").toggle(hsucat!="N/A");
+	//$("#hsdpa_dl").toggle(hsdcat!="N/A");
+
+	// HSUPA and HSDPA are not applicable to GSM,so hiding them from UI for GSM
+	if(connType.substring(0, 3) != "GSM" && connType.substring(0, 4) != "EDGE" && connType.substring(0, 5) != "EGPRS") {
+		$("#hsucat").html(hsucat);
+		$("#hsdcat").html(hsdcat);
+	}
+	else {
+		$("#hsupa_dl").css("display", "none");
+		$("#hsdpa_dl").css("display", "none");
+	}
+
+	var rscp0_ext="N/A", rscp1_ext="N/A";
+	if( rscp0!="N/A" || rscp1!="N/A" ) {
+		// The range is from 3gpp standard.
+		if (rscp0 >= -109)
+			rscp0_ext=rscp0;
+		if (rscp1 >= -109)
+			rscp1_ext=rscp1;
+
+		$("#rscps").html(_("carrier")+" 0:&nbsp;&nbsp;&nbsp;&nbsp;" + rscp0_ext + "<br/>"+_("carrier")+" 1:&nbsp;&nbsp;&nbsp;&nbsp;" + rscp1_ext);
+		$("#rscp_dl").toggle(true);
+	}
+	else {
+		$("#rscp_dl").toggle(RSCPs0!='0');
+		if(RSCPs0=="0") {
+			$("#rscps").html(_("na"));
+		}
+		else {
+			$("#rscps").html("-"+RSCPs0+(RSCPs0=="N/A"?"":" dBm"));
+		}
+	}
+
+	/* show or hide ecn0 and ecio */
+	var ecn0_mode=ECN0_valid=="1";
+
+#ifdef V_PRODUCT_ntc_1121
+	$("#ecn0s_dl").hide();
+	$("#ecios_dl").hide();
+	$("#rscp_dl").hide();
+	$("#hsupa_dl").hide();
+	$("#hsdpa_dl").hide();
+	$("#psc_dl").hide();
+#else
+	$("#ecn0s_dl").toggle(ecn0_mode);
+	$("#ecios_dl").toggle(!ecn0_mode);
+#endif
+
+
+	if(!ecn0_mode) {
+		if( ecio0!="N/A" || ecio1!="N/A" ) {
+			$("#ecios_dl").toggle(true);
+			$("#ecios").html(_("carrier")+" 0:&nbsp;&nbsp;&nbsp;&nbsp;" + ecio0 + "<br/>"+_("carrier")+" 1:&nbsp;&nbsp;&nbsp;&nbsp;" + ecio1);
+		}
+		else {
+			$("#ecios_dl").toggle(ECIOs0!="0");
+			if(ECIOs0=="0") {
+				$("#ecios").html(_("na"));
+			}
+			else {
+				$("#ecios").html("-"+ECIOs0+(ECIOs0=="N/A"?"":" dB"));
+			}
+		}
+	}
+	else {
+		/* print ecn0 if available */
+		if(ECN0s0!="N/A" && ECN0s0!="0" && ECN0s0!="") {
+			$("#ecn0s").html("-" + ECN0s0+" dB");
+		}
+		else {
+			$("#ecn0s").html("N/A");
+		}
+	}
+
+	/* hide power sources */
+	$("#dcvoltage_div").toggle(dcvoltage!="N/A");
+	$("#powersource_div").toggle(dcvoltage!="N/A");
+
+	if( dcvoltage != "N/A" && dcvoltage !=0 ) {
+		$("#dcvoltage").html(dcvoltage+"V");
+	}
+	else {
+		$("#dcvoltage").html(_("na"));
+	}
+
+	$("#powersource").html(powersource);
+
+	/* hide all LTE information */
+	$.each(
+		{
+			"#rsrp0_div":(rsrp0=="N/A")?rsrp0:rsrp0+" dBm",
+			"#rsrp1_div":(rsrp1=="N/A")?rsrp1:rsrp1+" dBm",
+			"#rsrq_div":(rsrq=="N/A")?rsrq:rsrq+" dB",
+		},
+
+		function(o,v){
+			var val=parseInt(v);
+			$(o).toggle(v!="N/A");
+
+			if (val != NaN && val <= -120)
+				v="N/A";
+
+			$(o).find("dd").html(v=="N/A"?_("na"):v);
+		}
+	);
+	/* display a single rsrp */
+	$("#rsrp0_dt").html((rsrp1 != "N/A") ? _("rsrp")+" 0":_("rsrp"));
+
+	if(rscp0=="N/A" && rscp1=="N/A" && RSCPs0=='0' && rsrp0=="N/A" && rsrp1=="N/A") {
+		$("#rssi_div").toggle(true);
+		if (csq >= -109)
+			$("#RSSI").html(csq+" dBm");
+		else
+			$("#RSSI").html(_("na"));
+	}
+	else {
+		$("#rssi_div").toggle(false);
+	}
+
+	update_openvpn(st);
+	update_ipsec(ipsecSt);
+	update_pptp(pptpSt);
+#if defined(V_WIFI)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+	update_wlan_ap(wlanSt, wds_enable, wds_cli_cnt);
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+#endif
+#if defined(V_WIFI_CLIENT)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+	update_wlan_sta(wifiClientSt);
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+#endif
+
+/* ================= Ports Status ================= */
+#if (defined V_ETH_PORT_2plw_l)
+	var all = new Array();
+	all = portStatus.split(",");
+	for(var i=0; i < all.length; i++) {
+		if(all[i].indexOf("Up")!= -1) {
+			$("#port"+(i+1)+"_text").html("<span style='display:inline-block;width:140px'>"+_("status up")+all[i].substr(3, all[i].indexOf("Mbps")+11)+"</span><i class='success-sml'/>");
+		}
+		else {
+			$("#port"+(i+1)+"_text").html("<span style='display:inline-block;width:140px'>"+_("status down")+"</span><i class='warning-sml'></i>");
+		}
+	}
+#else
+	$("#port1_text").html(portStatus);
+	if(portStatus.indexOf("Up")!= -1) {
+		$("#port1_text").html("<span style='display:inline-block;width:140px'>"+_("status up")+portStatus.substr(3, portStatus.indexOf("Mbps")+11)+"</span><i class='success-sml'/>");
+	}
+	else {
+		$("#port1_text").html("<span style='display:inline-block;width:140px'>"+_("status down")+"</span><i class='warning-sml'></i>");
+	}
+#endif
+
+#if defined(V_EVENT_NOTIFICATION)
+	$("#noti_count").html(noti_cnt);
+#endif
+
+//	rearrage_fileds_in_advanced_status();
+}
+
+function updata_usage(idx) {
+	var ray = new Array();
+	ray = currentSession.split(",");
+	ray_ltime = currentSession_ltime.split(",");
+
+	var h="";
+	if(ray.length >= 4) {
+		if(simStatus=="SIM OK") {
+			$("#connectionUpTime"+idx).html(toUpTime(ray[1]*1-ray[0]*1));
+		}
+		else {
+			$("#connectionUpTime"+idx).html(toUpTime(0));
+		}
+		h="<tr><td>"+ray_ltime[0]+"</td><td>";
+		if(show_duration[idx]) {
+			h += toUpTime(ray[1]*1-ray[0]*1);
+		}
+		else {
+			h += _("currentSession");
+		}
+		h += "</td><td>"+addcomma(ray[2]);
+		h += "</td><td>"+addcomma(ray[3]);
+		var total = parseInt(ray[2])+parseInt(ray[3]);
+		h += "</td><td>"+addcomma(total.toString())+"</td></tr>";
+	}
+	else {
+		$("#connectionUpTime"+idx).html(toUpTime(0));
+	}
+
+	var history = new Array();
+	history = usageHistory.split("&");
+	history_ltime = usageHistory_ltime.split("&");
+	for( var j=0; j<history.length; j++) {
+		ray = history[j].split(",");
+		ray_ltime = history_ltime[j].split(",");
+		if(ray.length >= 4 ) {
+			h += "<tr><td>"+ray_ltime[0]+"</td><td>";
+			if(show_duration[idx]) {
+				h += toUpTime( ray[1]*1-ray[0]*1 );
+			}
+			else {
+				h += ray_ltime[1];
+			}
+			h += "</td><td>"+addcomma(ray[2]);
+			h += "</td><td>"+addcomma(ray[3]);
+			var total = parseInt(ray[2])+parseInt(ray[3]);
+			h += "</td><td>"+addcomma(total.toString())+"</td></tr>";
+		}
+		else {
+			break;
+		}
+	}
+	$("#TBusage"+idx).html(h);
+}
+
+function switchDuration( idx, action ) {
+	if( action ) {
+		$("#data_usage_duration_toggle"+idx).html("<a href='javascript:switchDuration("+idx+",0)'>"+_('showEndTime')+"</a>");
+		$("#SessionEndDuration"+idx).html(_("sessionDuration"));
+	}
+	else {
+		$("#data_usage_duration_toggle"+idx).html("<a href='javascript:switchDuration("+idx+",1)'>"+_('showDuration')+"</a>");
+		$("#SessionEndDuration"+idx).html(_("sessionEnd"));
+	}
+	show_duration[idx]=action;
+	updata_usage(idx);
+}
+
+function switchUsage( idx ) {
+	if( $("#data_usage_table"+idx).css("display")=="none" ) {
+		$("#data_usage_table"+idx).css("display", "");
+		$("#showUsageButton"+idx).html("<i class='icon closed'></i>"+_("hideDataUsage"));
+		$("#data_usage_duration_toggle"+idx).css("display", "");
+	}
+	else {
+		$("#data_usage_table"+idx).css("display", "none");
+		$("#data_usage_duration_toggle"+idx).css("display", "none");
+		$("#showUsageButton"+idx).html("<i class='icon open'></i>"+_("showDataUsage"));
+	}
+}
+
+function rearrage_fileds_in_advanced_status()
+{
+	DIVs=$("#advanced-status>div");
+	DLs=$("#advanced-status>div>dl");
+
+	var dls_in_section=0;
+	var section_idx=0;
+	var section_cnt=DIVs.length;
+	var dls_per_section;
+
+	/* get total DLs */
+	var total_dls=0;
+	DLs.each(function(){
+		if($(this).css("display")!="none")
+			total_dls++;
+	});
+
+	/* get DLs per section - 5 in a section but if less than 2 section, rearrage them */
+	dls_per_section=5;
+	if((total_dls<=dls_per_section*2) || (total_dls>dls_per_section*3))
+		dls_per_section=Math.ceil(total_dls/DIVs.length);
+
+	/* re-arrage */
+	DLs.each(function(){
+
+		/* cap. section index */
+		if(section_idx>=section_cnt)
+			section_idx=section_cnt-1;
+
+		/* move to div */
+		$(this).detach();
+		DIVs.eq(section_idx).append($(this));
+
+		/* count dls */
+		if($(this).css("display")!="none")
+			dls_in_section++;
+
+		if(dls_in_section>=dls_per_section) {
+			dls_in_section=0;
+			section_idx++;
+		}
+	});
+}
+
+function format_ipv6addrs(ipv6addrs, width)
+{
+	var strs=ipv6addrs.split(" ");
+	var result="";
+	for (i=0; i < strs.length; i++) {
+		strs[i]=strs[i].replace(/:[0]+/g,':0').replace(/:0:/,'::');
+		strs[i]=strs[i].replace(/:0:/g,':z:').replace(/:0/g,':');
+		strs[i]=strs[i].replace(/:z:/g,':0:');
+		if (strs[i].length > width) {
+			temp=strs[i].slice(0, strs[i].indexOf(":",strs[i].length/2)+1);
+			strs[i]=temp.concat("<br/>", strs[i].slice(temp.length));
+		}
+		result=result.concat(strs[i],"<br/>");
+	}
+	return result;
+}
+
+$(document).ready(function() {
+	var h='<div class="box-content" id="none-profile" style="display:none;padding-top:20px;"><i class="caution-sml"></i>&nbsp;&nbsp;&nbsp;'+_("noProfileEnabled")+'</div>';
+	h += '<div class="box-content" id="roaming-block" style="display:none;padding-top:20px;"><i class="caution-sml"></i>&nbsp;&nbsp;&nbsp;'+_("admin warningMsg9-1");
+#ifdef V_WEBIF_SPEC_vdf
+	h += '<a href="/setband.html">';
+#else
+	h += '<a href="/Profile_Name_List.html">';
+#endif
+	h += _("admin warningMsg9-2")+'</a>'+_("admin warningMsg9-3")+'</div>';
+	for( i=0; i<max_enabled_profiles; i++ ) {
+	/*	if(st[i].type.match(/^openvpn\.[0-9]+$/) ) {
+			continue
+		}*/
+		h += '<div class="row" id="wwan-div'+i+'" style="display:none">';
+		if( i>0 ) {
+			h+='<div class="hr" style="top:0; margin:0;"></div>';
+		}
+		h+='<div class="box-content" style="padding-top:15px;">\
+		<div class="each-box alpha" style="padding-top:3px;">\
+			<dl>\
+				<dt>'+_("profileName")+'</dt>\
+				<dd id="wwanProfile'+i+'">&nbsp;</dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("status")+'</dt>\
+				<dd id="wwanStatus'+i+'"></dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("defaultProfile")+'</dt>\
+				<dd id="dftProfile'+i+'"></dd>\
+			</dl>\
+		</div>\
+		<div class="each-box">\
+			<dl>\
+				<dt>'+_("wwan ipaddr")+'</dt>\
+				<dd id="wwanIP'+i+'">&nbsp;</dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("dnsServer")+'</dt>\
+				<dd id="dnsServer'+i+'">&nbsp;</dd>\
+			</dl>\
+		</div>\
+		<div class="each-box omega" style="border:none">\
+			<dl>\
+				<dt>'+_("apn")+'</dt>\
+				<dd id="wwanAPN'+i+'">&nbsp;</dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("connectionUpTime")+'</dt>\
+				<dd id="connectionUpTime'+i+'">0:00</dd>\
+			</dl>\
+		</div>\
+		<div class="row" style="padding-top:15px;">\
+			<dl>\
+				<dt>'+_("wwan ipv6addr")+'</dt>\
+				<dd id="ipv6addr'+i+'">&nbsp;</dd>\
+			</dl>\
+		 </div>\
+		<button class="secondary sml toggle-area inline-right-button" id="showUsageButton'+i+'" onclick="switchUsage('+i+')" style="margin:30px 255px 15px 0;width:180px"><i class="icon open"></i>'+_('showDataUsage')+'</button>\
+	</div>\
+	<div id="data_usage_duration_toggle'+i+'" class="show-option" style="padding:0 20px 15px;margin-top:-48px;display:none">\
+		<a href="javascript:switchDuration('+i+',1)">'+_("showDuration")+'</a>\
+	</div>\
+	<table id="data_usage_table'+i+'" style="margin-bottom:0; display:none;">\
+		<colgroup>\
+			<col width="20%">\
+			<col width="20%">\
+			<col width="20%">\
+			<col width="20%">\
+			<col width="20%">\
+		</colgroup>\
+		<thead>\
+			<tr>\
+				<th class="sml">'+_("sessionStart")+'</th>\
+				<th class="sml" id="SessionEndDuration'+i+'">'+_("sessionEnd")+'</th>\
+				<th class="sml">'+_("dataReceivedBytes")+'</th>\
+				<th class="sml">'+_("dataSentBytes")+'</th>\
+				<th class="sml">'+_("totalDataBytes")+'</th>\
+			</tr>\
+			<tbody id="TBusage'+i+'"></tbody>\
+		</thead>\
+	</table></div>';
+	}
+	$("#wwan-subdiv").html(h);
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	var startPoll = function() {
+		$("#uptime").html(toUpTime( ++local_uptime ));
+		if( local_uptime%10==0 ) {
+			if( ++ajaxerror<=18) //3 mins
+				$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+			else
+				location.reload();
+		}
+	}
+	setInterval(startPoll, 1000);
+	local_uptime=uptime;
+	set_menu("Status", "", <%_val = session["user"];%>"@@_val");
+	if(serialnum=="" || serialnum=="N/A") {
+		$("#serialnum-div").css("display","none");
+	}
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	$("#logOff").css("display","none");
+<%}%>
+	for( i=0; i<pptpSt.length; i++ ) {
+		if(pptpSt[i].pptpStatus == "up") {
+			toggle_box_header($("#pptp-div"), 1);
+			break;
+		}
+	}
+});
+
+#ifdef V_USB_OTG_MANUAL_MODE_SELECTION
+var otg_status=new (function(){
+
+	var $target_ctrl;
+	var tcgi=new cgi("./cgi-bin/usbotg.cgi");
+
+	function poll(interval) {
+		tcgi.reset();
+		tcgi.poll(interval,"info",function(r){
+
+			/*
+				do not remove the following files - for string resources
+				_("device mode")
+				_("host mode")
+				_("unknown mode")
+				_("down mode")
+			*/
+
+			$.each(r.otg_bus,function(i,o){
+				$target_ctrl.html(_(o.mode + " mode"));
+				return false;
+			});
+		});
+
+	}
+
+	$(function(){
+		$target_ctrl=$("#otg_status");
+
+		/* start initial poll */
+		poll(status_poll_timer);
+	});
+});
+#endif
+
+<%nas_installed=get_single('system.package.installed.nas');
+if (nas_installed == '1') {
+%>
+/* create storage status object */
+var storage_status=new (function(){
+	var nas=new cgi("./cgi-bin/nas.cgi");
+	var $div_storage;
+	var $div_storage_internal;
+	var timer;
+
+	function poll_storage_info() {
+		timer=null;
+
+		nas.reset();
+		nas.run("info",function(res){
+
+			var s=res.storages;
+
+			/* update storage table */
+			var div_storage_internal;
+			var col1=new Array();;
+			var col2=new Array();;
+			$.each(s,function(i,o){
+				if(o.stat!="inserted")
+					return true;
+
+				if(o.mp=="")
+					return true;
+
+				var dev_name;
+
+				/* apply location-based description */
+				if(o.loc.match(/^usb.*/g))
+					dev_name=_("usb")+" #"+(parseInt(o.idx));
+				else if(o.loc.match(/^platform.*/g)) {
+					if(o.desc.match(/[Mm]icro[ ]*SD/))
+						dev_name=_("microsd");
+					else
+						dev_name=_("builtin");
+				}
+
+				action="umount";
+
+				col1.push(
+							"<dl>"+
+								"<dd>"+dev_name+" ("+o.size+")"+"</dd>"+
+							"</dl>"
+				);
+
+			/*	col2.push(
+							"<dl>"+
+								"<dd><a class='secondary sml' style='padding:0;border:0;' index='"+o.idx+"' title='"+_("safely eject")+"'><i class='icon eject'></i></a></dd>"+
+							"</dl>"
+				);*/
+
+			});
+
+			if(!col1.length && !col2.length) {
+				div_storage_internal="<div><dl><dd>"+_("no media found")+"</dd></dl></div>";
+			}
+			else {
+				div_storage_internal=
+							"<div class='storage_info_1' style='padding-top:8px;'>"+
+								col1.join("")+
+							"</div>"+
+							"<div class='storage_info_2'>"+
+							<% if(login){ %>
+								col2.join("")+
+							<% } %>
+							"</div>";
+			}
+
+			$div_storage_internal.html(div_storage_internal);
+
+			/* onclick for remove buttons */s
+			$("#div_storage_internal a").click(function(){
+
+				var this_button=this;
+				blockUI_confirm(_("SafelyEjectConfirm"), function(){
+					var storage_idx=parseInt($(this_button).attr("index"));
+					var storage_action="umount";
+
+					nas.reset();
+					nas.add(storage_idx);
+					nas.run(storage_action,function(res){
+						if(res.cgiresult!=0) {
+							alert(_("failed to umount"));
+						}
+
+						poll_storage_info();
+					});
+				});
+
+			});
+
+			//enable_elements(true);
+
+			/* reprogram the timer only when it is not set */
+			if(timer==null) {
+				timer=setTimeout(poll_storage_info,status_poll_timer);
+			}
+		});
+	}
+
+
+	$(function(){
+		$div_storage=$("#div_storage");
+		$div_storage_internal=$("#div_storage_internal");
+
+		/* start initial poll */
+		poll_storage_info();
+	});
+
+});
+<%}%>
+
+#ifdef V_MULTIPLE_LANWAN_UI
+/* create eth status object */
+var eth_status=new (function(){
+
+	var eth=new cgi("./cgi-bin/eth.cgi");
+	var $tbody_eth_wan;
+	var $div_ethwan_fo;
+
+	function poll_eth_stat() {
+		eth.reset();
+		eth.run("info_eth_profile",function(res){
+
+			var eth_profiles=res.eth_profiles;
+
+			/* sort */
+			eth_profiles.sort(function(a,b){
+				return a.metrics-b.metrics;
+			});
+
+			/* build eth status table */
+			var tbody_eth_wan=new Array();
+			$.each(eth_profiles,function(i,o){
+
+				if(o.dev_type!="eth")
+					return;
+
+				/* apply default */
+				if(o.monitor_type=="")
+					o.monitor_type="phy";
+
+				if(tbody_eth_wan.length==0) {
+					tbody_eth_wan.push(
+						"<tr>"+
+							"<th class='align10-2'>No</th>"+
+							"<th class='align10-2'>"+_("name")+"</th>"+
+							"<th class='align10-2'>"+_("status")+"</th>"+
+							"<th class='align10-2'>"+_("ip address")+"</th>"+
+							"<th class='align10-2'>"+_("netmask")+"</th>"+
+							"<th class='align10-2'>"+_("gateway")+"</th>"+
+						"</tr>"
+					);
+				}
+
+
+				if(o.status!="up") {
+					o.ip=_("na");
+					o.mask=_("na");
+					o.gw=_("na");
+				}
+
+				tbody_eth_wan.push(
+					"<tr>"+
+						"<td>"+i+"</td>"+
+						"<td>"+o.dev+"</td>"+
+						"<td>"+o.status+"</td>"+
+						"<td>"+o.ip+"</td>"+
+						"<td>"+o.mask+"</td>"+
+						"<td>"+o.gw+"</td>"+
+					"</tr>"
+				);
+			});
+			$tbody_eth_wan.html(tbody_eth_wan.join());
+
+			$("#eth-wan-div").toggle(tbody_eth_wan.length>0);
+
+			/* build failover status table */
+			var div_ethwan_fo=new Array();
+			$.each(eth_profiles,function(i,o){
+
+				if(o.fo_status=="up")
+					iclass="success-sml";
+				else
+					iclass="warning-sml";
+
+				/* apply default */
+				if(o.monitor_type=="")
+					o.monitor_type="phy";
+
+				if(div_ethwan_fo.length==0) {
+					div_ethwan_fo.push(
+						"<dl>"+
+							"<dt>"+_("priority")+"</dt>"+
+						"</dl>"
+					);
+				}
+
+				/*
+					** DO NOT DELETE THE FOLLOWINGS **
+					_("ping")
+					_("phy")
+				*/
+				if(o.dev_type=="wwan") {
+					d="wwan."+o.pf;
+				}
+				else {
+					d=o.dev;
+				}
+				div_ethwan_fo.push(
+					"<dl>"+
+						"<dd><span style='display:inline-block;width:140px'>" + d + " ["+_(o.monitor_type)+"]</span><i class=" + iclass + "></i></dd>"+
+					"</dl>"
+				);
+			});
+
+#if 0
+			div_ethwan_fo.push(
+				"<dl>"+
+					"<dt>" + _("online information") + "</dt>"+
+				"</dl>"+
+				"<dl>"+
+					"<dd><span>Since xx:xx:xx 3 may 2012</span></dd>"+
+				"</dl>"
+			);
+#endif
+			if(div_ethwan_fo=="")
+				div_ethwan_fo="<dl><dd>"+_("no wan interface is configured")+"</dd></dl>";
+
+			$div_ethwan_fo.html(div_ethwan_fo);
+
+			setTimeout(poll_eth_stat,5000);
+		});
+	}
+
+	$(function(){
+		$tbody_eth_wan=$("#tbody_eth_wan");
+		$div_ethwan_fo=$("#div_ethwan_fo");
+
+		/* start initial poll */
+		poll_eth_stat();
+	});
+
+});
+#endif
+</script>
+
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container dashboard">
+		<div class="grid-9 alpha">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("sysInfo"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="system-information" class="box-content">
+						<div class="each-box alpha">
+							<h3><script language=Javascript>document.write(_("status system up time"))</script></h3>
+							<div class="a-center">
+								<span class="time" id="uptime"></span>
+							</div>
+						</div>
+						<div class="each-box">
+							<h3><script language=Javascript>document.write(_("routerVersion"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("boardVersion"))</script></dt>
+								<dd><script language=Javascript>document.write(hw_ver);</script></dd>
+							</dl>
+							<dl>
+								<div id="serialnum-div">
+								<dt><script language=Javascript>document.write(_("routerSerialNumber"))</script></dt>
+								<dd><script language=Javascript>document.write(serialnum);</script></dd>
+								</div>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("firmware"))</script></dt>
+								<dd><script language=Javascript>document.write(version);</script></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("hardwareVersion"))</script></dt>
+<% model=get_single("system.product.model"); if( model=="vdf_nwl10") {%>
+								<dd><script language=Javascript>document.write("MachineLink 3G");</script></dd>
+<%}else if( model=="vdf_nwl22" || model =="vdf_nwl22w") {%>
+								<dd><script language=Javascript>document.write(_("machineLink4g"));</script></dd>
+<%}else if( model=="vdf_nwl220") {%>
+								<dd><script language=Javascript>document.write(_("machineLink4glite"));</script></dd>
+<%}else{%>
+								<dd><script language=Javascript>document.write(_("machineLink3gPlus"));</script></dd>
+<%}%>
+							</dl>
+						</div>
+						<div class="each-box omega" style="height:216px">
+							<h3><script language=Javascript>document.write(_("advStatus phoneModule"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("model"))</script></dt>
+								<dd id="moduleModel">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("module firmware"))</script></dt>
+								<dd id="moduleFirmwareVersion" style="display:inline-block;word-wrap:break-word;width:180px;"></dd>
+							</dl>
+#ifdef V_WEBIF_SPEC_vdf
+							<dl id="cid" style="display:none">
+								<dt><script language=Javascript>document.write(_("cid"))</script></dt>
+								<dd id="moduleFirmwareVersionExt" style="display:inline-block;word-wrap:break-word;width:180px;"><%var _fw=get_single( 'rdb_get wwan.0.firmware_version_cid');%>@@_fw</dd>
+							</dl>
+#endif
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CSimei"))</script></dt>
+								<dd id="imei">&nbsp;</dd>
+							</dl>
+							<dl id="hwver_div" style="display:none">
+								<dt><script language=Javascript>document.write(_("hardware"))</script></dt>
+								<dd id="hwver">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+			<script language=Javascript>set_var_tag();</script>
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("cellularConnectionStatus"))</script></h2>
+				</div>
+#ifdef V_WEBIF_SPEC_vdf
+				<div class="row">
+					<div id="connection-status" class="box-content" >
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("networkRegistrationStatus"))</script></dt>
+								<dd id="networkRegistration">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("simStatus"))</script></dt>
+								<dd><span id="simID">&nbsp;</span></dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<dl>
+								<dt><script language=Javascript>document.write(_("provider"))</script></dt>
+								<dd id="provider">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("signal strength"))</script></dt>
+								<dd><span id="umtsss">&nbsp;</span><span id="csqImg">&nbsp;</span></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CSfrequency"))</script></dt>
+								<dd id="freq">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CScoverage"))</script></dt>
+								<dd id="coverage">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("roaming status"))</script></dt>
+								<dd id="roaming_status">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+#else
+				<div class="row">
+					<div id="connection-status" class="box-content" >
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("simStatus"))</script></dt>
+								<dd><span id="simID">&nbsp;</span></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("signal strength"))</script></dt>
+								<dd><span id="umtsss">&nbsp;</span><span id="csqImg">&nbsp;</span></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("networkRegistrationStatus"))</script></dt>
+								<dd id="networkRegistration">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<dl>
+								<dt><script language=Javascript>document.write(_("operatorSelection"))</script></dt>
+								<dd id="operatorSelection">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("currentOperator"))</script></dt>
+								<dd id="provider">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("roaming status"))</script></dt>
+								<dd id="roaming_status">&nbsp;</dd>
+							</dl>
+
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("allowedBands"))</script></dt>
+								<dd id="selband">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("currentBand"))</script></dt>
+								<dd id="freq">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CScoverage"))</script></dt>
+								<dd id="coverage">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+#endif
+			</div>
+
+			<div class="box" id="wwan-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wwanStatus"))</script></h2>
+				</div>
+				<div class="row" id='wwan-subdiv'></div>
+			</div>
+
+#ifdef V_MULTIPLE_LANWAN_UI
+			<div id="eth-wan-div" class="box" style="display:none">
+				<div class="box-header open">
+					<h2><script language="Javascript">document.write(_("ethwanpStatus"))</script></h2>
+				</div>
+				<div class="row">
+					<div style="margin-top:2px" id="">
+						<table class="above-5-column" style="margin-bottom:0">
+						<tbody id="tbody_eth_wan">
+						</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+#endif
+
+#if defined(V_WIFI)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+			<div class="box" id="wlan-ap-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wlanapStatus"))</script></h2>
+				</div>
+
+				<div class="row">
+					<div id="wlanap-status" style="margin-top:2px"></div>
+					<dl>
+						<dt id="wds_cli_count_label">
+							<script language=Javascript>document.write(_("wdsClientsCount"))</script>
+						</dt>
+						<dd><span id="wds_cli_count">&nbsp;</span></dd>
+					</dl>
+				</div>
+			</div>
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+#endif
+
+#if defined(V_WIFI_CLIENT)
+#ifdef V_MODCOMMS_y
+<%if (__rf_mice_ready=='ready') {%>
+#endif
+			<div class="box" id="wlan-sta-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wlanStaStatus"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="wlan-connection-status" class="box-content" >
+						<div class="each-box alpha" style="border-right: 0px; margin-right: 0px">
+							<dl>
+								<dt><script language=Javascript>document.write(_("remoteSSID"))</script></dt>
+								<dd><span id="wrssid">&nbsp;</span></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("bssid"))</script></dt>
+								<dd><span id="wbssid">&nbsp;</span></dd>
+							</dl>
+						</div>
+						<div class="each-box" style="border-left: 1px solid #E5E5E5; padding-left: 38px; margin-left: 0px;">
+							<dl>
+								<dt><script language=Javascript>document.write(_("treeapp security"))</script></dt>
+								<dd id="wsecurity">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt id="waddress_label"><script language=Javascript>document.write(_("ip address"))</script></dt>
+								<dd id="wlocalIP">&nbsp;</dd>
+							</dl>
+#if defined(V_WIFI_CLIENT_qca_soc_lsdk) && defined(V_COPROCESSOR_hannibal_onboard)
+							<dl>
+								<dt><script language=Javascript>document.write(_("dnsServer"))</script></dt>
+								<dd><span id="wlanstaDNSIP">&nbsp;</span></dd>
+							</dl>
+#endif
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("status"))</script></dt>
+								<dd id="wstatus">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("wifiStatusPageMode"))</script></dt>
+								<dd id="w-wds-status">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+#ifdef V_MODCOMMS_y
+<%}%>
+#endif
+#endif
+
+			<div class="box" id="pppoe-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wan connection type pppoe"))</script></h2>
+				</div>
+				<div class="box-content">
+					<dl>
+						<dt><script language=Javascript>document.write(_("status"))</script></dt>
+						<dd id="pppoeStatus">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("IP"))</script></dt>
+						<dd id="pppoeIP">&nbsp;</dd>
+					</dl>
+#ifdef	V_ROUTER_TERMINATED_PPPOE
+					<dl style="display:none">
+#else
+					<dl>
+#endif
+						<dt><script language=Javascript>document.write(_("apnName"))</script></dt>
+						<dd id="pppoe_apn"></dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("serviceName"))</script></dt>
+						<dd id="pppoe_service">&nbsp;</dd>
+					</dl>
+				</div>
+			</div>
+			<div class="box" id="ipsec-div">
+				<div class="box-header open">
+					<h2><script language=Javascript>document.write(_("status ipsec"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="ipsec-status" style="margin-top:2px"></div>
+				</div>
+			</div>
+			<div class="box" id="openvpn-div" >
+				<div class="box-header open">
+					<h2><script language=Javascript>document.write(_("OpenVPN"))</script></h2>
+				</div>
+				<div class="row">
+					<table id="vpn-server" style="margin-top:2px"></table>
+					<table id="vpn-client"></table>
+				</div>
+			</div>
+			<div class="box">
+				<div class="box-header close">
+					<h2><script language=Javascript>document.write(_("advStatus advancedStatus"))</script></h2>
+				</div>
+				<div class="row hide">
+					<div id="advanced-status" class="box-content" style="padding-top:10px">
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("country code"))</script></dt>
+								<dd id="MCC">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus networkCode"))</script></dt>
+								<dd id="MNC">&nbsp;</dd>
+							</dl>
+							<dl id="ecios_dl">
+								<dt><script language=Javascript>document.write(_("signalQualityEcIo"))</script></dt>
+								<dd id="ecios">&nbsp;</dd>
+							</dl>
+							<dl id="ecn0s_dl">
+								<dt><script language=Javascript>document.write(_("signalQualityEcN0"))</script></dt>
+								<dd id="ecn0s">&nbsp;</dd>
+							</dl>
+							<dl id="rscp_dl">
+								<dt><script language=Javascript>document.write(_("receivedSignalCodePower"))</script></dt>
+								<dd id="rscps">&nbsp;</dd>
+							</dl>
+							<dl id="dcvoltage_div">
+							<dt><script language=Javascript>document.write(_("dcInputVoltage"))</script></dt>
+								<dd id="dcvoltage">&nbsp;</dd>
+							</dl>
+							<dl id="rsrq_div">
+								<dt><script language=Javascript>document.write(_("rsrq"))</script></dt>
+								<dd id="RSRQ">&nbsp;</dd>
+							</dl>
+							<dl id="rsrp0_div">
+								<dt id="rsrp0_dt"><script language=Javascript>document.write(_("rsrp")+" 0")</script></dt>
+								<dd id="RSRP0">&nbsp;</dd>
+							</dl>
+							<dl id="rsrp1_div">
+								<dt><script language=Javascript>document.write(_("rsrp")+" 1")</script></dt>
+								<dd id="RSRP1">&nbsp;</dd>
+							</dl>
+							<dl id="rssi_div">
+								<dt><script language=Javascript>document.write(_("rssi"))</script></dt>
+								<dd id="RSSI">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<dl id="hsupa_dl">
+								<dt><script language=Javascript>document.write(_("hsupaCategory"))</script></dt>
+								<dd id="hsucat">&nbsp;</dd>
+							</dl>
+							<dl id="hsdpa_dl">
+								<dt><script language=Javascript>document.write(_("hsdpaCategory"))</script></dt>
+								<dd id="hsdcat">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus iccid"))</script></dt>
+								<dd id="simICCID">&nbsp;</dd>
+							</dl>
+							<dl id="psc_dl">
+								<dt><script language=Javascript>document.write(_("primaryScramblingCode"))</script></dt>
+								<dd id="PSC">&nbsp;</dd>
+							</dl>
+							<dl id="powersource_div">
+								<dt><script language=Javascript>document.write(_("powerSource"))</script></dt>
+								<dd id="powersource">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus locationAreaCode"))</script></dt>
+								<dd id="LAC">&nbsp;</dd>
+							</dl>
+							<dl id="rac_id">
+								<dt><script language=Javascript>document.write(_("advStatus routingAreaCode"))</script></dt>
+								<dd id="RAC">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus imsi"))</script></dt>
+								<dd id="IMSI">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus cellID"))</script></dt>
+								<dd id="CellId">&nbsp;</dd>
+							</dl>
+							<dl id="chanNumUarfcn">
+								<dt><script language=Javascript>document.write(_("advStatus channelNumber UARFCN"))</script></dt>
+								<dd id="ChannelNumberUarfcn">&nbsp;</dd>
+							</dl>
+							<dl id="chanNumArfcn" style="display:none">
+								<dt><script language=Javascript>document.write(_("advStatus channelNumber ARFCN"))</script></dt>
+								<dd id="ChannelNumberArfcn">&nbsp;</dd>
+							</dl>
+							<dl id="priid_rev_div">
+								<dt><script language=Javascript>document.write(_("advStatus modulePRIID")+" "+_("Revision"))</script></dt>
+								<dd id="PRIID_REV">&nbsp;</dd>
+							</dl>
+							<dl id="priid_pn_div">
+								<dt><script language=Javascript>document.write(_("advStatus modulePRIID")+" "+_("PRI part number"))</script></dt>
+								<dd id="PRIID_PN">&nbsp;</dd>
+							</dl>
+#if defined(V_MODULE_MC7354) || defined(V_MODULE_MC7304)
+							<dl id="priid_carrier_div" style="display:none">
+								<dt><script language=Javascript>document.write(_("priid carrier"))</script></dt>
+								<dd id="priid_carrier">&nbsp;</dd>
+							</dl>
+							<dl id="priid_config_div" style="display:none">
+								<dt><script language=Javascript>document.write(_("priid config"))</script></dt>
+								<dd id="priid_config">&nbsp;</dd>
+							</dl>
+#endif
+						</div>
+					</div>
+				</div>
+			</div>
+
+		</div>
+		<div class="grid-3 omega">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("lan"))</script></h2>
+				</div>
+				<div class="box-content">
+					<dl>
+						<dt><script language=Javascript>document.write(_("IP"))</script></dt>
+						<dd><script language=Javascript>document.write(lan_ip+" / "+lan_mask);</script></dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("macAddress"))</script></dt>
+						<dd id="ethmac">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("lan port status"))</script></dt>
+#if (defined V_ETH_PORT_2plw_l)
+						<dd id="port2_text"></dd>
+#else
+						<dd id="port1_text"></dd>
+#endif
+					</dl>
+#if (defined V_ETH_PORT_2plw_l)
+<%if(get_single('network.interface.eth.0.mode')=="lan"){%>
+					<dl>
+						<dt><script language=Javascript>document.write(_("lanwan port status"))</script></dt>
+						<dd id="port1_text"></dd>
+					</dl>
+<%}%>
+#endif
+				</div>
+			</div>
+
+#ifdef V_MULTIPLE_LANWAN_UI
+			<style type="text/css">
+				div#ethwan-fo i {
+					padding-top: 7px;
+				}
+			</style>
+			<div class="box" id="ethwan-fo">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wan"))</script></h2>
+				</div>
+#if (defined V_ETH_PORT_2plw_l)
+<%if(get_single('network.interface.eth.0.mode')=="wan"){%>
+				<div class="box-content" style="padding-bottom:2px">
+					<dl>
+						<dt><script language=Javascript>document.write(_("lanwan port status"))</script></dt>
+						<dd id="port1_text"></dd>
+					</dl>
+					<div id="div_ethwan_fo" style="padding-bottom:20px"></div>
+				</div>
+<%}else{%>
+				<div class="box-content" id="div_ethwan_fo"></div>
+<%}%>
+#else
+				<div class="box-content" id="div_ethwan_fo"></div>
+#endif
+			</div>
+#endif
+
+<%
+if (nas_installed == '1') {
+%>
+			<style type="text/css">
+				.storage_info_1 {
+					float:left;
+					width:140px;
+				}
+
+				.storage_info_1 dl,.storage_info_2 dl {
+					height:23px;
+				}
+			</style>
+			<div class="box" id="div_storage">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("storage"))</script></h2>
+				</div>
+				<div class="box-content" style="padding-top:20px;" id="div_storage_internal">
+				</div>
+			</div>
+<%}%>
+
+#ifdef V_USB_OTG_MANUAL_MODE_SELECTION
+			<style type="text/css">
+			</style>
+			<div class="box" id="div_usb_otg">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("usb otg"))</script></h2>
+				</div>
+				<div class="box-content">
+					<dl>
+						<dt><script language=Javascript>document.write(_("usb otg status"))</script></dt>
+						<dd id="otg_status"></dd>
+					</dl>
+				</div>
+			</div>
+#endif
+
+			<div class="box" id="pptp-div">
+				<div class="box-header close">
+					<h2><script language=Javascript>document.write(_("wan connection type pptp"))</script></h2>
+				</div>
+				<div class="box-content hide">
+					<dl>
+						<dt><script language=Javascript>document.write(_("status"))</script></dt>
+						<dd id="pptpStatus">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("profileName"))</script></dt>
+						<dd id="pptpProfile">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("remoteServerAddress"))</script></dt>
+						<dd id="serveraddress">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("PtPLocal"))</script></dt>
+						<dd id="pptpLocal">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("PtPRemote"))</script></dt>
+						<dd id="pptpRemote">&nbsp;</dd>
+					</dl>
+				</div>
+			</div>
+
+#if defined(V_EVENT_NOTIFICATION)
+			<div class="box">
+				<div class="box-header open">
+					<h2><script language=Javascript>document.write(_("event noti"))</script></h2>
+				</div>
+#ifdef V_WEBIF_SPEC_vdf
+				<div class="box-content">
+#else
+				<div class="box-content" style="padding-top:0;">
+#endif
+					<dl>
+						<dt>
+#ifdef V_WEBIF_SPEC_vdf
+						<script language=Javascript>document.write(_("sent event noti count")+" (")</script><a href='/eventnotilog.html' style="color:BLUE;"><script language=Javascript>document.write(_("log low case"))</script></a><script language=Javascript>document.write(')')</script>
+#else
+						<script language=Javascript>document.write(_("sent event noti count"))</script>
+#endif
+						</dt>
+						<dd><span id="noti_count">&nbsp;</span></dd>
+					</dl>
+				</div>
+			</div>
+#endif
+
+		</div>
+
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+</body>
+</html>
+

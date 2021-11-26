@@ -1,0 +1,27 @@
+#!/bin/sh
+# WEBUI logoff event
+. /etc/variant.sh
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This template file is to notify WEBUI logoff event due to session timeout."
+    echo "Please do not run this file manually."
+    echo ""
+	exit 0
+fi
+
+SESSION_TIMEOUT="?<webinterface.session_timeout>;"
+
+log()
+{
+	logger "event `basename ${0}`: ${1}"
+}
+
+if [ "$SESSION_TIMEOUT" = "1" ]; then
+	log "WEBUI logged off due to session timeout"
+	elogger 10 "WEBUI logged off due to session timeout"
+fi
+
+exit 0

@@ -1,0 +1,1 @@
+link ../../bovine/scripts/tr069_exportLogFile.sh

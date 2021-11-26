@@ -1,0 +1,234 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>PRL Update</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+function submitF1 () {
+	document.form1.submit_val.value="NETINIT"
+
+	if(document.form1.Ninit_rd[0].checked == true) {
+		document.form1.Netinit_val.value="1";
+	}
+	else {
+		document.form1.Netinit_val.value="0";
+	}
+}
+
+var TextBoxMsg="";
+var CIcmd="";
+var Is_OnProcessing="FALSE";
+
+function submitF2 () {
+	var confirm_return=confirm("Do you really want to update PRL(Preferred Roaming List)?");
+
+	if(confirm_return == true) {
+		CIcmd="CLIINIT";
+		ajaxFunction();
+	}
+	else {
+		return;
+	}
+}
+
+function ajaxFunction() {
+	try {
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	if(CIcmd == "CLIINIT")
+	{
+		xmlHttp.open("GET","/cgi-bin/module_omadm.cgi?PRLUpdate&rnd_id=" + Math.random(),true);
+	}
+	else if (CIcmd == "QUERY")
+	{
+		xmlHttp.open("GET","/cgi-bin/module_omadm.cgi?query&rnd_id=" + Math.random(),true);
+	}
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function() {
+
+		if(xmlHttp.readyState==4) {
+			if(xmlHttp.responseText.length>0) {
+				eval( xmlHttp.responseText );
+			if(CIcmd == "QUERY") {
+			if(QueryStatus == 1) {
+			Is_OnProcessing="TRUE";
+			document.getElementById( "processwait" ).style['display']="";
+			document.getElementById( "processmsg" ).style['display']="";
+			setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			else if(QueryStatus == 0) {
+			document.getElementById( "processwait" ).style['display']="none";
+			document.getElementById( "processmsg" ).style['display']="none";
+			TextBoxMsg="";
+
+			if(Is_OnProcessing == "TRUE") {
+				alert("Complete");
+			}
+			else {
+				alert("Client Initiated Session ERROR!!");
+			}
+			Is_OnProcessing="FALSE";
+			}
+			}
+			else if(CIcmd == "CLIINIT") {
+			if(TriggerStatus.indexOf("done") >= 0) {
+			document.getElementById( "processwait" ).style['display']="";
+			document.getElementById( "processmsg" ).style['display']="";
+			TextBoxMsg=TextBoxMsg+"\n  Client Initiated Session Start.";
+			setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			else if(TriggerStatus.indexOf("error") >= 0) {
+			document.getElementById( "processwait" ).style['display']="none";
+			document.getElementById( "processmsg" ).style['display']="none";
+			TextBoxMsg="";
+			alert("Already Client Initiated Session Open");
+			}
+			}
+			}
+			else {
+			setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			document.getElementById( "processText_ID" ).value = TextBoxMsg;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	}
+}
+
+function load()
+{
+	setTimeout("check_result()", 50);
+}
+
+function check_result()
+{
+	if( document.form1.status.value.indexOf("CI_ERROR")!= -1)
+	{
+		alert('Client Initiated PRL Update Failure!');
+	}
+
+	document.form1.status.value ="";
+}
+
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(form['submit_val'] == 'NETINIT') {
+		tempval = form['Netinit_val'];
+		set_single( 'wwan.0.moduleconfig.cmd.cmdparam=PRLUpdate '+tempval);
+		set_single( 'wwan.0.moduleconfig.cmd.command=set' );
+		esp_sleep(2000);
+		form['status'] = get_single( 'wwan.0.moduleconfig.cmd.status' );
+
+		set_single( 'wwan.0.moduleconfig.cmd.cmdparam=PRLUpdate');
+		set_single( 'wwan.0.moduleconfig.cmd.command=get' );
+		esp_sleep(2000);
+		tempval = get_single( 'wwan.0.moduleconfig.cmd.statusparam' );
+		if( (tempval == "N/A") || (tempval == "") ) tempval = 0;
+		form['Netinit_val'] = tempval;
+	}
+//		else if(form['submit_val'] == 'CLIINIT') {
+//		  set_single( 'wwan.0.moduleconfig.cmd.cmdparam=CIPRL');
+//		  set_single( 'wwan.0.moduleconfig.cmd.command=CIupdate' );
+//		  esp_sleep(2000);
+
+//		  tempval = get_single( 'wwan.0.moduleconfig.cmd.status' );
+//		  if(tempval == "[error]")
+//		     form['status'] = "CI_ERROR";
+//		}
+}
+else {
+	set_single( 'wwan.0.moduleconfig.cmd.cmdparam=PRLUpdate');
+	set_single( 'wwan.0.moduleconfig.cmd.command=get' );
+	esp_sleep(2000);
+	tempval = get_single( 'wwan.0.moduleconfig.cmd.statusparam' );
+	if( (tempval == "N/A") || (tempval == "") ) tempval = 0;
+	form['Netinit_val'] = tempval;
+}
+%>
+</head>
+<body onload="load()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form name="form1" method="POST">
+<input type="hidden" name="Netinit_val" value="@@form['Netinit_val']"/>
+<input type="hidden" name="submit_val" value="@@form['submit_val']"/>
+<input type="hidden" name="status" value="@@form['status']">
+
+<h3>&nbsp;&nbsp;Internet Settings > Mobile Broadband > PRL Update</h3>
+
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+	<tr><th>Network&nbsp;initiated&nbsp;PRL&nbsp;Update</th></tr>
+</table>
+
+<table width="90%">
+<tr> 
+	<td width="15%"></td>
+	<td><input type=radio name='Ninit_rd' value='1'>&nbsp;Enable &nbsp;&nbsp;
+		<input type=radio name='Ninit_rd' value='0'>&nbsp;Disable &nbsp;&nbsp;
+		<input type="submit" id="Ninit_submit_ID" value="Save" onClick="javascript:submitF1()" />
+	</td>
+</tr>
+</table>
+
+<script type="text/javascript">
+if(document.form1.Netinit_val.value == 1) {
+	document.form1.Ninit_rd[0].checked=true;
+}
+else {
+	document.form1.Ninit_rd[1].checked=true;
+}
+</script>
+</form>
+
+<form name="formI">
+<table width="90%">
+	<tr><th>Client&nbsp;Initiated&nbsp;PRL&nbsp;Update</th></tr>
+</table>
+
+<table width="90%">
+
+<tr> 
+	<td width="15%"><img src="images/waiting.gif" align="right" width="20" height="20" id="processwait" style="display:none" /></td>
+	<td><input type="button" id="Cinit_submit_ID" value="Submit" onClick="javascript:submitF2()" /></td>
+</tr>
+</table>
+
+<div id="processmsg" style="display:none"> 
+<textarea id="processText_ID" cols="80" rows="20" style="background:#F0EFEB; border:2px;" tabindex="1" name="processText_name" readonly="readonly"></textarea>
+</div>
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+</form>
+
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>
+

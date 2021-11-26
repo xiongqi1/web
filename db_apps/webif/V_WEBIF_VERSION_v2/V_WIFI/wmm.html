@@ -1,0 +1,400 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Wireless WMM Configuration</title>
+<% include topinc_v2.inc %>
+<% include mbssid.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+rdbBase="wlan.0.wmm.";
+if (request['REQUEST_METHOD'] == "POST") {
+	set_single_direct("-p",rdbBase+"APAifsn",form['ap_aifsn_all']);
+	set_single_direct("-p",rdbBase+"APCwmin",form['ap_cwmin_all']);
+	set_single_direct("-p",rdbBase+"APCwmax",form['ap_cwmax_all']);
+	set_single_direct("-p",rdbBase+"APTxop",form['ap_txop_all']);
+	set_single_direct("-p",rdbBase+"APACM",form['ap_acm_all']);
+	set_single_direct("-p",rdbBase+"AckPolicy",form['ap_ackpolicy_all']);
+	set_single_direct("-p",rdbBase+"BSSAifsn",form['sta_aifsn_all']);
+	set_single_direct("-p",rdbBase+"BSSCwmin",form['sta_cwmin_all']);
+	set_single_direct("-p",rdbBase+"BSSCwmax",form['sta_cwmax_all']);
+	set_single_direct("-p",rdbBase+"BSSTxop",form['sta_txop_all']);
+	set_single_direct("-p",rdbBase+"BSSACM",form['sta_acm_all']);
+}
+else {
+	form['ap_acm_all']=get_single(rdbBase+'APACM');
+	form['ap_cwmin_all']=get_single(rdbBase+'APCwmin');
+	form['ap_cwmax_all']=get_single(rdbBase+'APCwmax');
+	form['ap_txop_all']=get_single(rdbBase+'APTxop');
+	form['ap_ackpolicy_all']=get_single(rdbBase+'AckPolicy');
+	form['ap_aifsn_all']=get_single(rdbBase+'APAifsn');
+	form['sta_aifsn_all']=get_single(rdbBase+'BSSAifsn');
+	form['sta_cwmin_all']=get_single(rdbBase+'BSSCwmin');
+	form['sta_cwmax_all']=get_single(rdbBase+'BSSCwmax');
+	form['sta_txop_all']=get_single(rdbBase+'BSSTxop');
+	form['sta_acm_all']=get_single(rdbBase+'BSSACM');
+}
+%>
+
+<!-- ================================================================================================ -->
+<script language="JavaScript">
+
+function combine_fields(fname, isCheckbox) {
+	if (typeof isCheckbox == 'undefined') isCheckbox = false;
+	if (isCheckbox) {
+		$("#"+fname+"_all").val(($("#"+fname+"_acbe").is(":checked")? '1':'0')+';'+
+								($("#"+fname+"_acbk").is(":checked")? '1':'0')+';'+
+								($("#"+fname+"_acvi").is(":checked")? '1':'0')+';'+
+								($("#"+fname+"_acvo").is(":checked")? '1':'0'));
+	} else {
+		$("#"+fname+"_all").val($("#"+fname+"_acbe").val()+';'+$("#"+fname+"_acbk").val()+';'+
+								$("#"+fname+"_acvi").val()+';'+$("#"+fname+"_acvo").val());
+	}
+	$("#"+fname+"_acbe").attr("disabled", true);
+	$("#"+fname+"_acbk").attr("disabled", true);
+	$("#"+fname+"_acvi").attr("disabled", true);
+	$("#"+fname+"_acvo").attr("disabled", true);
+}
+
+function CheckValue() {
+	combine_fields('ap_aifsn');
+	combine_fields('ap_cwmin');
+	combine_fields('ap_cwmax');
+	combine_fields('ap_txop');
+	combine_fields('ap_acm', true);
+	combine_fields('ap_ackpolicy',true);
+	combine_fields('sta_aifsn');
+	combine_fields('sta_cwmin');
+	combine_fields('sta_cwmax');
+	combine_fields('sta_txop');
+	combine_fields('sta_acm',true);
+	return true;
+}
+
+function field_load(fname, def_val, isCheckbox) {
+	var lfval, lfvalArray;
+	if ($("#"+fname+"_all").val() == "")
+		lfval = def_val;
+	else
+		lfval = $("#"+fname+"_all").val();
+	lfvalArray = lfval.split(";");
+	if (typeof isCheckbox == 'undefined') isCheckbox = false;
+	if (isCheckbox) {
+		$("#"+fname+"_acbe").attr("checked",(lfvalArray[0] == '1'? true:false));
+		$("#"+fname+"_acbk").attr("checked",(lfvalArray[1] == '1'? true:false));
+		$("#"+fname+"_acvi").attr("checked",(lfvalArray[2] == '1'? true:false));
+		$("#"+fname+"_acvo").attr("checked",(lfvalArray[3] == '1'? true:false));
+	} else {
+		$("#"+fname+"_acbe").val(lfvalArray[0]);
+		$("#"+fname+"_acbk").val(lfvalArray[1]);
+		$("#"+fname+"_acvi").val(lfvalArray[2]);
+		$("#"+fname+"_acvo").val(lfvalArray[3]);
+	}
+}
+
+function formLoad() {
+	field_load('ap_aifsn', "7;3;1;1");
+	field_load('ap_cwmin', "4;4;3;2");
+	field_load('ap_cwmax', "6;10;4;3");
+	field_load('ap_txop', "0;0;94;47");
+	field_load('ap_acm', "0;0;0;0", true);
+	field_load('ap_ackpolicy', "0;0;0;0", true);
+	field_load('sta_aifsn', "7;3;2;2");
+	field_load('sta_cwmin', "4;4;3;2");
+	field_load('sta_cwmax', "10;10;4;3");
+	field_load('sta_txop', "0;0;94;47");
+	field_load('sta_acm', "0;0;0;0", true);
+}
+
+function submit_apply() {
+	if (CheckValue() == true) {
+		$("#form").submit();
+		window.close();
+	}
+}
+
+$(document).ready( function() {formLoad();} );
+
+</script>
+<!-- ================================================================================================ -->
+
+
+
+<!-- ================================================================================================ -->
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="right-column white-box">
+
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<form name="wmm" id="form" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+			<div class="pad" id="wmmAP_setup_block">
+				<input type="hidden"  name="ap_aifsn_all" 		id="ap_aifsn_all" 		value="@@form['ap_aifsn_all']">
+				<input type="hidden"  name="ap_cwmin_all" 		id="ap_cwmin_all" 		value="@@form['ap_cwmin_all']">
+				<input type="hidden"  name="ap_cwmax_all" 		id="ap_cwmax_all" 		value="@@form['ap_cwmax_all']">
+				<input type="hidden"  name="ap_txop_all" 		id="ap_txop_all" 		value="@@form['ap_txop_all']">
+				<input type="hidden"  name="ap_acm_all" 		id="ap_acm_all" 		value="@@form['ap_acm_all']">
+				<input type="hidden"  name="ap_ackpolicy_all"	id="ap_ackpolicy_all"	value="@@form['ap_ackpolicy_all']">
+				<h2><script language=Javascript>document.write(_("wmm ap parameter"))</script></h2>
+				<table width="80%" style="text-align:center;" class="no-border">
+				<tr>
+					<th style="width:80px;">&nbsp;</th>
+					<th style="width:80px;">Aifsn</th>
+					<th style="width:80px;">CWMin</th>
+					<th style="width:80px;">CWMax</th>
+					<th style="width:80px;">Txop</th>
+					<th style="width:80px;">ACM</th>
+					<th style="width:80px;">AckPolicy</th>
+				</tr>
+
+				<tr>
+					<td>AC_BE</td>
+					<td><input type="text" name="ap_aifsn_acbe" id="ap_aifsn_acbe" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="ap_cwmin_acbe" id="ap_cwmin_acbe" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+						</select></td>
+					<td><select name="ap_cwmax_acbe" id="ap_cwmax_acbe" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4>15</option>
+						<option value=5>31</option>
+						<option value=6 selected>63</option>
+						</select></td>
+					<td><input type="text" name="ap_txop_acbe" id="ap_txop_acbe" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="ap_acm_acbe" id="ap_acm_acbe"></td>
+					<td><input type="checkbox" name="ap_ackpolicy_acbe" id="ap_ackpolicy_acbe"></td>
+				</tr>
+
+				<tr>
+					<td>AC_BK</td>
+					<td><input type="text" name="ap_aifsn_acbk" id="ap_aifsn_acbk" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="ap_cwmin_acbk" id="ap_cwmin_acbk" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+						</select></td>
+					<td><select name="ap_cwmax_acbk" id="ap_cwmax_acbk" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4>15</option>
+						<option value=5>31</option>
+						<option value=6>63</option>
+						<option value=7>127</option>
+						<option value=8>255</option>
+						<option value=9>511</option>
+						<option value=10 selected>1023</option>
+					</select></td>
+					<td><input type="text" name="ap_txop_acbk" id="ap_txop_acbk" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="ap_acm_acbk" id="ap_acm_acbk"></td>
+					<td><input type="checkbox" name="ap_ackpolicy_acbk" id="ap_ackpolicy_acbk"></td>
+				</tr>
+
+				<tr>
+					<td>AC_VI</td>
+					<td><input type="text" name="ap_aifsn_acvi" id="ap_aifsn_acvi" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="ap_cwmin_acvi" id="ap_cwmin_acvi" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3 selected>7</option>
+					</select></td>
+					<td>
+					<select name="ap_cwmax_acvi" id="ap_cwmax_acvi" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+					</select></td>
+					<td><input type="text" name="ap_txop_acvi" id="ap_txop_acvi" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="ap_acm_acvi" id="ap_acm_acvi"></td>
+					<td><input type="checkbox" name="ap_ackpolicy_acvi" id="ap_ackpolicy_acvi"></td>
+				</tr>
+
+				<tr>
+					<td>AC_VO</td>
+					<td><input type="text" name="ap_aifsn_acvo" id="ap_aifsn_acvo" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="ap_cwmin_acvo" id="ap_cwmin_acvo" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3 selected>7</option>
+					</select></td>
+					<td>
+					<select name="ap_cwmax_acvo" id="ap_cwmax_acvo" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+					</select></td>
+					<td><input type="text" name="ap_txop_acvo" id="ap_txop_acvo" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="ap_acm_acvo" id="ap_acm_acvo"></td>
+					<td><input type="checkbox" name="ap_ackpolicy_acvo" id="ap_ackpolicy_acvo"></td>
+				</tr>
+				</table>
+			</div>		<!-- div class="pad" id="wmmAP_setup_block" -->
+
+			<br><br>
+
+			<div class="pad" id="wmmSTA_setup_block">
+				<input type="hidden" name="sta_aifsn_all" 	 id="sta_aifsn_all" value="@@form['sta_aifsn_all']">
+				<input type="hidden" name="sta_cwmin_all" 	 id="sta_cwmin_all" value="@@form['sta_cwmin_all']">
+				<input type="hidden" name="sta_cwmax_all" 	 id="sta_cwmax_all" value="@@form['sta_cwmax_all']">
+				<input type="hidden" name="sta_txop_all" 	 id="sta_txop_all" 	value="@@form['sta_txop_all']">
+				<input type="hidden" name="sta_acm_all" 	 id="sta_acm_all" 	value="@@form['sta_acm_all']">
+				<h2><script language=Javascript>document.write(_("wmm sta parameter"))</script></h2>
+				<table width="80%" style="text-align:center;" class="no-border">
+				<tr>
+					<th style="width:80px;">&nbsp;</th>
+					<th style="width:80px;">Aifsn</th>
+					<th style="width:80px;">CWMin</th>
+					<th style="width:80px;">CWMax</th>
+					<th style="width:80px;">Txop</th>
+					<th style="width:80px;">ACM</th>
+					<th style="width:80px;"></th>	<!-- for cosmetic alignment -->
+				</tr>
+
+				<tr>
+					<td>AC_BE</td>
+					<td><input type="text" name="sta_aifsn_acbe" id="sta_aifsn_acbe" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="sta_cwmin_acbe" id="sta_cwmin_acbe" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+						</select></td>
+					<td><select name="sta_cwmax_acbe" id="sta_cwmax_acbe" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4>15</option>
+						<option value=5>31</option>
+						<option value=6>63</option>
+						<option value=7>127</option>
+						<option value=8>255</option>
+						<option value=9>511</option>
+						<option value=10 selected>1023</option>
+						</select></td>
+					<td><input type="text" name="sta_txop_acbe" id="sta_txop_acbe" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="sta_acm_acbe" id="sta_acm_acbe"></td>
+				</tr>
+
+				<tr>
+					<td>AC_BK</td>
+					<td><input type="text" name="sta_aifsn_acbk" id="sta_aifsn_acbk" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="sta_cwmin_acbk" id="sta_cwmin_acbk" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+						</select></td>
+					<td><select name="sta_cwmax_acbk" id="sta_cwmax_acbk" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4>15</option>
+						<option value=5>31</option>
+						<option value=6>63</option>
+						<option value=7>127</option>
+						<option value=8>255</option>
+						<option value=9>511</option>
+						<option value=10 selected>1023</option>
+					</select></td>
+					<td><input type="text" name="sta_txop_acbk" id="sta_txop_acbk" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="sta_acm_acbk" id="sta_acm_acbk"></td>
+				</tr>
+
+				<tr>
+					<td>AC_VI</td>
+					<td><input type="text" name="sta_aifsn_acvi" id="sta_aifsn_acvi" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="sta_cwmin_acvi" id="sta_cwmin_acvi" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3 selected>7</option>
+					</select></td>
+					<td>
+					<select name="sta_cwmax_acvi" id="sta_cwmax_acvi" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3>7</option>
+						<option value=4 selected>15</option>
+					</select></td>
+					<td><input type="text" name="sta_txop_acvi" id="sta_txop_acvi" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="sta_acm_acvi" id="sta_acm_acvi"></td>
+				</tr>
+
+				<tr>
+					<td>AC_VO</td>
+					<td><input type="text" name="sta_aifsn_acvo" id="sta_aifsn_acvo" class="validate[required,funcCall[validate_wmm_param]] required val_wmm_param small" size=4 maxlength=4></td>
+					<td><select name="sta_cwmin_acvo" id="sta_cwmin_acvo" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2 selected>3</option>
+					</select></td>
+					<td>
+					<select name="sta_cwmax_acvo" id="sta_cwmax_acvo" size="1" style="width:80px;">
+						<option value=1>1</option>
+						<option value=2>3</option>
+						<option value=3 selected>7</option>
+					</select></td>
+					<td><input type="text" name="sta_txop_acvo" id="sta_txop_acvo" class="validate[required] small required" size=4 maxlength=4></td>
+					<td><input type="checkbox" name="sta_acm_acvo" id="sta_acm_acvo"></td>
+				</tr>
+				</table>
+
+			</div>		<!-- div class="pad" id="wmmAP_setup_block" -->
+
+			<div class="submit-row">
+				<button type="button" name="submitForm" id="submitForm" onClick="submit_apply();"><script language=Javascript>document.write(_("apply"))</script></button>
+				<button type="reset" name="resetForm" id="resetForm" onClick="window.location.reload();"><script language=Javascript>document.write(_("cancel"))</script></button>
+				<button type="button" name="closeForm" id="closeForm" onClick="window.location.assign('/advanced.html');"><script language=Javascript>document.write(_("close"))</script></button>
+			</div>
+
+			</form>		<!-- name="wmm" -->
+                </div>	<!-- div class="right-column white-box" -->
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "Advanced", <%_val = session["user"];%>"@@_val");
+
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["val_wmm_param"]=_("field1and15");	//'Please specify a value between 1 and 15'
+	$.validator.addMethod("val_wmm_param",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 15) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.val_wmm_param);
+#else
+function validate_wmm_param(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 15) {
+		return _("field1and15");		//'Please specify a value between 1 and 15'
+	}
+}
+#endif
+</script>
+
+</body>
+</html>

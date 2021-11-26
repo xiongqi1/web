@@ -1,0 +1,330 @@
+This RDB bridge daemon is implemented as a critical part of RPC interface
+between Magpie and Lark.
+
+The design document for this RPC is in the below link;
+https://confluence.netcommwireless.com/display/MAG/RPC+interface+between+Magpie+and+Lark
+
+Detailed description is already in rdb_bridge_xxxx.conf and rdb_bridge.c but
+it may be not enough for full understanding.
+
+Here are some examples to illustrate the usage of the RDB bridge daemon.
+
+--------------------------------------------------------------------------
+Example 1. Simple case
+--------------------------------------------------------------------------
+
+If defined as below in rdb_bridge.conf in daemon A,
+
+# rdb name     rate      subset   force  alias
+#              limit     number   sync   name
+#-------------------------------------------------------------------------
+sw.version     0         1        0      owa.sw.version
+
+then
+
+RDB bridge daemon A:
+    - Reads this config file when launching
+
+    - Subscribe sw.version to rdb manager
+
+    - Waiting for remote client connection
+
+    - If sw.version is triggered then mark force_sync flag in data base
+
+    - Do initial synchronisation when connected to remote client
+      Include sw.version to initial synchronisation packet because this
+      variable was triggered before being online. If this variable was
+      not triggered during offline state then it will be excluded from
+      initial synchronisation packet because original force_sync flag is
+      off.
+
+    - Whenever sw.version is triggered this variable will be immediately
+      sent to remote daemon because its rate limit is 0. If config this
+      rate limit to 1000 then any triggering event earlier than 1000 ms
+      since last synchronisation will be ignored.
+
+    - Real variable name included in synchronisation packet is
+      owa.sw.version which is aliased name of sw.version.
+
+RDB bridge daemon B in remote side is doing exactly same thing as daemon A.
+
+The synchronisation packet for this example is:
+
+{
+  "owa.sw.version":{
+    "value":"ATTeng_X.X.X\u0000"
+  }
+}
+
+
+--------------------------------------------------------------------------
+Example 2. Parent and child variables
+--------------------------------------------------------------------------
+
+If defined as below in rdb_bridge.conf in daemon A,
+
+# rdb name                   rate      subset   force  alias
+#                            limit     number   sync   name
+#-------------------------------------------------------------------------
+wwan.0.manual_cell_meas.qty  0         3        1
+wwan.0.manual_cell_meas.[x]  0         0        1
+wwan.0.manual_cell_meas.seq  0         0        1
+
+Some RDB variable has a dependency to others. In this example,
+wwan.0.manual_cell_meas.[x] and wwan.0.manual_cell_meas.seq are changed together
+when wwan.0.manual_cell_meas.qty is changed. So we don't need to subscribe all
+of these variables in order to minimise the load to RDB manager, instead
+subscribe key variable only then synchronise all other child variables when the
+key variable is triggered. In this example config, wwan.0.manual_cell_meas.qty
+is parent variable which is subscribed to RDB manager and it has 2 child
+variables. One has dynamic index and the other has not.
+
+RDB bridge daemon A:
+    - Subscribe wwan.0.manual_cell_meas.qty to rdb manager
+
+    - Do initial synchronisation when connected to remote client
+      All variables will be included in initial synchronisation packet because
+      their force sync flag is set. It is same when wwan.0.manual_cell_meas.qty
+      is triggered.
+
+    - Read wwan.0.manual_cell_meas.qty first to get maximum index count for
+      following dynamic index variables. Let say wwan.0.manual_cell_meas.qty is
+      2 in this example. Let's call this variable as index variable from now.
+      Include max_index field here because this index variable could be empty or
+      deleted but still we need max_index field for synchronisation. Also this
+      index variable has subgroup_patterns field which will include all dynamic
+      variable patters of child variables.
+
+    - The next child variable is wwan.0.manual_cell_meas.[x] which has dynamic
+      index. It is now expanded to wwan.0.manual_cell_meas[0]~[1].
+
+    - The "max_index" field is used to delete any stale dynamic variables in
+      remote side. It is prepared for the case when NIT is disconnected from
+      OWA A and connected to OWA B which has different number of dynamic index
+      variables. If remote daemon has wwan.0.manual_cell_meas.[x] in local
+      where x is from 0 to 5 and received this synchronisation packet then
+      it will synchronise wwan.0.manual_cell_meas.[x] for index 0 and 1, then
+      delete index 2,3,4 and 5.
+
+The synchronisation packet for this example is:
+
+{
+  "wwan.0.manual_cell_meas.qty":{
+    "value":"3\u0000",
+    "max_index":"3",
+    "subgroup_patterns":[
+      "wwan.0.manual_cell_meas.[x]"
+    ]
+  },
+  "wwan.0.manual_cell_meas.0":{
+    "value":"E,55540,234,-78.06,-3.19\u0000"
+  },
+  "wwan.0.manual_cell_meas.1":{
+    "value":"E,55690,317,-79.31,-4.94\u0000"
+  },
+  "wwan.0.manual_cell_meas.2":{
+    "value":"E,55390,0,-77.38,-5.38\u0000"
+  },
+  "wwan.0.manual_cell_meas.seq":{
+    "value":"88\u0000"
+  }
+}
+
+Another good example of this case if throughput test variable.
+
+# rdb name                              rate      subset   force  alias
+#                                       limit     number   sync   name
+#-------------------------------------------------------------------------
+service.ttest.ftp.0.current_repeat         0      8        1
+service.ttest.ftp.0.repeats                0      0        1
+service.ttest.ftp.0.res.[x].duration       0      0        1
+service.ttest.ftp.0.res.[x].progress       0      0        1
+service.ttest.ftp.0.res.[x].expected_secs  0      0        1
+service.ttest.ftp.0.res.[x].speed          0      0        1
+service.ttest.ftp.0.res.[x].status         0      0        1
+service.ttest.ftp.0.res.[x].result         0      0        1
+service.ttest.ftp.1.current_repeat         0      8        1
+service.ttest.ftp.1.repeats                0      0        1
+service.ttest.ftp.1.res.[x].duration       0      0        1
+service.ttest.ftp.1.res.[x].progress       0      0        1
+service.ttest.ftp.1.res.[x].expected_secs  0      0        1
+service.ttest.ftp.1.res.[x].speed          0      0        1
+service.ttest.ftp.1.res.[x].status         0      0        1
+service.ttest.ftp.1.res.[x].result         0      0        1
+
+Its JSON packet example is:
+
+{
+  "service.ttest.ftp.1.current_repeat":{
+    "value":"1\u0000"
+  },
+  "service.ttest.ftp.1.repeats":{
+    "value":"3\u0000",
+    "max_index":"3",
+    "subgroup_patterns":[
+      "service.ttest.ftp.1.res.[x].duration",
+      "service.ttest.ftp.1.res.[x].progress",
+      "service.ttest.ftp.1.res.[x].expected_secs",
+      "service.ttest.ftp.1.res.[x].speed",
+      "service.ttest.ftp.1.res.[x].status",
+      "service.ttest.ftp.1.res.[x].result"
+    ]
+  },
+  "service.ttest.ftp.1.res.0.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.1.res.1.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.1.res.2.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.1.res.0.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.1.res.1.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.1.res.2.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.1.res.0.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.1.res.1.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.1.res.2.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.1.res.0.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.1.res.1.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.1.res.2.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.1.res.0.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.1.res.1.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.1.res.2.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.1.res.0.result":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.1.res.1.result":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.1.res.2.result":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.current_repeat":{
+    "value":"1\u0000"
+  },
+  "service.ttest.ftp.0.repeats":{
+    "value":"3\u0000",
+    "max_index":"3",
+    "subgroup_patterns":[
+      "service.ttest.ftp.0.res.[x].duration",
+      "service.ttest.ftp.0.res.[x].progress",
+      "service.ttest.ftp.0.res.[x].expected_secs",
+      "service.ttest.ftp.0.res.[x].speed",
+      "service.ttest.ftp.0.res.[x].status",
+      "service.ttest.ftp.0.res.[x].result"
+    ]
+  },
+  "service.ttest.ftp.0.res.0.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.0.res.1.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.0.res.2.duration":{
+    "value":"100\u0000"
+  },
+  "service.ttest.ftp.0.res.0.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.0.res.1.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.0.res.2.progress":{
+    "value":"30\u0000"
+  },
+  "service.ttest.ftp.0.res.0.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.0.res.1.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.0.res.2.expected_secs":{
+    "value":"120\u0000"
+  },
+  "service.ttest.ftp.0.res.0.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.0.res.1.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.0.res.2.speed":{
+    "value":"112200\u0000"
+  },
+  "service.ttest.ftp.0.res.0.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.res.1.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.res.2.status":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.res.0.result":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.res.1.result":{
+    "value":"ok\u0000"
+  },
+  "service.ttest.ftp.0.res.2.result":{
+    "value":"ok\u0000"
+  }
+}
+
+
+
+--------------------------------------------------------------------------
+Example 3. Deleted variables
+--------------------------------------------------------------------------
+
+If defined as below in rdb_bridge.conf in daemon A,
+
+# rdb name     rate      subset   force  alias
+#              limit     number   sync   name
+#-------------------------------------------------------------------------
+sw.version     0         1        1      owa.sw.version
+
+If a subcribed RDB variable is deleted then RDB manager triggers its client
+for that event. The deleted variable is synchronised to remote daemon as well.
+
+RDB bridge daemon A:
+    - Subscribe sw.version to rdb manager
+
+    - If sw.version is deleted and triggered this variable will be sent
+      to remote daemon with action field as "delete". It is same if the variable
+      is already deleted and RDB bridge daemon starts later.
+
+    - Real variable name included in synchronisation packet is
+      owa.sw.version which is aliased name of sw.version.
+
+The synchronisation packet for this example is:
+
+{
+  "owa.sw.version":{
+    "action":"delete"
+  }
+}

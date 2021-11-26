@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<title>Pots Profile</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(request["QUERY_STRING"]=='form1') {
+		tempval = form['telephonyProfile'];
+		retval=set_single( 'wwan.0.telephony.profile='+tempval );
+		redirect('/cgi-bin/set_telephony_profile.sh');
+	}
+}
+else if (request['REQUEST_METHOD'] == "GET") {
+	form['telephonyProfile'] = get_single('wwan.0.telephony.profile');
+}
+pots_disabled=get_single('potsbridge_disabled');
+pots_status=get_single('pots.status');
+%>
+
+<body onload="initFs()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("pots_profile");
+var profile_list = <%val=get_single('pots.profilelist');%>"@@val";
+
+function initTranslation() {
+	document.getElementById("telProfileIntro").innerHTML = _("telephony profile intro"); 
+}
+
+function initFs() {
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	document.form1.selTelProfile.value=parseInt(document.form1.telephonyProfile.value);
+<%}%>
+	initTranslation();
+}
+
+function disableButtons() {
+	document.form1.F1Apply.disabled=true;
+}
+
+function submitF1() {
+	if (confirm(_("telephony profile warningMsg"))) {
+		disableButtons();
+		document.getElementById('wt').innerHTML = "<font color='#FF0000'>"+_("telephony profile Msg2")+"...</font>";
+		document.form1.submit();	
+	}
+}
+</script>
+
+<h3><script language="JavaScript">document.write(_("telephony profile Msg1"))</script></h3>
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?form1">
+<input type=hidden name="telephonyProfile" value="@@form['telephonyProfile']">
+<table width="85%">
+	<tr><th><span id="telProfileTitle"><script language="JavaScript">document.write(_("telephony profile Msg1"))</script></span></th></tr>
+	<tr><td>
+	<span id="telProfileIntro"></span><br /><br />
+	</td></tr>
+</table>
+
+<table width="85%">
+<%if( pots_disabled=="1" || pots_status=="pots_disabled") {%>
+<br/><br/>
+<div align="center">
+<b><font style='color:red' size=3>&nbsp;&nbsp;<script language="JavaScript">document.write(_("telephony profile Msg3"))</script></font></b>
+</div>
+</table>
+<%} else {%>
+<tr>
+<td width="30%" height="40px" id="wt"><script language="JavaScript">document.write(_("telephony profile"))</script></td>
+<td><select name="selTelProfile" id="selTelProfile" onChange="document.form1.telephonyProfile.value=this.value" >
+	<script type="text/javascript">
+	if(profile_list!="N/A" && profile_list!="" ) {
+		var i;
+		var tel_profiles = new Array();
+		tel_profiles = profile_list.split(';');
+		for(i=0; tel_profiles[i] != ''; i++) {
+			document.write("<option value="+i+" id=\"selTelProfile"+i+"\">"+tel_profiles[i]+"<\/option>");
+		}
+// 		document.write("<option value="+2+" id=\"selTelProfile"+i+"\">"+"Other"+"<\/option>");//North America
+	}
+	</script>
+	</select>
+</td>
+</tr>
+</table>
+<br/>
+<div align="center"><input type="button" name="F1Apply" value="Apply" onClick="submitF1();" style="width:120px;"></div>
+<%}%>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

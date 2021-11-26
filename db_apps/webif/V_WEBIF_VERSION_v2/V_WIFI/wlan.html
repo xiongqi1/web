@@ -1,0 +1,2093 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>WLAN</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+#if defined(V_WIFI_MBSSID)
+<% include mbssid.inc %>
+#endif
+<!-- TODO: This file needs refactoring.  Currently, a lot of guest wifi code is
+           enabled even when V_WIFI_MBSSID (multiple SSIDs) is disabled.-->
+
+<%
+function setRdb(key, val) {
+	set_single_direct("-p",key, val);
+}
+function setWlanRdb(key, val) {
+	setRdb("wlan."+key, val);
+}
+function getWlanRdb(key) {
+	get_single('wlan.'+key);
+}
+
+// modes permit 40 Mhz bandwidth
+// reference: client side function constructing wireless mode options
+modes40m = new Array();
+modes40m[0] = '6';//11n
+modes40m[1] = '7';//11gnmix
+modes40m[2] = '9';//11bgnmix
+
+wlAuthModeOptValues = new Array("OPEN", "SHARED", "WPA", "WPAPSK", "WPA2", "WPA2PSK");
+encryptionTypeHOptValues = new Array("NONE", "WEP", "TKIP", "AES");
+
+function validateInput() {
+
+#if defined(V_WIFI_MBSSID)
+	if (form['wlMbSsid'] != undefined && form['wlMbSsid'] != "" && form['wlMbSsid'] != "N/A") {
+		var wlMbSsid = form['wlMbSsid'];
+		var wlMbSsidLen = string_length(wlMbSsid);
+		if (wlMbSsidLen == 0 || wlMbSsidLen > 32) {
+			onBadRequest();
+		}
+		// wlMbSsid does not accept ",\t,\,$, and `
+		// POSIX Extended regular expression does not allow escape inside brackets, so check \t here
+		if (string_regex_match(wlMbSsid, "\t") == true) {
+			onBadRequest();
+		}
+		var addition = "";
+#ifdef V_WEBIF_SPEC_vdf
+		var addition = "`";
+#endif
+		if (string_regex_match(wlMbSsid, "^[^\"\\$" + addition +"]+$") == false) {
+			onBadRequest();
+		}
+	}
+#ifdef V_WEBIF_SPEC_vdf
+	validateOnOffRadio(form['localManagementAccessEnable']);
+#endif
+	validateOnOffRadio(form['mbssidEnH']);
+	if (form['wdsApMode'] != undefined && form['wdsApMode'] != "") {
+		validateOnOffRadio(form['wdsApMode']);
+	}
+#endif
+#if 0
+	//TODO: validate input in case of undefined V_WIFI_MBSSID
+#endif
+
+	// for setCommonWlan1
+	if (isElementOfArray(form['wlAuthMode'], wlAuthModeOptValues) == false) {
+		onBadRequest();
+	}
+	if (form['wlPreauth'] != undefined && form['wlPreauth'] != "") {
+		validateOnOffRadio(form['wlPreauth']);
+	}
+	if (form['wlNetReauth'] != undefined && form['wlNetReauth'] != "" && form['wlNetReauth'] != "N/A") {
+		var wlNetReauth = string_to_number(form['wlNetReauth']);
+#if 0
+		// 4294967295 is more than 32-bit. For now only checking minimum value.
+#endif
+		if (wlNetReauth < 0) {
+			onBadRequest();
+		}
+	}
+	if (string_length(form['wlWpaPsk']) > 64) {
+		onBadRequest();
+	}
+	if (form['wlWpaGtkRekey'] != undefined && form['wlWpaGtkRekey'] != "" && form['wlWpaGtkRekey'] != "N/A") {
+		var wlWpaGtkRekey = string_to_number(form['wlWpaGtkRekey']);
+#if 0
+		// 4294967295 is more than 32-bit. For now only checking minimum value.
+#endif
+		if (wlWpaGtkRekey < 0) {
+			onBadRequest();
+		}
+	}
+	if (form['wlRadiusPort'] != undefined && form['wlRadiusPort'] != "") {
+		var wlRadiusPort = string_to_number(form['wlRadiusPort']);
+		if (wlRadiusPort < 1 || wlRadiusPort > 65535) {
+			onBadRequest();
+		}
+	}
+	if (string_length(form['wlRadiusKey']) > 80) {
+		onBadRequest();
+	}
+	var wlRadiusIPAddr = form['wlRadiusIPAddr1']+"."+form['wlRadiusIPAddr2']+"."+form['wlRadiusIPAddr3']+"."+form['wlRadiusIPAddr4'];
+	if (wlRadiusIPAddr != "...") {
+		validateIpAddress(wlRadiusIPAddr, "", "");
+	}
+	if (form['wlKeyBit'] != undefined && form['wlKeyBit'] != "" && form['wlKeyBit'] != "N/A" && form['wlKeyBit'] != "64" && form['wlKeyBit'] != "128") {
+		onBadRequest();
+	}
+	if (form['wlKeyIndex'] != undefined && form['wlKeyIndex'] != "" && form['wlKeyIndex'] != "N/A" && form['wlKeyIndex'] != "1" && form['wlKeyIndex'] != "2" && form['wlKeyIndex'] != "3" && form['wlKeyIndex'] != "4") {
+		onBadRequest();
+	}
+	// setCommonWlan2
+	if (form['encryptionTypeH'] != undefined && form['encryptionTypeH'] != "" && form['encryptionTypeH'] != "N/A") {
+		if (isElementOfArray(form['encryptionTypeH'], encryptionTypeHOptValues) == false) {
+			onBadRequest();
+		}
+	}
+	if (string_length(form['wlKeys1']) > 26) {
+		onBadRequest();
+	}
+	if (string_length(form['wlKeys2']) > 26) {
+		onBadRequest();
+	}
+	if (string_length(form['wlKeys3']) > 26) {
+		onBadRequest();
+	}
+	if (string_length(form['wlKeys4']) > 26) {
+		onBadRequest();
+	}
+	if (form['client_isolateH'] != undefined && form['client_isolateH'] != "" && form['client_isolateH'] != "N/A") {
+		validateOnOffRadio(form['client_isolateH']);
+	}
+	if (form['ssid_isolationH'] != undefined && form['ssid_isolationH'] != "" && form['ssid_isolationH'] != "N/A") {
+		validateOnOffRadio(form['ssid_isolationH']);
+	}
+	if (form['szChannel'] != undefined && form['szChannel'] != "" && form['szChannel'] != "N/A") {
+		var szChannel = string_to_number(form['szChannel']);
+		if (szChannel < 0 || szChannel > 14) {
+			onBadRequest();
+		}
+	}
+	if (form['bwsel'] != undefined && form['bwsel'] != "N/A" && form['bwsel'] != "0" && form['bwsel'] != "1") {
+		onBadRequest();
+	}
+#if defined(V_WIFI_qca_soc_lsdk)
+	if (form['maxNumStaH'] != undefined && form['maxNumStaH'] != "" && form['maxNumStaH'] != "N/A") {
+		var maxNumStaH = string_to_number(form['maxNumStaH']);
+		var nMaxNumSta = string_to_number(get_single('wlan.0.hw.max_num_sta'));
+		if (maxNumStaH < 1 || maxNumStaH > nMaxNumSta) {
+			onBadRequest();
+		}
+	}
+#endif
+
+	// for setCommonWlan3
+	// form['wlCountry'] is country code.
+	// Strictly, only element of a valid list should be allowed.
+	// However the list is very long and hard-coded in client javascript.
+	// Here only validate by allowing 2 to 5 alphanumberic characters.
+	if (form['wlCountry'] != undefined && form['wlCountry'] != "") {
+		if (string_regex_match(form['wlCountry'], "^[a-zA-Z0-9]{2,5}$") == false) {
+			onBadRequest();
+		}
+	}
+	validateOnOffRadio(form['wlEnbl']);
+#if defined(V_WIFI_FOLLOW_STA)
+	validateOnOffRadio(form['followEnbl']);
+#endif
+	if (form['wlMode'] != undefined && form['wlMode'] != "" && form['wlMode'] != "N/A") {
+		var wlMode = string_to_number(form['wlMode']);
+		if (wlMode < 0 || wlMode > 9) {
+			onBadRequest();
+		}
+	}
+	if (form['wep8021x'] != undefined && form['wep8021x'] != "" && form['wep8021x'] != "N/A") {
+		validateOnOffRadio(form['wep8021x']);
+	}
+	if (form['hidessidH'] != undefined && form['hidessidH'] != "" && form['hidessidH'] != "N/A") {
+		validateOnOffRadio(form['hidessidH']);
+	}
+}
+
+function setCommonWlan1(i) {
+	setWlanRdb(i+".network_auth",form['wlAuthMode']);
+	setWlanRdb(i+".wpa2_preauthentication",form['wlPreauth']);
+	setWlanRdb(i+".net_re_auth_interval",form['wlNetReauth']);
+	setWlanRdb(i+".wpa_pre_shared_key",form['wlWpaPsk']);
+	setWlanRdb(i+".wpa_group_rekey_interval",form['wlWpaGtkRekey']);
+	setWlanRdb(i+".radius_port",form['wlRadiusPort']);
+	setWlanRdb(i+".radius_key",form['wlRadiusKey']);
+	setWlanRdb(i+".radius_server_ip",form['wlRadiusIPAddr1']+"."+form['wlRadiusIPAddr2']+"."+form['wlRadiusIPAddr3']+"."+form['wlRadiusIPAddr4']);
+	setWlanRdb(i+".encryption_strength",form['wlKeyBit']);
+	setWlanRdb(i+".network_key_id",form['wlKeyIndex']);
+#ifdef V_WEBIF_SPEC_vdf
+	if (i != "") {
+		setWlanRdb(i+".local_management_access_enable",form['localManagementAccessEnable']);
+	}
+#endif
+}
+
+function setCommonWlan2(i) {
+	setWlanRdb(i+".encryption_type",form['encryptionTypeH']);
+	setWlanRdb(i+".network_key1",form['wlKeys1']);
+	setWlanRdb(i+".network_key2",form['wlKeys2']);
+	setWlanRdb(i+".network_key3",form['wlKeys3']);
+	setWlanRdb(i+".network_key4",form['wlKeys4']);
+	setWlanRdb(i+".ap_isolated",form['client_isolateH']);
+	setWlanRdb(i+".ssid_isolation",form['ssid_isolationH']);
+#if defined(V_WIFI_FOLLOW_STA)
+	if (form['followEnbl'] != 1) {
+		confChan = form['szChannel']; // use whatever user sets
+	} else {
+		confChan = 6; // default fixed channel
+		clientRadio = get_single('wlan_sta.0.radio');
+		apCurrChan = get_single('wlan.0.currChan');
+		staCurrChan = get_single('wlan_sta.0.currChan');
+		if (clientRadio == 1 && staCurrChan >=1 && staCurrChan <= 14) {
+			// the client radio current channel should be used if valid
+			confChan = staCurrChan;
+		} else if (apCurrChan >=1 && apCurrChan <= 14) {
+			confChan = apCurrChan;
+		}
+	}
+#else
+	confChan = form['szChannel'];
+#endif
+	setWlanRdb("0.conf.channel", confChan);
+	// setting bandwidth mode, 40 Mhz is only valid in certain modes
+	var bw40permitted = false;
+	var cur_wlMode = form['wlMode'];
+	for (idx = 0; idx < modes40m.length; idx++) {
+		if (modes40m[idx] == cur_wlMode) {
+			bw40permitted = true;
+			break;
+		}
+	}
+	if (bw40permitted) {
+		setWlanRdb("0.conf.bwselection",form['bwsel']);
+	}
+	else {
+		// otherwise 20 Mhz
+		setWlanRdb("0.conf.bwselection","0");
+	}
+#if defined(V_WIFI_qca_soc_lsdk)
+	setWlanRdb(i+".conf.max_num_sta",form['maxNumStaH']);
+#endif
+}
+
+function setCommonWlan3(i) {
+	setRdb("localisation.region",form['wlCountry']);
+	setWlanRdb("0.radio",form['wlEnbl']);
+#if defined(V_WIFI_FOLLOW_STA)
+	/* since wpa_supplicant.template subscribes to the follow_sta rdb,
+	 * to minimise unnecessary trigger, set it only when changed.
+	 */
+	oldFollow = getWlanRdb('0.follow_sta');
+	if (oldFollow != form['followEnbl']) {
+		setWlanRdb("0.follow_sta",form['followEnbl']);
+	}
+#endif
+	setWlanRdb("0.wireless_mode",form['wlMode']);
+	setWlanRdb(i+".wep8021x",form['wep8021x']);
+	setWlanRdb(i+".hide_accesspoint",form['hidessidH']);
+}
+
+#ifdef V_WIFI_ralink
+// Note this only applies to Ralink driver. On Open source this has no effect
+function setWdsTrigger() {
+	// In order to take effect WDS mode setting,
+	// wifi HW should be reset.
+	tmp=getWlanRdb('0.wds_mode');
+	if (tmp >= 1) {
+		setWlanRdb("0.wds_trigger",tmp);
+	}
+}
+#endif
+%>
+
+#if defined(V_WIFI_MBSSID)
+<%
+if (form['editmode'] != undefined &&  form['editmode'] != "") {
+	if (form['editmode'] != "1") {
+		redirect("/wlan.html");
+		exit(-1);
+	}
+}
+if (form['editidx'] != undefined && form['editidx'] != "") {
+	if (string_regex_match(form['editidx'], "^[0-9]+$") == false) {
+		redirect("/wlan.html");
+		exit(-1);
+	}
+}
+
+if(form['editmode']=='1' && form['editidx']!=''){
+	session["sessionSsidIdx"]=form['editidx'];
+	form['mulSSID']=form['editidx'];
+} else {
+	session["sessionSsidIdx"]='';
+	form['mulSSID']='';
+	form['editmode']='';
+	form['editidx']='';
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	validateInput();
+
+	i=form['editidx'];
+	setWlanRdb("currssid", i);
+
+	// TODO - fix me. When save is clicked on the common AP page,
+	// editidx and therefore i is empty, and this results in this code creating
+	// rogue wlan..xxx variables, e.g. "wlan" followed by a double dot.
+	// However, simply checking for
+	// "i" being non empty will not work as setCommonWlanX functions sneakily
+	// save common properties under wlan.0 key, ignoring empty 'i'
+	// So the whole thing would break. TT defect #10594 raised.
+	setWlanRdb(i+".ssid",form['wlMbSsid']);
+	setWlanRdb(i+".enable",form['mbssidEnH']);
+	if (i == 0) {
+		setWlanRdb("0.wds_ap_enable",form['wdsApMode']);
+	}
+
+
+	setCommonWlan1(i);
+	setCommonWlan2(i);
+	setCommonWlan3(i);
+#ifdef V_WIFI_ralink
+	setWdsTrigger();
+#endif
+
+	if( session["sessionSsidIdx"]!=form['mulSSID'] )
+		session["sessionSsidIdx"]=form['mulSSID'];
+	if(form['editmode']=='1' && form['editidx']!=''){
+		session["sessionSsidIdx"]='';
+		form['mulSSID']='';
+		form['editmode']='';
+		form['editidx']='';
+	}
+
+	// Write this last to ensure all configs are processed for this "post" method.
+	setWlanRdb("0.trigger", 1);
+
+	redirect('/wlan.html?success');
+}
+else { /*GET*/
+	form['wlEnbl'] = getWlanRdb('0.radio');
+#if defined(V_WIFI_FOLLOW_STA)
+	form['followEnbl'] = getWlanRdb('0.follow_sta');
+#else
+	form['followEnbl'] = 0;
+#endif
+	form['wlMode'] = getWlanRdb('0.wireless_mode');
+	form['client_isolateH'] = getWlanRdb(form['editidx']+'.ap_isolated');
+	form['ssid_isolationH'] = getWlanRdb(form['editidx']+'.ssid_isolation');
+#ifdef V_WEBIF_SPEC_vdf
+	form['localManagementAccessEnable'] = getWlanRdb(form['editidx']+'.local_management_access_enable');
+#endif
+	if (form['editidx'] == 0 && form['followEnbl'] != 1) {
+		form['wdsApMode'] = getWlanRdb('0.wds_ap_enable');
+	} else {
+		form['wdsApMode'] = "0";
+	}
+#if defined(V_WIFI_qca_soc_lsdk)
+	form['maxNumStaH'] = getWlanRdb(form['editidx']+'.conf.max_num_sta');
+#endif
+}
+%>
+#else
+<%
+if (request['REQUEST_METHOD'] == "GET") {
+	form['wlEnbl'] = getWlanRdb('0.radio');
+#if defined(V_WIFI_FOLLOW_STA)
+	form['followEnbl'] = getWlanRdb('0.follow_sta');
+#else
+	form['followEnbl'] = 0;
+#endif
+	form['wlMode'] = getWlanRdb('0.wireless_mode');
+	form['hidessidH'] = getWlanRdb('0.hide_accesspoint');
+	if (form['followEnbl'] != 1) {
+		form['wdsApMode'] = getWlanRdb('0.wds_ap_enable');
+	} else {
+		form['wdsApMode'] = "0";
+	}
+	form['wlEnbl_2'] = getWlanRdb('1.enable');
+	form['wlKeys1'] = getWlanRdb('0.network_key1');
+	form['wlKeys2'] = getWlanRdb('0.network_key2');
+	form['wlKeys3'] = getWlanRdb('0.network_key3');
+	form['wlKeys4'] = getWlanRdb('0.network_key4');
+	form['wep8021x'] = getWlanRdb('0.wep8021x');
+	form['client_isolateH'] = getWlanRdb('0.ap_isolated');
+	form['ssid_isolationH'] = getWlanRdb('0.ssid_isolation');
+#ifdef V_WEBIF_SPEC_vdf
+	form['localManagementAccessEnable'] = getWlanRdb('0.local_management_access_enable');
+#endif
+#if defined(V_WIFI_qca_soc_lsdk)
+	form['maxNumStaH'] = getWlanRdb('0.conf.max_num_sta');
+#endif
+}
+else {
+	// validate input
+#ifdef V_WEBIF_SPEC_vdf
+	validateOnOffRadio(form['localManagementAccessEnable']);
+#endif
+
+	i=form['wlSsidIdx'];
+
+	setWlanRdb("0.wds_ap_enable",form['wdsApMode']);
+	setWlanRdb("ssididx",i);
+	setCommonWlan1(i);
+	setCommonWlan2('0');
+
+	if( ( form['wlSsid'] != '' )&&( form['wlSsid_2'] != '' ) ) {
+		setWlanRdb("0.ssid",form['wlSsid']);
+		setWlanRdb("1.enable",form['wlEnbl_2']);
+		setWlanRdb("1.ssid",form['wlSsid_2']);
+		setCommonWlan3('0');
+	}
+#ifdef V_WIFI_ralink
+	setWdsTrigger();
+#endif
+
+	// this will be used in setCommonWlan2, so should be cleared late here
+	setWlanRdb("0.currChan","0");
+
+	// Write this last to ensure all configs are processed for this "post" method.
+	setWlanRdb("0.trigger", 1);
+}
+if(form['wlEnbl_2']=='0')
+	form['wlSsidIdx']='0';
+if( session["ssidIdx"]!=form['wlSsidIdx'] )
+	session["ssidIdx"]=form['wlSsidIdx'];
+
+if((session["ssidIdx"]!='0')&&(session["ssidIdx"]!='1')) {
+	i = get_single('wlan.ssididx');
+	if( (i!='0')&&(i!='1') ) i='0';
+		session["ssidIdx"] = i;
+	form['wlSsidIdx'] = i;
+}
+else {
+	i = session["ssidIdx"];
+}
+session["radiusServerIP"] = get_single('wlan.'+i+'.radius_server_ip');
+session["mode"] = get_single('wlan.'+i+'.network_auth');
+tmpval = get_single('wlan.'+i+'.encryption_strength');
+if(tmpval==128)
+	session["bit"] = '0';
+else
+	session["bit"] = '1';
+session["wpaPskKey"] = get_single('wlan.'+i+'.wpa_pre_shared_key');
+session["wpaGTKRekey"] = get_single('wlan.'+i+'.wpa_group_rekey_interval');
+session["radiusPort"] = get_single('wlan.'+i+'.radius_port');
+session["radiusKey"] = get_single('wlan.'+i+'.radius_key');
+session["varNetReauth"] = get_single('wlan.'+i+'.net_re_auth_interval');
+form['encryptionTypeH'] = get_single('wlan.0.encryption_type');
+%>
+#endif
+
+<!-- ================================================================================================ -->
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+<script type="text/javascript" src="/js/zxcvbn.js"></script>
+#endif
+
+<script language="JavaScript">
+
+#include "net_util.js"
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+#if (0)
+/*-----------------------------------------------------------------------*/
+// combine multiple line warning messages
+/*-----------------------------------------------------------------------*/
+
+/* password warning message for submit
+
+   Passwords configured on the router must meet the following criteria:
+     • Be a minimum of 8 characters and no more than 128 characters in length.
+     • Contain at least one upper case and one number.
+     • Contain at least one special character, such as: `~!@#$%^&*()-_=+[{]}\|;:'",<.>/?.
+ */
+#endif
+var pwdWarn1=[];
+	pwdWarn1[0] = _("passwordWarning6");
+	pwdWarn1[1] = bulletHead+_("passwordWarning2");
+	pwdWarn1[2] = bulletHead+_("passwordWarning3");
+	pwdWarn1[3] = bulletHead+_("passwordWarning4")+convert_to_html_entity('`~!@#$%^&*()-_=+[{]}\|;:\'\",\<.>/?.');
+
+#if (0)
+/*-----------------------------------------------------------------------*/
+#endif
+#endif
+
+#if defined(V_WIFI_MBSSID)
+var sessionSsidIdx = <%i=session["sessionSsidIdx"];%>"@@i";
+if( sessionSsidIdx!='0' && sessionSsidIdx!='1' && sessionSsidIdx!='2' && sessionSsidIdx!='3' && sessionSsidIdx!='4')
+	sessionSsidIdx = '0';
+#else
+var ssid = <%val=get_single('wlan.0.ssid');%>"@@val";
+var ssid_2 = <%val=get_single('wlan.1.ssid');%>"@@val";
+var ssidIdx = <%i=session["ssidIdx"];%>"@@i";
+if( ssidIdx!='0' && ssidIdx!='1')
+	ssidIdx = '0';
+var radiusServerIP = <%val=session["radiusServerIP"];%>"@@val";
+var mode = <%val=session["mode"];%>"@@val";
+if ( mode == '' ||  mode == 'N/A' )
+	mode = 'psk2';
+var bit = <%val=session["bit"];%>"@@val";
+var keyIdx = <%val=get_single('wlan.0.network_key_id');%>"@@val";
+if( keyIdx == "N/A") keyIdx = 1;
+var wpaPskKey = <%val=session["wpaPskKey"];%>"@@val";
+if(wpaPskKey == ''||wpaPskKey == 'N/A')
+	wpaPskKey='';
+var wpaGTKRekey = <%val=session["wpaGTKRekey"];%>"@@val";
+if(wpaGTKRekey=='N/A') wpaGTKRekey=0;
+var radiusPort = <%val=session["radiusPort"];%>"@@val";
+var radiusKey = <%val=session["radiusKey"];%>"@@val";
+//var wep = <%val=session["wlwep"];%>"@@val";
+var wlCorerev = '9';
+var varPreauth = '0';
+var varNetReauth = <%val=session["varNetReauth"];%>"@@val";
+if ( varNetReauth == '' || isNaN(varNetReauth) == true || varNetReauth < 0 || varNetReauth > 0xffffffff )
+	varNetReauth = '36000';
+var encryption_type = <%val=get_single('wlan.0.encryption_type');%>"@@val";
+#endif
+
+#ifndef V_WIFI_ralink
+// Read the STA/Client radio state
+var clientRadio = <%val=get_single('wlan_sta.0.radio');%>"@@val";
+#endif
+
+#if defined(V_WIFI_qca_soc_lsdk)
+var n_max_num_sta="<%get_single_direct('wlan.0.hw.max_num_sta');%>";
+var n_default_max_num_sta="<%get_single_direct('wlan.0.conf.default.max_num_sta');%>";
+#endif
+
+var country = <%val=get_single('localisation.region');%>"@@val";
+if(country=='N/A'||country=='') country='AU';
+var band= <%val=get_single('wlan.0.conf.band');%>"@@val";
+
+var channel = <%val=get_single("wlan.0.conf.channel");%>"@@val";
+if( channel == '' || channel == "N/A") channel = 8;
+
+var currChan = <%val=get_single("wlan.0.currChan");%>"@@val";
+if (currChan == '' || currChan == "N/A") currChan = 0;
+
+ChannelList_24 = [
+	"AUTO",
+	"2412MHz ("+_("channel")+" 1)",
+	"2417MHz ("+_("channel")+" 2)",
+	"2422MHz ("+_("channel")+" 3)",
+	"2427MHz ("+_("channel")+" 4)",
+	"2432MHz ("+_("channel")+" 5)",
+	"2437MHz ("+_("channel")+" 6)",
+	"2442MHz ("+_("channel")+" 7)",
+	"2447MHz ("+_("channel")+" 8)",
+	"2452MHz ("+_("channel")+" 9)",
+	"2457MHz ("+_("channel")+" 10)",
+	"2462MHz ("+_("channel")+" 11)",
+	"2467MHz ("+_("channel")+" 12)",
+	"2472MHz ("+_("channel")+" 13)",
+	"2484MHz ("+_("channel")+" 14)"
+];
+function CreateChannelOption() {
+	var x = document.getElementById("szChannel");
+	var maxchannel=11;
+	if (country=="AU"||country=="JP"||country=="TW"||country=="FR"||
+        country=="IE"||country=="CN"||country=="HK"||country=="SA"||country=="ALL")
+		maxchannel=13;
+	if (country=="JP" && $("#wlMode").val()=="1") //11b
+		maxchannel=14;
+	for (i = x.length - 1; i>=0; i--)
+		x.remove(i);
+	for( var i=0; i<=maxchannel; i++ ) {
+		var y = document.createElement('option');
+		y.text = ChannelList_24[i];
+		y.value = i;
+		try {
+			x.add(y,null); // standards compliant
+		}
+		catch(ex) {
+			x.add(y); // IE only
+		}
+	}
+	$("#szChannel").val(channel);
+}
+
+function wlLoadCountryList() {
+	var phytype = "b";
+	var cur = 0;
+	var sel = 0;
+	var i = 0;
+	if (band == "1") { // 5G
+		;
+	}
+	else {
+		document.wlan.wlCountry[i++] = new Option(_("AMERICAN SAMOA"), "AS");
+		document.wlan.wlCountry[i++] = new Option(_("ANTIGUA AND BARBUDA"), "AG");
+		document.wlan.wlCountry[i++] = new Option(_("ARGENTINA"), "AR");
+		document.wlan.wlCountry[i++] = new Option(_("ARUBA"), "AW");
+		document.wlan.wlCountry[i++] = new Option(_("AUSTRALIA"), "AU");
+		document.wlan.wlCountry[i++] = new Option(_("AUSTRIA"), "AT");
+		document.wlan.wlCountry[i++] = new Option(_("AZERBAIJAN"), "AZ");
+		document.wlan.wlCountry[i++] = new Option(_("BAHAMAS"), "BS");
+		document.wlan.wlCountry[i++] = new Option(_("BAHRAIN"), "BH");
+		document.wlan.wlCountry[i++] = new Option(_("BANGLADESH"), "BD");
+		document.wlan.wlCountry[i++] = new Option(_("BARBADOS"), "BB");
+		document.wlan.wlCountry[i++] = new Option(_("BELARUS"), "BY");
+		document.wlan.wlCountry[i++] = new Option(_("BELGIUM"), "BE");
+		document.wlan.wlCountry[i++] = new Option(_("BERMUDA"), "BM");
+		document.wlan.wlCountry[i++] = new Option(_("BHUTAN"), "BT");
+		document.wlan.wlCountry[i++] = new Option(_("BOLIVIA"), "BO");
+		document.wlan.wlCountry[i++] = new Option(_("BOSNIA AND HERZEGOVINA"), "BA");
+		document.wlan.wlCountry[i++] = new Option(_("BRAZIL"), "BR");
+		document.wlan.wlCountry[i++] = new Option(_("BRUNEI DARUSSALAM"), "BN");
+		document.wlan.wlCountry[i++] = new Option(_("BULGARIA"), "BG");
+		document.wlan.wlCountry[i++] = new Option(_("CANADA"), "CA");
+		document.wlan.wlCountry[i++] = new Option(_("CAPE VERDE"), "CV");
+		document.wlan.wlCountry[i++] = new Option(_("CAYMAN ISLANDS"), "KY");
+		document.wlan.wlCountry[i++] = new Option(_("CHILE"), "CL");
+		document.wlan.wlCountry[i++] = new Option(_("CHINA"), "CN");
+		document.wlan.wlCountry[i++] = new Option(_("COLOMBIA"), "CO");
+		document.wlan.wlCountry[i++] = new Option(_("COSTA RICA"), "CR");
+		document.wlan.wlCountry[i++] = new Option(_("CROATIA"), "HR");
+		document.wlan.wlCountry[i++] = new Option(_("CYPRUS"), "CY");
+		document.wlan.wlCountry[i++] = new Option(_("CZECH REPUBLIC"), "CZ");
+		document.wlan.wlCountry[i++] = new Option(_("DENMARK"), "DK");
+		document.wlan.wlCountry[i++] = new Option(_("DOMINICA"), "DM");
+		document.wlan.wlCountry[i++] = new Option(_("DOMINICAN REPUBLIC"), "DO");
+		document.wlan.wlCountry[i++] = new Option(_("ECUADOR"), "EC");
+		document.wlan.wlCountry[i++] = new Option(_("EGYPT"), "EG");
+		document.wlan.wlCountry[i++] = new Option(_("EL SALVADOR"), "SV");
+		document.wlan.wlCountry[i++] = new Option(_("ESTONIA"), "EE");
+		document.wlan.wlCountry[i++] = new Option(_("FALKLAND ISLANDS"), "FK");
+		document.wlan.wlCountry[i++] = new Option(_("FINLAND"), "FI");
+		document.wlan.wlCountry[i++] = new Option(_("FRENCH GUIANA"), "GF");
+		document.wlan.wlCountry[i++] = new Option(_("FRANCE"), "FR");
+		document.wlan.wlCountry[i++] = new Option(_("GIBRALTAR"), "GI");
+		document.wlan.wlCountry[i++] = new Option(_("GERMANY"), "DE");
+		document.wlan.wlCountry[i++] = new Option(_("GREECE"), "GR");
+		document.wlan.wlCountry[i++] = new Option(_("GUADELOUPE"), "GP");
+		document.wlan.wlCountry[i++] = new Option(_("GUAM"), "GU");
+		document.wlan.wlCountry[i++] = new Option(_("GUATEMALA"), "GT");
+		document.wlan.wlCountry[i++] = new Option(_("GUERNSEY"), "GG");
+		document.wlan.wlCountry[i++] = new Option(_("HAITI"), "HT");
+		document.wlan.wlCountry[i++] = new Option(_("HOLY SEE"), "VA");
+		document.wlan.wlCountry[i++] = new Option(_("HONDURAS"), "HN");
+		document.wlan.wlCountry[i++] = new Option(_("HONG KONG"), "HK");
+		document.wlan.wlCountry[i++] = new Option(_("HUNGARY"), "HU");
+		document.wlan.wlCountry[i++] = new Option(_("ICELAND"), "IS");
+		document.wlan.wlCountry[i++] = new Option(_("INDIA"), "IN");
+		document.wlan.wlCountry[i++] = new Option(_("INDONESIA"), "ID");
+		document.wlan.wlCountry[i++] = new Option(_("IRAN"), "IR");
+		document.wlan.wlCountry[i++] = new Option(_("IRELAND"), "IE");
+		document.wlan.wlCountry[i++] = new Option(_("ISRAEL"), "IL");
+		document.wlan.wlCountry[i++] = new Option(_("ITALY"), "IT");
+		document.wlan.wlCountry[i++] = new Option(_("JAMAICA"), "JM");
+		document.wlan.wlCountry[i++] = new Option(_("JAPAN"), "JP");
+		document.wlan.wlCountry[i++] = new Option(_("JERSEY"), "JE");
+		document.wlan.wlCountry[i++] = new Option(_("JORDAN"), "JO");
+		document.wlan.wlCountry[i++] = new Option(_("KENYA"), "KE");
+		document.wlan.wlCountry[i++] = new Option(_("KOREA"), "KR");
+		document.wlan.wlCountry[i++] = new Option(_("LATVIA"), "LV");
+		document.wlan.wlCountry[i++] = new Option(_("LIECHTENSTEIN"), "LI");
+		document.wlan.wlCountry[i++] = new Option(_("LITHUANIA"), "LT");
+		document.wlan.wlCountry[i++] = new Option(_("LUXEMBOURG"), "LU");
+		document.wlan.wlCountry[i++] = new Option(_("MACEDONIA"), "MK");
+		document.wlan.wlCountry[i++] = new Option(_("MALAWI"), "MW");
+		document.wlan.wlCountry[i++] = new Option(_("MACAO"), "MO");
+		document.wlan.wlCountry[i++] = new Option(_("MALAYSIA"), "MY");
+		document.wlan.wlCountry[i++] = new Option(_("MALDIVES"), "MV");
+		document.wlan.wlCountry[i++] = new Option(_("MALTA"), "MT");
+		document.wlan.wlCountry[i++] = new Option(_("MAN"), "IM");
+		document.wlan.wlCountry[i++] = new Option(_("MARTINIQUE"), "MQ");
+		document.wlan.wlCountry[i++] = new Option(_("MAURITANIA"), "MR");
+		document.wlan.wlCountry[i++] = new Option(_("MAURITIUS"), "MU");
+		document.wlan.wlCountry[i++] = new Option(_("MAYOTTE"), "YT");
+		document.wlan.wlCountry[i++] = new Option(_("MEXICO"), "MX");
+		document.wlan.wlCountry[i++] = new Option(_("MICRONESIA"), "FM");
+		document.wlan.wlCountry[i++] = new Option(_("MONACO"), "MC");
+		document.wlan.wlCountry[i++] = new Option(_("NETHERLANDS"), "NL");
+		document.wlan.wlCountry[i++] = new Option(_("NETHERLANDS ANTILLES"), "AN");
+		document.wlan.wlCountry[i++] = new Option(_("NEW ZEALAND"), "NZ");
+		document.wlan.wlCountry[i++] = new Option(_("NICARAGUA"), "NI");
+		document.wlan.wlCountry[i++] = new Option(_("NIGERIA"), "NG");
+		document.wlan.wlCountry[i++] = new Option(_("NORTHERN MARIANA ISLANDS"), "MP");
+		document.wlan.wlCountry[i++] = new Option(_("NORWAY"), "NO");
+		document.wlan.wlCountry[i++] = new Option(_("PAKISTAN"), "PK");
+		document.wlan.wlCountry[i++] = new Option(_("PANAMA"), "PA");
+		document.wlan.wlCountry[i++] = new Option(_("PAPUA NEW GUINEA"), "PG");
+		document.wlan.wlCountry[i++] = new Option(_("PERU"), "PE");
+		document.wlan.wlCountry[i++] = new Option(_("PHILIPPINES"), "PH");
+		document.wlan.wlCountry[i++] = new Option(_("POLAND"), "PL");
+		document.wlan.wlCountry[i++] = new Option(_("PORTUGAL"), "PT");
+		document.wlan.wlCountry[i++] = new Option(_("PUERTO RICO"), "PR");
+		document.wlan.wlCountry[i++] = new Option(_("REUNION"), "RE");
+		document.wlan.wlCountry[i++] = new Option(_("ROMANIA"), "RO");
+		document.wlan.wlCountry[i++] = new Option(_("RUSSIAN FEDERATION"), "RU");
+		document.wlan.wlCountry[i++] = new Option(_("SAINT PIERRE AND MIQUELON"), "PM");
+		document.wlan.wlCountry[i++] = new Option(_("SAUDI ARABIA"), "SA");
+		document.wlan.wlCountry[i++] = new Option(_("SINGAPORE"), "SG");
+		document.wlan.wlCountry[i++] = new Option(_("SLOVAKIA"), "SK");
+		document.wlan.wlCountry[i++] = new Option(_("SLOVENIA"), "SI");
+		document.wlan.wlCountry[i++] = new Option(_("SOUTH AFRICA"), "ZA");
+		document.wlan.wlCountry[i++] = new Option(_("SPAIN"), "ES");
+		document.wlan.wlCountry[i++] = new Option(_("SRI LANKA"), "LK");
+		document.wlan.wlCountry[i++] = new Option(_("SWEDEN"), "SE");
+		document.wlan.wlCountry[i++] = new Option(_("SWITZERLAND"), "CH");
+		document.wlan.wlCountry[i++] = new Option(_("TAIWAN"), "TW");
+		document.wlan.wlCountry[i++] = new Option(_("TANZANIA"), "TZ");
+		document.wlan.wlCountry[i++] = new Option(_("THAILAND"), "TH");
+		document.wlan.wlCountry[i++] = new Option(_("TURKEY"), "TR");
+		document.wlan.wlCountry[i++] = new Option(_("UKRAINE"), "UA");
+		document.wlan.wlCountry[i++] = new Option(_("UNITED ARAB EMIRATES"), "AE");
+		document.wlan.wlCountry[i++] = new Option(_("UNITED KINGDOM"), "GB");
+		document.wlan.wlCountry[i++] = new Option(_("UNITED STATES"), "US");
+		document.wlan.wlCountry[i++] = new Option(_("UNITED STATES MINOR OUTLYING ISLANDS"), "UM");
+		document.wlan.wlCountry[i++] = new Option(_("URUGUAY"), "UY");
+		document.wlan.wlCountry[i++] = new Option(_("UZBEKISTAN"), "UZ");
+		document.wlan.wlCountry[i++] = new Option(_("VENEZUELA"), "VE");
+		document.wlan.wlCountry[i++] = new Option(_("VIET NAM"), "VN");
+		document.wlan.wlCountry[i++] = new Option(_("VIRGIN ISLANDS, BRITISH"), "VG");
+		document.wlan.wlCountry[i++] = new Option(_("VIRGIN ISLANDS, U.S."), "VI");
+		document.wlan.wlCountry[i++] = new Option(_("YUGOSLAVIA"), "YU");
+		document.wlan.wlCountry[i++] = new Option(_("ZAMBIA"), "ZM");
+		document.wlan.wlCountry[i++] = new Option(_("BAKER ISLAND"), "Z2");
+		document.wlan.wlCountry[i++] = new Option(_("ALL CHANNELS"), "ALL");
+	}
+	for (i=0; i< document.wlan.wlCountry.options.length; i++) {
+		if (document.wlan.wlCountry.options[i].value == country) {
+			document.wlan.wlCountry.options[i].selected = true;
+			break;
+		}
+	}
+	/* set to all(the last one) if not found */
+	if( i == document.wlan.wlCountry.options.length )
+		document.wlan.wlCountry.options[i-1].selected = true;
+}
+
+function hideWlSecInfo(hidden) {
+	if ( hidden == 1 ) {
+		$("#wlCountry").attr("disabled", true);
+		$("#SecurityDiv").hide();
+#if !defined(V_WIFI_MBSSID)
+		$("#wlEnbl_2").attr("disabled", true);
+		$("#wlSsid").attr("disabled", true);
+#endif
+	} else {
+		$("#wlCountry").attr("disabled", false);
+		$("#SecurityDiv").show();
+#if !defined(V_WIFI_MBSSID)
+		$("#wlEnbl_2").attr("disabled", false);
+		$("#wlSsid").attr("disabled", false);
+#endif
+	}
+}
+
+function showWpaEncryptionOptions() {
+	var authMode = $("#wlAuthMode").val();
+	var encryption = $("#encryptionType").val();
+	if ((authMode == "WPAPSK") ||
+		(authMode == "WPA")) {
+		$("#id_wpa_tkip").attr("disabled", false);
+		$("#id_wpa_aes" ).attr("disabled", true);
+		if (encryption == "AES") {
+			$("#encryptionTypeH").val("TKIP");
+			$("#encryptionType").val("TKIP");
+		}
+	} else if ((authMode == "WPA2PSK") ||
+			   (authMode == "WPA2")) {
+		$("#id_wpa_tkip").attr("disabled", true);
+		$("#id_wpa_aes" ).attr("disabled", false);
+		if (encryption == "TKIP") {
+			$("#encryptionTypeH").val("AES");
+			$("#encryptionType").val("AES");
+		}
+	}
+}
+
+function checkHex(str) {
+	var len = str.length;
+	for (var i=0; i<str.length; i++) {
+		if ((str.charAt(i) >= '0' && str.charAt(i) <= '9') ||
+		(str.charAt(i) >= 'a' && str.charAt(i) <= 'f') ||
+		(str.charAt(i) >= 'A' && str.charAt(i) <= 'F') ) {
+			continue;
+		} else
+	        return false;
+	}
+	return true;
+}
+
+function setKey(k) {
+var keyValue = $("#wlKeys"+k).val();
+var keylength = keyValue.length;
+
+	if ( keylength != 0 ) {
+		if(keylength != 10 && keylength != 26) {
+			$("#wlKeys"+k).css("color", "BLACK");
+			$("#TEXT"+k).html("");
+		}
+		else {
+			$("#wlKeys"+k).css("color", "GREEN");
+			if(keylength == 10) {
+				$("#TEXT"+k).html("&nbsp;&nbsp;64 bit&nbsp;&nbsp;HEX");
+				$("#wlKeyBit").val("64");
+			}
+			else {
+				$("#TEXT"+k).html("&nbsp;&nbsp;128 bit&nbsp;&nbsp;HEX");
+				$("#wlKeyBit").val("128");
+			}
+			if( isValidKey(keyValue, 5)==false && isValidKey(keyValue, 13)==false )
+				$("#wlKeys"+k).css("color", "RED");
+		}
+		if( checkHex( keyValue ) == false) {
+			$("#wlKeys"+k).css("color", "RED");
+		}
+	}
+}
+
+function isValidWpaPskKey(val) {
+var ret = false;
+var len = val.length;
+var maxSize = 64;
+var minSize = 8;
+
+	if ( len >= minSize && len < maxSize )
+		ret = true;
+	else if ( len == maxSize ) {
+		for ( i = 0; i < maxSize; i++ )
+			if ( isHexaDigit(val.charAt(i)) == false )
+				break;
+		if ( i == maxSize )
+			ret = true;
+	} else
+		ret = false;
+	return ret;
+}
+
+function hideAllElements() {
+	$("#wpa_encrypt_sel").hide();
+	$("#pre_shared_key_input").hide();
+	$("#wpa_gtkrekey_int").hide();
+	$("#radius_server_setting").hide();
+	$("#pre_shared_key_sel").hide();
+	$("#reauth_int_input").hide();
+	$("#wep_encrypt_sel").hide();
+	$("#network_key_sel").hide();
+	$("#802_1x_wep_encrypt_sel").hide();
+}
+
+function authModeChange( alertMsg ) {
+#if defined(V_WIFI_MBSSID)
+	var ssidIdx=0;
+	ssidIdx=getSelectedSSIDIdx();
+	var keyIdx=mbssidST[ssidIdx].network_key_id;
+#endif
+	var authMode = $("#wlAuthMode").val()
+	hideAllElements();
+	switch ( authMode ) {
+	case 'OPEN':
+		if($("#wlWep").val()=="disabled")
+			$("#encryptionTypeH").val("NONE");
+		else
+			$("#encryptionTypeH").val("WEP");
+		$("#wep_encrypt_sel").show();
+		$("#wlWep").attr("disabled",false);
+	break;
+	case 'SHARED':
+		$("#wlWep").val("enabled");
+		$("#wlWep").attr("disabled",true);
+		$("#encryptionTypeH").val("WEP");
+		$("#wep_encrypt_sel").show();
+	break;
+	case 'WPA':
+		if(alertMsg)
+			blockUI_alert(_("restrictAccess"));
+		$("#wep_encrypt_sel").hide();
+		$("#wpa_gtkrekey_int").show();
+		$("#encryptionTypeH").val("TKIP");
+		$("#wpa_encrypt_sel").show();
+		$("#radius_server_setting").show();
+	break;
+	case 'WPAPSK':
+		if(alertMsg)
+			blockUI_alert(_("restrictAccess"));
+		$("#wep_encrypt_sel").hide();
+		$("#pre_shared_key_input").show();
+		$("#wpa_gtkrekey_int").show();
+		$("#encryptionTypeH").val("TKIP");
+		$("#wpa_encrypt_sel").show();
+		break;
+	case 'WPA2':
+		$("#wep_encrypt_sel").hide();
+		$("#wpa_gtkrekey_int").show();
+		$("#encryptionTypeH").val("AES");
+		$("#wpa_encrypt_sel").show();
+		$("#radius_server_setting").show();
+	break;
+	case 'WPA2PSK':
+		$("#wep_encrypt_sel").hide();
+		$("#pre_shared_key_input").show();
+		$("#wpa_gtkrekey_int").show();
+		$("#encryptionTypeH").val("AES");
+		$("#wpa_encrypt_sel").show();
+		break;
+	case 'IEEE8021X':
+		$("#802_1x_wep_encrypt_sel").show();
+		$("#radius_server_setting").show();
+	break;
+	}
+	document.wlan.wlKeyIndex[0] = new Option("1", "1");
+	document.wlan.wlKeyIndex[1] = new Option("2", "2");
+	document.wlan.wlKeyIndex[2] = new Option("3", "3");
+	document.wlan.wlKeyIndex[3] = new Option("4", "4");
+	$("#wlKeyIndex").val((keyIdx));
+	if (authMode == "OPEN" || authMode == "SHARED" || authMode == "WEPAUTO") {
+		if ($("#wlWep").val() == "enabled") {
+			$("#network_key_sel").show();
+			if(alertMsg)
+				blockUI_alert(_("wepExplanation"));
+		} else {
+			if(alertMsg)
+				blockUI_alert(_("weakWepSecurityWarning"));
+		}
+		$("#wlKeys1").disabled = 0;
+		$("#wlKeys2").disabled = 0;
+		$("#wlKeys3").disabled = 0;
+		$("#wlKeys4").disabled = 0;
+		$("#wlKeyIndex").length = 0;
+	}
+	else {
+		$("#network_key_sel").hide();
+	}
+
+	// Update these in case the authorisation mode has changed.
+	showWpaEncryptionOptions();
+}
+
+function wpapsk_window() {
+#if defined(V_WIFI_MBSSID)
+	wpaPskKey=$("#wlWpaPsk").val();
+#endif
+	var psk_window = window.open("", "", "toolbar=no,width=500,height=100");
+	if(Butterlate.getLang()=="ar")
+		psk_window.document.write("<style>body { direction:rtl; }</style>");
+	psk_window.document.write(_("WEPtext4")+"<b>&nbsp;"+htmlNumberEncode(wpaPskKey)+"</b>");
+	psk_window.document.close();
+}
+
+function chanUpdate(response)
+{
+	eval(response);
+	$("#currChanText").html("Current channel:&nbsp;&nbsp;<b>"+currChan+"</b>");
+}
+
+// check whether 40 Mhz is permitted in provided mode
+function bw40MhzPermitted(mode) {
+	var modes40m = [
+<%
+for (i = 0; i < modes40m.length; i++) {
+	write("'"+modes40m[i]+"'");
+	if (i < (modes40m.length-1)) {
+		write(",");
+	}
+}
+%>
+	];
+	var bw40permitted = false;
+	for (i = 0; i < modes40m.length; i++) {
+		if (mode == modes40m[i]) {
+			bw40permitted = true;
+			break;
+		}
+	}
+	return bw40permitted;
+}
+
+#if defined(V_WIFI_MBSSID)
+function formLoad(Idx) {
+#else
+function formLoad() {
+#endif
+	var ip_array = new Array();
+	var startPoll = function() {
+		$.get('/cgi-bin/wlan.cgi', chanUpdate );
+	}
+
+	var configChan = <%val=get_single("wlan.0.conf.channel");%>"@@val";
+	var configBW = <%val=get_single("wlan.0.conf.bwselection");%>"@@val";
+
+#ifdef V_WIFI_ralink
+	var apEnabled = <%val=get_single("wlan.0.enabled");%>"@@val";
+#else
+	var apEnabled = <%val=get_single("wlan.0.radio");%>"@@val";
+#endif
+
+	if (apEnabled == 0) {
+		$("#currChanText").html("");
+	}
+	else if (configChan == 0) {
+		if(currChan ==0) {
+			$("#currChanText").html("Current channel:&nbsp;&nbsp;<b>"+"Scanning..."+"</b>");
+		}
+		else {
+			$("#currChanText").html("Current channel:&nbsp;&nbsp;<b>"+currChan+"</b>");
+		}
+		 setInterval(startPoll, 10000);
+	} else {
+		$("#currChanText").html("Current channel:&nbsp;&nbsp;<b>"+configChan+"</b>");
+	}
+
+	// Create the WPA encryption options
+	showWpaEncryptionOptions();
+
+#if defined(V_WIFI_MBSSID)
+	var MbEntry;
+	var ssidIdx=0;
+	if(Idx==-1)
+		ssidIdx=sessionSsidIdx;
+	else
+		ssidIdx=Idx;
+	MbEntry= mbssidST[ssidIdx];
+	$("#wlAuthMode").val(MbEntry.network_auth);
+	encryption_type = MbEntry.encryption_type.toUpperCase();
+	if(encryption_type == "WEP")
+		$("#wlWep").val("enabled");
+	else
+		$("#wlWep").val("disabled");
+	$("#wlWpaPsk").val(MbEntry.wpa_pre_shared_key);
+	if(encryption_type != "WEP")
+		$("#encryptionType").val(encryption_type);
+	$("#wlWpaGtkRekey").val(MbEntry.wpa_group_rekey_interval);
+
+	ip_array = MbEntry.radius_server_ip.split(".");
+	if(ip_array.length != 4 ){ip_array[0]='0';ip_array[1]='0';ip_array[2]='0';ip_array[3]='0';}
+	$("#wlRadiusIPAddr1").val(ip_array[0]);
+	$("#wlRadiusIPAddr2").val(ip_array[1]);
+	$("#wlRadiusIPAddr3").val(ip_array[2]);
+	$("#wlRadiusIPAddr4").val(ip_array[3]);
+	$("#wlRadiusPort").val(MbEntry.radius_port);
+	$("#wlRadiusKey").val(MbEntry.radius_key);
+	$("#wlPreauth").val(MbEntry.wpa2_preauthentication);
+	$("#wlNetReauth").val(MbEntry.net_re_auth_interval);
+	$("#wlMbSsid").val(MbEntry.ssid);
+	$("#wlKeys1").val(MbEntry.network_key1);
+	$("#wlKeys2").val(MbEntry.network_key2);
+	$("#wlKeys3").val(MbEntry.network_key3);
+	$("#wlKeys4").val(MbEntry.network_key4);
+	$("#mbssidEnH").val(MbEntry.enable);
+	$("#hidessidH").val(MbEntry.hide_accesspoint);
+	$("#wep8021x").val(MbEntry.wep8021x);
+#else
+	if($("#wlEnbl_2").val() == '0') {
+		ssidIdx = 0;
+	}
+	$("#wlSsidIdx").val(ssidIdx);
+	$("#wlAuthMode").val(mode);
+	if(encryption_type =="WEP")
+		$("#wlWep").val("enabled");
+	else
+		$("#wlWep").val("disabled");
+	$("#wlWpaPsk").val(wpaPskKey);
+	if(encryption_type !="WEP")
+		$("#encryptionType").val(encryption_type);
+	$("#wlWpaGtkRekey").val(wpaGTKRekey);
+
+	ip_array = radiusServerIP.split(".");
+	if(ip_array.length != 4 ){ip_array[0]='0';ip_array[1]='0';ip_array[2]='0';ip_array[3]='0';}
+	$("#wlRadiusIPAddr1").val(ip_array[0]);
+	$("#wlRadiusIPAddr2").val(ip_array[1]);
+	$("#wlRadiusIPAddr3").val(ip_array[2]);
+	$("#wlRadiusIPAddr4").val(ip_array[3]);
+	$("#wlRadiusPort").val(radiusPort);
+	$("#wlRadiusKey").val(radiusKey);
+	$("#wlPreauth").val(varPreauth);
+	$("#wlNetReauth").val(varNetReauth);
+	$("#wlSsid").val(ssid);
+	$("#wlSsid_2").val(ssid_2);
+#endif
+
+#if defined(V_WIFI_MBSSID)
+	if ($("#mbssidEnH").val() == '1')
+		$("#mbssidEn-0").attr("checked", "checked");
+	else
+		$("#mbssidEn-1").attr("checked", "checked");
+
+#else
+	if ($("#wlEnbl_2").val()== '1') {
+		$("#wlEnbl_2-0").attr("checked", "checked");
+		$("#2nd_ssid_edit").show();
+	} else {
+		$("#wlEnbl_2-1").attr("checked", "checked");
+		$("#2nd_ssid_edit").hide();
+	}
+#endif
+
+	if (configBW == 0) {
+	  $("#bwsel").val(0);
+	}
+	else {
+	  $("#bwsel").val(1);
+	}
+
+	if($("#hidessidH").val() == '1')
+		$("#broadcastEn-1").attr("checked", "checked");
+	else
+		$("#broadcastEn-0").attr("checked", "checked");
+
+	if($("#wdsApMode").val() == '1')
+		$("#wdsApModeEn-0").attr("checked", "checked");
+	else
+		$("#wdsApModeEn-1").attr("checked", "checked");
+
+	if($("#client_isolateH").val() == '1')
+		$("#client_isolateEn-0").attr("checked", "checked");
+	else
+		$("#client_isolateEn-1").attr("checked", "checked");
+
+	if($("#ssid_isolationH").val() == '1')
+		$("#ssid_isolationEn-0").attr("checked", "checked");
+	else
+		$("#ssid_isolationEn-1").attr("checked", "checked");
+
+<%if (form['localManagementAccessEnable'] == "0") {%>
+	$("#localManagementAccessEnable1").attr("checked", "checked");
+<%} else {%>
+	$("#localManagementAccessEnable0").attr("checked", "checked");
+<%}%>
+
+	if($("#wep8021x").val() == '1')
+		$("#ieee8021x_wep-0").attr("checked", "checked");
+	else
+		$("#ieee8021x_wep-1").attr("checked", "checked");
+
+	if ($("#wlEnbl").val()== '1')
+		$("#radioButton_0").attr("checked", "checked");
+	else
+		$("#radioButton_1").attr("checked", "checked");
+#if defined(V_WIFI_FOLLOW_STA)
+	if ($("#followEnbl").val() == '1') {
+		$("#followEnbl_0").prop("checked", true);
+		enableFollow(true);
+	} else {
+		$("#followEnbl_1").prop("checked", true);
+	}
+#endif
+	$("#wirelessmode").val($("#wlMode").val());
+
+#if defined(V_WIFI_qca_soc_lsdk)
+	$("#maxNumSta").val($("#maxNumStaH").val());
+#endif
+
+#if defined(V_WIFI_MBSSID)
+	document.wlan.mulSSID.options[ssidIdx].selected  = true;
+	$("#ssid_sel").show();
+	$("#ssid_edit").hide();
+	// hide WDS if this is not the first SSID
+	if (getSelectedSSIDIdx()!="0") {
+		$("#wds_ap_on_off").hide();
+	}
+#else
+	// hide guest network selection menus
+	$("#ssid_sel").hide();
+	$("#wlan_second_ssid_block").hide();
+#endif
+
+	authModeChange(0);
+	for( var i=1; i<=4; i++ ) {
+		setKey(i);
+	}
+
+#if defined(V_WIFI_MBSSID)
+	// handler - Multi SSID Selection
+	$("#mulSSID").change(function() {
+		ssidChange();
+	});
+#endif
+
+	// handler - Network Authentication button
+	$("#wlAuthMode").change(function() {
+		authModeChange(1);
+	});
+
+	// handler - WEP Encryption Type
+	$("#wlWep").change(function() {
+		authModeChange(1);
+	});
+
+	// handler - Network Key
+	$("#wlKeys1").keyup(function() {setKey(1);});
+	$("#wlKeys2").keyup(function() {setKey(2);});
+	$("#wlKeys3").keyup(function() {setKey(3);});
+	$("#wlKeys4").keyup(function() {setKey(4);});
+
+	wlLoadCountryList();
+
+	// Hide unsupported features based on V_WIFI
+#if defined(V_WIFI_qca_soc_lsdk)
+	$("#client_isolate_on_off").hide();
+#endif
+	// hide "channel width selection" if only 20 Mhz is permitted
+	if (!bw40MhzPermitted($("#wlMode").val())) {
+		$("#BW_sel").hide();
+	}
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+	checkPassStrength();
+#endif
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	$("#passwordInfo").prop("title", _("passwordWarning10"));
+#endif
+
+}
+
+function btnApply() {
+	var swep = $("#wlWep").val();
+	var authMode = $("#wlAuthMode").val();
+	var value;
+
+#ifndef V_WIFI_ralink
+	if ($("#followEnbl").val() != 1) {
+		// Warn the user if both radios will be on or alert the user if both radios are on and auto channel selection option is selected
+		if ((clientRadio == 1) && ($("#wlEnbl").val() == 1)) {
+			if ($("#szChannel").val() == 0) {
+				blockUI_alert(_("wlanClientACSClash")); // auto channel selection of AP is not allowed if client radio is on
+				return 0;
+			} else {
+				blockUI_confirm(_("wlanApChanClash"), null, function(){return 0;})
+
+			}
+		}
+	} else {
+		// When AP-follow mode is enabled, we need to:
+		// 1) disable WDS
+		// 2) warn user that AP channel will always follow client
+		// 3) set a fixed AP channel
+		if ($("#wdsApMode").val() == 1) { // wds enabled
+			blockUI_confirm(_("wlanWDSShouldBeDisabled"), null, function(){return 0;})
+			$("#wdsApMode").val(0); // disable WDS
+		}
+		blockUI_confirm(_("wlanACSShouldBeDisabled"), null, function(){return 0;})
+
+		/*
+		 * The actual AP channel will be determined at the server side.
+		 * See server side script at the top.
+		 */
+	}
+#endif
+	if(authMode!="IEEE8021X")
+		$("#wep8021x").val("0");
+
+	if (authMode.indexOf("PSK")!= -1) {
+		value = $("#wlWpaPsk").val();
+		if ( isValidWpaPskKey(value) == false ) {
+			blockUI_alert(_("wlan warningMsg1"));	//'WPA Pre-Shared Key should be between 8 and 63 ASCII characters or 64 hexadecimal digits.'
+			return 0;
+		}
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+		if (value.length >= 8 && value.length < 64) {
+			if (passStrengthValidation(value) == false) {
+				validate_alert(_("securityAdvise"), pwdWarn1, true);	// Passwords configured on the router must meet the following criteria:...
+				return 0;
+			}
+		}
+#endif
+
+	}
+
+	if ($("#wlWep").val() == "enabled") {
+		var i, val;
+		var cbit = $("#wlKeyBit").val();
+		var num = parseInt($("#wlKeyIndex").val())-1;
+		if (num >= 0 && num < 4) {
+			val = $("#wlKeys"+(num+1)).val();
+		}
+		if ( val == '' && !(swep == 'enabled' && authMode == 'radius')) {
+			blockUI_alert(_("wlan warningMsg12"));	//'Cannot choose key that has empty value.'
+			return 0;
+		}
+		if ( val.length != 10 && val.length != 26 ) {
+			blockUI_alert(_("secure warningMsg22"));	//Please input 10 or 26 characters of WEP key
+			return 0;
+		}
+	}
+
+	if(authMode != "SHARED" && authMode != "WEPAUTO" && authMode != "OPEN") {
+		$("#encryptionTypeH").val($("#encryptionType").val());
+	}
+
+	var str = new String();
+#if defined(V_WIFI_MBSSID)
+	str = $("#wlMbSsid").val();
+#else
+	str = $("#wlSsid").val();
+#endif
+	if ( str.length > 32 ) {
+		blockUI_alert(_("wlan warningMsg5"));	//SSID should not be longer than 32 characters.
+#if defined(V_WIFI_MBSSID)
+		$("#wlMbSsid").val("");
+#else
+		$("#wlSsid").val("");
+#endif
+		return 0;
+	}
+
+#if defined(V_WIFI_MBSSID)
+	//  require at least one profile to be enabled or else the whole AP needs to be switched off
+	var ssid_en = new Array();
+	ssid_en[0] = <%val=get_single('wlan.0.enable');%>"@@val";
+	ssid_en[1] = <%val=get_single('wlan.1.enable');%>"@@val";
+	ssid_en[2] = <%val=get_single('wlan.2.enable');%>"@@val";
+	ssid_en[3] = <%val=get_single('wlan.3.enable');%>"@@val";
+	ssid_en[4] = <%val=get_single('wlan.4.enable');%>"@@val";
+	var i, empty = 1;
+	for (i = 0; i < 5; i++) {
+		if ((i == sessionSsidIdx && $("#mbssidEnH").val() == '1') ||
+			(i != sessionSsidIdx && ssid_en[i] == '1')) {
+			empty = 0;
+			break;
+		}
+	}
+	if (empty) {
+		blockUI_confirm(_("wlan warningMsg19"), function(){$("#wlEnbl").val('0')}, function(){return 0});//At least one SSID needs to be turned on otherwise WiFi radio power will turn off. Proceed anyway?
+	}
+#endif
+	return 1;
+}
+
+function submitF1() {
+
+	function validate_fields() {
+#ifdef V_WEBIF_SPEC_vdf
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if (!$("#form").validationEngine("validate")) {
+			validate_alert("","");
+			return;
+		}
+#endif
+		hideWlSecInfo(0);
+		$("#submitForm").attr("disabled", true);
+		// enable disabled widgets so that they get submitted
+		enableFollow(false);
+		blockUI_wait(_("GUI pleaseWait"));
+		$("#form").submit();
+	}
+	if( btnApply() ) {
+		clear_alert();
+#if defined(V_WIFI_MBSSID)
+<%if(form['editidx']!=''){%>
+		blockUI_confirm(_("warningChangeSecurity"), validate_fields);
+<%} else {%>
+		validate_fields();
+<%}%>
+#else
+		blockUI_confirm(_("warningChangeSecurity"), validate_fields)
+#endif
+
+	}
+}
+
+#if defined(V_WIFI_MBSSID)
+function createSSIDOption() {
+	for( var i=0; i<mbssidST.length; i++) {
+		ssidstr=(i+1) + ": ";
+		ssidstr+=mbssidST[i].ssid;
+		document.wlan.mulSSID.options[i] = new Option(ssidstr, i);
+	}
+}
+
+function getSelectedSSIDIdx() {
+	var selectedIdx=0;
+	for (var i=0; i< document.wlan.mulSSID.options.length; i++) {
+		if (document.wlan.mulSSID.options[i].selected  == true) {
+			selectedIdx = i;
+			break;
+		}
+	}
+	return selectedIdx;
+}
+
+function ssidChange() {
+	var Idx=0;
+	Idx=getSelectedSSIDIdx();
+	//formLoad(Idx);
+	window.location.href="/wlan.html?editmode=1&editidx="+Idx;
+}
+
+function editSSID() {
+	$("#ssid_sel").hide();
+	$("#ssid_edit").show();
+}
+#endif
+
+function makeList() {
+	for (var i = 0; i < 5; i++) {
+		document.write("<tr>");
+		document.write("<td>"+(i+1)+"</td>");
+		document.write("<td><input type=checkbox "+(mbssidST[i].enable=='1'?"checked='true'":"")+"disabled='true'></td>");
+		document.write("<td>"+mbssidST[i].ssid+"</td>");
+		document.write("<td>"+mbssidST[i].network_auth+"</td>");
+		document.write("<td>"+mbssidST[i].encryption_type.toUpperCase()+"</td>");
+		document.write("<td>"+(mbssidST[i].hide_accesspoint=='1'?'Off':'On')+"</td>");
+#ifdef V_WEBIF_SPEC_vdf
+		document.write("<td class='last'><a class='secondary sml' title='Edit' href='wlan.html?editmode=1&editidx="+i+"'><i class='icon edit'>"+_("edit")+"</i></a></td>");
+#else
+		document.write("<td class='last'><a class='secondary sml' style='padding:0;border:0;' title='Edit' href='wlan.html?editmode=1&editidx="+i+"'><i class='icon edit'></i></a></td>");
+#endif
+		document.write("</tr>");
+	}
+}
+
+/*
+ * enable/disable follow-mode related widgets.
+ * so far, only channel is dealt with until we find a reliable means to
+ * determine the other parameters from the client interface
+ */
+function enableFollow(en) {
+	$("#szChannel").prop("disabled", en);
+	// $("#wirelessmode").prop("disabled", en);
+	// $("#bwsel").prop("disabled", en);
+}
+
+/* whenever 'AP follow client' is clicked */
+function followClicked(en) {
+	if (en) {
+		$("#followEnbl").val("1"); // set the form value
+	} else {
+		$("#followEnbl").val("0");
+	}
+	enableFollow(en); // enable/disable related widgets
+}
+
+function extraSsidFilter(inSsid) {
+#if defined(V_WIFI_qca_soc_lsdk)
+	var inSsidStr = inSsid.value;
+	if (inSsidStr.indexOf("`") != -1) {
+		inSsid.value = inSsidStr.replace(/`/g,"");
+	}
+#endif
+}
+
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+function checkPassStrength() {
+	var f, t;
+	f = document.wlan.wlWpaPsk;
+	t = document.getElementById("PassStrength");
+	updatePassStrength(f, t);
+}
+#endif
+
+/* jQuery main function */
+$(function() {
+
+		// V_WIFI dependencies:
+
+		// Construct wireless mode options
+#if !defined(V_WIFI_qca_soc_lsdk)
+		$("#wirelessmode").append("<option value=0>" + _("basic wireless mode 11bgmix")	 + "</option>")
+#endif
+		$("#wirelessmode").append("<option value=1>" + _("basic wireless mode 11b")			 + "</option>")
+		// With open source, we cannot do pure g or pure n modes
+#if defined(V_WIFI_ralink) || defined(V_WIFI_qca_soc_lsdk)
+		$("#wirelessmode").append("<option value=4>" + _("basic wireless mode 11g")			 + "</option>")
+		$("#wirelessmode").append("<option value=6>" + _("basic wireless mode 11n")			 + "</option>")
+#endif
+#if defined(V_WIFI_qca_soc_lsdk)
+		$("#wirelessmode").append("<option value=7>" + _("basic wireless mode 11gnmix")	 + "</option>")
+#else
+		$("#wirelessmode").append("<option value=9>" + _("basic wireless mode 11bgnmix") + "</option>")
+#endif
+});
+
+$(document).ready( function() {formLoad(-1);} );
+
+</script>
+
+<!-- ================================================================================================ -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<form name="wlan" id="form" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+#if defined(V_WIFI_MBSSID)
+			<input type="hidden" name='mbssidEnH' 		id='mbssidEnH' 		value="@@form['mbssidEnH']">
+			<input type="hidden" name="editmode" 		id="editmode"		value="@@form['editmode']"/>
+			<input type="hidden" name="editidx" 		id="editidx"		value="@@form['editidx']"/>
+#endif
+			<input type="hidden" name='hidessidH' 		id='hidessidH' 		value="@@form['hidessidH']">
+			<input type="hidden" name='wdsApMode' 		id='wdsApMode' 		value="@@form['wdsApMode']">
+			<input type="hidden" name='client_isolateH' 	id='client_isolateH' 	value="@@form['client_isolateH']">
+			<input type="hidden" name='ssid_isolationH' 	id='ssid_isolationH' 	value="@@form['ssid_isolationH']">
+			<input type="hidden" name='wep8021x' 		id='wep8021x' 		value="@@form['wep8021x']">
+			<input type="hidden" name='encryptionTypeH'	id='encryptionTypeH' value="@@form['encryptionTypeH']"/>
+			<input type="hidden" name='wlKeyBit' 		id='wlKeyBit' 		value="@@form['wlKeyBit']">
+			<input type="hidden" name='wlMode' 			id='wlMode' 		value="@@form['wlMode']"/>
+			<input type="hidden" name='wlEnbl' 			id='wlEnbl'   		value="@@form['wlEnbl']"/>
+			<input type="hidden" name='followEnbl' id='followEnbl' value="@@form['followEnbl']"/>
+			<input type="hidden" name='wlEnbl_2' 		id='wlEnbl_2'		value="@@form['wlEnbl_2']"/>
+#if defined(V_WIFI_qca_soc_lsdk)
+			<input type="hidden" name='maxNumStaH' 		id='maxNumStaH' 		value="@@form['maxNumStaH']"/>
+#endif
+			<input style="display:none" type="text" name="fakeusernameremembered"/>
+			<input style="display:none" type="password" name="fakepasswordremembered"/>
+#if defined(V_WIFI_MBSSID)
+<!-- display SSID edit page -->
+<%if(form['editidx']!=''){%>
+			<div class="pad" id="wlan_setup_block" style="display:none">
+<%} else {%>
+			<div class="pad" id="wlan_setup_block">
+<%}%>
+#else
+			<div class="pad" id="wlan_setup_block">
+#endif
+				<h2><script language=Javascript>document.write(_("wirelessSetup"))</script></h2>
+
+				<!-- radio on/off -->
+				<div id="radio_on_off" class="form-row no-bg-form">
+					<label for="radio_on_off_title"><script language=Javascript>document.write(_("apRadio"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='radioButton' id='radioButton_0' onClick="javascript:document.wlan.wlEnbl.value=1;">
+								<label for="radioButton_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='radioButton' id='radioButton_1' onClick="javascript:document.wlan.wlEnbl.value=0;">
+								<label for="radioButton_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="radio_on_off" -->
+#if defined(V_WIFI_FOLLOW_STA)
+				<div id="follow_on_off" class="form-row no-bg-form">
+					<label for="follow_on_off_title"><script language=Javascript>document.write(_("apFollow"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='followEn' id='followEnbl_0' onClick="followClicked(true)">
+								<label for="followEnbl_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='followEn' id='followEnbl_1' onClick="followClicked(false)">
+								<label for="followEnbl_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="follow_on_off" -->
+#endif
+				<!-- Country Selection -->
+				<div id="country_sel" class="form-row no-bg-form">
+					<label for="country_sel_title"><script language=Javascript>document.write(_("country"))</script></label>
+					<div class="field">
+						<select name="wlCountry" id="wlCountry" size="1" value="@@form['wlCountry']" onchange="country=this.value;CreateChannelOption()">
+						</select>
+					</div>
+				</div>	<!-- div id="country_sel" -->
+
+				<!-- Wireless Mode Selection -->
+				<div id="wireless_mode_sel" class="form-row no-bg-form">
+					<label for="wireless_mode_sel_title"><script language=Javascript>document.write(_("basic network mode"))</script></label>
+					<div class="field">
+						<select name="wirelessmode" id="wirelessmode" size="1" onChange="document.wlan.wlMode.value=this.value;CreateChannelOption();">
+						</select>
+					</div>
+				</div>	<!-- div id="wireless_mode_sel" -->
+
+				<!-- Channel Selection -->
+				<div id="channel_sel" class="form-row no-bg-form">
+					<label for="channel_sel_title"><script language=Javascript>document.write(_("basic frequency"))</script></label>
+					<div class="field">
+						<select name="szChannel" id="szChannel" size="1" value="@@form['szChannel']">
+						<script type="text/javascript">CreateChannelOption();</script>
+						</select>
+						&nbsp;&nbsp;<span id="currChanText"></span>
+					</div>
+				</div>	<!-- div id="channel_sel" -->
+
+				<!-- 20MHZ/40MHZ Selection -->
+				<div id="BW_sel" class="form-row no-bg-form">
+					<label for="BW_sel_title"><script language=Javascript>document.write(_("channelwidth selection"))</script></label>
+					<div class="field">
+						<select name="bwsel" id="bwsel" size="1" value="@@form['bwsel']">
+						<option id="20MHZ" value="0"><script language=JavaScript>document.write(_("20MHZ"))</script></option>
+						<option id="40MHZ" value="1"><script language=JavaScript>document.write(_("40MHZ"))</script></option>
+						</select>
+					</div>
+				</div>	<!-- div id="BW_sel" -->
+
+			</div>		<!-- div class="pad" id="wlan_setup_block" -->
+
+#if defined(V_WIFI_MBSSID)
+<!-- display SSID edit page -->
+<%if(form['editidx']!=''){%>
+			<div class="pad" id="wlan_ssid_security_block">
+<%} else {%>
+			<div class="pad" id="wlan_ssid_security_block" style="display:none">
+<%}%>
+#else
+			<div class="pad" id="wlan_ssid_security_block">
+#endif
+				<h2><script language=Javascript>document.write(_("basic title"))</script></h2>
+
+#if defined(V_WIFI_MBSSID)
+				<!-- SSID Selection -->
+				<div id="ssid_sel" class="form-row no-bg-form">
+					<label for="ssid_sel_title"><script language=Javascript>document.write(_("station ssid"))</script></label>
+					<div class="field">
+						<select name="mulSSID" id="mulSSID">
+						</select>
+						&nbsp;&nbsp;<A HREF="javascript:editSSID()" style="color:BLUE"><script language=JavaScript>document.write(_("click here to edit SSID"))</script></A>
+					</div>
+					<script language="Javascript">
+					createSSIDOption();
+					</script>
+				</div>	<!-- div id="ssid_sel" -->
+#else
+				<!-- SSID Selection -->
+				<div id="ssid_sel" class="form-row no-bg-form">
+					<label for="ssid_sel_title"><script language=Javascript>document.write(_("secure select ssid"))</script></label>
+					<div class="field">
+						<select name="wlSsidIdx" id="wlSsidIdx" onChange="javascript:document.wlan.submit();">
+						<option value='0'><%write(get_single('wlan.0.ssid'));%></option>
+						</select>
+					</div>
+				</div>	<!-- div id="ssid_sel" -->
+#endif
+
+				<!-- SSID Edit -->
+#if defined(V_WIFI_MBSSID)
+				<div id="ssid_edit" class="form-row no-bg-form" style="display:none">
+#else
+				<div id="ssid_edit" class="form-row no-bg-form">
+#endif
+					<label for="ssid_edit_title"><script language=Javascript>document.write(_("station ssid"))</script></label>
+					<div class="field">
+#if defined(V_WIFI_MBSSID)
+						<input type="text" name="wlMbSsid" id="wlMbSsid" class="validate[required] large required" maxlength='32' value="@@form['wlMbSsid']" onKeyUp="ssidFilter(this);extraSsidFilter(this);">
+#else
+						<input type="text" name="wlSsid" id="wlSsid" class="validate[required] large required" maxlength='32' value="@@form['wlSsid']" onKeyUp="ssidFilter(this);extraSsidFilter(this);">
+#endif
+					</div>
+				</div>	<!-- div id="ssid_edit" -->
+
+#if defined(V_WIFI_MBSSID)
+				<!-- Security Division -->
+				<div id="SecurityDiv" class="form-row no-bg-form">
+					<!-- SSID enable/disable -->
+	<%if(form['editidx']=='0'){%>
+					<div id="ssid_on_off" style="display:none">
+	<%}else{%>
+					<div id="ssid_on_off" class="form-row no-bg-form">
+	<%}%>
+						<label for="ssid_on_off_title"><script language=Javascript>document.write(_("enable multi ssid"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='mbssidEn' id='mbssidEn-0' onClick="javascript:document.wlan.mbssidEnH.value=1;">
+									<label for="mbssidEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='mbssidEn' id='mbssidEn-1' onClick="javascript:document.wlan.mbssidEnH.value=0;">
+									<label for="mbssidEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>	<!-- div id="ssid_on_off" -->
+#endif
+
+					<!-- Broadcast on/off -->
+					<div id="broadcast_on_off" class="form-row no-bg-form">
+						<label for="broadcast_on_off_title"><script language=Javascript>document.write(_("Broadcast SSID"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='broadcastEn' id='broadcastEn-0' onClick="javascript:document.wlan.hidessidH.value=0;">
+									<label for="broadcastEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='broadcastEn' id='broadcastEn-1' onClick="javascript:document.wlan.hidessidH.value=1;">
+									<label for="broadcastEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>	<!-- div id="broadcast_on_off" -->
+
+#if defined(V_WIFI_WDS)
+					<!-- AP WDS on/off -->
+					<div id="wds_ap_on_off" class="form-row no-bg-form">
+						<label for="wds_ap_on_off_title"><script language=Javascript>document.write(_("wdsApEnable"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='wdsApModeEn' id='wdsApModeEn-0' onClick="javascript:document.wlan.wdsApMode.value=1;">
+									<label for="wdsApModeEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='wdsApModeEn' id='wdsApModeEn-1' onClick="javascript:document.wlan.wdsApMode.value=0;">
+									<label for="wdsApModeEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>	<!-- AP WDS on/off -->
+#endif
+
+					<!-- Client Isolation on/off -->
+					<div id="client_isolate_on_off" class="form-row no-bg-form">
+						<label for="client_isolate_on_off_title"><script language=Javascript>document.write(_("wirelessClientIsolation"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='client_isolateEn' id='client_isolateEn-0' onClick="javascript:document.wlan.client_isolateH.value=1;">
+									<label for="client_isolateEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='client_isolateEn' id='client_isolateEn-1' onClick="javascript:document.wlan.client_isolateH.value=0;">
+									<label for="client_isolateEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>	<!-- div id="Client Isolation_on_off" -->
+	#if defined(V_WIFI_MBSSID)
+					<!-- SSID Isolation on/off -->
+					<div id="ssid_isolate_on_off" class="form-row no-bg-form">
+						<label for="ssid_isolate_on_off_title"><script language=Javascript>document.write(_("wirelessSSIDIsolation"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='ssid_isolationEn' id='ssid_isolationEn-0' onClick="javascript:document.wlan.ssid_isolationH.value=1;">
+									<label for="ssid_isolationEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='ssid_isolationEn' id='ssid_isolationEn-1' onClick="javascript:document.wlan.ssid_isolationH.value=0;">
+									<label for="ssid_isolationEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>	<!-- div id="SSID Isolation_on_off" -->
+					<!-- Local management access enable -->
+					<div id="ssid_isolate_on_off" class="form-row no-bg-form">
+						<label><script language=Javascript>document.write(_("wifiLocalManagementAccessEnable"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name="localManagementAccessEnable" id="localManagementAccessEnable0" value="1">
+									<label for="localManagementAccessEnable0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name="localManagementAccessEnable" id="localManagementAccessEnable1" value="0">
+									<label for="localManagementAccessEnable1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+	#endif
+
+	#if defined(V_WIFI_qca_soc_lsdk)
+					<!-- Max Number of stations (clients) section -->
+					<div id="max_num_of_sta" class="form-row no-bg-form">
+						<label for="max_num_of_sta_title"><script language=Javascript>document.write(_("adv max num sta"))</script></label>
+						<div class="field">
+							<input type="text" name="maxNumSta" id="maxNumSta" class="validate[required,funcCall[validate_num_sta]] required maxNumSta med" maxlength='3' onkeyup="NumfieldEntry(this)" onChange="document.wlan.maxNumStaH.value=this.value;">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv maxnumsta range prefix")+n_max_num_sta+_("adv maxnumsta default prefix")+n_default_max_num_sta+_("adv maxnumsta default suffix"))</script></span>
+							<div style="float:right">
+	#ifndef V_WEBIF_SPEC_vdf
+								<a id="info" style="background-color:transparent;" title=""><i id="net-info"></i></a>
+	#endif
+							</div>
+						</div>
+
+					</div>	<!-- div id="max_num_of_sta" -->
+	#endif
+					<!-- Network Authentication -->
+					<div id="network_auth_sel" class="form-row no-bg-form">
+						<label for="network_auth_sel_title"><script language=Javascript>document.write(_("netAuth"))</script></label>
+						<div class="field">
+							<select name="wlAuthMode" id="wlAuthMode">
+								<option value="OPEN"><script language=JavaScript>document.write(_("CSopen"))</script></option>
+								<option value="SHARED"><script language=JavaScript>document.write(_("shared"))</script></option>
+								<option value="WPA">WPA</option>
+								<option value="WPAPSK">WPA-PSK</option>
+								<option value="WPA2">WPA2</option>
+								<option value="WPA2PSK">WPA2-PSK</option>
+								<!-- <option value="IEEE8021X">802.1X</option> // remove 820.1x option -->
+							</select>
+						</div> <!-- class="field" -->
+					</div>	<!-- div id="network_auth_sel" -->
+				</div>	<!-- div id="SecurityDiv" -->
+
+				<!-- WPA Pre-shared Key enable/disable -->
+				<div id="pre_shared_key_sel" class="form-row no-bg-form">
+					<label for="pre_shared_key_sel_title"><script language=Javascript>document.write(_("secure wpa preauth"))</script></label>
+					<div class="field">
+						<select name="wlPreauth" id="wlPreauth">
+							<option value="0"><script language=JavaScript>document.write(_("disabled"))</script></option>
+							<option value="1"><script language=JavaScript>document.write(_("enabled"))</script></option>
+						</select>
+					</div>
+				</div>	<!-- div id="pre_shared_key_sel" -->
+
+				<!-- Network Re-auth Interval -->
+				<div id="reauth_int_input" class="form-row">
+					<label for="wlNetReauth"><script language=Javascript>document.write(_("networkReauthInterval"))</script></label>
+					<div class="field">
+						<input type="text" name="wlNetReauth" id="wlNetReauth" class="validate[required,funcCall[validate_reauthint]] required wlNetReauth large" maxlength='10' value="@@form['wlNetReauth']" onkeyup="NumfieldEntry(this)">
+					</div>
+				</div>	<!-- div id="reauth_int_input" -->
+
+				<!-- WPA Pre-shared key input -->
+				<div id="pre_shared_key_input" class="form-row no-bg-form">
+					<label for="pre_shared_key_input_title"><script language=Javascript>document.write(_("WPApreSharedKey"))</script></label>
+					<div class="field">
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+						<input type="password" name="wlWpaPsk" id="wlWpaPsk" size='20' class='large' maxlength='64' value="@@form['wlWpaPsk']" autocomplete="new-password" onkeyup="checkPassStrength()">&nbsp;&nbsp;
+#else
+						<input type="password" name="wlWpaPsk" id="wlWpaPsk" size='20' class='large' maxlength='64' value="@@form['wlWpaPsk']" autocomplete="new-password">&nbsp;&nbsp;
+#endif
+						<A HREF="javascript:wpapsk_window()" style="color:BLUE"><script language=JavaScript>document.write(_("clickHereToDisplay"))</script></A>
+					</div>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+					<label for="PassStrength"><script language=Javascript>document.write(_("passwordStrength"))</script></label>
+					<div class="field" style='width:200px;'>
+						<span class="normal-text" id="PassStrength"></span>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+						<a href='javascript:showStrongPasswordInfo();' id="passwordInfo" style='background-color:transparent;'>
+						<i id='net-info' style='margin:5px;'></i></a>
+#endif
+					</div>
+#endif
+				</div>	<!-- div id="pre_shared_key_input" -->
+
+				<!-- WPA Group Re-key Interval -->
+				<div id="wpa_gtkrekey_int" class="form-row">
+					<label for="wlWpaGtkRekey"><script language=Javascript>document.write(_("wpaRekeyInterval"))</script></label>
+					<div class="field">
+						<input type="text" name="wlWpaGtkRekey" id="wlWpaGtkRekey" class="validate[required,funcCall[validate_gtkrekey]] required wlWpaGtkRekey large" size='20' maxlength='10' value="@@form['wlWpaGtkRekey']" onkeyup="NumfieldEntry(this)">
+					</div>
+				</div>	<!-- div id="wpa_gtkrekey_int" -->
+
+				<!-- Radius Server Setting -->
+				<div id="radius_server_setting">
+					<div id="radius_server_ip_addr" class="form-row">
+						<label for="radius_server_ip_addr_title"><script language=Javascript>document.write(_("radiusServerIpAddress"))</script></label>
+						<script language="JavaScript">htmlGenIpBlocks("wlRadiusIPAddr");</script>
+					</div>	<!-- div id="radius_server_ip_addr" -->
+					<div id="radius_server_port" class="form-row">
+						<label for="wlRadiusPort"><script language=Javascript>document.write(_("radiusPort"))</script></label>
+						<div class="field">
+						<input type="text" name="wlRadiusPort" id="wlRadiusPort" class="validate[required,funcCall[validate_radius_port]] required wlRadiusPort large" size='20' maxlength='5' value="@@form['wlRadiusPort']" onkeyup="NumfieldEntry(this)">
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+						</div>
+					</div>	<!-- div id="radius_server_port" -->
+					<div id="radius_server_key" class="form-row no-bg-form">
+						<label for="radius_server_key_title"><script language=Javascript>document.write(_("radiusKey"))</script></label>
+						<input type="password" name="wlRadiusKey" id="wlRadiusKey" class='large' size='20' maxlength='80' value="@@form['wlRadiusKey']" autocomplete="new-password">
+					</div>	<!-- div id="radius_server_key" -->
+				</div>	<!-- div id="radius_server_setting" -->
+
+				<!-- WPA Encryption Type -->
+				<div id="wpa_encrypt_sel" class="form-row no-bg-form">
+					<label for="wpa_encrypt_sel_title"><script language=Javascript>document.write(_("WPAencryption"))</script></label>
+					<div class="field">
+						<select name="encryptionType" id="encryptionType" value="@@form['encryptionType']">
+							<option id="id_wpa_tkip" value="TKIP"><script language=JavaScript>document.write(_("TKIP"))</script></option>
+							<option id="id_wpa_aes"  value="AES"><script language=JavaScript>document.write(_("AES"))</script></option>
+						</select>
+					</div>
+				</div>	<!-- div id="wpa_encrypt_sel" -->
+
+				<!-- WEP Encryption enable/disable -->
+				<div id="wep_encrypt_sel" class="form-row no-bg-form">
+					<label for="wep_encrypt_sel_title"><script language=Javascript>document.write(_("WEPencryption"))</script></label>
+					<div class="field">
+						<select name="wlWep" id="wlWep" value="@@form['wlWep']">
+							<option value="disabled"><script language=JavaScript>document.write(_("disabled"))</script></option>
+							<option value="enabled"><script language=JavaScript>document.write(_("enabled"))</script></option>
+						</select>
+					</div>
+				</div>	<!-- div id="wep_encrypt_sel" -->
+
+				<!-- IEEE 802.1x WEP Encryption enable/disable -->
+				<div id="802_1x_wep_encrypt_sel" class="form-row no-bg-form">
+					<label for="802_1x_wep_encrypt_sel_title"><script language=Javascript>document.write(_("secure 8021x wep"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="ieee8021x_wep-0" name="ieee8021x_wep" class="access" value=1 onClick="javascript:document.wlan.wep8021x.value='1';">
+								<label for="ieee8021x_wep-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="ieee8021x_wep-1" name="ieee8021x_wep" class="access" value=0 onClick="javascript:document.wlan.wep8021x.value='0';">
+								<label for="ieee8021x_wep-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="802_1x_wep_encrypt_sel" -->
+
+				<!-- Network Key Selection -->
+				<div id="network_key_sel" class="form-row no-bg-form">
+					<div id="network_key_index" class="form-row no-bg-form">
+						<label for="network_key_index_title"><script language=Javascript>document.write(_("currentNetworkKey"))</script></label>
+						<div class="field">
+							<select name="wlKeyIndex" id="wlKeyIndex" size='1'>
+							</select>
+						</div>
+					</div>	<!-- div id="network_key_index" -->
+					<div id="network_key_desc" class="form-row no-bg-form">
+						<label for="network_key_desc"></label>
+						<div class="field">
+						<!-- Enter 10 hexadecimal digits for 64-bit encryption keys or 26 hexadecimal digits for 128-bit encryption keys. -->
+						<script language="JavaScript">document.write(_("Msg60"))</script>
+						</div>
+					</div>	<!-- div id="network_key_index" -->
+					<div id="network_key_index_1" class="form-row no-bg-form">
+						<label for="network_key_index_1_title"><script language=Javascript>document.write(_("networkKey")+" 1")</script></label>
+						<div class="field">
+							<input type="text" name="wlKeys1" id="wlKeys1" size='30' maxlength='26' value="@@form['wlKeys1']">
+							<label class="field-right-desc" id="TEXT1"></label>
+						</div>
+					</div>	<!-- div id="network_key_index_1" -->
+					<div id="network_key_index_2" class="form-row no-bg-form">
+						<label for="network_key_index_2_title"><script language=Javascript>document.write(_("networkKey")+" 2")</script></label>
+						<div class="field">
+							<input type="text" name="wlKeys2" id="wlKeys2" size='30' maxlength='26' value="@@form['wlKeys2']">
+							<label class="field-right-desc" id="TEXT2"></label>
+						</div>
+					</div>	<!-- div id="network_key_index_2" -->
+					<div id="network_key_index_3" class="form-row no-bg-form">
+						<label for="network_key_index_3_title"><script language=Javascript>document.write(_("networkKey")+" 3")</script></label>
+						<div class="field">
+							<input type="text" name="wlKeys3" id="wlKeys3" size='30' maxlength='26' value="@@form['wlKeys3']">
+							<label class="field-right-desc" id="TEXT3"></label>
+						</div>
+					</div>	<!-- div id="network_key_index_3" -->
+					<div id="network_key_index_4" class="form-row no-bg-form">
+						<label for="network_key_index_4_title"><script language=Javascript>document.write(_("networkKey")+" 4")</script></label>
+						<div class="field">
+							<input type="text" name="wlKeys4" id="wlKeys4" size='30' maxlength='26' value="@@form['wlKeys4']">
+							<label class="field-right-desc" id="TEXT4"></label>
+						</div>
+					</div>	<!-- div id="network_key_index_4" -->
+				</div>	<!-- div id="network_key_sel" -->
+
+				<div class="pad">
+					<div class="submit-row">
+						<button type="button" name="submitForm" id="submitForm" onClick="javascript:submitF1()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div> <!-- class="submit-row" -->
+				</div> <!-- class="pad" -->
+			</div>		<!-- class="pad" id="wlan_setup_block" -->
+			</form>		<!-- name="wlan" -->
+
+			<br/><br/>
+
+#if defined(V_WIFI_MBSSID)
+			<form name="ssidlist" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+
+<!-- display SSID edit page -->
+<%if(form['editidx']!=''){%>
+			<div class="pad" id="ssidlist_block" style="display:none">
+<%} else {%>
+			<div class="pad" id="ssidlist_block">
+<%}%>
+				<h2><script language=Javascript>document.write(_("mbssid list"))</script></h2>
+				<table width="80%" style="text-align:left;" class="no-border">
+				<tr>
+					<th width="05%" style="text-align:center;"><script language="JavaScript">document.write(_("index"));</script></th>
+					<th width="05%" style="text-align:center;"><script language="JavaScript">document.write(_("status"));</script></th>
+					<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("SSID"));</script></th>
+					<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("netAuth"));</script></th>
+					<th width="15%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("encryption"));</script></th>
+					<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("GUI SSIDbroadcast"));</script></th>
+					<th width="10%" style="text-align:center;"></th>
+				</tr>
+				<script language="Javascript">
+				makeList();
+				</script>
+				</table>
+				<div class="pad">
+					<div class="submit-row">
+						<button type="button" name="submitForm" id="submitForm" onClick="javascript:submitF1()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div> <!-- class="submit-row" -->
+				</div> <!-- class="pad" -->
+			</div>		<!-- div class="pad" id="ssidlist_block" -->
+			</form>		<!-- name="ssidlist" -->
+#endif
+
+                </div>	<!-- div class="right-column white-box" -->
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "Basic", <%_val = session["user"];%>"@@_val");
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("", "");
+<%}%>
+$("#wirelessmode").change(function(){
+  if(bw40MhzPermitted($(this).val()))
+    $("#BW_sel").show();
+  else
+    $("#BW_sel").hide();
+});
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["wlNetReauth"]=_("wlan warningMsg3");	//'WPA Group Rekey Interval "' + wlWpaGtkRekey.value + '" should be between 0 and 4294967295.'
+	$.validator.addMethod("wlNetReauth",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 0 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.wlNetReauth);
+
+	VALIDATOR.config.errors["wlWpaGtkRekey"]=_("wlan warningMsg11");	//WPA Network Reauthentication Interval should be between 0 and 4294967295.'
+	$.validator.addMethod("wlWpaGtkRekey",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 0 || c > 4294967295) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.wlWpaGtkRekey);
+
+	VALIDATOR.config.errors["wlRadiusPort"]=_("warningMsg07");	// Invalid port number
+	$.validator.addMethod("wlRadiusPort",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") {
+				return false;
+			}
+			if (c < 1 || c > 65535) {
+				return false;
+			}
+		}
+		return true;
+	},VALIDATOR.config.errors.wlRadiusPort);
+
+#if defined(V_WIFI_qca_soc_lsdk)
+	VALIDATOR.config.errors["maxNumSta"]=_("adv warningMsg13");	//'Invalid max sta'
+	$.validator.addMethod("maxNumSta",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 1 || c > 127) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.maxNumSta);
+#endif
+#else
+function validate_reauthint(field) {
+	if(field.val() == "" || field.val() < 0 || field.val() > 4294967295) {
+		return _("wlan warningMsg3");		//'WPA Group Rekey Interval "' + wlWpaGtkRekey.value + '" should be between 0 and 4294967295.'
+	}
+}
+
+function validate_gtkrekey(field) {
+	if(field.val() == "" || field.val() < 0 || field.val() > 4294967295) {
+		return _("wlan warningMsg11");		//WPA Network Reauthentication Interval should be between 0 and 4294967295.'
+	}
+}
+
+function validate_radius_port(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 65535) {
+		return _("warningMsg07");			// Invalid port number
+	}
+}
+#if defined(V_WIFI_qca_soc_lsdk)
+function validate_num_sta(field) {
+        var max=parseInt(n_max_num_sta);
+	if(field.val() == "" || isNaN(max)==true || field.val() < 1 || field.val() > max) {
+		return _("adv warningMsg13");		//'Invalid max sta'
+	}
+}
+#endif
+#endif
+</script>
+
+</body>
+</html>

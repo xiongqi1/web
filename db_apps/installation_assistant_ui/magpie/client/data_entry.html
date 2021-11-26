@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Data Entry</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script>
+        // polling installation state to consider to enable Apply button
+        // when confirmation from server is received or after a polling period (< 3 seconds)
+        var queryInstallationStateCount = 0;
+        function getInstallationState() {
+            ajaxGetRequest("/installation_state", true, function(data) {
+                if (data.state == "data_entry" || queryInstallationStateCount >= 3) {
+                    document.getElementById("apply_button").disabled = false;
+                } else {
+                    queryInstallationStateCount++
+                    setTimeout(getInstallationState, 1000);
+                }
+            });
+        }
+
+        // set installation state Data Entry and start polling confirmation from OWA
+        function setDataEntryState() {
+            ajaxPostRequest("/installation_state", "state=data_entry", function (resp) {
+                // request is sent, start polling feedback
+                setTimeout(getInstallationState, 200);
+            }, function (code, resp) {
+                // error, should not occur, enable Apply button anyway
+                document.getElementById("apply_button").disabled = false;
+            });
+        }
+
+        var quickCopyMask = "";
+        // 32 cols in quick_copy textarea, show 30 masks to make sure it will not jump to the second line
+        for (var i = 1; i <= 30; i++) {
+            quickCopyMask += "*";
+        }
+
+        // Helper function to get text content of a XML node
+        // @param parentNode parent node
+        // @param tagName tag name
+        // @return text content of node or empty string if not found
+        function getXmlNodeContent(parentNode, tagName) {
+            var elList = parentNode.getElementsByTagName(tagName);
+            if (elList.length >=1) {
+                return elList[0].textContent;
+            } else {
+                return "";
+            }
+        }
+
+        /**
+         * Purpose   : Populates UI fields with Quick-Copy contents.
+         * Arg       : xml_text an XML text written in Quick-Copy schema that carries data for the UI fields.
+         * Return    : None.
+         */
+        function populate_fields(xml_text) {
+            var parser, xmlDoc, formObject, text;
+
+            text = xml_text.trim();
+            if (text.length == 0 || text.charAt(0) == '*') return;
+
+            parser = new DOMParser();
+
+            try {
+                xmlDoc = parser.parseFromString(text, "text/xml");
+            } catch (error) {
+                return;
+            }
+            // in case of failed parsing, browsers may not throw exception, but instead return an error document
+            if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                return;
+            }
+
+            //the requirement specifies to mask the textarea with "*" after copying data
+            document.getElementById("quick_copy").value = quickCopyMask;
+
+            var formObject = document.dataEntryIds;
+
+            // process CellSectors
+            var cellSectorsList = xmlDoc.getElementsByTagName("CellSectors");
+            // there should be only one
+            var i = 0;
+            var idx = 0;
+            if (cellSectorsList.length >= 1) {
+                var cellSectors = cellSectorsList[0].getElementsByTagName("CellSector");
+                var ferror = 0;
+                for (i = 0; i < cellSectors.length; i++) {
+                    // currently only 9 cell sectors are supported (fixed in UI)
+                    // Max 3 cell sectors are displayed and used in advanced_operations/scan page.
+                    // Max 9 cell sectors are used in the server side to check the serving cell is
+                    // valid or not.
+                    if (i >= 9) {
+                        alert("Maximum number of cell sectors supported is 9");
+                        break;
+                    }
+                    var cid = getXmlNodeContent(cellSectors[i], "CellSectorID");
+                    var pass = getXmlNodeContent(cellSectors[i], "MinimumRSRP");
+                    var heading = getXmlNodeContent(cellSectors[i], "Heading");
+                    // For fundamental sectors, copy the fields without condition then
+                    // validation will be done when submitting
+                    // For hidden sectors, copy the fields if the values are valid
+                    // otherwise ignore the fields
+                    // Note. Only want to validate CID field here so pass hard-coded PLMN value to
+                    // validate_one_cell() function.
+                    if (i >= 3) {
+                        if ((validate_one_cell("310410", cid, false) == false) ||
+                            (validate_one_rsrp(pass, cid) == false)) {
+                            ferror++;
+                            continue;
+                        }
+                    }
+                    formObject.elements["cid"+(idx+1)].value = cid;
+                    formObject.elements["pass"+(idx+1)].value = pass;
+                    formObject.elements["heading"+(idx+1)].value = heading;
+                    idx += 1;
+                }
+                if (ferror) {
+                    alert ("There are invalid cell sectors in Quick Copy content.");
+                }
+            }
+            // erase other cell sectors that are not in quick copy content
+            while (idx < 9) {
+                formObject.elements["cid"+(idx+1)].value = "";
+                formObject.elements["pass"+(idx+1)].value = "";
+                formObject.elements["heading"+(idx+1)].value = "";
+                idx++;
+            }
+            // enable rsrp if cell not empty
+            for (i = 1; i < 4; i++) {
+                disable_pass("cid"+i, "pass"+i);
+            }
+
+            // process GroupingParams
+            var groupingParamsList = xmlDoc.getElementsByTagName("GroupingParams");
+            // there should be only one
+            i = 0;
+            if (groupingParamsList.length >= 1) {
+                var groups = groupingParamsList[0].getElementsByTagName("Group");
+                for (i = 0; i < groups.length; i++) {
+                    // currently only 2 groups are supported (fixed in UI)
+                    if (i >= 2) {
+                        alert("Maximum number of CBRS group supported is 2");
+                        break;
+                    }
+
+                    var groupID = groups[i].getElementsByTagName("GroupID");
+                    var groupType = groups[i].getElementsByTagName("GroupType");
+                    // as group params are not editable in UI, both group id and type should exist in quick copy
+                    if (groupID.length >= 1 && groupType.length >= 1) {
+                        formObject.elements["group_id"+(i+1)].value = groupID[0].textContent;
+                        formObject.elements["group_type"+(i+1)].value = groupType[0].textContent;
+                    } else {
+                        formObject.elements["group_id"+(i+1)].value = "";
+                        formObject.elements["group_type"+(i+1)].value = "";
+                    }
+                }
+            }
+            // erase groups that are not in quick copy content
+            while (i < 2) {
+                formObject.elements["group_id"+(i+1)].value = "";
+                formObject.elements["group_type"+(i+1)].value = "";
+                i++;
+            }
+
+            formObject.ban.value = getXmlNodeContent(xmlDoc, "BAN");
+            formObject.band_select.value = getXmlNodeContent(xmlDoc, "Band");
+            changeUserIdLabel(formObject.band_select.value);
+            formObject.user_id.value = getXmlNodeContent(xmlDoc, "UserID");
+            formObject.call_sign.value = getXmlNodeContent(xmlDoc, "CallSign");
+
+            // Set CPI values in hidden fields
+            formObject.cpi_id.value = getXmlNodeContent(xmlDoc, "CPIID");
+            formObject.cpi_name.value = getXmlNodeContent(xmlDoc, "CPIName");
+            formObject.cpi_pem_key.value = getXmlNodeContent(xmlDoc, "CPICertificate");
+        }
+
+        function disable_pass(cid, pass) {
+            var elem_cid = document.getElementById(cid);
+            var elem_pass = document.getElementById(pass);
+            if (elem_cid.value == "") {
+                elem_pass.disabled = true;
+            } else {
+                elem_pass.disabled = false;
+            }
+        }
+
+        function disable_pass1() {
+            disable_pass("cid1", "pass1");
+        }
+        function disable_pass2() {
+            disable_pass("cid2", "pass2");
+        }
+        function disable_pass3() {
+            disable_pass("cid3", "pass3");
+        }
+
+        function make_plmn_readonly(plmn_array) {
+            for (var i = 0; i < plmn_array.length; i++) {
+                var elem = document.getElementById("plmn" + (i+1));
+                if (elem != null && elem.value != "") {
+                    elem.readOnly = true;
+                    elem.style.backgroundColor = "#CCCCCC";
+                }
+            }
+        }
+
+        function getFieldData() {
+
+            ajaxGetRequest("/user_entry/landing", true, function(data) {
+                //console.log(data);
+                formObject = document.forms['dataEntryIds'];
+
+                // Something is wrong on server, alert user
+                if (data.err_msg != "") {
+                     alert(data.err_msg);
+                 }
+
+                formObject.elements["ban"].value = data.ban;
+                formObject.elements["call_sign"].value = data.call_sign;
+                formObject.elements["user_id"].value = data.user_id;
+                formObject.elements["band_select"].value = data.band_select;
+                changeUserIdLabel(data.band_select);
+
+                // Convert string to proper JSON format and set CBRS group ID/Type
+                try {
+                    grp_params = JSON.parse(data.grp_params);
+                    for (var i=0; i < grp_params.length; i++){
+                        if (i == 2) break;    // there are only two fields on the UI
+                        formObject.elements["group_id"+(i+1)].value = grp_params[i].groupId;
+                        formObject.elements["group_type"+(i+1)].value = grp_params[i].groupType;
+                    }
+                } catch (e) {
+                    grp_params = null;
+                }
+
+                for (i = 1; i < 10; i++) {
+                    formObject.elements["cid"+i].value = data.cid[i-1];
+                    formObject.elements["plmn"+i].value = data.plmn[i-1];
+                    formObject.elements["pass"+i].value = data.pass[i-1];
+                    formObject.elements["heading"+i].value = data.heading[i-1];
+                }
+                // enable rsrp if cell not empty
+                for (i = 1; i < 4; i++) {
+                    disable_pass("cid"+i, "pass"+i);
+                }
+                // make PLMN non-editable if it is not empty.
+                // Avoids AT&T hardcoded PLMN if necessary, for testing for example.
+                // NOTICE: Commented-out as there are concerns for mock-up screens
+                // TODO: consider whether this read-only should be really removed
+                //make_plmn_readonly(data.plmn);
+            });
+        }
+
+        // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_BATTERY|BITMASK_ORIENTATION);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("document is ready");
+
+            setDataEntryState();
+
+            setupPeriodicKeepAlive();
+
+            getFieldData();
+            // invalidate timestamps when this page is visited.
+            localStorage.setItem("testStart", "N/A");
+            // work out if this is iPhone, iPad or iPod touch to decide which HTML5 control to use
+            // (meter or progress)
+            g_is_html5_supported = is_html5_supported();
+            if (!g_is_html5_supported) {
+                console.log("Will use progress element instead of a HTML5 meter element");
+            }
+
+            // populate versions
+            getVersions();
+        });
+
+        // validate one cell sector id. Can be either empty (if last argument is true) or 15 digits combined length
+        function validate_one_cell(plmn, cell_id, can_be_empty) {
+            if (cell_id == "" && can_be_empty) {
+                return true;
+            } else {
+                // if not empty, has to be 15 (6+9) digits combined
+                var is_num1 = /^\d+$/.test(plmn);
+                var is_num2 = /^\d+$/.test(cell_id);
+                if (is_num1 && is_num2 && (plmn.length == 6) && (cell_id.length == 9)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // validate on RSRP pass level. This should probably be narrowed to more reasonable values,
+        // but for now matched constants defined on the server side in data_collector, g_limits data object.
+        // Param cid is passed to allow not to enter rsrp if cid is also not entered.
+        function validate_one_rsrp(rsrp_pass, cid) {
+
+            // if cell id is empty, rsrp pass can be empty too
+            if (cid == "" && rsrp_pass == "") {
+                return true;
+            }
+            // -140 to -44. Data entry is inverted
+            if (rsrp_pass >= 44 && rsrp_pass <= 140) {
+                return true;
+            }
+            return false;
+        }
+
+        // validate on BAN, Billing Account Number.
+        // Should be all numbers.
+        // Mandatory field.
+        function validate_ban(data) {
+            if (data != "") {
+                var is_num = /^\d+$/.test(data);
+                if (is_num) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // validate on User ID.
+        // Should be UTF-8 string. Max length of 253 octets.
+        // Mandatory field for B48 and optional for B30 so allow empty field for B30
+        function validate_user_id(data) {
+            if (data != "") {
+                if (new Blob([data]).size < 254) {  // Max length is 253 octets
+                    return true;
+                }
+            } else if (formObject.band_select.value == "30") {
+                return true;
+            }
+            return false;
+        }
+
+        // validate on Group ID.
+        // Should be UTF-8 string. Max length of 253 octets.
+        function validate_group_id(data) {
+            if (data != "") {
+                if (new Blob([data]).size < 254) {  // Max length is 253 octets
+                    return true;
+                }
+            }
+            return true;
+        }
+
+        // validate on CPI ID.
+        // Should be of maximum 256 octets.
+        function validate_cpi_id(data) {
+            if (data != "") {
+                if (data.length > 256) {  // Max length is 256 octets
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // validate on CPI Name.
+        // Should be of maximum 256 octets.
+        function validate_cpi_name(data) {
+            if (data != "") {
+                if (data.length > 256) {  // Max length is 256 octets
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function record_values_local_storage(c1, c2, c3, p1, p2, p3) {
+            localStorage.setItem("cid1", c1);
+            localStorage.setItem("cid2", c2);
+            localStorage.setItem("cid3", c3);
+            localStorage.setItem("pass1", p1);
+            localStorage.setItem("pass2", p2);
+            localStorage.setItem("pass3", p3);
+        }
+
+        function validate() {
+            formObject = document.dataEntryIds;
+            if (validate_ban(formObject.ban.value) == false) {
+                alert ("BAN is empty or contains non-numeric character(s)");
+                return false;
+            } else if ((validate_one_cell(formObject.plmn1.value, formObject.cid1.value, false) == false) ||
+                (validate_one_cell(formObject.plmn2.value, formObject.cid2.value, true) == false) ||
+                (validate_one_cell(formObject.plmn3.value, formObject.cid3.value, true) == false)) {
+                alert ("Please enter at least one 9-digit cell ID and a minimum RSRP");
+                return false;
+            } else if ((validate_one_rsrp(formObject.pass1.value, formObject.cid1.value) == false) ||
+                (validate_one_rsrp(formObject.pass2.value, formObject.cid2.value) == false) ||
+                (validate_one_rsrp(formObject.pass3.value, formObject.cid3.value) == false)) {
+                alert ("Please enter minimum RSRP in the range of -140dBm to -44dBm");
+                return false;
+            } else if (validate_user_id(formObject.user_id.value) == false) {
+                alert ("User ID should contain only UTF-8 string and not more than 253 octets");
+                return false;
+            } else if ((validate_group_id(formObject.group_id1.value) == false) ||
+                (validate_group_id(formObject.group_id2.value) == false)) {
+                alert ("Group ID should contain only UTF-8 string and not more than 253 octets");
+                return false;
+            }
+            if (validate_cpi_id(formObject.cpi_id.value) == false) {
+                alert ("CPI ID string should not be more than 256 octets");
+                formObject.cpi_id.value = "";  // Reset value to blank, ignore error
+            }
+            if (validate_cpi_name(formObject.cpi_name.value) == false) {
+                alert ("CPI Name string should not be more than 256 octets");
+                formObject.cpi_name.value = "";  // Reset value to blank, ignore error
+            }
+
+            // Create groups in JSON array from two group fields
+            var groupParams = [];
+            // Ensure blank group ID or Type is not passed on to the server
+            if ((formObject.group_id1.value.length > 0) && (formObject.group_type1.value.length > 0)) {
+                groupParams.push({groupId:formObject.group_id1.value, groupType:formObject.group_type1.value});
+            }
+            if ((formObject.group_id2.value.length > 0) && (formObject.group_type2.value.length > 0)) {
+                groupParams.push({groupId:formObject.group_id2.value, groupType:formObject.group_type2.value});
+            }
+            formObject.grp_params.value = JSON.stringify(groupParams);
+
+            record_values_local_storage(
+                formObject.plmn1.value + formObject.cid1.value,
+                formObject.plmn2.value + formObject.cid2.value,
+                formObject.plmn3.value + formObject.cid3.value,
+                formObject.pass1.value, formObject.pass2.value, formObject.pass3.value)
+            return true;
+        }
+
+    // build versions
+    function buildVersions(data) {
+        var versions = data;
+        var res = "";
+
+        res += "<p>OA S/W Version: " + versions.sw_ver + "</p>";
+
+        return res;
+    }
+
+    // called when DOM is loaded before the page is first displayed
+    // Gets all relevant data from the server.
+    function getVersions() {
+        ajaxGetRequest("/versions/landing", true, function(data) {
+            var res = buildVersions(data);
+            document.getElementById("versions").innerHTML = res;
+        });
+    }
+
+    function changeUserIdLabel(band) {
+        if (band == "30") {
+            document.getElementById("user_id_label").innerText = "User ID";
+        } else {
+            document.getElementById("user_id_label").innerText = "User ID *";
+        }
+    }
+
+    </script>
+</head>
+
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>Data Entry</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="dataEntryIds" class="content" method="POST" action="/user_entry/landing" onsubmit="return(validate());">
+                <!-- Quick Copy -->
+                <h3>Quick Copy</h3>
+                <div class="form-row">
+                    <fieldset>
+                        <label for="quick_copy">Data Input</label>
+                        <div class="field">
+                            <textarea name="quick_copy" id="quick_copy" rows="1" cols="32" oninput="populate_fields(this.value)")></textarea>
+                            <input type="hidden" id="grp_params" name="grp_params" value="">
+                            <input type="hidden" id="cpi_id" name="cpi_id" value="">
+                            <input type="hidden" id="cpi_name" name="cpi_name" value="">
+                            <input type="hidden" id="cpi_pem_key" name="cpi_pem_key" value="">
+                            <!-- support maximum 2 groups -->
+                            <input type="hidden" name="group_id1" value="">
+                            <input type="hidden" name="group_type1" value="">
+                            <input type="hidden" name="group_id2" value="">
+                            <input type="hidden" name="group_type2" value="">
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="form-row top_delimiter"></div>
+                <!-- Customer BAN  -->
+                <div id="ban" class="form-row">
+                    <label for="ban">BAN *</label>
+                    <div class="field">
+                        <input type="text" name="ban" id="ban" size="12" maxlength="12">
+                    </div>
+                </div>
+
+                <h3>Cell Sector IDs</h3>
+                <p>&nbsp;&nbsp;&nbsp;&nbsp;Enter up to three Cell Sector ID's in the same order as they appear on the work order:</p>
+                <p>&nbsp;&nbsp;&nbsp;&nbsp;Enter Minimum RSRP value provided in the work order without '-' sign.</p>
+                <!-- <h3>Cell Sector #1:</h3> -->
+                <div id="cell_sector_1" class="form-row">
+
+                    <fieldset>
+                        <label for="cid1">Cell Sector ID #1 *</label>
+                        <div class="field">
+                            <input type="text" name="plmn1" id="plmn1" size="6" maxlength="6">
+                            <input type="text" name="cid1" id="cid1" size="9" maxlength="9" onkeyup="disable_pass1();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass1">Minimum RSRP *</label>
+                        <div class="field">
+                            <input type="text" name="pass1" id="pass1" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                    <input type="hidden" name="heading1" value="">
+                </div>
+
+                <!-- <h3>Cell Sector #2:</h3> -->
+                <div id="cell_sector_2" class="form-row">
+                    <fieldset>
+                        <label for="cid2">Cell Sector ID #2</label>
+                        <div class="field">
+                            <input type="text" name="plmn2" id="plmn2" size="6" maxlength="6">
+                            <input type="text" name="cid2" id="cid2" size="9" maxlength="9" onkeyup="disable_pass2();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass2">Minimum RSRP</label>
+                        <div class="field">
+                            <input type="text" name="pass2" id="pass2" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                    <input type="hidden" name="heading2" value="">
+                </div>
+
+                <!-- <h3>Cell Sector #3:</h3> -->
+                <div id="cell_sector_3" class="form-row">
+
+                    <fieldset>
+                        <label for="cid3">Cell Sector ID #3</label>
+                        <div class="field">
+                            <input type="text" name="plmn3" id="plmn3" size="6" maxlength="6">
+                            <input type="text" name="cid3" id="cid3" size="9" maxlength="9" onkeyup="disable_pass3();">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;up to 9 digits&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="pass3">Minimum RSRP</label>
+                        <div class="field">
+                            <input type="text" name="pass3" id="pass3" value="98">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;-dBm&nbsp;</span>
+                        </div>
+                    </fieldset>
+                    <input type="hidden" name="heading3" value="">
+                </div><br>
+
+                <!-- ============================================================= -->
+                <!-- BEGINNING OF HIDDEN CELL SECTORS                                  -->
+                <!-- ============================================================= -->
+                <!-- <h3>Cell Sector #4:</h3> -->
+                <div id="cell_sector_4" class="form-row" style="display:none">
+                    <input type="text" name="plmn4" id="plmn4" size="6" maxlength="6">
+                    <input type="text" name="cid4" id="cid4" size="9" maxlength="9">
+                    <input type="text" name="pass4" id="pass4" value="98">
+                    <input type="hidden" name="heading4" value="">
+                </div>
+                <!-- <h3>Cell Sector #5:</h3> -->
+                <div id="cell_sector_5" class="form-row" style="display:none">
+                    <input type="text" name="plmn5" id="plmn5" size="6" maxlength="6">
+                    <input type="text" name="cid5" id="cid5" size="9" maxlength="9">
+                    <input type="text" name="pass5" id="pass5" value="98">
+                    <input type="hidden" name="heading5" value="">
+                </div>
+                <!-- <h3>Cell Sector #6:</h3> -->
+                <div id="cell_sector_6" class="form-row" style="display:none">
+                    <input type="text" name="plmn6" id="plmn6" size="6" maxlength="6">
+                    <input type="text" name="cid6" id="cid6" size="9" maxlength="9">
+                    <input type="text" name="pass6" id="pass6" value="98">
+                    <input type="hidden" name="heading6" value="">
+                </div>
+                <!-- <h3>Cell Sector #7:</h3> -->
+                <div id="cell_sector_7" class="form-row" style="display:none">
+                    <input type="text" name="plmn7" id="plmn7" size="6" maxlength="6">
+                    <input type="text" name="cid7" id="cid7" size="9" maxlength="9">
+                    <input type="text" name="pass7" id="pass7" value="98">
+                    <input type="hidden" name="heading7" value="">
+                </div>
+                <!-- <h3>Cell Sector #8:</h3> -->
+                <div id="cell_sector_8" class="form-row" style="display:none">
+                    <input type="text" name="plmn8" id="plmn8" size="6" maxlength="6">
+                    <input type="text" name="cid8" id="cid8" size="9" maxlength="9">
+                    <input type="text" name="pass8" id="pass8" value="98">
+                    <input type="hidden" name="heading8" value="">
+                </div>
+                <!-- <h3>Cell Sector #9:</h3> -->
+                <div id="cell_sector_9" class="form-row" style="display:none">
+                    <input type="text" name="plmn9" id="plmn9" size="6" maxlength="6">
+                    <input type="text" name="cid9" id="cid9" size="9" maxlength="9">
+                    <input type="text" name="pass9" id="pass9" value="98">
+                    <input type="hidden" name="heading9" value="">
+                </div>
+
+                <!-- ============================================================= -->
+                <!-- END OF HIDDEN FIELDS                                          -->
+                <!-- ============================================================= -->
+
+                <!-- Band locking  -->
+                <h3>Operating Band</h3>
+                <div id="band_select" class="form-row">
+                    <fieldset>
+                        <label for="bandSelect"> </label>
+                        <div class="field">
+                            <select name="band_select" onChange="changeUserIdLabel(this.value)">
+                                <option value="30">30</option>
+                                <option value="48">48</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <!-- CBRS data  -->
+                <h3>CBRS Data</h3>
+                <div id="cbrs_data" class="form-row">
+                    <fieldset>
+                        <label for="call_sign">Call Sign</label>
+                        <div class="field">
+                            <input type="text" name="call_sign" id="call_sign" size="16" maxlength="12">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="user_id" id="user_id_label">User ID *</label>
+                        <div class="field">
+                            <input type="text" name="user_id" id="user_id" size="16" maxlength="63">
+                        </div>
+                    </fieldset>
+
+                </div>
+
+                <div class="submit-row">
+                    <button class="med" type="submit" disabled="true" id="apply_button">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Compass status -->
+    <div class="box" id="app-data-entry-compass">
+        <div class="box-header">
+            <h2>Compass Status</h2>
+        </div>
+        <div class="box-content">
+            <!-- <div id="compassStatus"></div> -->
+            <p><strong>Status: </strong><span id="orientation_status"></span></p>
+        </div>
+    </div>
+
+    <div class="box" id="app-data-entry-batt">
+        <div class="box-header">
+            <h2>Battery Status</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <div id="battResult"></div>
+        </div>
+    </div>
+
+    <!-- AT&T CR-7065 show the firmware version of the OWA -->
+    <div class="box" id="app-data-entry-versions">
+        <div class="box-header">
+            <h2>Firmware Version</h2>
+        </div>
+        <div class="box-content">
+            <div id="versions"></div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script src="js/orientation_data_handler.js"></script>
+<script>
+var orientationDataHandler = new OrientationDataHandler();
+</script>
+</html>

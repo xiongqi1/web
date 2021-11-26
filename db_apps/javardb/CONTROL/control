@@ -1,0 +1,8 @@
+Package: javardb
+Priority: optional
+Section: Misc
+Version: OracleJava8u6
+Architecture: arm
+Maintainer: William.Bennett@netcommwireless.com
+Depends:
+Description: Oracle embedded JRE (client/compact2) with binding for Netcomm RDB

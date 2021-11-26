@@ -1,0 +1,278 @@
+#!/bin/sh -f
+#
+# Connect script for GRE
+#
+# This script is called by connection_mgr as follows:-
+#
+# SGRE <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+BIN="$0"
+PROFILE="$1"
+INSTANCE="$2"
+ACTION="$3"
+
+# set default action
+if [ -z "$ACTION" ]; then
+	ACTION="start"
+fi
+
+log() {
+	rc=$?
+
+	logger -t "SGRE" -- "$@"
+
+	return $rc
+}
+
+bail() {
+	log "$@"
+	exit 1
+}
+
+# load v variables
+if [ -e "/etc/variant.sh" ]; then
+	. /etc/variant.sh
+fi
+
+log "start connection script (action=$ACTION)"
+
+first_zero_location()
+{
+	mask_octect="$1"
+	test_bit="128"
+	bit_count=0
+	while true; do
+		ret=$((test_bit & mask_octect))
+		if [ $ret -ne $test_bit  ]; then
+			echo $bit_count
+			break
+			
+		else
+			bit_count=$((bit_count+1))
+			test_bit=$((test_bit>>1))
+			
+		fi
+	done
+}
+
+count_mask_bits()
+{
+	SUBNET_MASK="$1"
+	MASK_OCTECT1=`echo $SUBNET_MASK |cut -d"." -f1| awk '{ print $1}'` 
+	MASK_OCTECT2=`echo $SUBNET_MASK |cut -d"." -f2| awk '{ print $1}'` 
+	MASK_OCTECT3=`echo $SUBNET_MASK |cut -d"." -f3| awk '{ print $1}'` 
+	MASK_OCTECT4=`echo $SUBNET_MASK |cut -d"." -f4| awk '{ print $1}'` 
+	if [ "$MASK_OCTECT1" = "255" ]; then
+		bitnum=8
+		if [ "$MASK_OCTECT2" = "255" ]; then
+			if [ "$MASK_OCTECT3" = "255" ]; then
+				if [ "$MASK_OCTECT4" = "255" ]; then
+					bitnum=32
+				else
+					num=`first_zero_location $MASK_OCTECT4`
+					bitnum=$((24+$num))
+				fi
+			else
+				num=`first_zero_location $MASK_OCTECT3`
+				bitnum=$((16+$num))
+			fi
+		
+		else
+			num=`first_zero_location $MASK_OCTECT2`
+			bitnum=$((8+$num))
+		fi
+	else
+		bitnum=`first_zero_location $MASK_OCTECT1`
+	
+	fi
+	echo $bitnum
+}
+
+get_default_if()
+{
+	# Find the default route interface name based on that the routing table is already sorted
+	route -n | grep '^0\.0\.0\.0[[:space:]]' | while read line; do
+		NETIF=""
+		eval $(echo "$line" | awk '{printf "NETIF=%s;\n",$8}')
+		echo $NETIF
+		break
+	done 
+}
+
+Is_Valid_IP()
+{
+	ipaddr=$1
+	regex="\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
+	CHECK=$(echo $ipaddr | egrep $regex)
+	if [ "$?" -eq 0 ] ;then
+		echo "1"
+	else
+		echo "0"
+	fi
+}
+
+resolve_ns()
+{
+	REMOTE_ROUTER=$1
+	isValidIP=`Is_Valid_IP "$REMOTE_ROUTER"`
+	if [ "$isValidIP" = "0" ]; then
+		#resolve it
+		remote_ip=`nslookup "$REMOTE_ROUTER" | sed -n 's/Address[[:space:]]\+[0-9]\+:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\).*$/\1/p' | sed -n '2p'`
+		isValidIP=`Is_Valid_IP "$remote_ip"`
+		if [ "$isValidIP" = "1" ]; then
+			echo $remote_ip
+		fi
+	else
+		echo $REMOTE_ROUTER
+	fi
+	
+}
+
+DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+TTY=`/usr/bin/rdb_get $DEV.data_if.$INSTANCE`
+
+# get gre RDB device
+GRE_DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+# check validation of gre RDB device name
+test -z "$GRE_DEV" && bail "GRE RDB device name not found (profile=$PROFILE)"
+# convert gre RDB device name to interface name
+GRE_INTERFACE_PREFIX=`echo "$GRE_DEV" | sed 's/\..*$//g'`
+# check validation of gre device name format
+test -z "$GRE_INTERFACE_PREFIX" && bail "incorrect GRE device name format (profile=$PROFILE,gre='$GRE_DEV')"
+# get GRE interface name
+GRE_INTERFACE_NAME="${GRE_INTERFACE_PREFIX}${PROFILE}"
+log "GRE interface name detected (gre=$GRE_INTERFACE_NAME)"
+
+GRE_LOCAL_ADDR=`/usr/bin/rdb_get link.profile.$PROFILE.local_ipaddr`
+test -z "$GRE_LOCAL_ADDR" && bail "GRE local address not specified (profile=$PROFILE,gre=$GRE_DEV)"
+
+run() {
+	log "run: $@"
+	"$@" 2>&1 | log
+}
+
+run_ip_updn_scripts() {
+	# build environment variables for ip-up script
+	PPP_IFACE="$GRE_INTERFACE_NAME"
+	PPP_TTY=""
+	PPP_SPEED=""
+	PPP_LOCAL="$GRE_LOCAL_ADDR"
+	PPP_REMOTE="0.0.0.0"
+	PPP_IPPARAM="$PROFILE"
+
+	log "call '$1' script (ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM)"
+	"$1" "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+	log "'$1' script finished (ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM)"
+}
+
+run_ip_dn_scripts() {
+	# clear pid
+	rm -f "/var/lock/ppp-${PROFILE}.pid"
+
+	run_ip_updn_scripts "/etc/ppp/ip-down"
+}
+
+run_ip_up_scripts() {
+	# set pid
+	echo "$$" > "/var/lock/ppp-${PROFILE}.pid"
+
+	run_ip_updn_scripts "/etc/ppp/ip-up"
+}
+
+start_gre() {
+	# get options
+	GRE_REMOTE_ROUTER=`/usr/bin/rdb_get link.profile.$PROFILE.serveraddress`
+	GRE_REMOTE_ADDR=`/usr/bin/rdb_get link.profile.$PROFILE.remote_ipaddr`
+	GRE_REMOTE_NETWORK=`/usr/bin/rdb_get link.profile.$PROFILE.remote_nwaddr`
+	GRE_REMOTE_NWMASK=`/usr/bin/rdb_get link.profile.$PROFILE.remote_nwmask`
+	GRE_TTL=`/usr/bin/rdb_get link.profile.$PROFILE.ttl`
+	GRE_DEBUG=`/usr/bin/rdb_get link.profile.$PROFILE.verbose_logging`
+
+	# check parameters
+	test -z "$GRE_INTERFACE_NAME" && bail "GRE interface name not detected (profile=$PROFILE,gre=$GRE_DEV)"
+	test -z "$GRE_REMOTE_ROUTER" && bail "GRE remote router address not specified (profile=$PROFILE,gre=$GRE_DEV)"
+	test -z "$GRE_REMOTE_ADDR" && bail "GRE remote address not specified (profile=$PROFILE,gre=$GRE_DEV)"
+	test -z "$GRE_TTL" && bail "GRE TTL not specified (profile=$PROFILE,gre=$GRE_DEV)"
+
+	# Resolve remote gateway
+	GRE_REMOTE_IP=`resolve_ns $GRE_REMOTE_ROUTER`
+
+	# Check the default route interface ready or not
+	NETIF=`get_default_if`
+	if [ -z "$NETIF" ]; then
+		exit 1
+	fi
+
+	if [ -z "$GRE_REMOTE_IP" ]; then
+		log "Remote router address \"$GRE_REMOTE_ROUTER\" can not be resolved, exit"
+		exit 1
+	fi
+
+	# delete the tunnel
+	ip tunnel del $GRE_INTERFACE_NAME 2> /dev/null > /dev/null
+
+	OCTECT1=`echo $GRE_REMOTE_ADDR |cut -d"." -f1| awk '{ print $1}'` 
+	OCTECT2=`echo $GRE_REMOTE_ADDR |cut -d"." -f2| awk '{ print $1}'` 
+	OCTECT3=`echo $GRE_REMOTE_ADDR |cut -d"." -f3| awk '{ print $1}'` 
+	GRE_REMOTE_NET=$OCTECT1.$OCTECT2.$OCTECT3.0/24
+
+
+	# add the tunnel
+	LOCAL_IP=`/sbin/ifconfig $NETIF | grep 'inet addr:'| grep -v '127.0.0.1' |cut -d":" -f2 | awk '{ print $1}'`
+
+	run ip tunnel add "$GRE_INTERFACE_NAME" mode gre remote "$GRE_REMOTE_IP" local "$LOCAL_IP" ttl "$GRE_TTL" || bail "failed to create tunnel"
+	run ip link set "$GRE_INTERFACE_NAME" up || bail "failed to activate tunnel interface"
+	run ip addr add "$GRE_LOCAL_ADDR" dev "$GRE_INTERFACE_NAME" || bail "failed to add GRE local address to route table"
+	run ip route add "$GRE_REMOTE_NET" dev "$GRE_INTERFACE_NAME" || bail "failed to add GRE remote network address to route table"
+
+	# paranoia check 
+	run ifconfig "$GRE_INTERFACE_NAME" || bail "GRE interface not found"
+
+	termRouteCmd=""
+	if [ -n "$GRE_REMOTE_NETWORK" -a -n "$GRE_REMOTE_NWMASK" ]; then
+		OCTECT1=`echo $GRE_REMOTE_NETWORK |cut -d"." -f1| awk '{ print $1}'` 
+		OCTECT2=`echo $GRE_REMOTE_NETWORK |cut -d"." -f2| awk '{ print $1}'` 
+		OCTECT3=`echo $GRE_REMOTE_NETWORK |cut -d"." -f3| awk '{ print $1}'` 
+		GRE_REMOTE_NETWORKPREFIX=$OCTECT1.$OCTECT2.$OCTECT3.0
+
+		MASK_BITS=`count_mask_bits $GRE_REMOTE_NWMASK`
+		run route add -net $GRE_REMOTE_NETWORKPREFIX/$MASK_BITS gw $GRE_LOCAL_ADDR dev $GRE_INTERFACE_NAME || bail "failed to add GRE remote route"
+	fi
+
+	# call ip-up.d
+	run_ip_up_scripts
+
+	# turn to runonterm
+	log "switching to runonterm \"$PROFILE\" \"$INSTANCE\" stop"
+	exec runonterm "\"$BIN\" \"$PROFILE\" \"$INSTANCE\" stop"
+}
+
+stop_gre() {
+	run ip link set "$GRE_INTERFACE_NAME" down
+	ip tunnel del "$GRE_INTERFACE_NAME"
+
+	# call ip-dn.d
+	run_ip_dn_scripts
+}
+
+case "$ACTION" in
+	'start')
+		start_gre
+		;;
+
+	'stop')
+		stop_gre
+		;;
+
+	*)
+		bail "incorrect action specified (action=$ACTION)"
+		;;
+esac
+
+log "done."
+
+exit 0

@@ -1,0 +1,482 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="-1"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>IP Mapping</title>
+</head>
+<script language="JavaScript" src="/cgi-bin/nat.cgi"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+
+function submitF() 
+{
+var f = document.formS;
+	try
+	{	
+		//if (f.NatEnable[0].checked == true)
+		{	
+			if(f.ipmapnum.value=="")
+			{
+				greyOutMappingFields();
+			}
+			else
+			{
+				if( (f.ipmapsrcport.value == "")||( (parseInt(f.ipmapsrcport2.value)-parseInt(f.ipmapsrcport.value)) < 0 ) )
+				{
+					alert(_("nat warningMsg01"));
+					f.editindex.value = '-1';
+					return;
+				}
+				if( (f.ipmapdstport.value == "")||( (parseInt(f.ipmapdstport2.value)-parseInt(f.ipmapdstport.value)) < 0 ) )
+				{
+					alert(_("nat warningMsg02"));
+					f.editindex.value = '-1';
+					return;
+				}
+				if ( (f.ipMapSrcIP1.value == "") || (f.ipMapSrcIP2.value == "")
+						|| (f.ipMapSrcIP3.value == "") || (f.ipMapSrcIP4.value == "")  )
+				{
+					alert(_("nat warningMsg03"));
+					f.editindex.value = '-1';
+					return;
+				}
+				if ( (f.ipMapDstIP1.value == "") || (f.ipMapDstIP2.value == "")
+						|| (f.ipMapDstIP3.value == "") || (f.ipMapDstIP4.value == "")  )
+				{
+					alert(_("nat warningMsg04"));
+					f.editindex.value = '-1';
+					return;
+				}
+			}
+		}
+		caldstport2();
+		f.ipmapdstport.disabled = false;
+		f.ipmapsrcip.value = f.ipMapSrcIP1.value + "."  + f.ipMapSrcIP2.value + "." + f.ipMapSrcIP3.value + "." + f.ipMapSrcIP4.value;
+		
+		f.ipmapdstip.value = f.ipMapDstIP1.value + "."  + f.ipMapDstIP2.value + "." + f.ipMapDstIP3.value + "." + f.ipMapDstIP4.value;
+	/*	if( f.ipmapnum.value < 1 || f.ipmapnum.value > st_nat.length )
+			f.editindex.value = st_nat.length+1;
+		else
+	    	f.editindex.value =f.ipmapnum.value;	*/
+		f.ipmapdstport2.disabled = false;
+		f.ProtocolText.value = f.ipmapprot.value;
+		value = parseInt(f.ipmapnum.value);  
+		if( isNaN(value)==true || value < 0 || value >= st_nat.length )
+		{
+			//f.editindex.value = st_nat.length+1;
+			i=st_nat.length;
+			makeCmd();
+			if(f.ipmapsrcip.value=="0.0.0.0")
+				document.form2.rdbCmd.value += "service.firewall.dnat."+i+"=\"-p "+f.ProtocolText.value+" --dport "+f.ipmapsrcport.value+":"+f.ipmapsrcport2.value+" -i rmnet0 -j DNAT --to-destination "+f.ipmapdstip.value+":"+f.ipmapdstport.value+"-"+f.ipmapdstport2.value+" \"&";
+			else
+				document.form2.rdbCmd.value += "service.firewall.dnat."+i+"=\"-p "+f.ProtocolText.value+" -s "+f.ipmapsrcip.value+" --dport "+f.ipmapsrcport.value+":"+f.ipmapsrcport2.value+" -i rmnet0 -j DNAT --to-destination "+f.ipmapdstip.value+":"+f.ipmapdstport.value+"-"+f.ipmapdstport2.value+" \"&";
+			document.form2.delindex.value = i+1;	
+		}
+		else
+		{	
+	    	//f.editindex.value = f.routenum.value;
+			i=f.ipmapnum.value;
+			st_nat[i].protocol = f.ProtocolText.value;
+			st_nat[i].sourceIP = f.ipmapsrcip.value;
+			st_nat[i].incomingPortStart = f.ipmapsrcport.value;
+			st_nat[i].incomingPortEnd = f.ipmapsrcport2.value;
+			st_nat[i].destinationIP = f.ipmapdstip.value;
+			st_nat[i].destinationPortStart = f.ipmapdstport.value;
+			st_nat[i].destinationPortEnd = f.ipmapdstport2.value;
+			makeCmd();
+		}	
+		document.form2.rdbCmd.value += "service.firewall.dnat.trigger=1";
+		document.form2.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+}
+
+function makeCmd()
+{
+	document.form2.rdbCmd.value = "";
+	k=0;
+	for (var i=0; i<st_nat.length; i++) 
+	{
+		if( st_nat[i].protocol != "" )
+		{
+			if( k>0 ) document.form2.rdbCmd.value += "&";
+			
+			if(st_nat[i].sourceIP=="0.0.0.0")
+				document.form2.rdbCmd.value += "service.firewall.dnat."+k+"=\"-p "+st_nat[i].protocol+" --dport "+st_nat[i].incomingPortStart+":"+st_nat[i].incomingPortEnd+" -i rmnet0 -j DNAT --to-destination "+st_nat[i].destinationIP+":"+st_nat[i].destinationPortStart+"-"+st_nat[i].destinationPortEnd+" \"";
+			else
+				document.form2.rdbCmd.value += "service.firewall.dnat."+k+"=\"-p "+st_nat[i].protocol+" -s "+st_nat[i].sourceIP+" --dport "+st_nat[i].incomingPortStart+":"+st_nat[i].incomingPortEnd+" -i rmnet0 -j DNAT --to-destination "+st_nat[i].destinationIP+":"+st_nat[i].destinationPortStart+"-"+st_nat[i].destinationPortEnd+" \"";
+			k++;
+		}
+		
+	}
+	document.form2.delindex.value = k;
+	if(k>0) document.form2.rdbCmd.value += "&";
+	
+}
+
+function delentry( index )
+{
+	try
+	{
+		st_nat[index].protocol = "";
+		makeCmd();	
+		document.form2.rdbCmd.value += "service.firewall.dnat.trigger=1";
+		document.form2.submit();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}	
+}
+
+
+// If NAT is disabled then we need to grey out these fields
+function unGreyOutMappingFields()
+{
+    try
+    {
+        document.formS.ipmapnum.disabled = false;
+    	document.formS.ipmapprot.disabled = false;
+		
+        document.formS.ipMapSrcIP1.disabled = false;
+		document.formS.ipMapSrcIP2.disabled = false;
+		document.formS.ipMapSrcIP3.disabled = false;
+		document.formS.ipMapSrcIP4.disabled = false;
+    
+		document.formS.ipMapDstIP1.disabled = false;
+		document.formS.ipMapDstIP2.disabled = false;
+		document.formS.ipMapDstIP3.disabled = false;
+		document.formS.ipMapDstIP4.disabled = false;
+		
+		document.formS.ipmapdstport.disabled = false;
+		document.formS.ipmapsrcport.disabled = false;
+		document.formS.ipmapsrcport2.disabled = false;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+
+// If NAT is disabled then we need to grey out these fields
+function greyOutMappingFields()
+{
+    try
+    {
+        document.formS.ipmapnum.disabled = true;
+    	document.formS.ipmapprot.disabled = true;
+		
+        document.formS.ipMapSrcIP1.disabled = true;
+		document.formS.ipMapSrcIP2.disabled = true;
+		document.formS.ipMapSrcIP3.disabled = true;
+		document.formS.ipMapSrcIP4.disabled = true;
+    
+		document.formS.ipMapDstIP1.disabled = true;
+		document.formS.ipMapDstIP2.disabled = true;
+		document.formS.ipMapDstIP3.disabled = true;
+		document.formS.ipMapDstIP4.disabled = true;
+		
+		document.formS.ipmapdstport.disabled = true;
+		document.formS.ipmapsrcport.disabled = true;
+		document.formS.ipmapsrcport2.disabled = true;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+
+function caldstport2()
+{
+	var f = document.formS;
+	if( parseInt(f.ipmapsrcport2.value) != parseInt(f.ipmapsrcport.value) )
+	{
+		f.ipmapdstport.value = f.ipmapsrcport.value;
+		f.ipmapdstport2.value = f.ipmapsrcport2.value;
+		f.ipmapdstport.disabled = true;
+		return;
+	}
+	f.ipmapdstport.disabled = false;
+	if( (parseInt(f.ipmapdstport.value)>0)&&(parseInt(f.ipmapsrcport2.value)>0)&&(parseInt(f.ipmapsrcport.value)>0)&&(( parseInt(f.ipmapsrcport2.value)-parseInt(f.ipmapsrcport.value))>=0) )
+	{
+		f.ipmapdstport2.value = parseInt(f.ipmapdstport.value) + parseInt(f.ipmapsrcport2.value) - parseInt(f.ipmapsrcport.value)
+	}
+	else
+	{
+		f.ipmapdstport2.value = "";
+	}
+}
+
+
+function checkDmzIPAddr(field)
+{
+    if(field.value == ""){
+        alert(_("warningMsg01"));
+        field.value = field.defaultValue;
+        field.focus();
+        return false;
+    }
+	var ray = new Array();
+	ray = field.value.split(".");
+	if(ray.length != 4 || IpCheck(ray[0],ray[1],ray[2],ray[3])==false) 
+	{
+		alert(_("nat warningMsg05"));
+		field.focus();
+        return false;
+	}
+
+    if( (!checkRange(field.value,1,0,255)) ||
+        (!checkRange(field.value,2,0,255)) ||
+        (!checkRange(field.value,3,0,255)) ||
+        (!checkRange(field.value,4,0,255)) ){
+        alert(_("warningMsg03"));//'IP format error.'
+        field.focus();
+        return false;
+    }
+
+	var mymask="<%val=get_single('link.profile.0.netmask');%>@@val";
+	var dmzAr = new Array();
+	var maskAr = new Array();
+	dmzAr = ip_pair[0].split('.');
+	maskAr = mymask.split('.');
+
+	var firstAr = new Array();
+	var negAr = new Array();
+	var lastAr = new Array();
+	for (i = 0; i < 4; i++) {
+		firstAr[i] = dmzAr[i] & maskAr[i];
+		negAr[i] = 255 - maskAr[i];
+		lastAr[i] = firstAr[i] | negAr[i];
+	}
+
+	if ((dmzAr[0] == firstAr[0] && dmzAr[1] == firstAr[1] && dmzAr[2] == firstAr[2] && dmzAr[3] == firstAr[3]) ||
+		(lastAr[0] == 255 && lastAr[1] == 255 && lastAr[2] == 255 && lastAr[3] == 255) ||
+		(dmzAr[0] == lastAr[0] && dmzAr[1] == lastAr[1] && dmzAr[2] == lastAr[2] && dmzAr[3] == lastAr[3]))
+	{
+		alert(_("dmz warningMsg01"));
+		field.focus();
+		return false;
+	}
+
+	return true;
+}
+
+function disableTextField (field)
+{
+  if(document.all || document.getElementById)
+    field.disabled = true;
+  else {
+    field.oldOnFocus = field.onfocus;
+    field.onfocus = skip;
+  }
+}
+
+function enableTextField (field)
+{
+  if(document.all || document.getElementById)
+    field.disabled = false;
+  else {
+    field.onfocus = field.oldOnFocus;
+  }
+}
+
+function updateState()
+{
+	if(document.formZ.DMZEnabled[0].checked==true){
+		enableTextField(document.formZ.DMZIPAddress);
+	}else{
+		disableTextField(document.formZ.DMZIPAddress);
+	}
+}
+
+function submitDMZ()
+{
+	if((document.formZ.dmzEnable.value=='1')&&(!checkDmzIPAddr(document.formZ.DMZIPAddress) )){
+		return;
+	}
+	document.formZ.submit();
+}
+</script>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST" )
+	{
+        i=form['delindex'];     
+        if( i>='0' )
+        {  
+	    set_single( 'service.firewall.dnat.'+i+'=', '-p'); //delete last
+            tempval = form['rdbCmd'];
+            set_list( tempval, '-p' );        
+        }
+        else
+        {
+            tempval = form['dmzEnable'];         
+            retval=set_single( 'service.firewall.dmz.enable='+tempval );     
+            if(tempval=='1')
+            {
+                tempval = form['DMZIPAddress'];
+                retval = set_single( 'service.firewall.dmz.address='+tempval ); 
+            }
+        }
+	}
+	form['dmzEnable'] = get_single( 'service.firewall.dmz.enable');  
+    myip = get_single( 'service.firewall.dmz.address' );
+	form['DMZIPAddress'] = myip;   
+%>
+
+<div class="content" >
+<!-- <h3>NAT Settings</h3> -->
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("routing")+" > "+_("NAT"));</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+<form name="formS" method="POST" action="@@request['SCRIPT_NAME']">	
+<input type="hidden" name="editindex" value="@@form['editindex']"/>
+<input type="hidden" name="ipmapsrcip" value="@@form['ipmapsrcip']"/>
+<input type="hidden" name="ipmapdstip" value="@@form['ipmapdstip']"/>
+<input type="hidden" name="ProtocolText" value="@@form['ProtocolText']"/>
+
+<table width="85%">
+    <tr><th><script language="JavaScript">document.write(_("ip mapping settings"));</script></th></tr>
+</table>
+
+<table width="85%">	
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("mapping no"));</script></td>
+	<td><input type="text" name="ipmapnum" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);" /></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("protocol"));</script></td>
+	<td><select name="ipmapprot" size="1" >
+    <option value="tcp">TCP</option>
+	<option value="udp">UDP</option>
+	<option value="all"><script language="JavaScript">document.write(_("log all"));</script></option>
+	</select>
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("port filter source ipaddr"));</script></font></td>
+	<td class="td_ltr"><input name="ipMapSrcIP1" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b>
+		<input name="ipMapSrcIP2" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b>
+		<input name="ipMapSrcIP3" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b> 
+		<input name="ipMapSrcIP4" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > 
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("incoming port range"));</script></td>
+	<td><input type="text" name="ipmapsrcport" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);document.formS.ipmapsrcport2.value=this.value;caldstport2();" ID="Text2"> &nbsp;-&nbsp;
+        <input type="text" name="ipmapsrcport2" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);caldstport2()">&nbsp;&nbsp;<script language="JavaScript">document.write(_("1-65535"))</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("destipaddr"));</script></td>
+	<td class="td_ltr"><input name="ipMapDstIP1" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b>
+		<input name="ipMapDstIP2" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b>
+		<input name="ipMapDstIP3" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > <b>.</b> 
+		<input name="ipMapDstIP4" size="2" maxLength="3"  onkeyup="WinExpIP(this,event);" > 
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("destination port range"));</script></font></td>
+	<td> <input type="text" name="ipmapdstport" size="8" maxLength="6" onKeyUp="NumfieldEntry(this);caldstport2()" onBlur="NumfieldEntry(this);caldstport2()" ID="Text12">&nbsp;-&nbsp;
+    	 <input type="text" name="ipmapdstport2" disabled="true" size="8" maxLength="6" >&nbsp;&nbsp;<script language="JavaScript">document.write(_("1-65535"))</script>
+    </td>
+</tr>
+</table>
+<div align="right" style="margin-right:15% ">
+<p></p><INPUT type="button" value="Save NAT" name="submitMe" onClick="javascript:submitF()">
+</div>
+</form>
+
+<form name="form2" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/> 
+<input type="hidden" name="delindex" value="@@form['delindex']"/>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>	
+<table width="85%" border="0" cellspacing="0" ID="Table2">
+<tr>
+	<td width="4%"><b><script language="JavaScript">document.write(_("item"));</script></b></td>
+	<td width="8%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("protocol"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("incoming addr"));</script></b></div></td>
+	<td width="16%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("incoming port"));</script></b></div></td>
+	<td width="22%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("monitor destinationAddress"));</script></b></div></td>
+	<td width="18%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("nat destport"));</script></b></div></td>
+	<td width="20%">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function makeList()
+{   
+	if (st_nat.length == 0)
+	{
+		document.write( "<tr><td colspan='8' align='center'>"+_("ip mtable empty")+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st_nat.length;
+	for (var i = 0; i < st_nat.length; i++) 
+	{
+		document.write("<tr>"); 
+		document.write("<td><div align=\"center\">"+i+"</div></td>");
+        function protocoltotext()
+        {
+            document.formS.ProtocolText.value=st_nat[i].protocol;
+        }
+        protocoltotext();
+		document.write("<td align='center'><div align=\"center\">"+document.formS.ProtocolText.value+"</div></td>");
+		document.write("<td><div align=\"center\">"+st_nat[i].sourceIP+"</div></td>");
+	    document.write("<td><div align=\"center\">"+st_nat[i].incomingPortStart+"&nbsp;-&nbsp;"+st_nat[i].incomingPortEnd+"</div></td>");
+		document.write("<td ><div align=\"center\">"+st_nat[i].destinationIP+"</div></td>");
+		document.write("<td><div align=\"center\">"+st_nat[i].destinationPortStart+"&nbsp;-&nbsp;"+st_nat[i].destinationPortEnd+"</div></td>");
+		document.write("<td><a href=javascript:delentry("+(i)+");>"+_("routing deleteEntry")+"</a></td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+</form>
+<form name="formZ" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="dmzEnable"  value="@@form['dmzEnable']"/>
+<table width="85%">
+<tr><th colspan="2"><script language="JavaScript">document.write(_("dmz configuration"));</script></th></tr>
+<tr>	
+    <td class="head" id="dmzSet"><script language="JavaScript">document.write(_("dmz setting"));</script></td>
+	<td>
+    <input type=radio name='DMZEnabled' onClick="javascript:document.formZ.dmzEnable.value='1'; updateState()"/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script> &nbsp;&nbsp;
+    <input type=radio name='DMZEnabled' onClick="javascript:document.formZ.dmzEnable.value='0'; updateState()"/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>  
+	</td>
+</tr>
+<tr>
+	<td class="head" id="dmzIPAddr"><script language="JavaScript">document.write(_("dmz ipaddr"));</script></td>
+	<td><input type="text" size="24" name="DMZIPAddress"  value="@@form['DMZIPAddress']"/></td>
+</tr>
+</table>
+<div align="right" style="margin-right:15%">
+<p></p><INPUT type="button" value="Save DMZ" name="submitMe" onClick="javascript:submitDMZ()">
+</div>
+</form>
+<script type="text/javascript">   
+if( parseInt(document.formZ.dmzEnable.value)==1  )
+	document.formZ.DMZEnabled[0].checked=true;
+else
+	document.formZ.DMZEnabled[1].checked=true;
+updateState();
+document.formS.ipmapnum.focus();
+document.formS.submitMe.value="   "+_("save nat")+"   ";
+document.formZ.submitMe.value="   "+_("save dmz")+"   ";
+</script>  
+</div>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

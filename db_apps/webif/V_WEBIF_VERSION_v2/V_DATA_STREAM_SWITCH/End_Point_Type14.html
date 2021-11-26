@@ -1,0 +1,158 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type14</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+var init_list={"0":_("Default"), "1":_("User")};
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+
+	$("#hidden_ep_index").val(i);
+	$("#hidden_ep_name").val(EP_Name);
+
+	document.form.submit();
+}
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	var ep_name = form['hidden_ep_name'];
+	var index = validate_number(form['hidden_ep_index']);
+
+	// validate input
+	if (string_regex_match(ep_name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	if (form["init_method"] != "" && form["init_method"] != "0" && form["init_method"] != "1" && form["init_method"] != "Default") {
+		onBadRequest();
+	}
+	var disconnectMins = string_to_number(form['disconnect_mins']);
+	if (disconnectMins < 0 || disconnectMins > 65535) {
+		onBadRequest();
+	}
+	set_single_direct("-p", 'service.dsm.ep.conf.' + index + '.name', ep_name);
+	set_single_direct("-p", 'service.dsm.ep.conf.' + index + '.type', '14');
+
+	// Create the list of RDBs and set them.
+	var dsmRoot = "service.dsm.ep.conf." + ep_name + ".";
+	set_single_direct("-p", dsmRoot + "init_method", form["init_method"]);
+	set_single_direct("-p", dsmRoot + "additional_init_str", form["init_additional"]);
+	set_single_direct("-p", dsmRoot + "inactivity_timeout_mins", form["disconnect_mins"]);
+
+
+	// trigger!
+	set_single_direct("-p", 'service.dsm.trigger', '1');
+	redirect('/end_points.html?success');
+}
+%>
+
+
+$(document).ready(function() {
+	add_options("init_method", init_list, "Default");
+	var v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.init_method');%>";
+	$("#init_method").val(v==""?"Default":v);
+<%
+	initAddition = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.additional_init_str', '', '--base64');
+	if (initAddition == "N/A") {
+		initAddition = "";
+	}
+%>
+	$("#init_additional").val(Base64.decode("@@initAddition"));
+	v="<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.inactivity_timeout_mins');%>";
+	$("#disconnect_mins").val(v==""?"0":v);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name="hidden_ep_index" id="hidden_ep_index" value="">
+			<input type="hidden" name="hidden_ep_name" id="hidden_ep_name" value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type14")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+
+				<div class="form-row">
+					<label for="init_method"><script language=Javascript>document.write(_("csdInitializationMethod"))</script></label>
+					<div class="field">
+						<select id="init_method" name="init_method"></select>
+					</div>
+				</div>
+
+				<div class="form-row">
+					<label for="init_additional"><script language=Javascript>document.write(_("csdAdditionalInit"))</script></label>
+					<div class="field">
+						<input type="text" name="init_additional" id="init_additional"  value="">
+					</div>
+				</div>
+
+				<div class="form-row">
+					<label for="disconnect_mins"><script language=Javascript>document.write(_("csdDiscTimeout"))</script></label>
+					<div class="field">
+						<input type="text" name="disconnect_mins" id="disconnect_mins" class="large required field1and65535 validate[required, funcCall[validate_field0and65535]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("csdDiscRange"))</script></span>
+					</div>
+				</div>
+
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+function validate_field0and65535(field) {
+	if( field.val() < 0 || field.val() > 65535 ) {
+		return _("field0and65535");
+	}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>SNMP</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['snmpenable'];
+	retval = set_single( 'service.snmp.enable='+tempval );
+	tempval = form['snmpROCommunityName'];
+	retval = set_single( 'service.snmp.name.readonly='+tempval );
+	tempval = form['snmpRWCommunityName'];
+	retval = set_single( 'service.snmp.name.readwrite='+tempval );
+}
+else { /*GET*/
+	temp = get_single( 'service.snmp.enable' );
+	form['snmpenable'] = temp;
+	temp = get_single( 'service.snmp.name.readonly' );
+	form['snmpROCommunityName'] = temp;
+	temp = get_single( 'service.snmp.name.readwrite' );
+	form['snmpRWCommunityName'] = temp;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("snmp");
+function greyOutSNMPFields() { // if SNMP is disabled then grey out the fields
+	document.form.snmpROCommunityName.disabled = true;
+	document.form.snmpRWCommunityName.disabled = true;
+}
+
+function ungreyOutSNMPFields() { // if SNMP is disabled then grey out the fields
+	document.form.snmpROCommunityName.disabled = false;
+	document.form.snmpRWCommunityName.disabled = false;
+}
+
+function checkSNMPConf() {
+	if (document.form.snmpEnable[1].checked == true)
+		greyOutSNMPFields();
+	else if (document.form.snmpEnable[0].checked == true)
+		ungreyOutSNMPFields();
+}
+</script>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3><script language="JavaScript">document.write(_("services")+" > SNMP")</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="snmpenable" value="@@form['snmpenable']"/>
+
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("snmp configuration"))</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("enable snmp"))</script></td>
+	<td><input type=radio name='snmpEnable' value=1 onClick="javascript:document.form.snmpenable.value='1';ungreyOutSNMPFields()" >&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+	<input type=radio name='snmpEnable' value=0 onClick="javascript:document.form.snmpenable.value='0';greyOutSNMPFields()" >&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("readonly community name"))</script></td>
+	<td><input type=text name='snmpROCommunityName' size=32 maxlength=64 value="@@form['snmpROCommunityName']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("rw community name"))</script></td>
+	<td><input type=text name='snmpRWCommunityName' size=32 maxlength=64 value="@@form['snmpRWCommunityName']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("download mib"))</script></td>
+	<td style="height:40px">
+	<a href="/cgi-bin/logfile.cgi?action=downloadMib"><script language="JavaScript">document.write(_("download"))</script></a>
+	</td>
+</tr>
+</table>
+<br/>
+<div align="center"><br/><input type="submit" value="Save" id="save_button" onClick="javascript:ungreyOutSNMPFields()" style="width:120px;"></div>
+<script type="text/javascript">
+	if(document.form.snmpenable.value=='1') {
+		ungreyOutSNMPFields();
+		document.form.snmpEnable[0].checked=true;
+	}
+	else {
+		greyOutSNMPFields();
+		document.form.snmpEnable[1].checked=true;
+	}
+	document.getElementById("save_button").value = _("CSsave");
+</script>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

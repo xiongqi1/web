@@ -1,0 +1,1 @@
+link ../../bovine/scripts/tr143_ping_core.lua

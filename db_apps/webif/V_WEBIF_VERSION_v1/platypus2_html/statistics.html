@@ -1,0 +1,149 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Ralink Wireless Station Statistics</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/cgi-bin/statistics.cgi"></script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language='javascript'>
+Butterlate.setTextDomain("statistics");
+</script>
+
+<h3><script language="JavaScript">document.write( _("administration")+" > "+_("statistics"))</script></h3>
+<form name="statistics" method="POST" action="@@request['SCRIPT_NAME']">
+<table cellpadding="2" cellspacing="1">
+<tr>
+	<th><script language="JavaScript">document.write( _("introduction"))</script></th>
+</tr>
+<tr><td>
+#if (defined V_BOARD_4gt101w)
+	<p id="statisticIntroduction">This page allows you to view the LAN, 3G and Wi-Fi wireless statistics. </p>
+#else
+	<p id="statisticIntroduction">This page allows you to view the LAN, WAN, 3G and Wi-Fi wireless statistics. </p>
+#endif
+</td></tr>
+</table>
+
+<table border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td class="title" colspan="2" id="statisticMM">Memory</td>
+</tr>
+<tr>
+	<td class="head" id="statisticMMTotal">Memory Total:</td>
+	<td id='MMTotalval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticMMLeft">Memory Left:</td>
+	<td id='MMLeftval'></td>
+</tr>
+<tr>
+#if (defined V_BOARD_4gt101w)
+	<td class="title" colspan="2" id="statisticWANLAN">LAN</td>
+#else
+	<td class="title" colspan="2" id="statisticWANLAN">WAN/LAN</td>
+#endif
+</tr>
+#if !defined (V_BOARD_4gt101w)
+<tr>
+	<td class="head" id="statisticWANRxPkt">WAN Rx Packets:</td>
+	<td id='WanRxPktsval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticWANRxBytes">WAN Rx Bytes:</td>
+	<td id='WanRxBytesval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticWANTxPkt">WAN Tx Packets:</td>
+	<td id='WanTxPktsval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticWANTxBytes">WAN Tx Bytes:</td>
+	<td id='WanTxBytesval'></td>
+</tr>
+#endif
+<tr>
+	<td class="head" id="statisticLANRxPkt">LAN Rx Packets:</td>
+	<td id='LanRxPktsval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticLANRxBytes">LAN Rx Bytes:</td>
+	<td id='LanRxBytesval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticLANTxPkt">LAN Tx Packets:</td>
+	<td id='LanTxPktsval'></td>
+</tr>
+<tr>
+	<td class="head" id="statisticLANTxBytes">LAN Tx Bytes:</td>
+	<td id='LanTxBytesval'></td>
+</tr>
+<tr>
+	<td class="title" colspan="2" id="statisticAllIF">All Interfaces</td>
+<tr>
+
+<script type="text/javascript">
+
+document.getElementById('MMTotalval').innerHTML =memtotal;
+document.getElementById('MMLeftval').innerHTML =memfree;
+
+#if !defined (V_BOARD_4gt101w)
+document.getElementById('WanRxBytesval').innerHTML =wan_array[0].recv_bytes;
+document.getElementById('WanRxPktsval').innerHTML =wan_array[0].recv_pkts;
+document.getElementById('WanTxPktsval').innerHTML =wan_array[0].tx_pkts;
+document.getElementById('WanTxBytesval').innerHTML =wan_array[0].tx_bytes;
+#endif
+
+document.getElementById('LanRxBytesval').innerHTML =lan_array[0].recv_bytes;
+document.getElementById('LanRxPktsval').innerHTML =lan_array[0].recv_pkts;
+document.getElementById('LanTxPktsval').innerHTML =lan_array[0].tx_pkts;
+document.getElementById('LanTxBytesval').innerHTML =lan_array[0].tx_bytes;
+
+var i;
+for(i=0; i<inf_num; i++) {
+	// name
+	document.write("<tr><td class=head>" + _("name") + "</td><td class=head>");
+	document.write("<b>"+allinfs_array[i].inf_name+"</b>");
+	document.write("</td></tr>");
+
+	// Order is important! rxpacket->rxbyte->txpacket->txbyte
+	// rxpacket
+	document.write("<tr><td class=head>" + _("statistic rx packet") + "</td><td>");
+	document.write(allinfs_array[i].recv_pkts);
+	document.write("</td></tr>");
+
+	// rxbyte
+	document.write("<tr><td class=head>" + _("statistic rx bytes") + "</td><td>");
+	document.write(allinfs_array[i].recv_bytes);
+	document.write("</td></tr>");
+
+	// txpacket
+	document.write("<tr><td class=head>" + _("statistic tx packet") + "</td><td>");
+	document.write(allinfs_array[i].tx_pkts);
+	document.write("</td></tr>");
+
+	// txbyte
+	document.write("<tr><td class=head>" + _("statistic tx bytes") + "</td><td>");
+	document.write(allinfs_array[i].tx_bytes);
+	document.write("</td></tr>");
+
+}
+</script>
+</table>
+</form>
+
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%></div>
+<div style="text-align:right" id="copyRight"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

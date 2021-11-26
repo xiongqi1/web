@@ -1,0 +1,6 @@
+digraph "Si3217x_General_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3217x_General_Cfg\n|+ device_key\l+ bom_option\l+ gdrv_option\l+ vdc_range\l+ daa_enable\l+ zcal_en\l+ pm_bom\l+ i_oithresh\l+ i_oithresh_lo\l+ i_oithresh_hi\land 44 more...\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

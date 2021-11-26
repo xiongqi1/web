@@ -1,0 +1,372 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>IP-Subnet based VLAN</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+if (request['REQUEST_METHOD'] == "POST" ) {
+	tmp = form['vlan_ipbased_enable'];
+	tmp2 = get_single('services.vlan.ipbased.enable');
+	if ((tmp != tmp2) && (tmp == '0' || tmp == '1')) {
+		retval = set_single( 'services.vlan.ipbased.enable='+tmp, '-p' );
+		set_single_direct('','services.vlan.ipbased.trigger','1');
+	}
+	redirect('/vlan_ipbased.html?success');
+}
+else { /*GET*/
+	form['vlan_ipbased_enable'] = get_single( 'services.vlan.ipbased.enable' );
+}
+%>
+<script language="JavaScript">
+
+#include "net_util.js"
+
+function submitF() {
+var f = document.formListEdit;
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#formListEdit").valid()) {
+		return;
+	}
+#else
+	if(!$("#formListEdit").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+
+	var arg_idx = f.editIdx.value;
+	var arg_vlanId = $("#virtualId").val();
+	var arg_ethPort = $("#ethernetPortList").val();
+	var destIpMask = [], sourIpMask = [];
+	var arg_destIpMask = "", arg_sourIpMask = "";
+
+	destIpMask[0] = load_value_from_element('dip_address');
+	destIpMask[1] = $("#dip_subnetmask").val();
+	arg_destIpMask = destIpMask.join("/");
+
+	sourIpMask[0] = load_value_from_element('sip_address');
+	sourIpMask[1] = $("#sip_subnetmask").val();
+	arg_sourIpMask = sourIpMask.join("/");
+
+	if(destIpMask[0].length < 1 && destIpMask[1].length > 0) {
+		validate_alert("",_("ipAddressRequired"));
+		return;
+	}
+	else if(destIpMask[0].length > 0 && destIpMask[1].length < 1) {
+		validate_alert("",_("subnetmaskRequired"));
+		return;
+	}
+
+	if(sourIpMask[0].length < 1 && sourIpMask[1].length > 0) {
+		validate_alert("",_("ipAddressRequired"));
+		return;
+	}
+	else if(sourIpMask[0].length > 0 && sourIpMask[1].length < 1) {
+		validate_alert("",_("subnetmaskRequired"));
+		return;
+	}
+	$("button").attr("disabled",true);
+	var args = {
+		csrfTokenGet:"@@session[csrfTokenName]"
+		, cmd:"editEntry"
+		, index:arg_idx
+		, vlanId:arg_vlanId
+		, ethPort:arg_ethPort
+		, destIpMask:arg_destIpMask
+		, sourIpMask:arg_sourIpMask
+	};
+	$.getJSON("./cgi-bin/vlan_ipbased.cgi",args,
+		function(res,stat,req) {
+			window.location.href="/vlan_ipbased.html?success"
+		}
+	);
+}
+
+function delEntry( idx ) {
+	var rdbIdx= $("#tdIndex-"+idx).text();
+	$.getJSON("./cgi-bin/vlan_ipbased.cgi",{csrfTokenGet: "@@session[csrfTokenName]", cmd:"delEntry", index:rdbIdx},
+		function(res,stat,req) {
+			window.location.href="/vlan_ipbased.html?success"
+		}
+	);
+
+	return;
+}
+
+
+function editEntry(idx) {
+	var f=document.formListEdit;
+
+	if (idx == -1) {
+		f.editIdx.value = idx;
+		$("#virtualId").val('');
+		$("#ethernetPortList").val('');
+		load_value_to_element('dip_address', '');
+		$("#dip_subnetmask").val('');
+		load_value_to_element('sip_address', '');
+		$("#sip_subnetmask").val('');
+
+	}
+	else {
+		f.editIdx.value = $("#tdIndex-"+idx).text();
+
+		$("#virtualId").val($("#tdVid-"+idx).text());
+		$("#ethernetPortList").val($("#tdPort-"+idx).text());
+
+		var str, addr;
+
+		str = $("#tdDestIP-"+idx).text();
+		addr = str.split("/");
+		load_value_to_element('dip_address', addr[0]);
+		$("#dip_subnetmask").val(addr[1]);
+
+		str = $("#tdSourIp-"+idx).text();
+		addr = str.split("/");
+		load_value_to_element('sip_address', addr[0]);
+		$("#sip_subnetmask").val(addr[1]);
+	}
+
+	clear_alert();
+	$("#listDisplayPage").css("display", "none");
+	$("#listEditPage").css("display", "");
+}
+
+
+function updateEthPortList () {
+	var eth_interfaces="";
+	var eth=new cgi("./cgi-bin/eth.cgi", "@@session[csrfTokenName]");
+	eth.reset();
+	eth.run("info",function(res){
+		$.each(res["interfaces"],function(n,o){
+			var val=o["hwclass"];
+
+			eth_interfaces+="<option value='"+val+"'>"+val+"</option>";
+		});
+		$("#ethernetPortList").html(eth_interfaces);
+	});
+}
+function updateList() {
+	$.getJSON("./cgi-bin/vlan_ipbased.cgi",{csrfTokenGet: "@@session[csrfTokenName]", cmd:"getList"}, function(res,stat,req) {
+		var h="";
+		$.each(res, function(idx, val) {
+			var destIpMask=val.destIpMask
+			var sourIpMask=val.sourIpMask
+			if (typeof(destIpMask) == "undefined" || destIpMask == "/")
+				destIpMask=""
+			if (typeof(sourIpMask) == "undefined" || sourIpMask == "/")
+				sourIpMask=""
+			h+="<tr id='trEntry-"+idx+"'>\
+			    <td id='tdIndex-"+idx+"' style=\"display:none\">"+val.rdbIndex+"</td>\
+			    <td id='tdVid-"+idx+"'>"+val.vlanId+"</td>\
+			    <td id='tdPort-"+idx+"'>"+val.ethPort+"</td>\
+			    <td id='tdDestIP-"+idx+"'>"+destIpMask+"</td>\
+			    <td id='tdSourIp-"+idx+"'>"+sourIpMask+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+			h+="<td class='last'><a class='secondary sml' href='javascript:editEntry("+idx+")'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+			h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:editEntry("+idx+")' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+			h+="<td class='last'><a href='javascript:delEntry("+idx+")' class=\"secondary sml\" style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close sml'></i></a></td>\
+			    </tr>";
+		});
+		$("#RulesList").html(h);
+	});
+}
+
+$(document).ready(function() {
+	updateEthPortList();
+	updateList();
+
+	if ($("#vlan_ipbased_enable").val() == '1') {
+		$("#vlan_ipbased_enable_0").attr("checked", "checked");
+	} else {
+		$("#vlan_ipbased_enable_1").attr("checked", "checked");
+	}
+
+
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="formListEdit" id="formListEdit" class="validate" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+			<div class="pad" id="listEditPage" style="display:none">
+				<input type="hidden" name="editIdx" value="@@form['editIdx']"/>
+
+				<h2><script language=Javascript>document.write(_("ipbasedVlanSetting"))</script></h2>
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="virtualId"><script language=Javascript>document.write(_("virtualId"))</script></label>
+						<input type="text" name="virtualId" id="virtualId" class="validate[required,funcCall[validate_vlanId]] required large number vlanId" maxLength="32" onKeyUp="NumfieldEntry(this);">
+					#if defined(V_COPROCESSOR_hannibal_onboard)
+						<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("vidRangeForHannibal"))</script></span>
+					#else
+						<span class="normal-text"><script language=Javascript>document.write("&nbsp;&nbsp;"+_("vidRange1to4095"))</script></span>
+					#endif
+					</div>
+					<div class="form-row">
+						<label for="ethernetPortList"><script language=Javascript>document.write(_("ethernetPort"))</script></label>
+						<select id="ethernetPortList">
+						</select>
+					</div>
+					<div class="form-row">
+						<label for="dip_address"><script language=Javascript>document.write(_("destIPAddrMask"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("dip_address");</script>
+							<span class='input-connect-dot' for='dip_subnetmask'>&nbsp;/&nbsp;</span>
+							<div class='field'><input type='text' class='ip-adress ip_address_size validate[condRequired[dip_address1,dip_address2,dip_address3,dip_address4],funcCall[validate_subnetMask]] subnetMask' maxLength='2' name='dip_subnetmask' id='dip_subnetmask' onKeyUp="NumfieldEntry(this);"></div>
+					</div>
+					<div class="form-row">
+						<label for="sip_address"><script language=Javascript>document.write(_("sourIPAddrMask"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocksWithoutRequired0("sip_address");</script>
+							<span class='input-connect-dot' for='sip_subnetmask'>&nbsp;/&nbsp;</span>
+							<div class='field'><input type='text' class='ip-adress ip_address_size validate[condRequired[sip_address1,sip_address2,sip_address3,sip_address4],funcCall[validate_subnetMask]] subnetMask' maxLength='2' name='sip_subnetmask' id='sip_subnetmask' onKeyUp="NumfieldEntry(this);"></div>
+					</div>
+				</div>
+				<div class="submit-row multi-button">
+					<button type="button" name="submitForm" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="reset" class="secondary" name='BtDel'><script language=Javascript>document.write(_("reset"))</script></button>
+					<button type="button" name='BtCancel' class="secondary" onClick="location.href='vlan_ipbased.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+			<br/>
+			<div class="pad" id="listDisplayPage">
+			<form name="formListDisplay" id="formListDisplay" class="validate" method="POST" action="@@request['SCRIPT_NAME']" nonvalidate="novalidate">
+			<%appendCsrfToken();%>
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("ipbasedVlanConfiguration"))</script></h2>
+				<input type="hidden" name="vlan_ipbased_enable" id="vlan_ipbased_enable" value="@@form['vlan_ipbased_enable']"/>
+				<div id="vlan_ipbased_operation" class="form-row no-bg-form">
+					<label for="field-0"><script language=Javascript>document.write(_("ipbasedVlanOperation"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="vlan_ipbased_enable_0" name="vlan_ipbased_enable_radio" class="access" value="1" onClick="javascript:document.formListDisplay.vlan_ipbased_enable.value='1';">
+								<label for="vlan_ipbased_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="vlan_ipbased_enable_1" name="vlan_ipbased_enable_radio" class="access" value="0" onClick="javascript:document.formListDisplay.vlan_ipbased_enable.value='0';">
+								<label for="vlan_ipbased_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="vlan_ipbased_operation" -->
+				<div class="submit-row">
+					<button type="submit" onClick='$("button").attr("disabled",true);$("#formListDisplay").submit();'><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>	<!-- div class="pad" -->
+			</form>
+			<form class="validate" action="#" novalidate="novalidate">
+				<div class="grid-33">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("vlanList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-66">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="editEntry(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+
+				<table class="above-5-column">
+					<colgroup>
+						<col width="60px">
+						<col width="90px">
+						<col width="180px">
+						<col width="180px">
+						<col width="90px">
+						<col width="50px">
+					</colgroup>
+					<thead id="list-head">
+						<tr>
+							<th class="align10"><script language=Javascript>document.write(_("virtualId"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("ethernetPort"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("destIPAddrMask"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("sourIPAddrMask"))</script></th>
+							<th>&nbsp;</th>
+							<th >&nbsp;</th>
+						</tr>
+					<thead>
+					<tbody id="RulesList"></tbody>
+				</table>
+			</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Internet", "VLAN_IPBASED", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('submitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["subnetMask"]=_("invalidSubnetMask");
+	$.validator.addMethod("subnetMask",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 32) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.subnetMask);
+	VALIDATOR.config.errors["vlanId"]=_("invalidVID");
+	$.validator.addMethod("vlanId",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 4095) {
+				return false;
+			}
+#if defined(V_COPROCESSOR_hannibal_onboard)
+			// VID 1, 10,11,12,13,14,15 are reserved on the system.
+			else if (c == 1 || (c <=15 && c >= 10)) {
+				return false;
+			}
+#endif
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.vlanId);
+#else
+/********* for NTC ValidationEngine **********/
+function validate_subnetMask(field) {
+	if( field.val() < 0 || field.val() > 32 ) {
+		return _("invalidSubnetMask");
+	}
+}
+function validate_vlanId(field) {
+	if( field.val() < 1 || field.val() > 4095 ) {
+		return _("invalidVID");
+	}
+#if defined(V_COPROCESSOR_hannibal_onboard)
+	// VID 1, 10,11,12,13,14,15 are reserved on the system.
+	else if (field.val() == 1 || (field.val() <=15 && field.val() >= 10)) {
+		return _("invalidVID");
+	}
+#endif
+}
+#endif
+</script>
+</body>
+</html>

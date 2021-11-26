@@ -1,0 +1,374 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>TR-069</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	$("button").attr("disabled",true);
+	document.form.periodic_interval.disabled=false;
+	document.form.randominform_win.disabled=false;
+	document.form.submit();
+}
+
+$(document).ready( function() {
+	var f=document.form;
+
+	if(f.tr069_enable.value=='1') {
+		$("#tr069Enable-0").attr("checked", "checked");
+		$("#box_341_tr069_configuration").css("display","");
+	}
+	else {
+		$("#tr069Enable-1").attr("checked", "checked");
+		$("#box_341_tr069_configuration").css("display","none");
+	}
+	if(f.periodic_enable.value=='1') {
+		$("#periodicEnable-0").attr("checked", "checked");
+		document.form.periodic_interval.disabled=false;
+		$("#box_342_periodic_inform").css("display", "");
+	}
+	else {
+		$("#periodicEnable-1").attr("checked", "checked");
+		document.form.periodic_interval.disabled=true;
+		$("#box_342_periodic_inform").css("display", "none");
+	}
+	if(f.randominform_enable.value=='1') {
+		$("#randomInformEnable-0").attr("checked", "checked");
+		f.randominform_win.disabled=false;
+		$("#box_randominform_win").css("display", "");
+	}
+	else {
+		$("#randomInformEnable-1").attr("checked", "checked");
+		f.randominform_win.disabled=true;
+		$("#box_randominform_win").css("display", "none");
+	}
+	$("#submitBtn").val(_("CSsave"));
+	$("#saveBtn").val(_("CSsave"));
+
+	$("#manufacturerOUI").html("<%get_single_direct('systeminfo.oui');%>");
+	$("#modelname").html("<%get_single_direct('system.product.model');%>");
+	$("#description").html("<%get_single_direct('system.product.title');%>");
+#ifdef V_CUSTOM_FEATURE_PACK_fastmile
+	$("#productclass").html("ODU"); // fastmile fixed ProductClass
+#else
+	$("#productclass").html("<%get_single_direct('system.product.class');%>");
+#endif
+#ifdef V_PRODUCT_ntc_8000c
+	$("#serialnumber").html("<%get_single_direct('uboot.sn');%>");
+#elif defined V_CUSTOM_FEATURE_PACK_fastmile
+	$("#serialnumber").html("<%get_single_direct('systeminfo.udid');%>");
+#else
+	$("#serialnumber").html("<%get_single_direct('systeminfo.serialnumber');%>");
+#endif
+	var startPoll = function() {
+		$.get('/cgi-bin/tr069.cgi', function(d){eval(d);$("#InformStartAt").html(informStartStatus);$("#InformEndAt").html(informEndStatus);} );
+	}
+	setInterval(startPoll, 2000);
+});
+
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if( request["QUERY_STRING"]=='server') {
+		tempval = form['tr069_enable'];
+		set_single( 'service.tr069.enable='+tempval );
+
+		tempval = form['ACSURL'];
+		set_single( 'tr069.server.url='+tempval );
+
+		tempval = form['username'];
+		set_single( 'tr069.server.username='+tempval );
+
+		tempval = form['password'];
+		set_single( 'tr069.server.password='+tempval );
+
+		penable = form['periodic_enable'];
+		set_single( 'tr069.server.periodic.enable='+penable );
+
+		tempval = form['ConReq_username'];
+		set_single( 'tr069.request.username='+tempval );
+
+		tempval = form['ConReq_password'];
+		set_single( 'tr069.request.password='+tempval );
+
+		if (penable == '1') {
+			tempval = form['periodic_interval'];
+			set_single( 'tr069.server.periodic.interval='+tempval );
+		}
+
+		tempval = form['randominform_enable'];
+		set_single( 'tr069.server.random_inform.enable='+tempval );
+
+		if (tempval == '1') {
+			tempval = form['randominform_win'];
+			set_single( 'tr069.server.random_inform.window='+tempval );
+		}
+
+	}
+	redirect('/TR069.html?success');
+}
+
+form['tr069_enable'] = get_single( 'service.tr069.enable' );
+form['ACSURL'] = get_single( 'tr069.server.url' );
+form['username'] = get_single( 'tr069.server.username' );
+temp = get_single( 'tr069.server.password' );
+form['password'] = temp;
+form['Vpassword'] = temp;
+form['periodic_enable'] = get_single( 'tr069.server.periodic.enable' );
+form['periodic_interval'] = get_single( 'tr069.server.periodic.interval' );
+form['randominform_enable'] = get_single( 'tr069.server.random_inform.enable' );
+form['randominform_win'] = get_single( 'tr069.server.random_inform.window' );
+
+form['ConReq_username'] = get_single( 'tr069.request.username' );
+temp = get_single( 'tr069.request.password' );
+form['ConReq_password'] = temp;
+form['ConReq_Vpassword'] = temp;
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+		<%appendCsrfToken();%>
+		<div class="right-column hide_for_pppoe_en white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("tr069 configuration"))</script></h2>
+				<input type="hidden" name="tr069_enable" value="@@form['tr069_enable']"/>
+				<input type="hidden" name="periodic_enable" value="@@form['periodic_enable']"/>
+				<input type="hidden" name="randominform_enable" value="@@form['randominform_enable']"/>
+				<div class="form-row no-bg-form">
+					<label for="tr069Enable"><script language=Javascript>document.write(_("enableTR069Service"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_341_tr069_configuration">
+								<input type="radio" id="tr069Enable-0" name="tr069Enable" class="access" value=1 onClick="javascript:document.form.tr069_enable.value='1';">
+								<label for="tr069Enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="tr069Enable-1" name="tr069Enable" class="access" value=0 onClick="javascript:document.form.tr069_enable.value='0';">
+								<label for="tr069Enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="grey-box" id="box_341_tr069_configuration" style="display: none">
+					<div class="form-row">
+						<label for="ACSURL"><script language=Javascript>document.write(_("ACS URL"))</script></label>
+						<div class="field">
+							<input type="text" class="validate[required] large required" name="ACSURL" id="ACSURL" value="@@form['ACSURL']" onKeyUp="urlFilter(this);">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="username"><script language=Javascript>document.write(_("acsUsername"))</script></label>
+						<div class="field">
+							<input type="text" name="username" id="username" class="validate[required] large required" value="@@form['username']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="password"><script language=Javascript>document.write(_("acsPassword"))</script></label>
+						<div class="field">
+							<input type="password" name="password" id="password" class="validate[required] large required" value="@@form['password']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="Vpassword"><script language=Javascript>document.write(_("verifyACSpassword"))</script></label>
+						<div class="field">
+							<input type="password" name="Vpassword" id="Vpassword" class="validate[required,equals[password]] large required" value="@@form['Vpassword']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ConReq_username"><script language=Javascript>document.write(_("connectionRequestUsername"))</script></label>
+						<div class="field">
+							<input type="text" name="ConReq_username" id="ConReq_username" class="validate[required] large required" value="@@form['ConReq_username']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ConReq_password"><script language=Javascript>document.write(_("connectionRequestPassword"))</script></label>
+						<div class="field">
+							<input type="password" name="ConReq_password" id="ConReq_password" class="validate[required] large required" value="@@form['ConReq_password']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ConReq_Vpassword"><script language=Javascript>document.write(_("verify connection request password"))</script></label>
+						<div class="field">
+							<input type="password" name="ConReq_Vpassword" id="ConReq_Vpassword" class="validate[required,equals[ConReq_password]] large required" value="@@form['ConReq_Vpassword']">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="informEnabled"><script language=Javascript>document.write(_("enableperiodicACSinforms"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="periodicEnable-0" name="periodicEnable" class="access" value=1 onClick="javascript:document.form.periodic_enable.value='1';document.form.periodic_interval.disabled=false;$('#box_342_periodic_inform').css('display', '');">
+									<label for="periodicEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="periodicEnable-1" name="periodicEnable" class="access" value=0 onClick="javascript:document.form.periodic_enable.value='0';document.form.periodic_interval.disabled=true;$('#box_342_periodic_inform').css('display', 'none');">
+									<label for="periodicEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_342_periodic_inform" style="display:none">
+						<div class="form-row">
+							<label for="periodic_interval"><script language=Javascript>document.write(_("informPeriod"))</script></label>
+							<div class="field">
+								<input type="text" name="periodic_interval" id="periodic_interval" class="validate[required,funcCall[validate_interval]] sml required periodic_interval" maxlength=7 onKeyUp="NumfieldEntry(this);" value="@@form['periodic_interval']">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(30-2592000) secs</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<label for="randomInformEnabled"><script language=Javascript>document.write(_("enableRandomInform"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="randomInformEnable-0" name="randomInformEnable" class="access" value=1 onClick="javascript:document.form.randominform_enable.value='1';document.form.randominform_win.disabled=false;$('#box_randominform_win').css('display', '');">
+									<label for="randomInformEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="randomInformEnable-1" name="randomInformEnable" class="access" value=0 onClick="javascript:document.form.randominform_enable.value='0';document.form.randominform_win.disabled=true;$('#box_randominform_win').css('display', 'none');">
+									<label for="randomInformEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_randominform_win" style="display:none">
+						<div class="form-row">
+							<label for="randominform_win"><script language=Javascript>document.write(_("randomInformWindow"))</script></label>
+							<div class="field">
+								<input type="text" name="randominform_win" id="randominform_win" class="validate[required,funcCall[validate_randomInformWin]] sml required randominform_win" maxlength=4 onKeyUp="NumfieldEntry(this);" value="@@form['randominform_win']">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(0-3600) secs</span>
+							</div>
+						</div>
+					</div>
+
+					<h2>&nbsp;&nbsp;<script language=Javascript>document.write(_("last inform status"))</script></h2>
+					<div class="form-row">
+						<label for="InformStartAt"><script language=Javascript>document.write(_("start at"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="InformStartAt"></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="InformEndAt"><script language=Javascript>document.write(_("end at"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="InformEndAt"></span>
+						</div>
+					</div>
+				</div>
+				<div class="grey-box">
+					<h2>&nbsp;&nbsp;<script language=Javascript>document.write(_("tr069 deviceInfo"))</script></h2>
+					<div class="form-row">
+						<label for="manufacturer"><script language=Javascript>document.write(_("tr069 manufacturer"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="manufacturer">NetComm Wireless Limited</span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="manufacturerOUI"><script language=Javascript>document.write(_("tr069 manufacturerOUI"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="manufacturerOUI"></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="modelname"><script language=Javascript>document.write(_("tr069 modelname"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="modelname"></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="description"><script language=Javascript>document.write(_("tr069 description"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="description"></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="productclass"><script language=Javascript>document.write(_("tr069 productclass"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="productclass"></span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="serialnumber"><script language=Javascript>document.write(_("tr069 serialnumber"))</script></label>
+						<div class="field" style="margin:6px 0 0 3px;">
+							<span id="serialnumber"></span>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "TR", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["periodic_interval"]=_("Msg120");
+	$.validator.addMethod("periodic_interval",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 30 || c > 2592000 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.periodic_interval);
+#else
+/********* NTC ValidationEngine **********/
+function validate_interval(field) {
+	if( field.val() < 30 || field.val() > 2592000 || !isAllNum(field.val()) ) {
+		return _("Msg120");
+	}
+}
+function validate_randomInformWin(field) {
+	if( field.val() < 0 || field.val() > 3600 || !isAllNum(field.val()) ) {
+		return _("field0and3600");
+	}
+}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('tr069SubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

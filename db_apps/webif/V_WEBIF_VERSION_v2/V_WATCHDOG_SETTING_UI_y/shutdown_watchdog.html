@@ -1,0 +1,155 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Commitment Timer Watchdog</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+var shutdownPrefix = 'sys.watchdog.shutdown';
+var rdbTrigger = 'sys.watchdog.shutdown.trigger';
+
+function toInt( str ) {
+	return str-0;
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	/* Avoid triggering any variables if the value has not changed */
+	var changed = false;
+	var currval = get_single( shutdownPrefix+'.enable' );
+	var tempval = form['watchdog_enable'];
+	if (currval != tempval) {
+		set_single_direct("-p", shutdownPrefix+'.enable', form['watchdog_enable']);
+		changed = true;
+	}
+
+	currval = get_single( shutdownPrefix + '.timeout' );
+	tempval = form['shutdownTimer'];
+	if (currval != tempval) {
+		set_single_direct("-p", shutdownPrefix + '.timeout', tempval);
+		changed = true;
+	}
+
+	if (changed) {
+		set_single_direct("", rdbTrigger, '1');
+	}
+
+	redirect(request['SCRIPT_NAME'] + "?success");
+}
+else { /*GET*/
+	form['watchdog_enable'] = get_single( shutdownPrefix+'.enable' );
+	if (form['watchdog_enable'] == "N/A") {
+		form['watchdog_enable'] = 1;
+	}
+
+	form['shutdownTimer'] = get_single( shutdownPrefix + '.timeout' );
+	if (form['shutdownTimer'] == "N/A") {
+		form['shutdownTimer'] = 1200;
+	}
+	else {
+		/* Limit timeout to the range 30 to 3600 */
+		if (toInt(form['shutdownTimer']) < 30)
+			form['shutdownTimer']= 30;
+		else if (toInt(form['shutdownTimer']) > 3600)
+			form['shutdownTimer']= 3600;
+	}
+}
+%>
+
+<script language="JavaScript">
+function submitForm() {
+	clear_alert();
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+
+	document.form.submit();
+}
+
+$(document).ready( function() {
+ load_value_to_element("input:radio.access[name=watchdog_enable]","@@form['watchdog_enable']"=="1");
+	$("input:radio.access[name=watchdog_enable]").change(function() {
+		$("#commitment-timers-toggle-div").css("display", $("#watchdog_enable-0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=watchdog_enable]").trigger("change");
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+	<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST">
+	<%appendCsrfToken();%>
+		<div class="right-column white-box" id="watchdog_setup">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("shutdownWatchdog"))</script></h2>
+				<div style="padding:15px 0 60px 20px; width:660px;">
+					<label for="field-1"><script language=Javascript>document.write(_("enabled"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div id="watchdog_enable-div" class="radio-switch">
+								<input type="radio" id="watchdog_enable-0" name="watchdog_enable" class="access" value="1">
+								<label for="watchdog_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+
+								<input type="radio" id="watchdog_enable-1" name="watchdog_enable" class="access" value="0">
+								<label for="watchdog_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="commitment-timers-toggle-div">
+					<b><script language=Javascript>document.write(_("timeoutSettings"))</script></b>
+					<div class="p-des-full-width" style="padding:15px 0 0 20px; width:660px;">
+						<div class="form-row" id="shutdownTimer-div">
+							<label for="shutdownTimer"><script language=Javascript>document.write(_("shutdownTimeout"))</script></label>
+							<div class="field">
+								<input type="text" name="shutdownTimer" id="shutdownTimer" class="validate[required,funcCall[validate_shutdown]] large" value="@@form['shutdownTimer']" onKeyUp='NumfieldEntry(this)'>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("watchdogTimerRange")+")&nbsp;&nbsp;"+_("seconds"))</script></span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row" style="margin-left:252px;">
+					<button type="button" onClick="submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div></div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("System", "ShutdownWatchdog", <%_val = session["user"];%>"@@_val");
+
+function validate_shutdown(field) {
+	if( field.val() < 30 || field.val() > 3600 ) {
+		return _("watchdogTimerWarningMsg");
+	}
+}
+
+function validate_max_reboots(field) {
+	if( field.val() < 1 || field.val() > 4294967 ) {
+		return _("maxRebootsWarningMsg");
+	}
+}
+
+<%if(request['QUERY_STRING']=="success") {%>
+	success_alert("",_('watchdogSettingSubmitSuccess'));
+<%}%>
+</script>
+
+</body>
+</html>

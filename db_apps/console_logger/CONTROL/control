@@ -1,0 +1,8 @@
+Package: console-logger
+Priority: optional
+Section: Misc
+Version: 1.0
+Architecture: arm
+Maintainer: Iwo.Mergler@netcommwireless.com
+Depends:
+Description: Software package for the hardware console logger

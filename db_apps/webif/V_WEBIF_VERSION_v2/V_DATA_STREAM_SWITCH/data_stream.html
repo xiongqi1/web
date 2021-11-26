@@ -1,0 +1,303 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Data stream manager</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+#include "end_point_types.inc"
+<script language="JavaScript" src="/cgi-bin/data_stream.cgi?getList"></script>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+
+<script language="JavaScript">
+var MAX_DATA_STREAMS=20;
+var mode_list_a = [];
+// for end point A, for relevant end points we allow to select raw or modbus mode
+// mapping is as per end_point_types.inc
+mode_list_a[0]={"1":_("mode1"), "2":_("mode2"), "3":_("mode3"),  "4":_("mode4"), "5":_("mode5")};
+mode_list_a[1]={"1":_("mode1")};
+mode_list_a[2]={"1":_("mode1")};
+mode_list_a[3]={"1":_("mode1")};
+mode_list_a[4]={"1":_("mode1")};
+mode_list_a[5]={"1":_("mode1")};
+mode_list_a[6]={"1":_("mode1")};
+mode_list_a[7]={"1":_("mode1"), "2":_("mode2"), "3":_("mode3"),  "4":_("mode4"), "5":_("mode5")};
+mode_list_a[8]={"1":_("mode1"), "2":_("mode2"), "3":_("mode3"),  "4":_("mode4"), "5":_("mode5")};
+mode_list_a[9]={"1":_("mode1"), "2":_("mode2"), "3":_("mode3"),  "4":_("mode4"), "5":_("mode5")};
+mode_list_a[10]={"1":_("mode1")};
+mode_list_a[11]={"1":_("mode1")};
+mode_list_a[12]={"1":_("mode1")};
+mode_list_a[13]={"1":_("mode1")};
+mode_list_a[14]={"1":_("mode1")};
+mode_list_a[15]={"1":_("mode1")};
+mode_list_a[16]={"1":_("mode1")};
+
+// for end point B, only raw mode is supported
+var mode_list_b={"1":_("mode1")};
+
+var a_mode="1";
+var edit_idx=0;
+function submitList() {
+	blockUI_wait(_("GUI pleaseWait"));
+	var c="";
+	for (var i=0; i<st_streams.length; i++) {
+		if( i>0 ) c += ":";
+		c+=st_streams[i].enable+","+st_streams[i].name+","+st_streams[i].epa_name+","+st_streams[i].epb_name+","+st_streams[i].epa_mode+","+st_streams[i].epb_mode;
+	}
+	$.get("/cgi-bin/data_stream.cgi?<%appendCsrfTokenToQueryString();%>setup&"+c, function(){setTimeout("window.location='/data_stream.html?success'", 3000)});
+}
+
+function submitForm() {
+	st_streams[edit_idx].enable=$("input:radio[name=stream-enable]:checked").val();
+	st_streams[edit_idx].name=$("#streamName").val();
+	st_streams[edit_idx].epa_name=$("#a-name").val();
+	st_streams[edit_idx].epb_name=$("#b-name").val();
+	st_streams[edit_idx].epa_mode=$("#a-mode").val();
+	st_streams[edit_idx].epb_mode=$("#b-mode").val();
+	submitList();
+}
+
+function delentry(idx) {
+	st_streams.splice(idx, 1)
+	renew_list();
+}
+
+function stream_edit(idx) {
+	$("#stream_setup").css("display", "");
+	$("#stream_list").css("display", "none");
+	clear_alert();
+	if(idx<0 || idx>=st_streams.length ) { //add
+		if(st_streams.length>=MAX_DATA_STREAMS) {
+			blockUI_alert(_("maxstreams"));
+			return;
+		}
+		if(typeof(st_streams)=="undefined") {
+			idx=0;
+		}
+		else {
+			idx=st_streams.length;
+		}
+		st_streams[idx]={ "enable":"1", "name":"", "epa_name":"", "epb_name":"", "epa_mode":"", "epb_mode":"", "pid":"0", "validated":""};
+	}
+
+	$("#streamName").val(st_streams[idx].name);
+	load_value_to_element($("input:radio[name=stream-enable]"), st_streams[idx].enable=="1");
+	a_mode=st_streams[idx].epa_mode;
+	$("#a-name").val(st_streams[idx].epa_name);
+	$("#b-name").val(st_streams[idx].epb_name);
+	$("#b-mode").val(st_streams[idx].epb_mode);
+	$("#a-name").trigger("change");
+	$("#b-name").trigger("change");
+	edit_idx=idx;
+}
+
+function renew_list() {
+var h="";
+	for (var i=0; i<st_streams.length;i++) {
+		if(st_streams[i].validated=="1") {
+			if(st_streams[i].pid=="0" || st_streams[i].pid==""){
+				var status=_("stopped");
+			}
+			else {
+				var status=_("running");
+			}
+		}
+		else {
+			var status=_("invalid");
+		}
+		var en=st_streams[i].enable=="1"?_("enabled"):_("disabled");
+		h+="<tr>\
+		<td>"+breakWord(st_streams[i].name,13)+"</td>\
+		<td>"+st_streams[i].epa_name+"</td>\
+		<td>"+mode_list_a[0][st_streams[i].epa_mode]+"</td>\
+		<td>"+st_streams[i].epb_name+"</td>\
+		<td>"+mode_list_b[st_streams[i].epb_mode]+"</td>\
+		<td>"+en+"</td>\
+		<td>"+status+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+		h+="<td class='last'><a href='javascript:stream_edit("+i+")' class='secondary sml'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+		h+="<td class='last'><a href='javascript:stream_edit("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+		h+="<td class='last'><a href='javascript:delentry("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close'></i></a></td>\
+		</tr>";
+	}
+	$("#DSSlist").html(h);
+	if(validated=="0") {
+		validate_alert( _("epValidateFailed"), error_msg )
+	}
+}
+
+$(document).ready(function() {
+	add_options("b-mode", mode_list_b, "1");
+	for (var i=0; i<endpoints.length;i++) {
+		$("#a-name").append("<option value='"+endpoints[i].name+"'>"+endpoints[i].name+"</option>");
+		$("#b-name").append("<option value='"+endpoints[i].name+"'>"+endpoints[i].name+"</option>");
+	}
+	$("#a-name").change(function() {
+		if(typeof(endpoints)=="undefined" || endpoints.length == 0) return;
+		$("#a-type").html(g_ep_types_list[endpoints[this.selectedIndex].type]);
+		$("#a-mode").empty();
+		add_options("a-mode", mode_list_a[parseInt(endpoints[this.selectedIndex].type)-1], a_mode);
+	});
+	$("#a-name").trigger("change");
+
+	$("#b-name").change(function() {
+		if(typeof(endpoints)=="undefined" || endpoints.length == 0) return;
+		$("#b-type").html(g_ep_types_list[endpoints[this.selectedIndex].type]);
+	});
+	if(typeof(st_streams)=="undefined" || st_streams.length == 0) {
+		h="<tr><th colspan=\"9\"><div align=\"center\">"+_("DSSLempty")+"</div></th></tr>";
+		$("#title-head").css("display", "none");
+		$("#submit-div").css("display", "none");
+		$("#DSSlist").html(h);
+	}
+	else {
+		renew_list();
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<div class="pad" id="stream_list">
+			<form class="validate" novalidate="novalidate">
+				<div class="grid-50">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("dataStreamSwitchList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-50">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="stream_edit(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<table class="above-5-column name-list">
+					<colgroup>
+						<col width="80px">
+						<col width="100px">
+						<col width="100px">
+						<col width="100px">
+						<col width="100px">
+						<col width="80px">
+						<col width="90px">
+						<col width="auto">
+						<col width="20px">
+					</colgroup>
+					<thead id="title-head">
+					<tr>
+						<th class="align10"><script language=Javascript>document.write(_("name"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("endpointA"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("mode"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("endpointB"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("mode"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("enabled"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("status"))</script></th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+					<tbody id="DSSlist"></tbody>
+					</thead>
+				</table>
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitList();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='data_stream.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</form>
+			</div>
+			<div class="pad" id="stream_setup" style="display:none">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+				<h2><script language=Javascript>document.write(_("editDataStream"))</script></h2>
+				<div class="grey-box">
+					<div class="form-row no-bg-form">
+						<label for="stream-enable"><script language=Javascript>document.write(_("station active"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="stream-enable-0" name="stream-enable" class="access" value=1>
+									<label for="stream-enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="stream-enable-1" name="stream-enable" class="access" value=0>
+									<label for="stream-enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="streamName"><script language=Javascript>document.write(_("streamName"))</script></label>
+						<input type=text name='streamName' id='streamName' class="validate[required] large" maxlength=64 value="@@form['streamName']" onKeyUp="nameFilter(this);">
+					</div>
+					<h2>&nbsp;&nbsp;<script language=Javascript>document.write(_("endpointA"))</script></h2>
+					<div class="form-row">
+						<fieldset>
+							<label for="a-name"><script language=Javascript>document.write(_("endPointName"))</script></label>
+							<div class="field">
+								<select id="a-name" name="a-name" style="width:205px"></select>
+							</div>
+							<div>
+								<span class="normal-text" id="a-type" style="padding-left:10px"></span>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row">
+						<fieldset>
+							<label for="a-mode"><script language=Javascript>document.write(_("mode"))</script></label>
+							<div class="field">
+								<select id="a-mode" name="a-mode" style="width:205px"></select>
+							</div>
+						</fieldset>
+					</div>
+					<h2>&nbsp;&nbsp;<script language=Javascript>document.write(_("endpointB"))</script></h2>
+					<div class="form-row">
+						<fieldset>
+							<label for="b-name"><script language=Javascript>document.write(_("endPointName"))</script></label>
+							<div class="field">
+								<select id="b-name" name="b-name" style="width:205px"></select>
+							</div>
+							<div>
+								<span class="normal-text" id="b-type" style="padding-left:10px"></span>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row">
+						<fieldset>
+							<label for="a-mode"><script language=Javascript>document.write(_("mode"))</script></label>
+							<div class="field">
+								<select id="b-mode" name="b-mode" style="width:205px"></select>
+							</div>
+						</fieldset>
+					</div>
+
+					<div class="submit-row">
+						<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						<button type="button" class="secondary" onClick="window.location='data_stream.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+					</div>
+				</div>
+			</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "DSS", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+</script>
+</body>
+</html>

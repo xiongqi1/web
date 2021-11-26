@@ -1,0 +1,242 @@
+[Version: 17.05.12.90128]
+ML Rank,Best Network,MCC,MNC,Country,Network Name
+1,1,276,2,Albania,Vodafone
+2,1,230,3,Czech Republic,Vodafone
+3,1,262,2,Germany,Vodafone
+4,1,620,2,Ghana,Vodafone
+5,1,202,5,Greece,Vodafone
+6,1,216,70,Hungary,Vodafone
+7,1,272,1,Ireland,Vodafone
+8,1,222,10,Italy,Vodafone
+9,1,278,1,Malta,Vodafone
+10,1,204,4,Netherlands,Vodafone
+11,1,530,1,New Zealand,Vodafone
+12,1,268,1,Portugal,Vodafone
+13,1,226,1,Romania,Vodafone
+14,1,214,1,Spain,Vodafone
+15,1,286,2,Turkey,Vodafone 
+16,1,234,15,United Kingdom,Vodafone
+17,1,655,1,South Africa,Vodacom
+18,1,274,2,Iceland,Vodafone
+19,1,244,5,Finland,Elisa
+20,1,232,1,Austria,Mobilkom
+21,1,284,1,Bulgaria,M-Tel
+22,1,219,10,Croatia,VIPnet
+23,1,248,2,Estonia,Elisa
+24,1,404,46,India,Vodafone
+25,1,639,2,Kenya,Safaricom
+26,1,295,5,Liechtenstein,Mobilkom
+27,1,294,3,Macedonia,VIP OPERATOR
+28,1,220,5,Serbia,VIP
+29,1,293,40,Slovenia,SI Mobil
+30,1,640,4,"Tanzania, United Republic Of",Vodacom
+31,1,310,410,United States,AT&T
+32,1,260,1,Poland,Plus
+33,1,425,3,Israel,Pelephone
+34,1,643,4,Mozambique,VODACOM MOZAMBIQUE
+35,0,208,1,France,ORANGE
+36,1,238,1,Denmark,TDC
+37,0,716,17,Peru,Nextel
+38,0,216,1,Hungary,Telenor
+39,1,630,1,"Congo, The Democratic Republic",Vodacom
+40,1,280,1,Cyprus,Cytamobile-Vodafone
+41,0,284,3,Bulgaria,Vivacom
+42,0,228,2,Switzerland,Sunrise
+43,1,270,77,Luxembourg,Tango
+44,1,206,1,Belgium,Proximus
+45,1,730,3,Chile,CLARO CHILE S.A.
+46,1,712,3,Costa Rica,Claro
+47,0,370,2,Dominican Republic,COMPANIA DOMINICANA DE TEL.
+48,1,334,020,Mexico,Telcel
+49,0,714,3,Panama,Claro
+50,1,716,10,Peru,Claro
+51,1,330,110,Puerto Rico,Claro
+52,1,302,610,Canada,BELL MOBILITY
+53,0,204,16,Netherlands,T-Mobile
+54,0,232,3,Austria,T-Mobile
+55,0,219,1,Croatia,Croatian Telecom
+56,0,230,1,Czech Republic,T-Mobile
+57,0,262,1,Germany,T-Mobile
+58,0,216,30,Hungary,T-Mobile
+59,0,260,2,Poland,Era
+60,1,231,2,"Slovakia, Slovak Republic",T-Mobile
+61,1,505,3,Australia,Vodafone
+62,0,510,1,Indonesia,Indosat
+63,1,234,3,Jersey,Airtel-Vodafone
+64,1,228,1,Switzerland,Swisscom
+65,0,219,2,Croatia,Tele2
+66,0,248,3,Estonia,Tele2
+67,0,247,2,Latvia,Tele2
+68,0,246,3,Lithuania,Tele2
+69,0,242,5,Norway,Network Norway
+70,1,240,7,Sweden,Tele 2
+71,1,714,1,Panama,Cable & Wireless
+72,0,248,1,Estonia,EMT
+73,0,247,1,Latvia,LMT
+74,0,260,6,Poland,Play
+75,1,247,5,Latvia,Bite Latvija
+76,1,246,2,Lithuania,Bite GSM
+77,0,208,20,France,Bouygues
+78,0,262,3,Germany,E-plus
+79,1,454,3,Hong Kong,3
+80,0,454,4,Hong Kong,Hutchison
+81,0,401,2,Kazakhstan,KCell
+82,0,270,1,Luxembourg,LUXGSM
+83,0,297,1,Montenegro,Telenor
+84,1,525,5,Singapore,StarHub
+85,0,466,1,Taiwan,Far EasTone
+86,0,234,55,"United Kingdom (Channel Islands)",Cable & Wireless
+87,0,234,58,United Kingdom,Manx Telecom
+88,1,460,1,China,China Unicom
+89,1,724,31,Brazil,Oi
+90,1,466,92,Taiwan,Chunghwa
+91,0,238,2,Denmark,Telenor
+92,1,283,5,Armenia,VivaCell
+93,1,250,1,Russian Federation,MTS
+94,0,255,1,Ukraine,MTS
+95,0,302,220,Canada,Telus
+96,1,528,11,Brunei Darussalam,DST
+97,1,732,111,Columbia,Tigo
+98,1,510,89,Indonesia,3
+99,1,450,8,"Korea, Republic Of",KT Corp.
+100,0,520,4,Thailand,RealFuture 
+101,1,520,99,Thailand,True Move
+102,0,310,260,United States,T-Mobile
+103,0,400,2,Azerbaijan,BAKCELL LTD.
+104,1,338,050,Jamaica,Digicel
+105,1,340,20,Martinique,Digicel
+106,0,714,4,Panama,Digicel
+107,1,208,10,France,SFR
+108,1,647,10,Reunion,SRR
+109,1,242,1,Norway,Telenor
+110,1,266,1,Gibraltar,GIBTELECOM
+111,0,450,5,"Korea, Republic Of",SK TELECOM
+112,0,505,2,Australia,Optus
+113,0,528,2,Brunei Darussalam,PROGRESIF CELLULAR SDN BHD
+114,0,244,14,Finland,Alands Mobiltelefon
+115,0,454,6,Hong Kong,SmarTone
+116,0,440,20,Japan,Softbank
+117,0,419,3,Kuwait,Wataniya
+118,0,502,12,Malaysia,Maxis Mobile
+119,1,502,19,Malaysia,Celcom
+120,1,427,2,Qatar,Vodafone
+121,0,226,10,Romania,ORANGE ROMANIA SA
+122,1,420,4,Saudi Arabia,Zain
+123,0,220,3,Serbia,mt:s
+124,1,413,2,Sri Lanka,Dialog
+125,1,234,50,"United Kingdom (Channel Islands)",Jersey Telecom
+126,0,206,20,Belgium,Base
+127,0,284,5,Bulgaria,Globul
+128,0,240,8,Sweden,Telenor
+129,0,204,8,Netherlands,KPN
+130,1,456,2,Cambodia,SMART AXIATA CO.LTD IV
+131,0,293,41,Slovenia,Mobitel
+132,0,419,4,Kuwait,VIVA
+133,0,286,3,Turkey,AVEA
+134,0,405,810,India,Aircel
+135,0,405,800,India,Aircel
+136,0,405,805,India,Aircel
+137,0,405,803,India,Aircel
+138,0,405,801,India,Aircel
+139,0,404,42,India,Aircel
+140,0,404,19,India,Idea
+141,0,404,4,India,Idea
+142,0,405,848,India,Idea
+143,0,405,799,India,Idea
+144,0,404,41,India,Aircel
+145,0,404,22,India,Idea
+146,1,440,10,Japan,NTT DoCoMo
+147,1,297,3,Montenegro,Mtel
+148,1,722,034,Argentina,Telecom Personal
+149,0,302,500,Canada,Videotron
+150,1,370,4,Dominican Republic,Trilogy
+151,1,542,1,Fiji,Vodafone
+152,0,404,67,India,Reliance
+153,1,428,88,Mongolia,Unitel
+154,0,425,1,Israel,Orange
+155,0,425,2,Israel,Cellcom
+156,0,420,1,Saudi Arabia,SAUDI TELECOM COMPANY (STC)
+157,1,400,4,Azerbaijan,NAR Mobile
+158,1,602,2,Egypt,Vodafone
+159,0,297,2,Montenegro,T-MOBILE MONTENEGRO
+160,0,515,3,Philippines,SMART COMMUNICATIONS PHI
+161,1,436,4,Tajikistan,Dialog
+162,1,412,20,Afghanistan,Roshan
+163,1,515,2,Philippines,Globe
+164,1,218,90,Bosnia And Herzegowina,BH Telecom 
+165,0,454,16,Hong Kong,HUTCHISON 3G HONG KONG
+166,1,470,1,Bangladesh,GrameenPhone
+167,1,344,920,Antigua And Barbuda,Lime
+168,0,310,450,United States,Viaero
+169,0,427,1,Qatar,Q-Tel
+170,1,426,2,Bahrain,Zain BH
+171,1,418,20,Iraq,Zain
+172,1,350,0,Bermuda,CellOne
+173,0,405,25,India,Tata Docomo
+174,0,510,11,Indonesia,EXCELCOMINDO INDONESIA
+175,1,419,2,Kuwait,Zain
+176,0,525,3,Singapore,M1
+177,0,405,41,India,Tata Docomo
+178,1,424,3,United Arab Emirates,du
+179,0,428,99,Mongolia,MOBICOM CORP. MONGOLIA
+180,1,736,1,Bolivia,Nuevatel
+181,0,620,6,Ghana,Airtel
+182,0,454,0,Hong Kong,HONG KONG CSL LIMITED
+183,1,646,1,Madagascar,Airtel
+184,1,621,20,Nigeria,Airtel
+185,1,255,6,Ukraine,Life
+186,1,422,2,Oman,OMAN MOBILE
+187,0,422,3,Oman,Nawras
+188,0,404,43,India,Vodafone
+189,0,218,5,Bosnia And Herzegowina,mtel
+190,0,604,0,Morocco,Medi Telecom
+191,1,616,2,Benin,Moov
+192,1,612,2,Cote D Ivoire,Moov
+193,0,602,3,Egypt,Etisalat
+194,1,628,2,Gabon,Moov
+195,0,621,60,Nigeria,Etisalat
+196,0,426,4,Bahrain,VIVA
+197,1,401,1,Kazakhstan,Beeline
+198,1,416,3,Jordan,Umniah
+199,1,617,3,Mauritius,MTML
+200,1,604,2,Morocco,Wana
+201,1,603,3,Algeria,Wataniya
+202,1,609,10,Mauritania,Mauritel
+203,1,452,5,Vietnam,VietnaMobile
+204,0,418,5,Iraq,ASIA CELL TELECOMMUNICATIONS
+205,1,627,3,Equatorial Guinea,Hits
+206,0,655,7,South Africa,Cell C
+207,1,472,2,Maldives,Wataniya 
+208,1,618,7,Liberia,CELLCOM TELECOMMUNICATIONS INC
+209,0,643,1,Mozambique,mCel
+210,0,276,3,Albania,ALBTELECOM SH.A.
+211,0,218,3,Bosnia And Herzegowina,Eronet
+212,1,901,12,International Waters,Maritime Communications 
+213,0,730,1,Chile,Entel
+214,0,621,50,Nigeria,Glo Mobile
+215,1,702,67,Belize,BTL
+216,0,456,9,Cambodia,Beeline
+217,1,548,1,Cook Islands,TELECOM COOK ISLANDS LTD.(RB)
+218,1,290,1,Greenland,TELE Greenland
+219,1,340,8,Guadeloupe,Dauphin
+220,1,310,470,Guam,Docomo Pacific
+221,0,310,140,Guam,mPulse
+222,0,274,11,Iceland,Nova
+223,0,405,30,India,Tata Docomo
+224,0,646,4,Madagascar,Telma Mobile
+225,1,901,19,International Waters,Vodafone Maritime
+226,0,617,10,Mauritius,Emtel
+227,1,649,3,Namibia,TN Mobile
+228,0,250,39,Russian Federation,Rostelecom
+229,1,635,13,Rwanda,Tigo
+230,1,292,1,San Marino,San Marino Telecom
+231,1,633,1,Seychelles,Cable & Wireless
+232,0,640,2,"Tanzania, United Republic Of",MOBITEL TANZANIA
+233,1,615,1,Togo,Togo Cellulaire
+234,1,605,2,Tunisia,Tuntel
+235,0,310,020,United States,Union Telephone Company
+236,0,452,7,Vietnam,Beeline
+237,0,268,3,Portugal,Optimus
+238,0,420,3,Saudi Arabia,ETIHAD ETISALAT COMPANY
+239,0,250,99,Russian Federation,Beeline
+240,1,437,9,Kyrgyzstan,NURTELECOM LLC

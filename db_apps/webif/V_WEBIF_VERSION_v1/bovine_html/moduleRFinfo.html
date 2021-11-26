@@ -1,0 +1,212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Connection/RF Information</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+
+// var xmlHttp=0;
+
+function ajaxFunction()
+{
+	try
+	{
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e)
+	{  // Internet Explorer
+		try
+		{
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e)
+		{
+			try
+			{
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+
+			}
+			catch (e)
+			{
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	xmlHttp.open("GET","/cgi-bin/ajax.cgi",true);
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function()
+	{
+		if(xmlHttp.readyState==4 && xmlHttp.responseText.length > 100 )
+		{
+			try
+			{
+				eval(xmlHttp.responseText);
+			}
+			catch(e)
+			{
+				alert(e.message);
+				return;
+			}
+
+			document.getElementById("mod_serviceoption_ID").value = module_serviceoption;
+			document.getElementById("mod_sci_ID").value = module_sci;
+			document.getElementById("mod_bandclass_ID").value = module_bandclass;
+			document.getElementById("mod_channelnum_ID").value = module_channelnum;
+			document.getElementById("mod_SID_ID").value = module_SID;
+			document.getElementById("mod_NID_ID").value = module_NID;
+			document.getElementById("mod_1xrtt_aset_ID").value = module_1xrtt_aset;
+			document.getElementById("mod_evdo_aset_ID").value = module_evdo_aset;
+			document.getElementById("mod_1xrtt_cset_ID").value = module_1xrtt_cset;
+			document.getElementById("mod_evdo_cset_ID").value = module_evdo_cset;
+	// 			document.getElementById("mod_1xrtt_nset_ID").value = module_1xrtt_nset;
+	// 			document.getElementById("mod_evdo_nset_ID").value = module_evdo_nset;
+			document.getElementById("mod_1xrtt_nset_ID").innerHTML = module_1xrtt_nset;
+			document.getElementById("mod_evdo_nset_ID").innerHTML = module_evdo_nset;
+			document.getElementById("mod_dominantPN_ID").value = module_dominantPN;
+			document.getElementById("mod_evdo_drc_ID").value = module_evdo_drc;
+			document.getElementById("mod_1xrtt_rssi_ID").value = module_1xrtt_rssi;
+			document.getElementById("mod_evdo_rssi_ID").value = module_evdo_rssi;
+			document.getElementById("mod_ecio_ID").value = module_ecio;
+			document.getElementById("mod_1xrtt_per_ID").value = module_1xrtt_per;
+			document.getElementById("mod_evdo_per_ID").value = module_evdo_per;
+			document.getElementById("mod_txadj_ID").value = module_txadj;
+
+			xmlHttp.responseText.clear;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	}
+}
+
+function reload_timer()
+{
+	xmlHttp=0;
+	ajaxFunction();
+	setTimeout("reload_timer()", 3000);
+}
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+</head>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form action="/cgi-bin/ajax.cgi" name="form1">
+<h3>&nbsp;&nbsp;Sprint Test > RF Information</h3>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+<table width="90%">
+	<tr><th width="100%">RF&nbsp;Information</th></tr>
+</table>
+
+<table width="90%">
+<tr>
+	<td colspan=2 width="22%">Service Option Number</td>
+	<td><input type="text" id="mod_serviceoption_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Slot Cycle Index</td>
+	<td><input type="text" id="mod_sci_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Band Class</td>
+	<td><input type="text" id="mod_bandclass_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Channel Number</td>
+	<td><input type="text" id="mod_channelnum_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>SID</td>
+	<td><input type="text" id="mod_SID_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>NID</td>
+	<td><input type="text" id="mod_NID_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+
+<tr>
+	<td rowspan=2>PN Active Set</td>
+	<td>1xRTT</td>
+	<td><input type="text" id="mod_1xrtt_aset_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td>EVDO</td>
+	<td><input type="text" id="mod_evdo_aset_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td rowspan=2>PN Candidate Set</td>
+	<td>1xRTT</td>
+	<td><input type="text" id="mod_1xrtt_cset_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td>EVDO</td>
+	<td><input type="text" id="mod_evdo_cset_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td rowspan=2>PN Neighbor Set</td>
+	<td>1xRTT</td>
+	<td id="mod_1xrtt_nset_ID" style="color:#000000;"><!--<input type="text" id="mod_1xrtt_nset_ID"  size="100" class='cdcsAjax' readonly/>--></td>
+</tr>
+<tr>
+	<td>EVDO</td>
+	<td id="mod_evdo_nset_ID" style="color:#000000;"><!--<input type="text" id="mod_evdo_nset_ID"  size="100" class='cdcsAjax' readonly/>--></td>
+</tr>
+<tr>
+	<td colspan=2>Dominant PN</td>
+	<td><input type="text" id="mod_dominantPN_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>DRC Request</td>
+	<td><input type="text" id="mod_evdo_drc_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td rowspan=2>RSSI</td>
+	<td>1xRTT</td>
+	<td><input type="text" id="mod_1xrtt_rssi_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td>EVDO</td>
+	<td><input type="text" id="mod_evdo_rssi_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Ec/Io</td>
+	<td><input type="text" id="mod_ecio_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td rowspan=2>Receive<br />Frame Error Rate</td>
+	<td>1xRTT</td>
+	<td><input type="text" id="mod_1xrtt_per_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td>EVDO</td>
+	<td><input type="text" id="mod_evdo_per_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td colspan=2>Transmit Adjustment</td>
+	<td><input type="text" id="mod_txadj_ID"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<script language=Javascript>
+setTimeout("reload_timer()", 200);
+</script>
+</table>
+</div>
+</form>
+
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,290 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>LAN/WAN Switch</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+
+#if 0
+<!-- server script -->
+#endif
+<%
+
+function validateInput() {
+	validateOnOffRadio(form["pppoe_en"]);
+	validateOnOffRadio(form["pppoe_verbose_en"]);
+#if 0
+	// WARNING: no validation on pppoe_service
+#endif
+	validateOnOffRadio(form["pppoe_auth_en"]);
+	if (form["pppoe_auth_type"] != "" && form["pppoe_auth_type"] != "chap" && form["pppoe_auth_type"] != "pap") {
+		onBadRequest();
+	}
+	validateOnOffRadio(form["pppoe_wan_ip"]);
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	validateInput();
+
+	set_single_direct("-p","service.pppoe.server.0.enable",form["pppoe_en"]);
+	set_single_direct("-p","service.pppoe.server.0.verbose",form["pppoe_verbose_en"]);
+
+	if(form["pppoe_en"]=="1") {
+		set_single_direct("-p","service.pppoe.server.0.service",form["pppoe_service"]);
+		set_single_direct("-p","service.pppoe.server.0.auth_enable",form["pppoe_auth_en"]);
+		#if 0
+		/* pppoe authentication not available yet */
+		if(form["pppoe_auth_en"]=="1") {
+			set_single_direct("-p","service.pppoe.server.0.auth_type",form["pppoe_auth_type"]);
+			set_single_direct("-p","service.pppoe.server.0.user",form["pppoe_user"]);
+			set_single_direct("-p","service.pppoe.server.0.passwd",form["pppoe_passwd"]);
+		}
+		#endif
+		set_single_direct("-p","service.pppoe.server.0.wanipforward_enable",form["pppoe_wan_ip"]);
+		#if 0
+		/* connect-on-demand not available yet */
+		set_single_direct("-p","service.pppoe.server.0.connect_on_demand",form["pppoe_cod"]);
+		#endif
+	}
+	redirect('/pppoe.html?success');
+}
+%>
+
+<!-- client script -->
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+
+var menu_main="Internet";
+var menu_sub="PPPOE";
+var menu_title=_("pppoe configuration");
+
+$(function(){
+	$("#pppoe_submit").click(function() {
+#ifdef V_WEBIF_SPEC_vdf
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			return;
+		}
+#endif
+		$("button").attr("disabled",true);
+		$("#form").submit();
+	});
+
+	function update_pppoe_auth_div() {
+		var checked;
+
+		checked=$("input:radio.access[name=pppoe_auth_en][value=1]").is(":checked");
+		$("#pppoe_auth_div").toggle(checked);
+	}
+
+	$("input:radio.access[name=pppoe_auth_en]").click(update_pppoe_auth_div);
+
+#if 0
+	/* these RDBs are not used for router-ended pppoe */
+	// service.pppoe.server.0.apn
+	// service.pppoe.server.0.dialstr
+#endif
+
+	load_values_to_elements( {
+		"input:radio.access[name=pppoe_en]":"<%get_single_direct('service.pppoe.server.0.enable');%>"=="1",
+		"input:radio.access[name=pppoe_verbose_en]":"<%get_single_direct('service.pppoe.server.0.verbose');%>"=="1",
+		"#pppoe_service":Base64.decode("<%val=get_single('service.pppoe.server.0.service', '', '--base64'); write (val);%>"),
+		"input:radio.access[name=pppoe_auth_en]":"<%get_single_direct('service.pppoe.server.0.auth_enable');%>"=="1",
+		"input:radio.access[name=pppoe_auth_type]":"<%get_single_direct('service.pppoe.server.0.auth_type');%>",
+		"#pppoe_user":"<%get_single_direct('service.pppoe.server.0.user');%>",
+		"#pppoe_passwd":"<%get_single_direct('service.pppoe.server.0.passwd');%>",
+		"#pppoe_passwd2":"<%get_single_direct('service.pppoe.server.0.passwd');%>",
+		"input:radio.access[name=pppoe_wan_ip]":"<%get_single_direct('service.pppoe.server.0.wanipforward_enable');%>"=="1",
+		"input:radio.access[name=pppoe_cod]":"<%get_single_direct('service.pppoe.server.0.connect_on_demand');%>"=="1",
+	});
+
+	update_pppoe_auth_div();
+});
+
+</script>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+
+#if 0
+<!--
+	##template## examples
+-->
+#endif
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(menu_title)</script></h2>
+ 				<div class="grey-box">
+					<div class="form-row">
+						<label><script language=Javascript>document.write(_("pppoe enable"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch" data-toggle-element="pppoe_en_div" >
+									<input type="radio" id="pppoe_en_on" name="pppoe_en" class="access" value="1">
+									<label for="pppoe_en_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="pppoe_en_off" name="pppoe_en" class="access" value="0">
+									<label for="pppoe_en_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div id="pppoe_en_div">
+						<div class="form-row">
+							<label for="pppoe_service"><script language=Javascript>document.write(_("serviceName"))</script></label>
+							<div class="field">
+								<input class="large" id="pppoe_service" type="text" name="pppoe_service" maxlength=128 onKeyUp="hostNameFilter(this);">
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("pppoe debug"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch"  >
+										<input type="radio" id="pppoe_verbose_en_on" name="pppoe_verbose_en" class="access" value="1">
+										<label for="pppoe_verbose_en_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="pppoe_verbose_en_off" name="pppoe_verbose_en" class="access" value="0">
+										<label for="pppoe_verbose_en_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						#if 0
+						/* pppoe authentication not available yet */
+						#endif
+						<div style='display:none'>
+							<div class="form-row">
+								<label><script language=Javascript>document.write(_("pppoe authentication enable"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch"  >
+											<input type="radio" id="pppoe_auth_en_on" name="pppoe_auth_en" class="access" value="1">
+											<label for="pppoe_auth_en_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" id="pppoe_auth_en_off" name="pppoe_auth_en" class="access" value="0">
+											<label for="pppoe_auth_en_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div id="pppoe_auth_div">
+								<div class="form-row">
+									<label for="AuthType"><script language=Javascript>document.write(_("authentication type"))</script></label>
+									<div class="radio-box-group">
+										<div class="radio-box">
+											<input type="radio" class="access" name="pppoe_auth_type" id="pppoe_auth_type_chap" value="chap">
+											<label for="pppoe_auth_type_chap"><div class="radioText"><script language=Javascript>document.write(_("chap"))</script></div></label>
+										</div>
+										<div class="radio-box">
+											<input type="radio" class="access" name="pppoe_auth_type" id="pppoe_auth_type_pap" value="pap">
+											<label for="pppoe_auth_type_pap"><div class="radioText"><script language=Javascript>document.write(_("pap"))</script></div></label>
+										</div>
+									</div>
+								</div>
+
+								<div class="form-row">
+									<label for="pppoe_user"><script language=Javascript>document.write(_("pppoe user"))</script></label>
+									<div class="field">
+										<input class="large validate[required] required" id="pppoe_user" type="text" name="pppoe_user" maxlength=128>
+									</div>
+								</div>
+
+								<div class="form-row">
+									<label for="pppoe_passwd"><script language=Javascript>document.write(_("pppoe passwd"))</script></label>
+									<div class="field">
+										<input class="large validate[required] required" id="pppoe_passwd" type="password" name="pppoe_passwd" maxlength=128>
+									</div>
+								</div>
+
+								<div class="form-row">
+									<label for="pppoe_passwd2"><script language=Javascript>document.write(_("pppoe passwd verify"))</script></label>
+									<div class="field">
+										<input class="large validate[required,equals[pppoe_passwd]] text-input" id="pppoe_passwd2" type="password" name="pppoe_passwd2" maxlength=128>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-row">
+							<label><script language=Javascript>document.write(_("pppoe WAN IP forward"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="pppoe_wan_ip_on" name="pppoe_wan_ip" class="access" value="1">
+										<label for="pppoe_wan_ip_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="pppoe_wan_ip_off" name="pppoe_wan_ip" class="access" value="0">
+										<label for="pppoe_wan_ip_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						#if 0
+						/* connect-on-demand not available yet */
+						#endif
+						<div style='display:none'>
+							<div class="form-row">
+								<label><script language=Javascript>document.write(_("pppoe connect on demand"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch">
+											<input type="radio" id="pppoe_cod_on" name="pppoe_cod" class="access" value="1">
+											<label for="pppoe_cod_on" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" id="pppoe_cod_off" name="pppoe_cod" class="access" value="0">
+											<label for="pppoe_cod_off" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button id="pppoe_submit" name="pppoe_submit" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+<%        if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+</script>
+
+</body>
+</html>

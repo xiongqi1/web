@@ -1,0 +1,108 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type7</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p",varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=validate_number(form['idxEP']);
+	EP_Name=form['nameEP'];
+	// validate input
+	if (string_regex_match(EP_Name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type",'7');
+	setDsmRdb(EP_Name+".exec_name",form['execname']);
+	set_single_direct("","service.dsm.trigger","1");
+	redirect('/end_points.html?success');
+}
+%>
+
+
+function submitForm() {
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+
+	$("#idxEP").val(i);
+	$("#nameEP").val(EP_Name);
+	$("#form").submit();
+}
+
+$(document).ready(function() {
+<%
+	execName = get_single('service.dsm.ep.conf.'+request['QUERY_STRING']+'.exec_name', '', '--base64');
+	if (execName == "N/A") {
+		execName = "";
+	}
+%>
+	$("#execname").val(Base64.decode("@@execName"));
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type7")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<div class="grey-box">
+					<label for="execname"><script language=Javascript>document.write(_("command"))</script></label>
+					<div class="field">
+						<input type="text" name="execname" id="execname"  value="">
+					</div>
+				</div>
+
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

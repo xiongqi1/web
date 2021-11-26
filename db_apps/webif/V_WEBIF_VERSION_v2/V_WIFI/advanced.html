@@ -1,0 +1,893 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Advanced Wireless Configuration</title>
+<% include topinc_v2.inc %>
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<% include mbssid.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+function validateInput() {
+	// TODO: validate "required" and range rules
+	if (form['advBGProtectH'] != "" && form['advBGProtectH'] != "N/A" && form['advBGProtectH'] != "0" && form['advBGProtectH'] != "1" && form['advBGProtectH'] != "2") {
+		onBadRequest();
+	}
+	tryConvertStringNumber(form['advIdleTimeout']);
+	tryConvertStringNumber(form['maxNumSta']);
+	tryConvertStringNumber(form['advBeaconInterval']);
+	tryConvertStringNumber(form['advDTIM']);
+	tryConvertStringNumber(form['advFrag']);
+	tryConvertStringNumber(form['advRTS']);
+	tryConvertStringNumber(form['advTxPW']);
+	tryValidateOnOffRadio(form['short_preambleH']);
+	tryValidateOnOffRadio(form['short_slotH']);
+	tryValidateOnOffRadio(form['tx_burstH']);
+	tryValidateOnOffRadio(form['pkt_aggregateH']);
+	tryValidateOnOffRadio(form['apisolatedH']);
+	tryValidateOnOffRadio(form['mbssidapisolatedH']);
+	tryValidateOnOffRadio(form['wmm_capableH']);
+	tryValidateOnOffRadio(form['apsd_capableH']);
+	tryValidateOnOffRadio(form['dls_capableH']);
+	tryValidateOnOffRadio(form['m2u_enableH']);
+	tryConvertStringNumber(form['tx_streamH']);
+	tryConvertStringNumber(form['rx_streamH']);
+	tryValidateOnOffRadio(form['n_modeH']);
+	tryValidateOnOffRadio(form['n_bandwidthH']);
+	tryValidateOnOffRadio(form['n_giH']);
+	tryConvertStringNumber(form['advHTAutoMCSH']);
+	tryValidateOnOffRadio(form['n_rdgH']);
+	tryConvertStringNumber(form['n_extchaH']);
+	tryValidateOnOffRadio(form['n_amsduH']);
+	tryValidateOnOffRadio(form['n_autobaH']);
+	tryValidateOnOffRadio(form['n_badeclineH']);
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	validateInput();
+	set_single_direct("-p","wlan.0.bg_protection",form['advBGProtectH']);
+	set_single_direct("-p","wlan.0.idletimeout",form['advIdleTimeout']);
+	set_single_direct("-p","wlan.0.conf.max_num_sta",form['maxNumSta']);
+	set_single_direct("-p","wlan.0.conf.beacon_interval",form['advBeaconInterval']);
+	set_single_direct("-p","wlan.0.conf.dtim_interval",form['advDTIM']);
+	set_single_direct("-p","wlan.0.conf.fragmentation_threshold",form['advFrag']);
+	set_single_direct("-p","wlan.0.conf.rts_threshold",form['advRTS']);
+	set_single_direct("-p","wlan.0.conf.transmit_power",form['advTxPW']);
+	set_single_direct("-p","wlan.0.conf.preamble_type",form['short_preambleH']);
+	set_single_direct("-p","wlan.0.short_slot",form['short_slotH']);
+	set_single_direct("-p","wlan.0.tx_burst",form['tx_burstH']);
+	set_single_direct("-p","wlan.0.pkt_aggregate",form['pkt_aggregateH']);
+	set_single_direct("-p","wlan.0.apisolated",form['apisolatedH']);
+	set_single_direct("-p","wlan.0.mbssidapisolated",form['mbssidapisolatedH']);
+	set_single_direct("-p","wlan.0.wmm_capable",form['wmm_capableH']);
+	set_single_direct("-p","wlan.0.apsd_capable",form['apsd_capableH']);
+	set_single_direct("-p","wlan.0.dsl_capable",form['dls_capableH']);
+	set_single_direct("-p","wlan.0.m2u",form['m2u_enableH']);
+	set_single_direct("-p","wlan.0.ht_txstream",form['tx_streamH']);
+	set_single_direct("-p","wlan.0.ht_rxstream",form['rx_streamH']);
+	set_single_direct("-p","wlan.0.ht_opmode",form['n_modeH']);
+	set_single_direct("-p","wlan.0.conf.bandwidth",form['n_bandwidthH']);
+	set_single_direct("-p","wlan.0.ht_gi",form['n_giH']);
+	set_single_direct("-p","wlan.0.ht_mcs",form['advHTAutoMCSH']);
+	set_single_direct("-p","wlan.0.ht_rdg",form['n_rdgH']);
+	set_single_direct("-p","wlan.0.ht_extra",form['n_extchaH']);
+	set_single_direct("-p","wlan.0.amsdu",form['n_amsduH']);
+	set_single_direct("-p","wlan.0.ht_autoba",form['n_autobaH']);
+	set_single_direct("-p","wlan.0.badecline",form['n_badeclineH']);
+#if defined(V_WIFI_qca_soc_lsdk)
+	set_single( 'wlan.0.trigger=1');
+#endif
+    redirect('/advanced.html?success');
+}
+else {
+	form['advBGProtectH']=get_single('wlan.0.bg_protection');
+	form['advIdleTimeout']=get_single('wlan.0.idletimeout');
+	form['maxNumSta']=get_single('wlan.0.conf.max_num_sta');
+	form['advBeaconInterval']=get_single('wlan.0.conf.beacon_interval');
+	form['advDTIM']=get_single('wlan.0.conf.dtim_interval');
+	form['advFrag']=get_single('wlan.0.conf.fragmentation_threshold');
+	form['advRTS']=get_single('wlan.0.conf.rts_threshold');
+	form['advTxPW']=get_single('wlan.0.conf.transmit_power');
+	form['short_preambleH']=get_single('wlan.0.conf.preamble_type');
+	form['short_slotH']=get_single('wlan.0.short_slot');
+	form['tx_burstH']=get_single('wlan.0.tx_burst');
+	form['pkt_aggregateH']=get_single('wlan.0.pkt_aggregate');
+	form['apisolatedH']=get_single('wlan.0.apisolated');
+	form['mbssidapisolatedH']=get_single('wlan.0.mbssidapisolated');
+	form['wmm_capableH']=get_single('wlan.0.wmm_capable');
+	form['apsd_capableH']=get_single('wlan.0.apsd_capable');
+	form['dls_capableH']=get_single('wlan.0.dsl_capable');
+	form['m2u_enableH']=get_single('wlan.0.m2u');
+	form['tx_streamH']=get_single('wlan.0.ht_txstream');
+	form['rx_streamH']=get_single('wlan.0.ht_rxstream');
+	form['n_modeH']=get_single('wlan.0.ht_opmode');
+	form['n_bandwidthH']=get_single('wlan.0.conf.bandwidth');
+	form['n_giH']=get_single('wlan.0.ht_gi');
+	form['advHTAutoMCSH']=get_single('wlan.0.ht_mcs');
+	form['n_rdgH']=get_single('wlan.0.ht_rdg');
+	form['n_extchaH']=get_single('wlan.0.ht_extra');
+	form['n_amsduH']=get_single('wlan.0.amsdu');
+	form['n_autobaH']=get_single('wlan.0.ht_autoba');
+	form['n_badeclineH']=get_single('wlan.0.badecline');
+}
+%>
+
+<!-- ================================================================================================ -->
+<script language="JavaScript">
+var n_extchaH="<%get_single_direct('wlan.0.ht_extra');%>";
+var n_max_num_sta="<%get_single_direct('wlan.0.hw.max_num_sta');%>";
+n_max_num_sta=parseInt(n_max_num_sta);
+if (isNaN(n_max_num_sta)) {
+	n_max_num_sta=127;
+}
+var n_default_max_num_sta="<%get_single_direct('wlan.0.conf.default.max_num_sta');%>";
+function style_display_on() {
+	if (window.ActiveXObject) { // IE
+		return "block";
+	}
+	else if (window.XMLHttpRequest) { // Mozilla, Safari,...
+		return "table-row";
+	}
+}
+
+function set_radio_button(idval, start_val) {
+	var default_val = (start_val == '1'? '0':'1');
+	if ($("#"+idval+"H").val() == start_val) {
+		$("#"+idval+"-0").attr("checked", "checked");
+	} else {
+		$("#"+idval+"-1").attr("checked", "checked");
+		// set default value if not defined
+		$("#"+idval+"H").val(default_val);
+	}
+}
+
+function formLoad() {
+	$("#advBGProtect").val($("#advBGProtectH").val());
+	set_radio_button("short_preamble", '1');
+	set_radio_button("short_slot", '1');
+	set_radio_button("tx_burst", '1');
+	set_radio_button("pkt_aggregate", '1');
+	set_radio_button("apisolated", '1');
+	set_radio_button("mbssidapisolated", '1');
+	set_radio_button("wmm_capable", '1');
+	set_radio_button("apsd_capable", '1');
+	set_radio_button("dls_capable", '1');
+	set_radio_button("m2u_enable", '1');
+	$("#tx_stream").val($("#tx_streamH").val());
+	$("#rx_stream").val($("#rx_streamH").val());
+	set_radio_button("n_mode", '1');
+	set_radio_button("n_bandwidth", '0');
+	set_radio_button("n_gi", '1');
+	$("#advHTAutoMCS").val($("#advHTAutoMCSH").val());
+	set_radio_button("n_rdg", '1');
+	$("#n_extcha").val(n_extchaH);
+	set_radio_button("n_amsdu", '1');
+	set_radio_button("n_autoba", '1');
+	set_radio_button("n_badecline", '1');
+
+	if ($("#wmm_capableH").val() == '1') {
+		$("#apsd_capable_sel").show();
+		$("#dls_capable_sel").show();
+	} else {
+		$("#apsd_capable_sel").hide();
+		$("#dls_capable_sel").hide();
+	}
+
+	if ($("#n_bandwidthH").val() == '1') {
+		$("#ht_ext_ch_sel").show();
+	} else {
+		$("#ht_ext_ch_sel").hide();
+	}
+
+	$("#info").prop("title", _("advWifiInfo"));
+
+	// hide some divisions
+	$("#ExtConfDiv").hide();
+	$("#wlan_wmm_block").hide();
+	$("#dls_capable_sel").hide();
+	$("#wlan_11n_block").hide();
+	$("#wlan_11n_phy_block").hide();
+	$("#wlan_m2u_block").hide();
+}
+
+function submitF1() {
+#if defined(TEST)
+	var rdb_window = window.open("", "", "toolbar=no,width=600,height=550");
+	var rdb_cmd="     -----------------------------"+
+		"wlan.0.bg_protection="+$("#advBGProtectH").val()+"     -----------------------------"+
+		"wlan.0.idletimeout="+$("#advIdleTimeout").val()+"     -----------------------------"+
+		"wlan.0.max_num_sta="+$("#maxNumSta").val()+"     -----------------------------"+
+		"wlan.0.conf.beacon_interval="+$("#advBeaconInterval").val()+"     -----------------------------"+
+		"wlan.0.conf.dtim_interval="+$("#advDTIM").val()+"     -----------------------------"+
+		"wlan.0.conf.fragmentation_threshold="+$("#advFrag").val()+"     -----------------------------"+
+		"wlan.0.conf.rts_threshold="+$("#advRTS").val()+"     -----------------------------"+
+		"wlan.0.conf.transmit_power="+$("#advTxPW").val()+"     -----------------------------"+
+		"wlan.0.conf.preamble_type="+$("#short_preambleH").val()+"     -----------------------------"+
+		"wlan.0.short_slot="+$("#short_slotH").val()+"     -----------------------------"+
+		"wlan.0.tx_burst="+$("#tx_burstH").val()+"     -----------------------------"+
+		"wlan.0.pkt_aggregate="+$("#pkt_aggregateH").val()+"     -----------------------------"+
+		"wlan.0.apisolated="+$("#apisolatedH").val()+"     -----------------------------"+
+		"wlan.0.mbssidapisolated="+$("#mbssidapisolatedH").val()+"     -----------------------------"+
+		"wlan.0.wmm_capable="+$("#wmm_capableH").val()+"     -----------------------------"+
+		"wlan.0.apsd_capable="+$("#apsd_capableH").val()+"     -----------------------------"+
+		"wlan.0.dsl_capable="+$("#dls_capableH").val()+"     -----------------------------"+
+		"wlan.0.m2u="+$("#m2u_enableH").val()+"     -----------------------------"+
+		"wlan.0.ht_txstream="+$("#tx_streamH").val()+"     -----------------------------"+
+		"wlan.0.ht_rxstream="+$("#rx_streamH").val()+"     -----------------------------"+
+		"wlan.0.ht_opmode="+$("#n_modeH").val()+"     -----------------------------"+
+		"wlan.0.conf.bandwidth="+$("#n_bandwidthH").val()+"     -----------------------------"+
+		"wlan.0.ht_gi="+$("#n_giH").val()+"     -----------------------------"+
+		"wlan.0.ht_mcs="+$("#advHTAutoMCSH").val()+"     -----------------------------"+
+		"wlan.0.ht_rdg="+$("#n_rdgH").val()+"     -----------------------------"+
+		"wlan.0.ht_extra="+$("#n_extchaH").val()+"     -----------------------------"+
+		"wlan.0.amsdu="+$("#n_amsduH").val()+"     -----------------------------"+
+		"wlan.0.ht_autoba="+$("#n_autobaH").val()+"     -----------------------------"+
+		"wlan.0.badecline="+$("#n_badeclineH").val();
+	rdb_window.document.write(rdb_cmd);
+	rdb_window.document.close();
+#endif
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		return;
+	}
+#endif
+
+	$("#submitForm").attr("disabled", true);
+	$("#form").submit();
+}
+
+function open_wmm_window() {
+	window.open("wmm.html","WMM_Parameters_List","toolbar=no, location=yes, scrollbars=yes, resizable=yes")
+}
+
+function wmm_capable_enable_switch(new_val) {
+	$("#wmm_capableH").val(new_val);
+	if ($("#wmm_capableH").val() == '1') {
+		$("#apsd_capable_sel").show();
+		$("#dls_capable_sel").show();
+	} else {
+		$("#apsd_capable_sel").hide();
+		$("#dls_capable_sel").hide();
+	}
+}
+
+function Channel_BandWidth_onClick(value) {
+	$("#n_bandwidthH").val(value);
+	if (value == '1') {
+		$("#ht_ext_ch_sel").show();
+	} else {
+		$("#ht_ext_ch_sel").hide();
+	}
+}
+
+$(document).ready( function() {formLoad();} );
+
+</script>
+<!-- ================================================================================================ -->
+
+
+
+<!-- ================================================================================================ -->
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<form name="wlan" id="form" method="POST" action="@@request['SCRIPT_NAME']" class="validate" novalidate="novalidate" autocomplete="off" >
+			<%appendCsrfToken();%>
+			<div class="right-column white-box">
+			<input type="hidden" name='advBGProtectH' 		id='advBGProtectH' 		value="@@form['advBGProtectH']">
+			<input type="hidden" name='short_preambleH' 	id='short_preambleH' 	value="@@form['short_preambleH']">
+			<input type="hidden" name='short_slotH' 		id='short_slotH' 		value="@@form['short_slotH']">
+			<input type="hidden" name='tx_burstH' 			id='tx_burstH' 			value="@@form['tx_burstH']">
+			<input type="hidden" name='pkt_aggregateH' 		id='pkt_aggregateH' 	value="@@form['pkt_aggregateH']">
+			<input type="hidden" name='apisolatedH' 		id='apisolatedH' 		value="@@form['apisolatedH']">
+			<input type="hidden" name='mbssidapisolatedH'	id='mbssidapisolatedH'	value="@@form['mbssidapisolatedH']">
+			<input type="hidden" name='wmm_capableH' 		id='wmm_capableH' 		value="@@form['wmm_capableH']">
+			<input type="hidden" name='apsd_capableH' 		id='apsd_capableH' 		value="@@form['apsd_capableH']">
+			<input type="hidden" name='dls_capableH' 		id='dls_capableH' 		value="@@form['dls_capableH']">
+			<input type="hidden" name='m2u_enableH' 		id='m2u_enableH' 		value="@@form['m2u_enableH']">
+			<input type="hidden" name='tx_streamH' 			id='tx_streamH' 		value="@@form['tx_streamH']">
+			<input type="hidden" name='rx_streamH' 			id='rx_streamH' 		value="@@form['rx_streamH']">
+			<input type="hidden" name='n_modeH' 			id='n_modeH' 			value="@@form['n_modeH']">
+			<input type="hidden" name='n_bandwidthH' 		id='n_bandwidthH' 		value="@@form['n_bandwidthH']">
+			<input type="hidden" name='n_giH' 				id='n_giH' 				value="@@form['n_giH']">
+			<input type="hidden" name='advHTAutoMCSH' 		id='advHTAutoMCSH' 		value="@@form['advHTAutoMCSH']">
+			<input type="hidden" name='n_rdgH' 				id='n_rdgH' 			value="@@form['n_rdgH']">
+			<input type="hidden" name='n_extchaH' 			id='n_extchaH' 			value="@@form['n_extchaH']">
+			<input type="hidden" name='n_amsduH' 			id='n_amsduH' 			value="@@form['n_amsduH']">
+			<input type="hidden" name='n_autobaH' 			id='n_autobaH' 			value="@@form['n_autobaH']">
+			<input type="hidden" name='n_badeclineH' 		id='n_badeclineH' 		value="@@form['n_badeclineH']">
+
+			<div id="wlan_adv_setup_block">
+				<h2><script language=Javascript>document.write(_("adv advanced settings"))</script></h2>
+				<div class="p-des-full-width">
+					<p><script language=Javascript>document.write(_("adv introduction"))</script></p>
+				</div>
+
+#ifdef V_WIFI_backports
+				<!-- Max Number of stations (clients) section -->
+				<div id="client_idle_timeout_sel" class="form-row">
+					<label for="maxNumSta"><script language=Javascript>document.write(_("adv max num sta"))</script></label>
+					<div class="field">
+						<input type="text" name="maxNumSta" id="maxNumSta" class="validate[required,funcCall[validate_num_sta]] required maxNumSta med" maxlength='3' onkeyup="NumfieldEntry(this)" value="@@form['maxNumSta']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv maxnumsta range prefix")+n_max_num_sta+_("adv maxnumsta default prefix")+n_default_max_num_sta+_("adv maxnumsta default suffix"))</script></span>
+						<div style="float:right">
+#ifndef V_WEBIF_SPEC_vdf
+							<a id="info" style="background-color:transparent;" title=""><i id="net-info"></i></a>
+#endif
+						</div>
+					</div>
+				</div>	<!-- div id="client_idle_timeout_sel" -->
+#elif defined(V_WIFI_qca_soc_lsdk)
+				<!-- NONE -->
+#else
+				<!-- BG Protection Mode Selection -->
+				<div id="bg_prot_mode_sel" class="form-row no-bg-form">
+					<label for="bg_prot_mode_sel_title"><script language=Javascript>document.write(_("adv bgpro"))</script></label>
+					<div class="field">
+						<select name="advBGProtect" id="advBGProtect" size="1" onChange="document.wlan.advBGProtectH.value=this.value;">
+							<option id="advBGProAuto" value=0><script language="JavaScript">document.write( _("auto"))</script></option>
+							<option id="advBGProOn"   value=1><script language="JavaScript">document.write( _("on"))</script></option>
+							<option id="advBGProOff"  value=2><script language="JavaScript">document.write( _("off"))</script></option>
+						</select>
+					</div>
+				</div>	<!-- div id="bg_prot_mode_sel" -->
+#endif
+#if !defined(V_WIFI_HW_rtl8723)
+				<!-- Client Idle Timeout Selection -->
+				<div id="client_idle_timeout_sel" class="form-row">
+					<label for="advIdleTimeout"><script language=Javascript>document.write(_("adv client idle timeout"))</script></label>
+					<div class="field">
+						<input type="text" name="advIdleTimeout" id="advIdleTimeout" class="validate[required,funcCall[validate_idletimeout]] required advIdleTimeout med" maxlength='3' onkeyup="NumfieldEntry(this)" value="@@form['advIdleTimeout']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;sec&nbsp;<script language="JavaScript">document.write( _("adv idletimeout range"))</script></span>
+					</div>
+				</div>	<!-- div id="client_idle_timeout_sel" -->
+#endif
+				<!-- Beacon Interval Selection -->
+				<div id="beacon_int_sel" class="form-row">
+					<label for="advBeaconInterval"><script language=Javascript>document.write(_("adv beacon interval"))</script></label>
+					<div class="field">
+						<input type="text" name="advBeaconInterval" id="advBeaconInterval" class="validate[required,funcCall[validate_beaconint]] required advBeaconInterval med" maxlength='3' onkeyup="NumfieldEntry(this)" value="@@form['advBeaconInterval']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;ms&nbsp;<script language="JavaScript">document.write( _("adv beacon interval range"))</script></span>
+					</div>
+				</div>	<!-- div id="beacon_int_sel" -->
+#if !defined(V_WIFI_HW_rtl8723)
+				<!-- Data Beacon Rate Selection -->
+				<div id="data_beacon_rate_sel" class="form-row">
+					<label for="advDTIM"><script language=Javascript>document.write(_("adv dtim"))</script></label>
+					<div class="field">
+						<input type="text" name="advDTIM" id="advDTIM" class="validate[required,funcCall[validate_dtim]] required advDTIM med" maxlength='3' onkeyup="NumfieldEntry(this)" value="@@form['advDTIM']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv dtim range"))</script></span>
+					</div>
+				</div>	<!-- div id="data_beacon_rate_sel" -->
+
+				<!-- Fragment Threshold Selection -->
+				<div id="fragment_threshold_sel" class="form-row">
+					<label for="advFrag"><script language=Javascript>document.write(_("adv fragment threshold"))</script></label>
+					<div class="field">
+						<input type="text" name="advFrag" id="advFrag" class="validate[required,funcCall[validate_fragth]] required advFrag med" maxlength='4' onkeyup="NumfieldEntry(this)" value="@@form['advFrag']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv fragment threshold range"))</script></span>
+					</div>
+				</div>	<!-- div id="fragment_threshold_sel" -->
+
+				<!-- RTS Threshold Selection -->
+				<div id="rts_threshold_sel" class="form-row">
+					<label for="advRTS"><script language=Javascript>document.write(_("adv rts threshold"))</script></label>
+					<div class="field">
+						<input type="text" name="advRTS" id="advRTS" class="validate[required,funcCall[validate_rtsth]] required advRTS med" maxlength='4' onkeyup="NumfieldEntry(this)" value="@@form['advRTS']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv rts threshold range"))</script></span>
+					</div>
+				</div>	<!-- div id="rts_threshold_sel" -->
+
+				<!-- Tx Power Selection -->
+				<div id="tx_power_sel" class="form-row">
+					<label for="advTxPW"><script language=Javascript>document.write(_("adv tx power"))</script></label>
+					<div class="field">
+						<input type="text" name="advTxPW" id="advTxPW" class="validate[required,funcCall[validate_txpwr]] required advTxPW med" maxlength='3' onkeyup="NumfieldEntry(this)" value="@@form['advTxPW']">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;&nbsp;<script language="JavaScript">document.write( _("adv tx power range"))</script></span>
+					</div>
+				</div>	<!-- div id="tx_power_sel" -->
+#endif
+				<!-- Short Preamble Selection -->
+				<div id="short_preamble_sel" class="form-row no-bg-form">
+					<label for="short_preamble_sel_title"><script language=Javascript>document.write(_("adv short preamble"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='short_preamble' id='short_preamble-0' onClick="javascript:document.wlan.short_preambleH.value=1;">
+								<label for="short_preamble-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='short_preamble' id='short_preamble-1' onClick="javascript:document.wlan.short_preambleH.value=0;">
+								<label for="short_preamble-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="short_preamble_sel" -->
+
+				<!-- Extended Advanced Configuration -->
+				<div id="ExtConfDiv" class="form-row no-bg-form">
+				<!-- Short Slot Selection -->
+				<div id="short_slot_sel" class="form-row no-bg-form">
+					<label for="short_slot_sel_sel_title"><script language=Javascript>document.write(_("adv short slot"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='short_slot' id='short_slot-0' onClick="javascript:document.wlan.short_slotH.value=1;">
+								<label for="short_slot-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='short_slot' id='short_slot-1' onClick="javascript:document.wlan.short_slotH.value=0;">
+								<label for="short_slot-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="short_slot_sel" -->
+
+				<!-- Tx Burst Selection -->
+				<div id="tx_burst_sel" class="form-row no-bg-form">
+					<label for="tx_burst_sel_title"><script language=Javascript>document.write(_("adv tx burst"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='tx_burst' id='tx_burst-0' onClick="javascript:document.wlan.tx_burstH.value=1;">
+								<label for="tx_burst-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='tx_burst' id='tx_burst-1' onClick="javascript:document.wlan.tx_burstH.value=0;">
+								<label for="tx_burst-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="tx_burst_sel" -->
+
+				<!-- Packet Aggregate Selection -->
+				<div id="packet_aggregate_sel" class="form-row no-bg-form">
+					<label for="packet_aggregate_sel_title"><script language=Javascript>document.write(_("adv pkt aggregate"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='pkt_aggregate' id='pkt_aggregate-0' onClick="javascript:document.wlan.pkt_aggregateH.value=1;">
+								<label for="pkt_aggregate-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='pkt_aggregate' id='pkt_aggregate-1' onClick="javascript:document.wlan.pkt_aggregateH.value=0;">
+								<label for="pkt_aggregate-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="packet_aggregate_sel" -->
+
+				<!-- AP Isolation Selection -->
+				<div id="ap_isolation_sel" class="form-row no-bg-form">
+					<label for="ap_isolation_sel_title"><script language=Javascript>document.write(_("basic apisolated"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='apisolated' id='apisolated-0' onClick="javascript:document.wlan.apisolatedH.value=1;">
+								<label for="apisolated-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='apisolated' id='apisolated-1' onClick="javascript:document.wlan.apisolatedH.value=0;">
+								<label for="apisolated-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ap_isolation_sel" -->
+
+				<!-- MBSSID AP Isolation Selection -->
+				<div id="mbssid_ap_isolation_sel" class="form-row no-bg-form">
+					<label for="mbssid_ap_isolation_sel_title"><script language=Javascript>document.write(_("basic mbssidapisolated"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='mbssidapisolated' id='mbssidapisolated-0' onClick="javascript:document.wlan.mbssidapisolatedH.value=1;">
+								<label for="mbssidapisolated-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='mbssidapisolated' id='mbssidapisolated-1' onClick="javascript:document.wlan.mbssidapisolatedH.value=0;">
+								<label for="mbssidapisolated-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="mbssid_ap_isolation_sel" -->
+				</div>	<!-- div id="ExtConfDiv" -->
+
+			</div>		<!-- div class="pad" id="wlan_adv_setup_block" -->
+
+			<div id="wlan_wmm_block">
+				<h2><script language=Javascript>document.write(_("adv wmm"))</script></h2>
+
+				<!-- WMM Capable Selection -->
+				<div id="wmm_capable_sel" class="form-row no-bg-form">
+					<label for="wmm_capable_sel_title"><script language=Javascript>document.write(_("adv wmm capable"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='wmm_capable' id='wmm_capable-0' onClick="wmm_capable_enable_switch(1);">
+								<label for="wmm_capable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='wmm_capable' id='wmm_capable-1' onClick="wmm_capable_enable_switch(0);">
+								<label for="wmm_capable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="wmm_capable_sel" -->
+
+				<!-- APSD Capable Selection -->
+				<div id="apsd_capable_sel" class="form-row no-bg-form">
+					<label for="apsd_capable_sel_title"><script language=Javascript>document.write(_("adv apds capable"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='apsd_capable' id='apsd_capable-0' onClick="javascript:document.wlan.apsd_capableH.value=1;">
+								<label for="apsd_capable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='apsd_capable' id='apsd_capable-1' onClick="javascript:document.wlan.apsd_capableH.value=0;">
+								<label for="apsd_capable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="apsd_capable_sel" -->
+
+				<!-- DLS Capable Selection -->
+				<div id="dls_capable_sel" class="form-row no-bg-form">
+					<label for="dls_capable_sel_title"><script language=Javascript>document.write(_("adv dls capable"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='dls_capable' id='dls_capable-0' onClick="javascript:document.wlan.dls_capableH.value=1;">
+								<label for="dls_capable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='dls_capable' id='dls_capable-1' onClick="javascript:document.wlan.dls_capableH.value=0;">
+								<label for="dls_capable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="dls_capable_sel" -->
+
+				<div class="submit-row">
+					<button type="button" name="wmm_list" id="wmm_list" onClick="javascript:open_wmm_window()"><script language=Javascript>document.write(_("adv wmm configuration"))</script></button>
+				</div>
+			</div>		<!-- div class="pad" id="wlan_wmm_block" -->
+
+			<div id="wlan_m2u_block">
+				<br/><br/>
+				<h2><script language=Javascript>document.write(_("adv multicast2unicast converter"))</script></h2>
+
+				<!-- Mcast2Ucast Conversion Selection -->
+				<div id="mcast2ucast_conversion_sel" class="form-row no-bg-form">
+					<label for="mcast2ucast_conversion_sel_title"><script language=Javascript>document.write(_("adv multicast2unicast"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='m2u_enable' id='m2u_enable-0' onClick="javascript:document.wlan.m2u_enableH.value=1;">
+								<label for="m2u_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='m2u_enable' id='m2u_enable-1' onClick="javascript:document.wlan.m2u_enableH.value=0;">
+								<label for="m2u_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="mcast2ucast_conversion_sel" -->
+			</div>		<!-- div class="pad" id="wlan_m2u_block" -->
+
+			<div id="wlan_11n_block">
+				<h2><script language=Javascript>document.write(_("basic other"))</script></h2>
+
+				<!-- HT Tx Stream Selection -->
+				<div id="ht_tx_stream_sel" class="form-row no-bg-form">
+					<fieldset>
+						<label for="ht_tx_stream_sel_title"><script language=Javascript>document.write(_("basic ht txstream"))</script></label>
+						<div class="field">
+							<select name="tx_stream" id="tx_stream" size="1" onChange="document.wlan.tx_streamH.value=this.value;">
+								<option value=1>1</option>
+								<option value=2>2</option>
+							</select>
+						</div>
+					</fieldset>
+				</div>	<!-- div id="ht_tx_stream_sel" -->
+
+				<!-- HT Rx Stream Selection -->
+				<div id="ht_rx_stream_sel" class="form-row no-bg-form">
+					<fieldset>
+						<label for="ht_rx_stream_sel_title"><script language=Javascript>document.write(_("basic ht rxstream"))</script></label>
+						<div class="field">
+							<select name="rx_stream" id="rx_stream" size="1" onChange="document.wlan.rx_streamH.value=this.value;">
+								<option value=1>1</option>
+								<option value=2>2</option>
+							</select>
+						</div>
+					</fieldset>
+				</div>	<!-- div id="ht_rx_stream_sel" -->
+			</div>		<!-- div class="pad" id="wlan_11n_block" -->
+
+			<div id="wlan_11n_phy_block">
+				<h2><script language=Javascript>document.write(_("basic ht phy mode"))</script></h2>
+
+				<!-- HT OP Mode Selection -->
+				<div id="ht_op_mode_sel" class="form-row no-bg-form">
+					<label for="ht_op_mode_sel_title"><script language=Javascript>document.write(_("basic ht op mode"))</script></label>
+					<div class="field">
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='n_mode' id='n_mode-0' onClick="javascript:document.wlan.n_modeH.value=1;">
+								<label for="n_mode-0"><div class="radioText"><script language=Javascript>document.write(_("basic ht op mixed"))</script></div></label>
+								<input type="radio" class="access" name='n_mode' id='n_mode-1' onClick="javascript:document.wlan.n_modeH.value=0;">
+								<label for="n_mode-1"><div class="radioText"><script language=Javascript>document.write(_("greenField"))</script></div></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_op_mode_sel" -->
+
+				<!-- HT Channel Bandwidth Selection -->
+				<div id="ht_ch_bw_sel" class="form-row no-bg-form">
+					<label for="ht_ch_bw_sel_title"><script language=Javascript>document.write(_("basic ht channel bandwidth"))</script></label>
+					<div class="field">
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='n_bandwidth' id='n_bandwidth-0' onClick="Channel_BandWidth_onClick(0);">
+								<label for="n_bandwidth-0"><div class="radioText">20</div></label>
+								<input type="radio" class="access" name='n_bandwidth' id='n_bandwidth-1' onClick="Channel_BandWidth_onClick(1)">
+								<label for="n_bandwidth-1"><div class="radioText">20/40</div></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_ch_bw_sel" -->
+
+				<!-- HT Guard Interval Selection -->
+				<div id="ht_guard_int_sel" class="form-row no-bg-form">
+					<label for="ht_guard_int_sel_title"><script language=Javascript>document.write(_("basic ht guard interval"))</script></label>
+					<div class="field">
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='n_gi' id='n_gi-0' onClick="javascript:document.wlan.n_giH.value=1;">
+								<label for="n_gi-0"><div class="radioText"><script language=Javascript>document.write(_("wireless long"))</script></div></label>
+								<input type="radio" class="access" name='n_gi' id='n_gi-1' onClick="javascript:document.wlan.n_giH.value=0;">
+								<label for="n_gi-1"><div class="radioText"><script language=Javascript>document.write(_("auto"))</script></div></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_guard_int_sel" -->
+
+				<!-- HT Auto MCS Selection -->
+				<div id="ht_auto_mcs_sel" class="form-row no-bg-form">
+					<fieldset>
+						<label for="ht_auto_mcs_sel_title"><script language=Javascript>document.write(_("mcs"))</script></label>
+						<div class="field">
+							<select name="advHTAutoMCS" id="advHTAutoMCS" size="1" onChange="document.wlan.advHTAutoMCSH.value=this.value;">
+								<option value = 0>0</option>
+								<option value = 1>1</option>
+								<option value = 2>2</option>
+								<option value = 3>3</option>
+								<option value = 4>4</option>
+								<option value = 5>5</option>
+								<option value = 6>6</option>
+								<option value = 7>7</option>
+								<option value = 8>8</option>
+								<option value = 9>9</option>
+								<option value = 10>10</option>
+								<option value = 11>11</option>
+								<option value = 12>12</option>
+								<option value = 13>13</option>
+								<option value = 14>14</option>
+								<option value = 15>15</option>
+								<option value = 32>32</option>
+								<option value = 33>33</option>
+							</select>
+						</div>
+					</fieldset>
+				</div>	<!-- div id="ht_auto_mcs_sel" -->
+
+				<!-- HT RDG Selection -->
+				<div id="ht_rdg_sel" class="form-row no-bg-form">
+					<label for="ht_rdg_sel_title"><script language=Javascript>document.write(_("basic ht rdg"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='n_rdg' id='n_rdg-0' onClick="javascript:document.wlan.n_rdgH.value=1;">
+								<label for="n_rdg-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='n_rdg' id='n_rdg-1' onClick="javascript:document.wlan.n_rdgH.value=0;">
+								<label for="n_rdg-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_rdg_sel" -->
+
+				<!-- HT Extension Channel Selection -->
+				<div id="ht_ext_ch_sel" class="form-row no-bg-form">
+					<fieldset>
+						<label for="ht_ext_ch_sel_title"><script language=Javascript>document.write(_("basic ht extension channel"))</script></label>
+						<div class="field">
+							<select id="n_extcha" name="n_extcha" size="1">
+							<option value = 0 selected>2412MHz <script language="JavaScript">document.write( _("channel"))</script> 1</option>
+							</select>
+						</div>
+					</fieldset>
+				</div>	<!-- div id="ht_ext_ch_sel" -->
+
+				<!-- HT AMSDU Selection -->
+				<div id="ht_amsdu_sel" class="form-row no-bg-form">
+					<label for="ht_amsdu_sel_title"><script language=Javascript>document.write(_("basic ht amsdu"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='n_amsdu' id='n_amsdu-0' onClick="javascript:document.wlan.n_amsduH.value=1;">
+								<label for="n_amsdu-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='n_amsdu' id='n_amsdu-1' onClick="javascript:document.wlan.n_amsduH.value=0;">
+								<label for="n_amsdu-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_amsdu_sel" -->
+
+				<!-- HT ADDBA Selection -->
+				<div id="ht_addba_sel" class="form-row no-bg-form">
+					<label for="ht_addba_sel_title"><script language=Javascript>document.write(_("basic ht addba"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='n_autoba' id='n_autoba-0' onClick="javascript:document.wlan.n_autobaH.value=1;">
+								<label for="n_autoba-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='n_autoba' id='n_autoba-1' onClick="javascript:document.wlan.n_autobaH.value=0;">
+								<label for="n_autoba-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_addba_sel" -->
+
+				<!-- HT DELBA Selection -->
+				<div id="ht_delba_sel" class="form-row no-bg-form">
+					<label for="ht_delba_sel_title"><script language=Javascript>document.write(_("basic ht delba"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" class="access" name='n_badecline' id='n_badecline-0' onClick="javascript:document.wlan.n_badeclineH.value=1;">
+								<label for="n_badecline-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='n_badecline' id='n_badecline-1' onClick="javascript:document.wlan.n_badeclineH.value=0;">
+								<label for="n_badecline-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="ht_delba_sel" -->
+
+			</div>		<!-- div class="pad" id="wlan_11n_phy_block" -->
+
+			<div class="submit-row">
+				<button type="button" name="submitForm" id="submitForm" onClick="submitF1();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				<button type="reset" name="resetForm" id="resetForm" class="secondary" onClick="window.location.reload();"><script language=Javascript>document.write(_("cancel"))</script></button>
+			</div>
+
+                        </div>	<!-- div class="right-column white-box" -->
+                        </form>		<!-- name="wlan" -->
+
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+<!-- ================================================================================================ -->
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "Advanced", <%_val = session["user"];%>"@@_val");
+
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["maxNumSta"]=_("adv warningMsg13");	//'Invalid max sta'
+	$.validator.addMethod("maxNumSta",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 1 || c > 127) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.maxNumSta);
+
+	VALIDATOR.config.errors["advIdleTimeout"]=_("adv warningMsg12");	//'Invalid Idle Timeout'
+	$.validator.addMethod("advIdleTimeout",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 60 || c > 600) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advIdleTimeout);
+
+	VALIDATOR.config.errors["advBeaconInterval"]=_("adv warningMsg2");	//'Invalid Beacon Interval'
+	$.validator.addMethod("advBeaconInterval",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 20 || c > 999) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advBeaconInterval);
+
+	VALIDATOR.config.errors["advDTIM"]=_("adv warningMsg4");	//'Invalid DTIM Interval'
+	$.validator.addMethod("advDTIM",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 1 || c > 255) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advDTIM);
+
+	VALIDATOR.config.errors["advFrag"]=_("adv warningMsg6");	//'Invalid Fragmentation Length'
+	$.validator.addMethod("advFrag",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 256 || c > 2346) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advFrag);
+
+	VALIDATOR.config.errors["advRTS"]=_("adv warningMsg8");	//'Invalid RTS Threshold'
+	$.validator.addMethod("advRTS",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 1 || c > 2347) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advRTS);
+
+	VALIDATOR.config.errors["advTxPW"]=_("adv warningMsg9");	//'Invalid Tx Power Threshold'
+	$.validator.addMethod("advTxPW",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c=="") { return false; }
+			if (c < 1 || c > 100) { return false; }
+		}
+		return true;
+	},VALIDATOR.config.errors.advTxPW);
+#else
+function validate_idletimeout(field) {
+	if(field.val() == "" || field.val() < 60 || field.val() > 600) {
+		return _("adv warningMsg12");		//'Invalid Idle Timeout'
+	}
+}
+function validate_num_sta(field) {
+	field_val = parseInt(field.val());
+	if(isNaN(field_val) || field_val < 1 || field_val > n_max_num_sta) {
+		return _("adv warningMsg13");		//'Invalid max sta'
+	}
+}
+function validate_beaconint(field) {
+	if(field.val() == "" || field.val() < 20 || field.val() > 999) {
+		return _("adv warningMsg2");		//'Invalid Beacon Interval'
+	}
+}
+function validate_dtim(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 255) {
+		return _("adv warningMsg4");		//'Invalid DTIM Interval'
+	}
+}
+function validate_fragth(field) {
+	if(field.val() == "" || field.val() < 256 || field.val() > 2346) {
+		return _("adv warningMsg6");		//'Invalid Fragmentation Length'
+	}
+}
+function validate_rtsth(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 2347) {
+		return _("adv warningMsg8"); //'Invalid RTS Threshold'
+	}
+}
+function validate_txpwr(field) {
+	if(field.val() == "" || field.val() < 1 || field.val() > 100) {
+		return _("adv warningMsg9");		//'Invalid Tx Power Threshold'
+	}
+}
+#endif
+<%if(request['QUERY_STRING']=="success") {%>
+    success_alert("",_('advWirelessSubmitSuccess'));
+<%}%>
+</script>
+
+</body>
+</html>

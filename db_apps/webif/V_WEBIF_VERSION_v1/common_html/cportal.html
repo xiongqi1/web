@@ -1,0 +1,219 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%
+	var reason = get_single('service.cportal.capture.reason');
+	var wizard_status = get_single('wizard_status');
+%>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>system | connection problem</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body onLoad="initTranslation();">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+
+var wizard_status = "@@wizard_status";
+if(wizard_status<5)
+	window.location="/wizard.asp";
+var reasons = {
+	'administrative-disable': {
+		description: 'Web Error Capture is disabled.  You may activate it from the WEC config page.',
+		action: 'wec-config',
+		buttonTitle: 'WEC Config'
+	},
+	'radio-unavailable': {
+		description: 'No radio module found.',
+		//action: null
+		action: 're-direct'
+	},
+	'sim-removed': {
+		description: 'SIM not installed. Please install a SIM and restart the radio.',
+	//	action: 'cycle-module',
+	//	buttonTitle: 'Restart Radio'
+		action: 're-direct'
+	},
+	'sim-locked': {
+		description: 'SIM is locked.  You must enter the PIN code to unlock the SIM.',
+		action: 're-direct'
+	//	action: 'pin-entry',
+	//	buttonTitle: 'Enter PIN'
+	},
+	'sim-blocked': {
+		description: 'SIM is CHV1 blocked.  You must enter the PUK code to unblock the SIM.',
+		action: 're-direct'
+	//	action: 'puk-entry',
+	//	buttonTitle: 'Enter PUK'
+	},
+	'mep-locked': {
+		description: 'MEP Locked.',
+		//action: 'pin-entry',
+		action: 're-direct'
+	},
+	'sim-issue': {
+		description: 'General SIM failure. Check SIM installation and restart the device.',
+		action: 'cycle-module',
+		buttonTitle: 'Restart Radio'
+	},
+	'network-account': {
+		description: 'Network is rejecting registration due to an account problem. Contact your provider.',
+		action: null
+	},
+	'network-reject': {
+		description: 'Network is rejecting registration. Contact your provider.',
+		action: null
+	},
+	'service-unavailable': {
+		description: 'No Service.  Network coverage is currently unavailable.',
+		action: 're-direct' //null
+	},
+	'service-invalid': {
+		description: 'Invalid Service.  Network is unavailable.',
+		action: 're-direct' //null
+	},
+	'no-wwan-enabled': {
+		description: 'WAN is down and no WWAN connections are enabled. Restore WAN connection or enable a WWAN connection configuration to establish a connection.',
+		action: 're-direct'
+		//action: 'connection-config',
+		//buttonTitle: 'View Connections'
+	},
+	'no-wwan-up': {
+		description: 'WAN is down and none of the configured WWAN connections are currently up. This may be a transient problem as connections are re-establised after a loss of service, but if it persists check the connection configurations.',
+		action: 're-direct'
+		//action: 'connection-config',
+		//buttonTitle: 'View Connections'
+	},
+	'wan-up': {
+		description: 'WAN is UP.',
+		action: 're-direct' //null
+	},
+	'wwan-up': {
+		description: 'WWAN is UP.',
+		action: 're-direct' //null
+	},
+	'seems-ok': {
+		description: 'Seems OK?',
+		action: 're-direct' //null
+	}
+}
+
+var actions = {
+	'wec-config': {
+		type: 'gotoPage',
+		uri: '/wec.html',
+	},
+	'cycle-module': {
+		type: 'ajax',
+		uri: '/cgi-bin/reboot_module.cgi',
+		callback: function(responseText) {
+//			alert('Response: ' + responseText);
+			alert('Restart initiated.  Please wait a few moments while the radio module restarts...');
+		}
+	},
+	'pin-entry': {
+		type: 'gotoPage',
+		uri: '/pinsettings.html'
+	},
+	'puk-entry': {
+		type: 'gotoPage',
+		uri: '/pinsettings.html'
+	},
+	'connection-config': {
+		type: 'gotoPage',
+		uri: '/GUI-3gwwan.html',
+	},
+	're-direct': {
+		type: 'reDirect',
+		uri: '/index.html',
+	}
+};
+
+function doAction(action) {
+	var act = actions[action];
+	if(!act) {
+		alert('Unknown action "' + action + '".');
+		return false;
+	}
+
+	if(act.confirm) {
+		if(!confirm(act.confirm)) return false;
+	}
+
+	if(act.type == 'ajax') {
+		return $.get(act.uri, act.callback);
+	} else {
+		// gotoPage
+		document.location = act.uri;
+		return false;
+	}
+}
+
+function pollReason() {
+	$.get('/cgi-bin/cportal_reason.cgi', function(responseText) {
+		reason = responseText;
+		reason = reason.trim();
+		if(reason != '') updatePage();
+	});
+	setTimeout(pollReason, 1000);
+}
+
+function updatePage() {
+	var r = reasons[reason];
+	if(!r) alert('Unknown reason "' + reason + '".');
+	document.getElementById('description').innerHTML = r.description;
+	var button = document.getElementById('button');
+	if(r.action == "re-direct") {
+		document.location = actions[r.action].uri;
+	}
+	else if(r.action != null) {
+		button.value = r.buttonTitle;
+		button.onclick = function() { doAction(r.action); };
+		button.style.display = 'inline';
+	} else {
+		button.style.display = 'none';
+	}
+}
+
+function initTranslation() {
+	;
+}
+</script>
+<form name='form' class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>Error</h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%"><tr><th>Connection Problem&nbsp;</th></tr></table>
+
+<table border="0" cellspacing="1" cellpadding="5" width="75%">
+<tr align="left"> 
+	<td height="33" colspan="2">&nbsp;</td>
+</tr>
+
+<tr align="left"> 
+    <td colspan="2" >
+	    <p id="description" style="font-size:16px"></p>
+    </td>
+</tr>
+
+<tr align="left"> 
+    <td height="33" colspan="2" align="center">
+        <input style="display: none;" id="button" type="button" value=""/>
+    </td>
+</tr>
+</table>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+var reason = "<%=reason%>";
+updatePage();
+pollReason();
+</script>
+</body>
+</html>

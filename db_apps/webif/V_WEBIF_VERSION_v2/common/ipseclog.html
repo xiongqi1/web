@@ -1,0 +1,205 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>IPsec Logging</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tmp_verblog = form['IPsecLog'];
+	tmp2_verblog = get_single('ipsec.0.verblog');
+	logfilters = form['selectedFilters'];
+	if (tmp_verblog == 'none' || tmp_verblog == 'all') {
+		if (tmp_verblog != tmp2_verblog) {
+			retval = set_single('ipsec.0.verblog='+tmp_verblog,'-p');
+		}
+	} else if (logfilters != tmp2_verblog) {
+		retval = set_single('ipsec.0.verblog='+logfilters,'-p');
+	}
+	redirect('/ipseclog.html?success');
+}
+%>
+
+<script language="JavaScript">
+function ipsecLogOnChange() {
+	blockUI_alert(_("ipsecLogOnChangeMsg"));
+	return;
+}
+
+function ipsecVerlogApply() {
+	var req="/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=ipsecLogApply&param=";
+	if ($("#IPsecLog").val() == 'filtered') {
+		$("#selectedFilters").val('');
+		for (i = 0; i < document.form.IPsecLogFilter.selectedOptions.length; i++) {
+			document.form.selectedFilters.value += document.form.IPsecLogFilter.selectedOptions[i].value;
+			document.form.selectedFilters.value += ' ';
+		}
+	}
+	$.get(req, function(){document.form.submit();});
+}
+
+function check_file(filename) {
+	$.get("/cgi-bin/check_file.cgi?"+filename, function(v){
+		eval(v);
+		if(result=="") {
+			validate_alert("",_("ipsecLogEmpty"));
+		}
+		else {
+			location.href = "/cgi-bin/logfile.cgi?action=downloadIPseclog";//downloadlog  //
+		}
+	});
+}
+
+function updateIpsecLog() {
+	blockUI_wait(_("GUI pleaseWait"));
+	$("#saveButton").attr("disabled", true);
+	$("#get_log_btn").attr("disabled", true);
+	$("#update_log_btn").attr("disabled", true);
+	$.get('/cgi-bin/logfile.cgi?action=getIPseclog', 
+		function(response) { 
+			$("#ipsecLogBox").val(response);
+			$("#saveButton").removeAttr("disabled");
+			$("#get_log_btn").removeAttr("disabled");
+			$("#update_log_btn").removeAttr("disabled");
+			$.unblockUI();
+		}
+	);
+}
+
+function displayLogFilterMenu(level) {
+	if (level == 'none' || level == 'all')
+		$("#IPsecLogFilterDiv").hide();
+	else
+		$("#IPsecLogFilterDiv").show();
+}
+
+function updateCurrentLogFilter(filter) {
+	// Can't use string.search or string.match method because of "control" & "controlmore" filter
+	var f_array = new Array();
+	f_array = filter.split(" ");
+	for (j = 0; j < document.form.IPsecLogFilter.length; j++) {
+		document.form.IPsecLogFilter[j].selected = false;
+		for (i = 0; i < f_array.length; i++) {
+			if (f_array[i] == document.form.IPsecLogFilter[j].value)
+				document.form.IPsecLogFilter[j].selected = true;
+		}
+	}
+}
+
+$(document).ready( function() {
+	// set log level menu
+	var logLevel = <%_v1=get_single('ipsec.0.verblog');%>"@@_v1";
+	if (logLevel == '' || logLevel == 'N/A')
+		logLevel = 'none'
+	if (logLevel == 'none' || logLevel == 'all') {
+		$("#IPsecLog").val(logLevel);
+	} else {
+		$("#IPsecLog").val('filtered');
+		updateCurrentLogFilter(logLevel)
+	}
+
+	// set log filter menu
+	displayLogFilterMenu(logLevel);
+
+	$("#IPsecLog").change(function(){
+		displayLogFilterMenu($("#IPsecLog").val());
+	});
+
+	updateIpsecLog();
+});
+</script>
+
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form name="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<div class="right-column hide_for_pppoe_en white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("ipseclog title"))</script></h2>
+				<div class="form-row no-bg-form">
+					<div class="form-row">
+						<label for="IPsecLog"><script language=Javascript>document.write(_("logLevel"))</script></label>
+						<div class="field">
+							<select name="IPsecLog" ID="IPsecLog" value="@@form['IPsecLog']" size=1 >
+								<option value="none">None</option>
+								<option value="all">All</option>
+								<option value="filtered">Filtered log</option>
+							</select>
+						</div>
+					</div>
+
+					<div class="form-row" id="IPsecLogFilterDiv" style="display:none">
+						<input type="hidden" name="selectedFilters" value="@@form['selectedFilters']"/>
+						<label for="IPsecLogFilter"><script language=Javascript>document.write(_("log filter"))</script></label>
+						<div class="field">
+#ifdef V_WEBIF_SPEC_vdf
+							<select name="IPsecLogFilter" ID="IPsecLogFilter" value="@@form['IPsecLogFilter']" size=13 multiple style="height:auto;background-image:none;">
+#else
+							<select name="IPsecLogFilter" ID="IPsecLogFilter" value="@@form['IPsecLogFilter']" size=13 multiple style="height:auto;">
+#endif
+								<option value="crypt">Crypt</option>
+								<option value="raw">Raw</option>
+								<option value="parsing">Parsing</option>
+								<option value="emitting">Emitting</option>
+								<option value="control">Control</option>
+								<option value="controlmore">ControlMore</option>
+								<option value="lifecycle">Lifecycle</option>
+								<option value="pfkey">Pfkey</option>
+								<option value="dns">Dns</option>
+								<option value="dpd">Dpd</option>
+								<option value="natt">Natt</option>
+								<option value="oppo">Oppo</option>
+								<option value="private">Private</option>
+							</select>
+						</div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("multi sel desc"))</script></span>
+					</div>
+				</div>
+
+				<div class="submit-row" style="padding:0 0 40px 0;">
+					<button type="button" id="saveButton" class="secondary" onClick="ipsecVerlogApply()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<button type="button" id="get_log_btn" class="secondary" onClick="check_file('/etc/ipseclog.txt')" style="margin-left:0"><script language=Javascript>document.write(_("download"))</script></button>
+					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<button type="button" id="update_log_btn" class="secondary" onClick="updateIpsecLog()"><script language=Javascript>document.write(_("update"))</script></button>
+				</div>
+
+				<div id="ipsecLogBoxDiv" style="padding-right:20px;">
+					<textarea name='ipsecLogBox' id='ipsecLogBox' style="width:700px;height:600px;" readonly='readonly' ></textarea>
+				</div>
+
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("System", "IPSECLOG", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_("ipsecChangLogSuccess"));
+<%	}%>
+</script>
+</body>
+</html>

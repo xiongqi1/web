@@ -1,0 +1,8 @@
+Package: btsensormon-demo
+Priority: optional
+Section: Misc
+Version: 1.0
+Architecture: arm
+Maintainer: alan.au@netcommwireless.com
+Depends:
+Description: Software package for the Bluetooth Sensor Monitor (demo)

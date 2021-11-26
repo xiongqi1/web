@@ -1,0 +1,217 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<%var reason = get_single('service.cportal.capture.reason');%>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>System | Connection Problem</title>
+
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript">
+var reasons = {
+	'administrative-disable': {
+		description: 'Web Error Capture is disabled.  You may activate it from the WEC config page.',
+		action: 'wec-config',
+		buttonTitle: 'WEC Config'
+	},
+	'radio-unavailable': {
+		description: 'No radio module found.',
+		action: null
+	},
+	'sim-removed': {
+		description: 'SIM not installed. Please install a SIM and restart the radio.',
+		action: 'cycle-module',
+		buttonTitle: 'Restart Radio'
+	},
+	'sim-locked': {
+		description: 'SIM is locked.  You must enter the PIN code to unlock the SIM.',
+		action: 'pin-entry',
+		buttonTitle: 'Enter PIN'
+	},
+	'sim-blocked': {
+		description: 'SIM is CHV1 blocked.  You must enter the PUK code to unblock the SIM.',
+		action: 'puk-entry',
+		buttonTitle: 'Enter PUK'
+	},
+	'mep-locked': {
+		description: 'MEP Locked.',
+		action: null
+	},
+	'sim-issue': {
+		description: 'General SIM failure. Check SIM installation and restart the radio.',
+		action: 'cycle-module',
+		buttonTitle: 'Restart Radio'
+	},
+	'network-account': {
+		description: 'Network is rejecting registration due to an account problem. Contact your provider.',
+		action: null
+	},
+	'network-reject': {
+		description: 'Network is rejecting registration. Contact your provider.',
+		action: null
+	},
+	'service-unavailable': {
+		description: 'No Service.  Network coverage is unavailable.',
+		action: null
+	},
+	'service-invalid': {
+		description: 'Invalid Service.  Network is unavailable.',
+		action: null
+	},
+	'no-wwan-enabled': {
+		description: 'No WWAN connections enabled. Enable a connection configuration to establish a WWAN connection.',
+		action: 'connection-config',
+		buttonTitle: 'View Connections'
+	},
+	'no-wwan-up': {
+		description: 'None of the configured WWAN connections are currently up. This may be a transient problem as connections are re-establised after a loss of service, but if it persists check the connection configurations.',
+		action: 'connection-config',
+		buttonTitle: 'View Connections'
+	},
+	'seems-ok': {
+		description: 'Everything looks OK. WWAN connection(s) are up.',
+		action: null
+	}
+}
+
+var actions = {
+	'wec-config': {
+		type: 'gotoPage',
+		uri: '/WEC.html',
+	},
+	'cycle-module': {
+		type: 'ajax',
+		uri: '/cgi-bin/reboot_module.cgi',
+//		confirm: 'Do you really want to restart the radio module?',
+		callback: function(xhr) {
+//			alert('Response: ' + xhr.responseText);
+			alert('Restart initiated.  Please wait a few moments while the radio module restarts...');
+		}
+	},
+	'pin-entry': {
+		type: 'gotoPage',
+		uri: '/pinsettings.html'
+	},
+	'puk-entry': {
+		type: 'gotoPage',
+		uri: '/pinsettings.html'
+	},
+	'connection-config': {
+		type: 'gotoPage',
+		uri: '/3gwwan.html',
+	}
+};
+
+function doAction(action) {
+	var act = actions[action];
+	if(!act) {
+		alert('Unknown action "' + action + '".');
+		return false;
+	}
+
+	if(act.confirm) {
+		if(!confirm(act.confirm)) return false;
+	}
+
+	if(act.type == 'ajax') {
+		return doAJAXCall(act.uri, act.callback);
+	} else {
+		// gotoPage
+		document.location = act.uri;
+		return false;
+	}
+}
+
+function doAJAXCall(uri, callback) {
+	var xhr;
+
+	try {
+		xmlHttp = new ActiveXObject("Microsoft.XMLHTTP");
+	} catch(e) {
+		try {
+			// Internet Explorer
+			xhr = new ActiveXObject("Msxml2.XMLHTTP");
+		} catch(e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				xhr = new XMLHttpRequest();
+			} catch(e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+	xhr.open("GET", uri, true);
+	xhr.send();
+	xhr.onreadystatechange = function() {
+		if(xhr.readyState == 4 && callback) {
+			callback(xhr);
+		}
+	}
+}
+
+function pollReason() {
+	doAJAXCall('/cgi-bin/cportal_reason.cgi', function(xhr) {
+		reason = xhr.responseText;
+		reason = reason.trim();
+		if(reason != '') updatePage();
+	});
+	setTimeout(pollReason, 1000);
+}
+
+function updatePage() {
+	var r = reasons[reason];
+	if(!r) alert('Unknown reason "' + reason + '".');
+	document.getElementById('description').innerHTML = r.description;
+	var button = document.getElementById('button');
+	if(r.action != null) {
+		button.value = r.buttonTitle;
+		button.onclick = function() { doAction(r.action); };
+		button.style.display = 'inline';
+	} else {
+		button.style.display = 'none';
+	}
+}
+</script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<form name='form' class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>Error</h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%"><tr><th>Connection Problem&nbsp;</th></tr></table>
+
+<table border="0" cellspacing="1" cellpadding="5" width="75%">
+<tr align="left">
+	<td height="33" colspan="2">&nbsp;</td>
+</tr>
+
+<tr align="left">
+    <td colspan="2" >
+	    <p id="description" style="font-size:16px"></p>
+    </td>
+</tr>
+
+<tr align="left">
+    <td height="33" colspan="2" align="center">
+        <input style="display: none;" id="button" type="button" value=""/>
+    </td>
+</tr>
+</table>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+var reason = '<%=reason%>';
+updatePage();
+pollReason();
+</script>
+</body>
+</html>

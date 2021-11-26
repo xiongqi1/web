@@ -1,0 +1,1055 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>System | Status</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="/cgi-bin/vpn.cgi"></script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['rdbCmd'];
+	if( tempval != "" )
+	set_list( tempval, '-p' );
+}
+
+pots_disabled=get_single('potsbridge_disabled');pots_status=get_single('pots.status');
+%>
+
+<body>
+<div id="contentWrapper">
+<%include menu.html%>
+<script language='javascript'>
+Butterlate.setTextDomain("status");
+
+var imageidx = 0;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var ajaxerror = 0;
+var show_duration = 0;
+var currentSession = "";
+var usageHistory = "";
+var portStatus="0,10,H,0,10,H,0,10,H,0,10,H,0,10,H,";
+var sim_stat_disp_count = 0;
+var hw_ver = <%_v=get_single('uboot.hw_ver');%>"@@_v";
+if(hw_ver=="")
+	hw_ver="1.10";
+
+function addcomma( myval ) {
+var	retval="";
+var	cm=parseInt((myval.length-1)/3);
+	for( i=0; i<cm; i++ ) retval+=myval.substring( retval.length-i, myval.length-(cm-i)*3)+',';
+		retval+=myval.substring(retval.length-i, myval.length);
+	return retval;
+}
+
+function toUpTime( uptime ) {
+var upday = parseInt(uptime / (24 * 3600));
+var uphr = parseInt((uptime - upday * 24 * 3600) / (3600));
+var upmin = parseInt((uptime - upday * 24 * 3600 - uphr * 3600) / 60);
+var upsec = parseInt(uptime - upday * 24 * 3600 - uphr * 3600 - upmin * 60);
+	uphr=uphr<10?"0"+uphr.toString():uphr.toString();
+	upmin=upmin<10?"0"+upmin.toString():upmin.toString();
+	upsec=upsec<10?"0"+upsec.toString():upsec.toString();
+	if (upday) {
+		var buf2=upday.toString() + " ";
+		if (upday > 1)
+			buf2=buf2+_("days")+" ";
+		else
+			buf2=buf2+_("day")+" ";
+	}
+	else {
+		var buf2="";
+	}
+	return buf2+uphr+":"+upmin+":"+upsec;
+}
+
+function getEnableStr(str) {
+	if(typeof(str)=="undefined" || str==null || str=="N/A")
+		return str;
+	var enableStr;
+	if(hasSubStr(str,/enable/i))
+		enableStr=_("enabled");
+	else
+		enableStr=_("disabled");
+	var phoneM=str.match(/[\+][0-9]+/);
+	var phoneNo="";
+	if(phoneM!=null)
+		phoneNo=phoneM[0];
+	if(phoneNo=="")
+		return enableStr;
+	return enableStr + "  ( " + phoneNo + " )";
+}
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	eval(response);
+	document.getElementById( "simwait" ).style['display']='none';
+	document.form1.uptime.value=toUpTime( uptime );
+#if defined V_SKIN_ro
+	freq=freq.replace("UMTS", "HSPA");
+	freq=freq.replace("WCDMA", "HSPA");
+#else
+	freq=freq.replace("WCDMA 800", "WCDMA 850");
+	freq=freq.replace("IMT2000", "WCDMA 2100");
+#endif
+
+
+	// show freqency if frequency is available or if service type is not available
+	document.getElementById("service_type_div").style['display']=(coverage=="N/A" || coverage.indexOf("Invalid")!=-1 || coverage.indexOf("None")!=-1)?'none':'';
+	document.getElementById("freq_div").style['display']=(freq!="N/A")?'':'none';
+
+	document.form1.connuptime.value=toUpTime(connuptime);
+	document.form1.coverage.value=freq.indexOf("No band")==-1?freq:_("band not available");
+	document.form1.connType.value=coverage;
+	document.form1.imei.value=imei;
+	document.getElementById("version").innerHTML=version;
+
+#if (defined V_PRODUCT_swi_nhd1w)
+	if(mhs_docked=="1") {
+		if(mhs_chargingonly=="1")
+			$("#deviceDock").html(_("docked")+"&nbsp;("+_("charging only")+")");
+		else
+			$("#deviceDock").html(_("docked"));
+	}
+	else {
+		$("#deviceDock").html(_("undocked"));
+	}
+#endif
+	//document.getElementById("Fversion").innerHTML=moduleFirmwareVersion.substring(0, moduleFirmwareVersion.indexOf(" "))
+	//document.getElementById("mac").innerHTML=eth0mac;
+	simStatusID=document.getElementById('simID');
+
+	if( simStatus.indexOf("SIM locked")!=-1 || simStatus.indexOf("SIM PIN")!=-1)
+		simStatus="SIM locked";
+	else if( simStatus.indexOf("PH-NET PIN")!=-1 || simStatus.indexOf("SIM PH-NET")!=-1)
+		simStatus="MEP locked";
+
+	switch(simStatus) {
+		case "SIM locked":
+			simStatusID.value = _("SIMlocked");
+		break;
+		case "SIM PUK":
+			simStatusID.value = _("status pukLocked");
+		break;
+		case "SIM OK":
+			simStatusID.value = _("simOK");
+		break;
+		case "SIM not inserted":
+			simStatusID.value = _("sim not inserted");
+		break;
+		default:
+			simStatusID.value = simStatus;
+		break;
+	}
+
+	csq = csq.substring(0, csq.indexOf("dBm") );
+	csqstr = _("not available");
+
+#if defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3)
+
+	// LTE is using RSRP that has a different range of dBm
+	// Quanta (4gt101w) is the only module that provides now
+	if(coverage.indexOf("LTE")>=0) {
+		if(csq == 0)
+			imageidx = 0;
+		else if(csq > -70 ) {
+			csqstr = _("high");
+			imageidx = 5;
+		}
+		else if(csq > -90 ) {
+			csqstr = _("medium");
+			if(csq > -80 )
+				imageidx = 4;
+			else
+				imageidx = 3;
+		}
+		else if(csq > -100 ) {
+			csqstr = _("low");
+			if(csq > -90)
+				imageidx = 2;
+			else
+				imageidx = 1;
+		}
+		else
+			imageidx = 0;
+	}
+	else {
+#endif
+	// Changed by Testra recommendation : Test Track #3796
+	// Changed by Testra recommendation : Test Track #8066
+	if(csq == 0)
+		imageidx = 0;
+	else if(csq >= -77 ) {
+		csqstr = _("high");
+		imageidx = 5;
+	}
+	else if(csq >= -92 ) {
+		csqstr = _("medium");
+		if(csq >= -86 )
+			imageidx = 4;
+		else
+			imageidx = 3;
+	}
+	else if(csq >= -108 ) {
+		csqstr = _("low");
+		if(csq >= -101)
+			imageidx = 2;
+		else
+			imageidx = 1;
+	}
+	else
+		imageidx = 0;
+
+#if defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3)
+	}
+#endif
+
+	if(csq=="" || csq=="N/A")
+		$("#umtsss").html(_("na"));
+	else
+		$("#umtsss").html(csq+" dBm         "+csqstr+"<img style='margin-left:80px' src='/images/csq"+imageidx+".GIF' width='67' height='20'/>");
+
+	var patt=/%[0-1][0-9a-f]%/gi
+	if( typeof(hint)!="undefined" && hint!="N/A" && hint!="" ) {
+		hint = hint.replace(patt, "%20%") // Some SIM cards have character less than %20. This ruins decoding rules.
+		provider = UrlDecode(hint);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>ROAMING</font>";
+		}
+	}
+	else if(provider=="Limited Service")
+		provider=_("limited service");
+	else if (provider=="N/A")
+		provider=_("na");
+	else if (provider.charAt(0) == "%") {
+		provider = UrlDecode(provider);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>ROAMING</font>";
+		}
+	}
+	provider=provider.replace("3Telstra", "Telstra");
+	provider=provider.replace("3TELSTRA", "Telstra");
+#if defined V_SKIN_ro
+	provider = provider.replace("Rogers Wireless", "Rogers");
+#endif
+	$("#provider").html(provider.replace("Telstra Mobile", "Telstra"));
+
+	document.form1.connuptime.value="";
+	if(simStatus == "SIM OK") {
+		simStatusID.style.color = 'GREEN';
+		document.getElementById( "simwait" ).style['display']='none';
+		//document.form1.connType.value = connType;
+		if(current_session=='wwan down') {
+			for( i=0; i<6; i++ )
+				document.getElementById( 'ppp'+i ).style['display'] = 'none';
+		}
+		document.getElementById( 'pppwait' ).style['display'] = 'none';
+		for( i=0; i<st.length && i<6; i++ ) {
+			document.getElementById( 'ppp'+i ).style['display'] = '';
+			document.getElementById( 'profile'+i ).innerHTML = st[i].name;
+			if( st[i].pppStatus=="waiting" && st[i].enable == 1 ) {
+				document.getElementById( 'status'+i ).innerHTML = _("waiting");
+			}
+			else if( st[i].pppStatus!="up" && st[i].enable == 1 ) {
+				document.getElementById( 'status'+i ).innerHTML = _("connecting");
+				document.getElementById( 'pppwait' ).style['display'] = '';
+			}
+			else {
+				document.getElementById( 'interface'+i ).innerHTML = "  "+st[i].interface;
+				document.getElementById( 'status'+i ).innerHTML = _("connected");
+				document.getElementById( 'local'+i ).innerHTML = st[i].iplocal;
+				document.form1.connuptime.value=toUpTime(connuptime);
+			}
+
+			if( autoapn == "1" ) {
+				if( current_apn != "" && current_apn != "N/A")
+					document.getElementById( 'apn'+i ).innerHTML = current_apn;
+				else
+					document.getElementById( 'apn'+i ).innerHTML = "";
+			}
+			else {
+				document.getElementById( 'apn'+i ).innerHTML = st[i].apn;
+			}
+		}
+	}
+	else if(document.form1.simStatus.value == "N/A") {
+		document.form1.simStatus.value = _("negotiating");
+		simStatusID.style.color = 'Orange'
+		document.getElementById( "simwait" ).style['display']='';
+		for( i=0; i<6; i++ )
+			document.getElementById( 'ppp'+i ).style['display'] = 'none';
+	}
+	else {
+		simStatusID.style.color = "RED";
+		// get matching count
+		if(prvSimStatus != simStatus) {
+			sim_stat_disp_count++;
+		}
+		else {
+			sim_stat_disp_count=0;
+		}
+		fUpdateStat=(sim_stat_disp_count>5) || (simStatus == "N/A") || (prvSimStatus=="");
+		if(fUpdateStat)
+			sim_stat_disp_count=0;
+		if(fUpdateStat) {
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+			switch(simStatus)
+			{
+			case "SIM not inserted":
+				alert( _("admin warningMsg8") );
+				break;//Please insert an active SIM card in order to connect to the internet. Please wait around 60 seconds for the router to restart after inserting your SIM card.
+			case "SIM general failure":
+				alert( _("admin warningMsg2") );//SIM general failure
+				break;
+			case "SIM locked":
+				alert( _("admin warningMsg3") );//You need to enter the PIN code to unlock the SIM before use
+				window.location=('pinsettings.html');
+				break;
+			case "SIM PUK":
+			case "SIM CHV1 blocked":
+				alert( _("admin warningMsg4 3g22wv") );//You need to enter the PUK code to unlock the SIM before use
+				window.location=('pinsettings.html');
+				break;
+			case "Network reject - Account":
+				alert( _("admin warningMsg6") );//Network reject - Account
+				break;
+			case "Network reject":
+				alert( _("admin warningMsg7") );//Network reject
+				break;
+			case "MEP locked":
+				if(confirm(_("mep warningMsg2"))) {
+					window.location=('pinsettings.html');
+				}
+				break;
+			default:
+				sim_stat_disp_count=0;
+			break;
+				case "PH-NET PIN":
+				case "SIM PH-NET":
+					window.location="/pinsettings.html";
+					break;
+			}
+<%}%>
+			prvSimStatus = simStatus;
+		}
+		for( i=0; i<6; i++ )
+			document.getElementById( 'ppp'+i ).style['display'] = 'none';
+	}
+	if(moduleFirmwareVersion.indexOf(" ") >= 0)
+		moduleFirmwareVersion=moduleFirmwareVersion.substring(0, moduleFirmwareVersion.indexOf(" "));
+#if (defined V_PRODUCT_swi_nhd1w)
+	document.getElementById("moduleInfo").innerHTML = _("module")+":&nbsp;"+moduleModel+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+_("Firmware")+":&nbsp;"+moduleFirmwareVersion;
+#else
+	// some dongles that don't support Hardware version return error code like "[error] err1:FSN NV read error" - Defect 4218
+	if (moduleHardwareVersion.search(/\[error\]/i) >= 0 )
+		moduleHardwareVersion="N/A";
+	var mi=_("module")+":&nbsp;"+moduleModel
+	if(moduleHardwareVersion!="" && moduleHardwareVersion!="N/A")
+		mi+="&nbsp;&nbsp;&nbsp;&nbsp;Hardware:&nbsp;"+moduleHardwareVersion
+	if(moduleFirmwareVersion!="" && moduleFirmwareVersion!="N/A")
+		mi+="&nbsp;&nbsp;&nbsp;&nbsp;"+_("Firmware")+":&nbsp;"+moduleFirmwareVersion;
+	document.getElementById("moduleInfo").innerHTML = mi;
+#endif
+	showPortStatus( portStatus );
+	currentSession=current_session;
+	usageHistory=usage_history;
+	updata_usage();
+#if (defined V_SHOW_ACTIVE_CONNECTION)
+	document.getElementById("actConn").innerHTML = actConn;
+#endif
+
+// #if (defined V_SHOW_PPPOE_y)
+	/*wan ip address information*/
+	if(connTypeWan.toUpperCase() == "PPPOE")
+		document.getElementById("conntype").innerHTML = "PPPoE";
+	else
+		document.getElementById("conntype").innerHTML = connTypeWan.toUpperCase();
+
+	if(connTypeWan.toUpperCase()=="PPPOE") {
+		document.getElementById("pppoeStatus").innerHTML = _("enabled");
+		document.getElementById("pppoeAddress").innerHTML = pppoeAddress;
+		document.getElementById( "pppoeip" ).style['display']='';
+	}
+	else {
+		document.getElementById("pppoeStatus").innerHTML = _("disabled");
+		document.getElementById( "pppoeip" ).style['display']='none';
+	}
+// #endif
+	document.getElementById("wanip").innerHTML = (typeof(WanIp)!="undefined")?WanIp:"";
+	document.getElementById("submask").innerHTML = (typeof(subMask)!="undefined")?subMask:"";
+	document.getElementById("gateway").innerHTML = (typeof(Gateway)!="undefined")?Gateway:"";
+	document.getElementById("dns1").innerHTML = (typeof(DNS1)!="undefined")?DNS1:"";
+	document.getElementById("dns2").innerHTML = (typeof(DNS2)!="undefined")?DNS2:"";
+	document.getElementById("macadd").innerHTML = (typeof(MacAdd)!="undefined")?MacAdd:"";
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	if(document.getElementById("callwaiting")!=null) {
+		document.getElementById("callwaiting").innerHTML=getEnableStr(call_waiting);
+		document.getElementById("uncdcallforward").innerHTML=getEnableStr(call_forwarding_uncond);
+		document.getElementById("busycallforward").innerHTML=getEnableStr(call_forwarding_busy);
+		document.getElementById("noreplycdcallforward").innerHTML=getEnableStr(call_forwarding_noreply);
+		document.getElementById("notreachablecallforward").innerHTML=getEnableStr(call_forwarding_notreach);
+	}
+<%}%>
+#endif
+}
+
+function updata_usage() {
+	var ray = new Array();
+	ray = currentSession.split(",");
+	if(ray.length == 4 ) {
+		document.getElementById( "usage_current" ).style['display']='';
+		startDate = new Date(ray[0]*1000);
+		document.getElementById("usage_current_0").innerHTML = startDate.toLocaleString();
+		if(show_duration)
+			document.getElementById("usage_current_1").innerHTML = toUpTime( ray[1]*1-ray[0]*1 );
+		else
+			document.getElementById("usage_current_1").innerHTML = _("Current Session");
+		document.getElementById("usage_current_2").innerHTML = addcomma(ray[2]);
+		document.getElementById("usage_current_3").innerHTML = addcomma(ray[3]);
+		var total = parseInt(ray[2])+parseInt(ray[3]);
+		document.getElementById("usage_current_4").innerHTML = addcomma(total.toString());
+	}
+	else {
+		document.getElementById( "usage_current" ).style['display']='none';
+	}
+	var history = new Array();
+	history = usageHistory.split("&");
+	for( var i=0; i<5; i++) {
+		if( i < history.length ) {
+			document.getElementById( "usage"+i ).style['display']='';
+			ray = history[i].split(",");
+			if(ray.length == 4 ) {
+				startDate = new Date(ray[0]*1000);
+				eval('document.getElementById(\"usage'+i+'_0\").innerHTML=\"'+startDate.toLocaleString()+'\"');
+				if(show_duration) {
+					eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+toUpTime( ray[1]*1-ray[0]*1 )+'\"');
+				}
+				else {
+					/*if(ray[1]*1<1234567890)
+					{
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"System Up time:  '+toUpTime( ray[1]*1 )+'\"');
+					}
+					else*/
+					{
+						endDate = new Date(ray[1]*1000);
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+endDate.toLocaleString()+'\"');
+					}
+				}
+				eval('document.getElementById(\"usage'+i+'_2\").innerHTML=\"'+addcomma(ray[2])+'\"');
+				eval('document.getElementById(\"usage'+i+'_3\").innerHTML=\"'+addcomma(ray[3])+'\"');
+				total = parseInt(ray[2])+parseInt(ray[3]);
+				eval('document.getElementById(\"usage'+i+'_4\").innerHTML=\"'+addcomma(total.toString())+'\"');
+			}
+			else {
+				document.getElementById( "usage"+i ).style['display']='none';
+			}
+		}
+		else {
+			document.getElementById( "usage"+i ).style['display']='none';
+		}
+	}
+}
+
+var pppoeStatus='DISABLED';
+var ItemList = new Array();
+ItemList["ipdiv"] = 1;
+ItemList["sysInfodiv"] = 1;
+ItemList["portstadiv"] = 1;
+ItemList["pppdiv"] = 1;
+ItemList["connectiondiv"] = 1;
+
+#if (defined V_ETH_PORT_4plllw_l) || (defined V_ETH_PORT_4pw_llll)
+ItemList["connTypediv"] = 1;
+#endif
+
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+ItemList["callforwarddiv"] = 1;
+<%}%>
+#endif
+
+#if (defined V_SHOW_PPPOE_y)
+ItemList["pppoediv"] = 1;
+#endif
+
+function display_statusdiv() {
+	if( (ItemList["ipdiv"] == 1)
+		&& (ItemList["sysInfodiv"] == 1)
+		&& (ItemList["portstadiv"] == 1)
+		&& (ItemList["pppdiv"] == 1)
+		&& (ItemList["connectiondiv"] == 1)
+#if (defined V_SHOW_PPPOE_y)
+		&& (ItemList["pppoediv"] == 1)
+#endif
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+		&& (ItemList["callforwarddiv"] == 1)
+<%}%>
+#endif
+#if (defined V_ETH_PORT_4plllw_l) || (defined V_ETH_PORT_4pw_llll)
+		&& (ItemList["connTypediv"] == 1)
+#endif
+	) {
+		document.getElementById( "alldiv" ).style['display']='none';
+		document.getElementById( "statusdiv" ).style['display']='';
+	}
+	else {
+		document.getElementById( "alldiv" ).style['display']='';
+		document.getElementById( "statusdiv" ).style['display']='none';
+	}
+}
+
+function hideItem( itemID, action ) {
+	itemID0=document.getElementById( itemID+"0" );
+	itemID1=document.getElementById( itemID+"1" );
+
+	if( action==1 ) {
+		ItemList[itemID] = 1;
+
+		if(itemID0!=null)
+			itemID0.style['display']='none';
+		if(itemID1!=null)
+			itemID1.style['display']='';
+	}
+	else {
+		ItemList[itemID] = 0;
+
+		if(itemID1!=null)
+			itemID1.style['display']='none';
+		if(itemID0!=null)
+			itemID0.style['display']='';
+	}
+	display_statusdiv();
+#if (defined V_SHOW_PPPOE_y)
+	if( document.getElementById("pppoeStatus").innerHTML == _("disabled") )
+		document.getElementById( "pppoeip" ).style['display']='none';
+	else
+		document.getElementById( "pppoeip" ).style['display']='';
+#endif
+}
+
+<% wan_mode=get_single("link.profile.0.wan_mode"); %>
+
+function showAllItems() {
+#if (defined V_ETH_PORT_4plllw_l) || (defined V_ETH_PORT_4pw_llll)
+	<% if(wan_mode=="wan") { %>
+		hideItem('connTypediv', 1);
+	<% } %>
+#endif
+	hideItem('ipdiv', 1);
+	hideItem('sysInfodiv', 1);
+	hideItem('portstadiv', 1);
+#if (defined V_PRODUCT_swi_nhd1w)
+	document.getElementById( "connectiondiv0" ).style['display']='none';
+	document.getElementById( "pppdiv0" ).style['display']='none';
+#else
+	hideItem('pppdiv', 1);
+	hideItem('connectiondiv', 1);
+#endif
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	hideItem('callforwarddiv', 1);
+<%}%>
+#endif
+#if (defined V_SHOW_PPPOE_y)
+	hideItem('pppoediv', 1);
+#endif
+}
+function showDefaultItems() {
+#if (defined V_PRODUCT_swi_nhd1w)
+	showAllItems();
+#else
+	hideItem('ipdiv', 0);
+#endif
+
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	hideItem('callforwarddiv', 0);
+<%}%>
+#endif
+
+#if(defined V_ETH_PORT_4plllw_l) || (defined V_ETH_PORT_4pw_llll)
+	<%if(wan_mode=="wan") {%>
+	hideItem('connTypediv', 1);
+	<%}else{ %>
+	hideItem('connTypediv', 0);
+	document.getElementById( "connTypediv0" ).style['display']='none';
+	<%}%>
+#else
+	hideItem('connTypediv', 0);
+#endif
+
+#if (defined V_SHOW_PPPOE_y)
+	if(pppoeStatus=='DISABLED')
+		hideItem('pppoediv', 0);
+#endif
+}
+
+function switchItem( action ) {
+	if( action ) {
+		document.getElementById("usageDiv0").innerHTML="&nbsp;&nbsp;"+_("mobile broadband mbb")+'<a href=javascript:switchItem(0); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;'+_("hideDataUsage")+"</a>";
+		document.getElementById( "usageDiv1" ).style['display']='';
+	}
+	else {
+		document.getElementById("usageDiv0").innerHTML="&nbsp;&nbsp;"+_("mobile broadband mbb")+'<a href=javascript:switchItem(1); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;'+_("showDataUsage")+"</a>";
+		document.getElementById( "usageDiv1" ).style['display']='none';
+	}
+}
+
+function switchDuration( action ) {
+	if( action ) {
+		document.getElementById("Session_End").innerHTML=_("sessionDuration")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(0);>'+_("showEndTime")+'</a>';
+	}
+	else {
+		document.getElementById("Session_End").innerHTML=_("sessionEnd")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(1);>'+_("showDuration")+'</a>';
+	}
+	show_duration=action;
+	updata_usage();
+}
+
+#include "port_status.js"
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi',ajaxUpdate );
+	showDefaultItems();
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 3000);
+#if (defined V_ETH_PORT_4pw_llll) || (defined V_ETH_PORT_4plllw_l)
+<%if( session["sessionid"] != request["SESSION_ID"] ){%>
+	document.form1.selWanatp6.disabled=true;
+<%}%>
+#endif
+	if("@@request['QUERY_STRING']"=="setdate") {
+		$.get('/cgi-bin/setdate.cgi?'+HostDate());
+	}
+});
+</script>
+
+<form class="content" name="form1" method="POST"  >
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+<h3 id="statusdiv"><script language="JavaScript">document.write(_("status allstatus"));</script></h3>
+<p style="font-size:12px">
+<a id="alldiv" style="display:none" href="javascript:showAllItems();"><br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status allstatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="sysInfodiv0" style="display:none" href="javascript:hideItem('sysInfodiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("sysInfo"));</script>&nbsp;&nbsp;&nbsp;</a>
+#if (defined V_ETH_PORT_4plllw_l) || (defined V_ETH_PORT_4pw_llll)
+<a id="connTypediv0" style="display:none" href="javascript:hideItem('connTypediv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wan"));</script>&nbsp;&nbsp;&nbsp;</a>
+#endif
+<a id="ipdiv0" style="display:none" href="javascript:hideItem('ipdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("lan"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="portstadiv0" style="display:none" href="javascript:hideItem('portstadiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("portStatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="pppdiv0" style="display:none" href="javascript:hideItem('pppdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("mobile broadband"));</script>&nbsp;&nbsp;&nbsp;</a>
+#if (defined V_SHOW_PPPOE_y)
+<a id="pppoediv0" style="display:none" href="javascript:hideItem('pppoediv', 1);">&nbsp;&nbsp;&nbsp;PPPoE&nbsp;&nbsp;&nbsp;</a>
+#endif
+<!--a id="pptpdiv0" style="display:none" href="javascript:hideItem('pptpdiv', 1);">&nbsp;&nbsp;&nbsp;PPTP&nbsp;&nbsp;&nbsp;</a-->
+<a id="connectiondiv0" style="display:none" href="javascript:hideItem('connectiondiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status connection"));</script>&nbsp;&nbsp;&nbsp;</a>
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+<a id="callforwarddiv0" style="display:none; padding-left:20px" href="javascript:hideItem('callforwarddiv', 1);"><script language="JavaScript">document.write(_("status callforwarding"));</script></a>
+<%}%>
+#endif
+</p>
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('sysInfodiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("System Information"));</script></th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status System Up Time"));</script></td>
+	<td><input type="text" name="uptime"  size="40" class='cdcsAjax' width="25%"  readonly/> </td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("Device Version"));</script></td>
+	<td>
+	<script language="JavaScript">document.write(_("hardware"));</script>:&nbsp;<script language=Javascript>document.write(hw_ver);</script>&nbsp;&nbsp;
+	&nbsp;&nbsp;<script language="JavaScript">document.write(_("Firmware"));</script>:&nbsp;<font id="version"></font>
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("Cellular Module"));</script></td>
+	<td id="moduleInfo"></td>
+</tr>
+#if (defined V_SHOW_ACTIVE_CONNECTION)
+<tr>
+	<td><script language="JavaScript">document.write(_("active connection"));</script></td>
+	<td id="actConn"></td>
+</tr>
+#endif
+#if (defined V_PRODUCT_swi_nhd1w)
+<tr>
+	<td><script language="JavaScript">document.write(_("device"));</script></td>
+	<td id="deviceDock"></td>
+</tr>
+#endif
+</table>
+</div>
+
+<!-- ================= WAN ================= -->
+<div id="connTypediv1" style="padding-left:2px; padding-right:2px">
+	<table  border="0" cellpadding="0" cellspacing="0">
+	<tr>
+		<td style="padding:0px 0px;"><a href="javascript:hideItem('connTypediv', 0);"><img src="/images/close_0.gif" alt="-"/></a></td>
+		<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("wan"));</script></th>
+	</tr>
+	</table>
+
+	<table border="0">
+	<tr>
+		<td width='22%'><script language="JavaScript">document.write(_("status connect type"));</script></td>
+		<td id="conntype"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("status wan ipaddr"));</script></td>
+		<td id="wanip"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("Subnet Mask"));</script></td>
+		<td id="submask"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("default Gateway"));</script></td>
+		<td id="gateway"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("status primary dns"));</script></td>
+		<td id="dns1"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("status secondary dns"));</script></td>
+		<td id="dns2"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("port Filter Macaddr"));</script></td>
+		<td id="macadd"></td>
+	</tr>
+	</table>
+</div>
+
+<!-- ================= PPPoE ================= -->
+#if (defined V_SHOW_PPPOE_y)
+<div id="pppoediv1">
+#else
+<div id="pppoediv1" style="display:none">
+#endif
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('pppoediv', 0);" ><img src="/images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;PPPoE</th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status statusPPPoE"));</script></td>
+	<td id="pppoeStatus"></td>
+</tr>
+<tr id="pppoeip">
+	<td><script language="JavaScript">document.write(_("status addrPPPoE"));</script></td>
+	<td id="pppoeAddress"></td>
+</tr>
+</table>
+</div>
+
+<!-- ================= Lan ================= -->
+<div id="ipdiv1" style="padding-left:2px; padding-right:2px">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('ipdiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("lan"));</script></th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("IP"));</script></td>
+	<td>
+<%val=get_single('link.profile.0.address');%>@@val
+	&nbsp;&nbsp;/&nbsp;&nbsp;
+<%val=get_single('link.profile.0.netmask');%>@@val</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("MAC Address"));</script></td>
+	<td class="td_ltr" id="mac"><%v=get_single('link.profile.0.mac');%>@@v</td>
+</tr>
+</table>
+</div>
+#if (defined V_PRODUCT_swi_nhd1w)
+<div id="pppdiv1" style="display:none">
+#else
+<div id="pppdiv1" style="padding-left:2px; padding-right:2px">
+#endif
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('pppdiv', 0);switchItem(0)" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%" id="usageDiv0" >
+&nbsp;&nbsp;<script language="JavaScript">document.write(_("mobile broadband mbb"));</script><a href=javascript:switchItem(1); name="usageDiv0" style="margin-left:60px">&nbsp;&nbsp;<script language="JavaScript">document.write(_("showDataUsage"));</script></a>
+	</th>
+	</tr>
+</table>
+<div>
+<table width="92%">
+<tr>
+<td width="20%"><b><script language="JavaScript">document.write(_("Profile Name"));</script></b></td>
+<td width="8%"><b><script language="JavaScript">document.write(_("interface"));</script></b></td>
+<td width="26%"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="pppwait" style="display:none"/></td>
+<td width="26%"><b><script language="JavaScript">document.write(_("apn"));</script></b></td>
+<td width="20%"><b><script language="JavaScript">document.write(_("Ip Address"));</script></b></td>
+</tr>
+</table>
+</div>
+
+<table width="92%" id="ppp0" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile0"></td>
+<td width="8%" id="interface0"></td>
+<td width="26%" id="status0"></td>
+<td width="26%" id="apn0"></td>
+<td width="20%" id="local0"></td>
+</tr>
+</table>
+<table width="92%" id="ppp1" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile1"></td>
+<td width="8%" id="interface1"></td>
+<td width="26%" id="status1"></td>
+<td width="26%" id="apn1"></td>
+<td width="20%" id="local1"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp2" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile2"></td>
+<td width="8%" id="interface2"></td>
+<td width="26%" id="status2"></td>
+<td width="26%" id="apn2"></td>
+<td width="20%" id="local2"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp3" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile3"></td>
+<td width="8%" id="interface3"></td>
+<td width="26%" id="status3"></td>
+<td width="26%" id="apn3"></td>
+<td width="20%" id="local3"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp4" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile4"></td>
+<td width="8%" id="interface4"></td>
+<td width="26%" id="status4"></td>
+<td width="26%" id="apn4"></td>
+<td width="20%" id="local4"></td>
+</tr>
+</table>
+
+<table width="92%" id="ppp5" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="20%" id="profile5"></td>
+<td width="8%" id="interface5"></td>
+<td width="26%" id="status5"></td>
+<td width="26%" id="apn5"></td>
+<td width="20%" id="local5"></td>
+</tr>
+</table>
+</div>
+
+<div id="usageDiv1" style="display:none">
+<table width="92%" cols="5">
+<tr style="font-weight:bold">
+	<td width="24%" style="font-size:11px"><script language="JavaScript">document.write(_("Session Start"));</script></td>
+	<td id="Session_End" width="24%" style="font-size:11px"><script language="JavaScript">document.write(_("Session End"));</script>&nbsp;&nbsp;<a style='font-size:11px; text-decoration:underline;' href=javascript:switchDuration(1);><script language="JavaScript">document.write(_("showDuration"));</script></a></td>
+	<td width="13%" style="font-size:11px"><script language="JavaScript">document.write(_("Data Received"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+	<td width="13%" style="font-size:11px"><script language="JavaScript">document.write(_("dataSent"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+	<td width="18%" style="font-size:11px"><script language="JavaScript">document.write(_("totalData"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+</tr>
+<tr id="usage_current" style="display:none">
+	<td id="usage_current_0" style="font-size:9px"></td>
+	<td id="usage_current_1" style="font-size:9px; color:GREEN"><script language="JavaScript">document.write(_("Current Session"));</script></td>
+	<td id="usage_current_2" style="font-size:10px"></td>
+	<td id="usage_current_3" style="font-size:10px"></td>
+	<td id="usage_current_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage0" style="display:none">
+	<td id="usage0_0" style="font-size:9px"></td>
+	<td id="usage0_1" style="font-size:9px"></td>
+	<td id="usage0_2" style="font-size:10px"></td>
+	<td id="usage0_3" style="font-size:10px"></td>
+	<td id="usage0_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage1" style="display:none">
+	<td id="usage1_0" style="font-size:9px"></td>
+	<td id="usage1_1" style="font-size:9px"></td>
+	<td id="usage1_2" style="font-size:10px"></td>
+	<td id="usage1_3" style="font-size:10px"></td>
+	<td id="usage1_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage2" style="display:none">
+	<td id="usage2_0" style="font-size:9px"></td>
+	<td id="usage2_1" style="font-size:9px"></td>
+	<td id="usage2_2" style="font-size:10px"></td>
+	<td id="usage2_3" style="font-size:10px"></td>
+	<td id="usage2_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage3" style="display:none">
+	<td id="usage3_0" style="font-size:9px"></td>
+	<td id="usage3_1" style="font-size:9px"></td>
+	<td id="usage3_2" style="font-size:10px"></td>
+	<td id="usage3_3" style="font-size:10px"></td>
+	<td id="usage3_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage4" style="display:none">
+	<td id="usage4_0" style="font-size:9px"></td>
+	<td id="usage4_1" style="font-size:9px"></td>
+	<td id="usage4_2" style="font-size:10px"></td>
+	<td id="usage4_3" style="font-size:10px"></td>
+	<td id="usage4_4" style="font-size:10px"></td>
+</tr>
+</table>
+<table width="92%" cols="5">
+<tr >
+	<td align="right"><script language="JavaScript">document.write(_("data usage warning"));</script></td>
+</tr>
+</table>
+</div>
+#if (defined V_PRODUCT_swi_nhd1w)
+<div id="connectiondiv1" style="display:none">
+#else
+<div id="connectiondiv1" style="padding-left:2px; padding-right:2px">
+#endif
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('connectiondiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("Connection Status"));</script></th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status ip up time"));</script></td>
+	<td><input type="text" name="connuptime" size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("provider"));</script></td>
+	<td id="provider" style="color:#000000"></td>
+</tr>
+<tr id="service_type_div" style="display:none">
+	<td><script language="JavaScript">document.write(_("service type"));</script></td>
+	<td><input type="text" name="connType" size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr id="freq_div" >
+	<td><script language="JavaScript">document.write(_("status CSfrequency"));</script></td>
+	<td><input type="text" name="coverage" size="40" class='cdcsAjax'  readonly/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status CSimei"));</script></td>
+	<td><input type="text" name="imei" size='40' class='cdcsAjax'  readonly/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("signal Strength"));</script></td>
+	<td id="umtsss" style="color:#000"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("sim Status"));</script></td>
+	<td><input type="text" name="simStatus" id="simID" size="40" style="border-style:none; background:#F0EFEB" />
+	<img src="images/waiting.gif" width="24" height="24" id="simwait" style="display:none" /></td>
+</tr>
+</table>
+</div>
+
+<% if( request["SESSION_ID"]==session["sessionid"] ) { %>
+<p></p>
+&nbsp;&nbsp;<input type="Button" value="Advanced Status" id="bottomButton" onClick="window.location='AdvancedStatus.html'" style="padding:3px 8px">
+<p></p>
+<%}%>
+
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+<!-- ================= Callforwarding Status ================= -->
+<div id="callforwarddiv1">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+	<tr><td style="padding:0px 0px"><a href="javascript:hideItem('callforwarddiv', 0);" ><img src="/images/close_0.gif" alt="-"/></a></td>
+	<th width="100%" class="title" id="statusCallForwarding">&nbsp;&nbsp;<script language="JavaScript">document.write(_("status callForwardingStatus"));</script></th>
+	</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status statusCallwaiting"));</script></td>
+	<td id="callwaiting"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusUncdcallforward"));</script></td>
+	<td id="uncdcallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusBusycallforward"));</script></td>
+	<td id="busycallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusNoreplycdcallforward"));</script></td>
+	<td id="noreplycdcallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusNotreachablecallforward"));</script></td>
+	<td id="notreachablecallforward"></td>
+</tr>
+</table>
+</div>
+<%}%>
+#endif
+
+#include "port_status.htm"
+
+</form>
+</div>
+
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+<%
+var a_voice_roaming_blocked1=get_single('roaming.voice.outgoing.blocked');
+var a_voice_roaming_blocked2=get_single('roaming.voice.incoming.blocked');
+var a_data_roaming_blocked=get_single('roaming.data.blocked');
+if (a_voice_roaming_blocked1 == '' || a_voice_roaming_blocked1 == 'N/A') {
+	set_single('roaming.voice.outgoing.blocked=');
+}
+if (a_voice_roaming_blocked2 == '' || a_voice_roaming_blocked2 == 'N/A') {
+	set_single('roaming.voice.incoming.blocked=');
+}
+if (a_data_roaming_blocked == '' || a_data_roaming_blocked == 'N/A') {
+	set_single('roaming.data.blocked=');
+}
+%>
+<script language="JavaScript" type="text/javascript">
+var j_voice_roaming_blocked1="@@a_voice_roaming_blocked1";
+var j_voice_roaming_blocked2="@@a_voice_roaming_blocked2";
+var j_data_roaming_blocked="@@a_data_roaming_blocked";
+var roaming_warning_blocked = 0;
+
+if ((j_voice_roaming_blocked1 == '1' || j_voice_roaming_blocked2 == '1' || j_data_roaming_blocked == '1') && roaming_warning_blocked == 0) {
+	if ((j_voice_roaming_blocked1 == '1' || j_voice_roaming_blocked2 == '1') && j_data_roaming_blocked == '1')
+		alert_item=_("roaming warning1");
+	else if (j_voice_roaming_blocked1 == '1' || j_voice_roaming_blocked2 == '1')
+		alert_item=_("roaming warning2");
+	else if (j_data_roaming_blocked == '1')
+		alert_item=_("roaming warning3");
+	var r = confirm(alert_item+"\n\n" +_("roaming warning4"));
+	if (r == true)
+		setTimeout('window.location="/3gwwan.html"',10);
+	else
+		roaming_warning_blocked = 1;
+}
+</script>
+</html>

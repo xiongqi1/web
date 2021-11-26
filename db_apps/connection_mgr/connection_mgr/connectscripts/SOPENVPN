@@ -1,0 +1,103 @@
+#!/bin/sh -f
+#
+# Connect script for Generic PPTP
+#
+# This script is called by connection_mgr as follows:-
+#
+# SSierraUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+PROFILE=$1
+INSTANCE=$2
+
+DEV=`rdb_get link.profile.$PROFILE.dev`
+TTY=`rdb_get $DEV.data_if.$INSTANCE`
+
+
+# server parameters
+vpn_type=`rdb_get link.profile.$PROFILE.vpn_type`
+serverport=`rdb_get link.profile.$PROFILE.serverport`
+serverporttype=`rdb_get link.profile.$PROFILE.serverporttype`
+defaultgw=`rdb_get link.profile.$PROFILE.defaultgw`
+network_addr=`rdb_get link.profile.$PROFILE.network_addr`
+network_mask=`rdb_get link.profile.$PROFILE.network_mask`
+auth_type=`rdb_get link.profile.$PROFILE.vpn_authtype`
+conn_type=$(rdb_get "link.profile.$PROFILE.conn_type")
+route_metric=$(rdb_get "link.profile.$PROFILE.route_metric")
+tls_auth=$(rdb_get "link.profile.$PROFILE.tls_auth")
+if [ "$auth_type" = "1" -o "$auth_type" = "2" ]; then
+	user=`rdb_get link.profile.$PROFILE.user`
+	pass=`rdb_get link.profile.$PROFILE.pass`
+else
+	user=""
+	pass=""
+fi
+
+# additional parameters for client
+serveraddress=`rdb_get link.profile.$PROFILE.serveraddress`
+certi=`rdb_get link.profile.$PROFILE.certi`
+# additional parameters for peer
+local_ipaddr=`rdb_get link.profile.$PROFILE.local_ipaddr`
+remote_ipaddr=`rdb_get link.profile.$PROFILE.remote_ipaddr`
+remote_nwaddr=`rdb_get link.profile.$PROFILE.remote_nwaddr`
+remote_nwmask=`rdb_get link.profile.$PROFILE.remote_nwmask`
+vpn_keepalive_ping=$(rdb_get "link.profile.$PROFILE.keepalive_ping")
+vpn_keepalive_restart=$(rdb_get "link.profile.$PROFILE.keepalive_restart")
+
+# use default keepalive
+if [ -z "$vpn_keepalive_ping" ]; then
+	vpn_keepalive_ping="3"
+fi
+
+if [ -z "$vpn_keepalive_restart" ]; then
+	vpn_keepalive_restart="30"
+fi
+
+export OPENVPN_KEEPALIVE="$vpn_keepalive_ping $vpn_keepalive_restart"
+log "*openvpn keepalive settings"
+cat << EOF | log
+vpn_keepalive_ping="$vpn_keepalive_ping"
+vpn_keepalive_restart="$vpn_keepalive_restart"
+OPENVPN_KEEPALIVE="$OPENVPN_KEEPALIVE"
+EOF
+
+log() {
+	logger -t "SOPENVPN" "$@"
+}
+
+# set openvpn user parameters
+OPENVPN_USER_SCRIPT="/etc/cdcs/connectscripts/SOPENVPN-SUB"
+OPENVPN_USER_PARAM="$PROFILE"
+export OPENVPN_USER_SCRIPT OPENVPN_USER_PARAM
+
+case $vpn_type in
+	'server')
+		log "launching server mode..."
+		log "exec openvpn.sh server \"$serverporttype:$serverport\" \"$network_addr\" \"$network_mask\" \"$user\" \"$pass\""
+		exec openvpn.sh server "$serverporttype:$serverport" "$network_addr" "$network_mask" "$user" "$pass" "$conn_type" "$tls_auth"
+		;;
+		
+	'client')
+		if [ "$route_metric" = "" ]; then
+			route_metric=20
+		fi
+
+		log "launching client mode..."
+		log "openvpn.sh client \"$serveraddress\" \"$serverporttype:$serverport\" \"$certi\" \"$defaultgw\" \"$user\" \"$pass\" \"$conn_type\" \"$route_metric\" \"$auth_type\"" 
+		exec openvpn.sh client "$serveraddress" "$serverporttype:$serverport" "$certi" "$defaultgw" "$user" "$pass" "$conn_type" "$route_metric" "$auth_type" "$tls_auth"
+		;;
+		
+	'peer')
+		log "launching peer mode..."
+		log "openvpn.sh point-to-point \"$serveraddress\" \"$serverporttype:$serverport\" \"$local_ipaddr\" \"$remote_ipaddr\" \"$remote_nwaddr\" \"$remote_nwmask\""
+		exec openvpn.sh point-to-point "$serveraddress" "$serverporttype:$serverport" "$local_ipaddr" "$remote_ipaddr" "$remote_nwaddr" "$remote_nwmask" "$conn_type"
+		;;
+		
+	*)
+		log "unknown mode - $vpn_type"
+	
+esac
+

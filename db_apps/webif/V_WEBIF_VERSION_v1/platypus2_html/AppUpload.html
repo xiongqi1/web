@@ -1,0 +1,273 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Application Installation Manager</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+
+<script language="javascript" type="text/javascript" src="/cedric.js"></script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/get_files.cgi?getInstallMsg'></script>
+<script language="javascript" type="text/javascript">
+var user_agent = '@@headers['USER_AGENT']';
+var skin = <%val='\"'+get_single('system.product.skin')+'\"';%>@@val;
+var ceder = 0;
+
+function iniCedric() {
+	if (!ceder) {
+		ceder = new Cedric( skin.indexOf('CDR')!=-1?660:838 );
+		ceder.zeroProgressBar();
+	}
+}
+
+function uploadFiles() {
+	ceder.startProgressStatus = ceder.startNetProgressStatus;
+	ceder && ceder.runRabbit("/cgi-bin/CdcsProgress.cgi?g=CdcsProgress");
+}
+
+function submitF1(){
+	document.form1.submit();
+	uploadFiles();
+}
+
+var errors = "";
+function processErrors() {
+	if( errors != "" ) {
+		printf("<tr><td valign=\"top\" align=\"left\"><b>Errors:</b></td><td align=\"left\">");
+			printf( errors );
+			printf("</td></tr>");
+	}
+}
+
+function getFileList() {
+	$.get("/cgi-bin/get_files.cgi?getfilelist", function(responseText) {
+		var flDiv = document.getElementById("FileList");
+		if(flDiv) {
+			flDiv.innerHTML = responseText;
+			setTimeout("ajaxFunction();", 10)
+		}
+	});
+}
+
+function displayimg( myid, action ) {
+	document.getElementById( myid ).style['display']=action;
+}
+
+function setEndPosition(elemId) {
+	var elem = document.getElementById(elemId);
+	if(elem != null) {
+		if(elem.createTextRange) {
+			var range = elem.createTextRange();
+			range.move('character', elem.value.length);
+			range.select();
+		}
+		else {
+			if(elem.selectionStart) {
+				elem.setSelectionRange(elem.value.length, elem.value.length);
+				elem.scrollTop=elem.scrollHeight;
+			}
+			else
+				elem.focus();
+		}
+	}
+}
+
+var WaitImage="";
+function installFile( waitimg, filename ) {
+	WaitImage = waitimg;
+	if(confirm(_("installConfirm")+filename) ) {
+		displayimg(waitimg, "");
+		$.get("/cgi-bin/file_action.cgi?I&"+filename, function() {
+			displayimg( "installmsg", "" );
+			document.getElementById( "nonInstall" ).style['display']='none';
+			setTimeout("ajaxFunction();", 500);
+			document.formI.installMsg.value = "";
+		});
+	}
+}
+
+function deleteFile( filename ) {
+	if(confirm(_("deleteConfirm")+filename) ) {
+		installFileName=filename;
+		$.get("/cgi-bin/file_action.cgi?D&"+filename, function (responseText) {
+				window.location = '/AppUpload.html';
+			}
+		);
+	}
+	else {
+		window.location = '/AppUpload.html';
+	}
+}
+
+var msgRayIndex = 0;
+var msgRay = new Array();
+function displayMsg() {
+	if( msgRayIndex < msgRay.length ) {
+		document.formI.installMsg.value += "  "+msgRay[msgRayIndex++]+"\n";
+		setEndPosition( "installText" );
+		setTimeout( "displayMsg();", 100 );
+	}
+	else {
+		//check result message from ipkg-cl as well
+		if( ( msgRay[msgRayIndex-1]!="Done")&&
+		      (msgRay[msgRayIndex-1]!="reboot")&&
+		      (msgRay[msgRayIndex-1]!="Successfully terminated.")&&
+		      (msgRay[msgRayIndex-1]!="An error ocurred") ) {
+			ajaxFunction();
+		}
+		else if( WaitImage!="" ) {
+			displayimg( WaitImage, "none");
+		}
+	}
+}
+
+var ajaxstop = 0;
+var prvMsg = "";
+function ajaxFunction() {
+	$.get("GET","/cgi-bin/get_files.cgi?getInstallMsg", function(responseText) {
+		if(responseText.length>0) {
+			eval( responseText );
+			len = installMsg.length;
+			if( len > 2 ) {
+				if( installMsg == prvMsg ) {
+					ajaxFunction();
+					return;
+				}
+				if( installMsg.substring(0, prvMsg.length) == prvMsg ) {
+					var newstr = installMsg.substring( prvMsg.length, len );
+					msgRay = newstr.split("\n");
+				}
+				else {
+					msgRay = installMsg.split("\n");
+				}
+				prvMsg = installMsg;
+				msgRayIndex = 0;
+				displayMsg();
+			}
+		}
+		else {
+			if( ++ajaxstop > 5) {
+				alert( "No response from router!\nPossibly the router has been forced to reboot." );
+			}
+			else {
+				setTimeout("ajaxFunction();	", 3000);
+			}
+		}
+	});
+}
+</script>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include /menu.html %>
+<h3>System > Load/Save > Upload</h3>
+<br/>
+<div id="nonInstall">
+<div class="info"  id="progress_info" >
+	<table class="data" cellpadding='3' cellspacing='1'>
+	<tr>
+		<td width="80px" align="left"><b>Phase:</b></td>
+		<td align="center"><span id="phase"></span></td>
+	</tr>
+	<script language=Javascript>
+	processErrors();
+	</script>
+	</table>
+</div>
+
+<div id="progress_bar" >
+<table class="data" cellpadding='3' cellspacing='1' >
+<tr>
+	<td width="80px" align="left"><b>Percent Complete:</b></td>
+	<td align="center"><span id="percent">0%</span></td>
+</tr>
+</table>
+<table class="data" cellpadding='3' cellspacing='1' style="background:#F0EFEB">
+	<div class="bar1" id="upload_status_wrap" align="center"><div align="center" class="bar2" id="upload_status"></div></div>
+	<tr>
+		<td width="80px" align="left"><b>Current Position:</b></td>
+		<td align="center"><span id="current">0</span> / <span id="total_kbytes"></span> KBytes</td>
+	</tr>
+	<tr>
+		<td align="left"><b>Elapsed time:</b></td>
+		<td align="center"><span id="time">0</span></td>
+	</tr>
+	<tr>
+		<td align="left"><b>Est Time Left:</b></td>
+		<td align="center"><span id="remain">0</span></td>
+	</tr>
+	<tr>
+		<td align="left"><b>Est Speed:</b></td>
+		<td align="center"><span id="speed">0</span> KB/s.</td>
+	</tr>
+	</table>
+</div>
+ 
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?form1" enctype="multipart/form-data">
+<table width="90%">
+	<tr><th>Upload:</th></tr>
+</table>
+<table width="90%">
+<tr>
+	<td width="8%"> <div align="center">File</div></td>
+	<td width="40%"> <input type=file height="30" size="35" name="uploadFile"> </td>
+	<td width="52%" ><div align=center><input type=button onClick="javascript:submitF1();" value="Upload"></div></td>
+</tr>
+</table>
+</form> 
+</div>
+
+<form name="formI">
+<div id="FileList"> 
+<table width="90%">
+	<td width="30%"><b>Loading Uploaded Files:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="22" height="22"/></td>
+</table>
+</div> 
+<div id="installmsg" style="display:none"> 
+<textarea id="installText" cols="78" rows="20" style="background:#F0EFEB; border:2px;" tabindex="1" name="installMsg" readonly="readonly"></textarea>
+<p></p>
+<div align="right" style="margin-right:10% "><a href="/cgi-bin/get_files.cgi?delMsgFile"><b>Close</b></a></div>
+</div> 
+<script language="javascript" type="text/javascript">
+
+if( user_agent.indexOf( "Konqueror" )!=-1 )
+	document.formI.installMsg.cols = 118;
+else
+	document.formI.installMsg.cols = 102;
+if( installMsg.length>0 ) {
+	displayimg( "installmsg", "");
+	document.getElementById( "nonInstall" ).style['display']='none';
+	document.formI.installMsg.value = installMsg;
+}
+</script>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+	session["filename"] = files['uploadFile'].CLIENT_FILENAME;
+	for (f in files) {
+		var filename = files[f].FILENAME;
+		retval=set_single( 'upload.local_filename=' + filename );
+		target = '/opt/cdcs/upload/' + session["filename"];
+		rename(files['uploadFile'].FILENAME, target);
+	}
+	%>
+	<script language='JavaScript' type="text/javascript">iniCedric(); uploadFiles();</script>
+	<script language='JavaScript' type="text/javascript">setTimeout( "ceder.showProgressDiv(0,0)", 2000);</script>
+	<script language=Javascript> setTimeout("getFileList()", 2100); </script>
+	<%
+}
+else {
+	set_single( 'upload.file_size=0' );
+	set_single( 'upload.current_size=0' );
+%>
+	<script language='JavaScript' type="text/javascript">iniCedric(); ceder.showProgressDiv(0,0);</script>
+	<script language='Javascript' type="text/javascript">getFileList();</script>
+<%
+}
+%>
+</html>

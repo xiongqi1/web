@@ -1,0 +1,211 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<head>
+<title>MyZone HotSpot -- Login</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />	
+<style>
+h1, h2, h3, h4, h5, h6 {
+font-size:100%;
+font-weight:normal;
+list-style-type: disc;
+}
+#logo {
+padding-left:24px;
+padding-top:38px;
+padding-bottom: 36px;
+}
+table {
+border:medium none;
+padding-right:0px;
+}
+th {
+    background:transparent url(images/NTC_tableHeader.gif) repeat-x scroll right top;
+    color:#FFFFFF;
+    font-size:12px;
+    font-weight:bold;
+    padding:5px 0px 5px 0px;
+    text-align:left;
+    width: 840px;
+}
+td {
+    background:#F0EFEB none repeat scroll 0%;
+    color:#695E4A;
+    font-size:12px;
+    padding:4px 10px;
+}
+#contentWrapper {
+    background:#FFFFFF url(images/NetComm_GUI_banner.jpg) no-repeat scroll right top;
+	margin:0px auto;
+	position:relative;
+	width:840px;
+	height:300px;
+}
+body {
+    background:#CCCCCC none repeat scroll 0%;
+    color:#695E4A;
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:12px;
+    overflow:visible;
+    position:relative;
+    padding-bottom: 10px;
+}
+h1 {
+	color:dff1ff;
+    font-size:24px;
+    font-weight:bold;
+    margin-bottom:8px;
+    font-style: italic;
+    padding-left: 0px;
+    font-family: sans-serif;
+}
+h2 {
+	color:3f3629;
+	font-size:13px;
+	font-weight:bold;
+	margin-bottom:2px;
+	padding:0pt;
+}
+#mainMenu {
+	left:349px;
+	position:absolute;
+	padding-top:0px;
+	width: 325px;
+	height: 61px;
+	top: 28px;
+}
+
+</style>
+<script language='JavaScript' src='/hotspotInit.cgi'></script>
+<script language='JavaScript'>
+	function checkRadio()
+	{
+			if(document.form.checkMe.value=='true' )
+			{
+				document.form.RememberMe.checked=true;
+			}
+			else
+			{
+				document.form.RememberMe.checked=false;
+			}
+			//alert(document.form.RememberMe.value+"  "+document.form.RememberMe.checked+"  "+document.form.checkMe.value)	
+	}
+</script>    
+</head>
+ <% 
+ 	if (request['QUERY_STRING'] == "" )
+	{
+		redirect(request['REQUEST_URI']+'?'+get_rand() );
+	}
+	url=request['REMOTE_ADDR'];
+	mac = get_single( url ); 
+  	//  form['myurl'] = url;
+    %><script language="javascript" type="text/javascript">
+		var pinError = <%val=get_single('hotspot.pin_error'+mac);%>"@@val";	
+		if (pinError=="N/A") pinError = 1;
+	</script><%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+		// Post-back. Process user data.
+		mypassword = form['password'];
+        retval=set_single( mac+'='+mypassword );
+        form['password'] = mypassword;
+        hotspot_pin_error = get_single( 'hotspot.pin_error'+mac );
+        if(hotspot_pin_error=='N/A')
+        {
+            hotspot_pin_error=1;
+        }
+        else
+        {
+            hotspot_pin_error=hotspot_pin_error+1; 
+        }
+        retval=set_single( 'hotspot.pin_error'+mac+'='+hotspot_pin_error );
+	    DDpassword = get_single( 'hotspot.user.password' );
+        AdminPassword = get_single( 'admin.user.admin' );
+		if(DDpassword=='N/A')
+		{
+		%>
+	        <script language="javascript" type="text/javascript">
+	            alert( 'The password is not initialized! Please contact administrator.' );
+	        </script>    
+		<%
+		}
+		else if(( mypassword == DDpassword ) || ( mypassword == AdminPassword ))
+		{
+	    	retval=set_single( 'hotspot.pin_error'+mac+'=1' );
+            retval=set_single( mac+'='+mypassword );
+        	if( mypassword != DDpassword )
+			{
+                session["sessionid"] = request['SESSION_ID'];
+                session["user"] = "admin";
+                session["userlevel"] = '1';
+            }
+	    %>
+	        <script language='JavaScript' type="text/javascript" src='/hotspotWiFi.cgi'></script>
+	        <script language="javascript" type="text/javascript">
+	        var locationstring = window.location.toString();	
+	     	var mystring = locationstring.substring(0,  locationstring.indexOf("/index.html") ); 
+//alert('OK ! <% write("mp =" + mypassword + " mac =" +mac + " url = "+ url ); %>' + " str = "+ mystring + " newurl = " + newurl ); 
+			if( newurl.indexOf( mystring ) == -1 )
+			{
+				//window.open( mystring );
+				//setTimeout("window.location.replace( newurl );", 2000);
+				//setTimeout("window.location.href=mystring;", 2000);
+				setTimeout("window.location.replace( mystring );", 2000);
+			}
+			else
+			{
+				window.location.replace( newurl );
+			}	
+		//	setTimeout("window.location.replace('/status.html');", 1000);	
+	        </script>
+		<%
+		}   
+		else 
+		{
+		%>
+			<script language="javascript" type="text/javascript">
+			if( parseInt(pinError)<5 )
+				alert( "Incorrect password! You have "+(5-parseInt(pinError))+" remaining attempts.");
+	        </script>
+		<%
+		}
+	}
+%>
+<body> 
+<div id="contentWrapper">  
+<div id="logo">	 
+	<div id="mainMenu">
+    <h1>MyZone Hotspot - Login</h1> </div>
+</div>
+<form name="form" method="POST" action="@@requst['SCRIPT_NAME']">
+<br></br>
+<div id="mainbody" style="padding-bottom:40px; padding-right:0px" >
+<table>
+	<tr><th colspan="2">&nbsp;&nbsp;&nbsp;&nbsp;Login</th></tr>
+    <tr><td colspan="2">&nbsp;</td></tr>					
+	<tr>
+		<td width="40%">&nbsp;&nbsp;&nbsp;<b>Please enter password</b></td>
+		<td><input type="password" name="password" maxlength="20" size="20" value="@@form['password']"></td>
+	</tr>
+	<tr>
+        <td colspan="2">
+        <br><br><div align="center" style="margin-right:5%"><input type="button" name="submitForm" onClick='document.form.submit();;' value="Submit"></div>
+        </td>
+	</tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+</table> 
+<div width="80%" style="margin-right:20%"  ><br>
+<br/>
+<br/>
+</div>
+</div>
+<script language="javascript" type="text/javascript">
+	if(parseInt(pinError)>=5)
+		document.getElementById("mainbody").innerHTML = "<h2>Please power cycle the device physically and restart the browser to try again</h2>";
+</script>
+</form>
+</div>
+</body>
+</html>

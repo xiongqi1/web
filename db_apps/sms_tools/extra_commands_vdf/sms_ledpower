@@ -1,0 +1,51 @@
+#!/usr/bin/awk -f
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+BEGIN {
+
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "This AWK script is used by SMS tools to control LED behaviour."
+		print "It takes 2 parameters:"
+        print "get - prints the current LED settings"
+        print "set - takes an int (0-65535 minutes) to specify how long the"
+        print "      LEDs should remain on before turning off. 0 indicates"
+        print "      that there is no timeout."
+		exit (0);
+	}
+
+	if(ARGV[1]=="get") {
+		timer=exec("rdb_get system.led_off_timer")
+		if(timer==0) {
+			msg="LEDs are always on."
+		}
+		else {
+			msg="LEDs turn off after " timer " minutes."
+		}
+	}
+	else if(ARGV[1]=="set") {
+		if( ARGC != 3 ) {
+			msg="Parameter ERROR";
+		}
+		else if( 0<=ARGV[2] && ARGV[2]<=65535) {
+			system("rdb_set system.led_off_timer " ARGV[2])
+			msg="ledpower timer=" ARGV[2] " min"
+		}
+		else {
+			msg="Parameter ERROR";
+		}
+	}
+	else {
+		msg="Parameter ERROR";
+	}
+
+	system( "logger '"msg"'" );
+	print msg;
+}

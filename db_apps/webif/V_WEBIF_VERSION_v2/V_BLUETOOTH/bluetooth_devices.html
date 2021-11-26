@@ -1,0 +1,827 @@
+<!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Bluetooth Configuration</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+  <div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+
+	<div class="grid-9 omega">
+	  <form class="validate" name="form" id="form"
+            novalidate="novalidate" method="POST"
+            action="@@request['SCRIPT_NAME']">
+		<div class="right-column white-box">
+		  <div class="pad">
+
+            <!-- Message goes here if bluetooth disabled -->
+            <table id="bluetooth_disabled" class="border-top"></table>
+
+            <!-- Everything below here only shown if bluetooth is enabled -->
+            <div id="devices_content">
+			  <h2>
+                <script language=Javascript>
+                  document.write(_("bluetooth_this_dev"))
+                </script>
+              </h2>
+
+              <!-- "Discoverable" radio buttons "on" and "off" -->
+              <!-- TODO: on/off and time countdown needs to be inited properly -->
+			  <div class="form-row no-bg-form">
+			    <label for="field" id="discoverable_label">
+                  <script language=Javascript>
+                    document.write(_("bluetooth_discoverable"))
+                  </script>
+                </label>
+			    <div class="field">
+				  <div class="location-settings">
+				    <div class="radio-switch">
+					  <input type="radio" id="discoverable_on"
+                             name="discoverable_radio"
+                             class="access" value=1>
+					  <label for="discoverable_on" class="on">
+                        <script language=Javascript>document.write(_("on"))
+                        </script>
+                      </label>
+					  <input type="radio" id="discoverable_off"
+                             name="discoverable_radio"
+                             class="access" value=0>
+					  <label for="discoverable_off" class="off">
+                        <script language=Javascript>document.write(_("off"))
+                        </script>
+                      </label>
+				    </div>
+				  </div>
+			    </div>
+              </div>
+
+              <div class="pad">
+			    <h2>
+                  <script language=Javascript>
+                  document.write(_("bluetooth_paired_devs"))
+                  </script>
+                </h2>
+
+                <br/>
+
+			    <table id="paired_devs_table" class="border-top">
+			      <colgroup>
+				    <col width="30%">
+				    <col width="40%">
+				    <col width="auto">
+			      </colgroup>
+                  <thead>
+                    <tr>
+                      <th class='align10'>
+                        <script language=Javascript>
+                          document.write(_("bluetooth_address"))
+                        </script>
+                      </th>
+                      <th class='align10'>
+                        <script language=Javascript>
+                          document.write(_("bluetooth_name"))
+                        </script>
+                      <th>
+                    </tr>
+                  </thead>
+			      <tbody id="paired_devs_list">
+                  </tbody>
+			    </table>
+
+              </div>
+
+              <div class="pad">
+
+                <div class="grid-50">
+			      <div class="pad alpha">
+                    <h2>
+                      <script language=Javascript>
+                        document.write(_("bluetooth_available_devs"))
+                      </script>
+                    </h2>
+			      </div>
+		        </div>
+
+                <!-- Scan/Stop scan buttons -->
+                <div class="grid-50">
+			      <div class="pad omega">
+				    <div class="submit-row-condensed">
+                      <img src="/img/loading_spinner-20x20px.gif"
+                           id="scanning_spinner" class="hide"/>
+                      <!--
+                        -- Only one of the following two buttons is shown at
+                        -- any given time
+                        -->
+                      <button type="button" class="secondary sml fr"
+                              id="scan_devices">
+                        <script language=Javascript>
+                          document.write(_("bluetooth_scan"))
+                        </script>
+                      </button>
+                      <button type="button" class="secondary sml fr hide"
+                              id="stop_scan">
+                        <script language=Javascript>
+                          document.write(_("bluetooth_stop_scan"))
+                        </script>
+                      </button>
+				    </div>
+			      </div>
+			    </div>
+
+                <!-- Available devices list -->
+			    <table id="available_devs_table" class="border-top">
+			      <colgroup>
+				    <col width="30%">
+				    <col width="40%">
+				    <col width="auto">
+			      </colgroup>
+                  <thead>
+                    <tr>
+                      <th class='align10'>
+                        <script language=Javascript>
+                          document.write(_("bluetooth_address"))
+                        </script>
+                      </th>
+                      <th class='align10'>
+                        <script language=Javascript>
+                          document.write(_("bluetooth_name"))
+                        </script>
+                      <th>
+                    </tr>
+                  </thead>
+			      <tbody id="available_devs_list">
+                  </tbody>
+			    </table>
+              </div>
+            </div>
+          </div>
+        </div>
+	  </form>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <p class="copy-right">
+      <script language=Javascript>document.write(_("powered by netComm"))
+      </script>
+    </p>
+  </div>
+</footer>
+
+<script language='javascript'>
+
+set_menu("Internet", "BT_DEVICES", <%_val = session["user"];%>"@@_val");
+
+/* Server side constants */
+<%
+var RPC_SVC = "btmgr.rpc"
+var RPC_TIMEOUT_SECS = 2;
+var RPC_RESULT_LEN = 100;
+var MAX_DEVICE_STR_LEN = 4096;
+%>
+
+/* Client side constants */
+var ONE_SEC_MSEC = 1000;
+
+/*
+ * Sets the label string for the discoverable radio buttons. If the time in
+ * the minutes and seconds paramters are not zero then the label will include
+ * both the button description and the current remaining discoverable time.
+ * Otherwise the label will just have the buttons description.
+ *
+ * Parameters:
+ *    minutes: Minute component of the time left before the adapter
+ *             discoverable is turned off.
+ *    seconds: Second component of the time left before the adapter
+ *             discoverable is turned off.
+ */
+function set_discoverable_label (minutes, seconds)
+{
+    var label = _("bluetooth_discoverable");
+
+    if ((minutes < 0) || (seconds < 0)) {
+        label += " (" + _("bluetooth_no_timeout") + ")";
+    } else if ((minutes > 0) || (seconds > 0)) {
+        if (seconds < 10) {
+            /* Zero pad to make fixed two digit string for seconds */
+            seconds = "0" + seconds;
+        }
+        label += " (" + minutes + ":" + seconds + ")";
+    }
+
+    $("#discoverable_label").html(label);
+}
+
+var discoverable_timer = undefined;
+var discoverable_on = false;
+
+/*
+ * Starts the discoverable timer.
+ *
+ * Parameters:
+ *    seconds: The number of seconds that the adapter discoverable will be
+ *             enabled for. -1 means no timeout (no auto disable).
+ */
+function discoverable_start_timer (seconds)
+{
+    if (seconds < 0) {
+        /* No timeout. Just set the label. No need to start timer */
+        set_discoverable_label(-1, -1);
+    } else {
+        /* Initialise the discoverable label with the starting countdown time */
+        var minutes_str = Math.floor(seconds / 60);
+        var seconds_str = seconds % 60;
+        set_discoverable_label(minutes_str, seconds_str);
+
+        /*
+         * Install 1 second interval timer that just updates the countdown
+         * label
+         */
+        discoverable_timer =
+            setInterval(function()
+                        {
+                            if (--seconds < 0) {
+                                $("#discoverable_off").trigger("click");
+                                return;
+                            }
+
+                            minutes_str = Math.floor(seconds / 60);
+                            seconds_str = seconds % 60;
+                            set_discoverable_label(minutes_str, seconds_str);
+                        },
+                        ONE_SEC_MSEC);
+    }
+    discoverable_on = true;
+}
+
+/*
+ * Handler for the "Discoverable On" click.
+ */
+$("#discoverable_on").click(function() {
+
+    /*
+     * Proceed only if discoverable currently off. Send an
+     * ajax request to turn on discoverable and start the local timer.
+     * Note: btmgr will automatically turn off discoverable after the configured
+     * timeout. Could poll btmgr until it says that has occured. But it's
+     * simpler and just as effective to have a local timer (the ajax request
+     * returns the discoverable timeout seconds).
+     */
+    if (!discoverable_on) {
+        $.post("cgi-bin/bluetooth.cgi",
+               {
+                  command:"discoverable",
+                  enable:"1"
+               },
+               function(res) {
+                   if (res.rval == 0) {
+                       var discoverable_timeout = res.data;
+                       if (discoverable_timeout == 0) {
+                           discoverable_timeout = -1;
+                       } 
+                       discoverable_start_timer(discoverable_timeout);
+                   }
+               });
+    }
+});
+
+/*
+ * Handler for "Discoverable Off" click.
+ */
+$("#discoverable_off").click(function() {
+
+    /*
+     * Proceed only if discoverable currently on. Send an
+     * ajax request to turn off discoverable and then stop the local timer.
+     */
+    if (discoverable_on) {
+        $.post("cgi-bin/bluetooth.cgi",
+               {
+                  command:"discoverable",
+                  enable:"0"
+               },
+               function(res) {
+                   if (discoverable_timer !== undefined) {
+                       /*
+                        * Timer is only present if there is a timeout.
+                        * (ie, not forever timeout).
+                        */
+                       clearInterval(discoverable_timer);
+                       discoverable_timer = undefined;
+                   }
+
+                   /*
+                    * Label needs to be set _after_ the timer is stopped by
+                    * clearInterval. Otherwise the timer can fire after the
+                    * label is set here and will overwrite it with the wrong
+                    * text.
+                    */
+                   set_discoverable_label(0, 0);
+                   discoverable_on = false;
+               });
+    }
+});
+
+var scan_timer = undefined;
+
+/*
+ * Updates the page during a scan operation.
+ *
+ * Parameters:
+ *    end: Boolean value (true or false). If true, end the scan and do one final
+ *         page update. If false, do only the update.
+ */
+function scan_update (end)
+{
+    if (end && (scan_timer !== undefined)) {
+        /*
+         * End the scan. Update the scan related UIs to indicate that the
+         * scan has ended. Also stop the local scan timer as the page updates
+         * for the scan should no longer occur.
+         */
+        $("#stop_scan").css("display", "none");
+        $("#scan_devices").css("display", "");
+        $("#scanning_spinner").css("display", "none");
+        clearTimeout(scan_timer);
+        scan_timer = undefined;
+    }
+
+    /*
+     * Get the device list from the server and update the device lists
+     * on this page.
+     */
+    fill_dev_lists_ajax();
+}
+
+/*
+ * Handler for "Scan" click.
+ */
+$("#scan_devices").click(function() {
+
+    /*
+     * Update the scan related UI elements to indicate that the scan
+     * has started. There is spinner (activity indicator), the scan button is
+     * hidden and the stop scan button is shown.
+     */
+    $("#scan_devices").css("display", "none");
+    $("#stop_scan").css("display", "inline");
+    $("#scanning_spinner").css("display","inline");
+
+    /*
+     * Request the server to start the scan for a given number of seconds.
+     * Create a one second interval timer to update the page device lists as
+     * devices are discovered.
+     */
+    var SCAN_SECONDS = 10;
+    $.post(
+            "cgi-bin/bluetooth.cgi",
+            {
+               command:"scan",
+               time:SCAN_SECONDS
+            },
+            function(res) {
+                var count = 0;
+                if (res.rval == 0) {
+                    scan_timer = setInterval(function(){
+                        var end = false;
+                        if (count++ >= SCAN_SECONDS) {
+                            /* Scan complete. scan_update will stop the timer */
+                            end = true;
+                        }
+                        scan_update(end);
+                    }, ONE_SEC_MSEC);
+
+                }
+                else {
+                  scan_update(true);
+                }
+            }
+        );
+});
+
+/*
+ * Handler for "Stop scan" click
+ */
+$("#stop_scan").click(function() {
+
+    /* scan_update will update the page to show that the scan has stopped */
+    scan_update(true);
+
+    /* Request a 0 second scan which tells the server to stop scanning */
+    $.post(
+            "cgi-bin/bluetooth.cgi",
+            {
+                command:"scan",
+                time:0
+            }
+        );
+});
+
+/* Device object constructor */
+function Device (address, name, paired)
+{
+    this.address = address;
+    this.name = name;
+    this.paired = paired;
+}
+
+/*
+ * Uses ajax to confirm/reject a passkey for a given device pairing.
+ *
+ * Parameters:
+ *    address: The BT device address
+ *    passkey: The passkey to be confirmed/rejected
+ *    confirm: Boolean. true to confirm, false to reject
+ */
+function confirm_passkey (address, passkey, confirm)
+{
+    $.post(
+           "cgi-bin/bluetooth.cgi",
+           {
+               command:"passkey_confirm",
+               address:address,
+               passkey:passkey,
+               confirm:confirm
+           }
+       );
+
+    $.blockUI({ message: null });
+}
+
+var pair_timer = undefined;
+var pair_prompt_shown = false;
+
+/* Dictionary that maps Bluez error codes to internationalised error strings */
+var bz_error_str = {
+    "org.bluez.Error.Failed": _("failed"),
+    "org.bluez.Error.AuthenticationFailed": _("authentication_failed"),
+    "org.bluez.Error.AuthenticationCanceled": _("authentication_canceled"),
+    "org.bluez.Error.AuthenticationRejected": _("authentication_rejected"),
+    "org.bluez.Error.AuthenticationTimeout": _("authentication_timeout"),
+    "org.bluez.Error.ConnectionAttemptFailed": _("connection_failed"),
+    "org.bluez.Error.AlreadyInProgress": _("already_in_progress"),
+    "org.bluez.Error.AlreadyExists": _("bluetooth_already_paired"),
+    "org.bluez.Error.InvalidDevice": _("invalid_device"),
+    "org.bluez.Error.NotPaired": _("bluetooth_not_paired")
+};
+
+/*
+ * Constructs an internationalised error message from a bluez error_code
+ */
+function get_bz_error_msg (error_code)
+{
+    /*
+     * Get the string corresponding to the code and use a default if the code
+     * is not recongnised.
+     */
+    var err_msg = bz_error_str[error_code];
+    if (err_msg === undefined) {
+        err_msg = _("failed");
+    }
+
+    return (err_msg);
+}
+
+/*
+ * Poll function that gets the pairing status and processes it.
+ */
+function pair_poll (dev_address, dev_name)
+{
+    $.post
+    (
+        "cgi-bin/bluetooth.cgi",
+        {
+            command:"pair_status",
+            address:dev_address
+        },
+        function(res) {
+            if (res.rval == 0) {
+                /*
+                 * The pair status is returned in the form: <status>[;parameter]
+                 * The optional parameter is present depending on the status.
+                 */
+                var result = res.data.split(";");
+                var status = result[0];
+
+                if (status == "confirm_passkey") {
+                    /* A passkey needs to be confirmed. Prompt the user. */
+                    var passkey = result[1];
+                    if (!pair_prompt_shown) {
+                        pair_prompt_shown = true;
+                        blockUI_confirm
+                        (
+                            /*
+                             * dev_name will eventually arrive within an html
+                             * element via jquery.blockUI, so it must be entity
+                             * encoded for correct rendering of special chars
+                             */
+                            lang_sentence(_("bluetooth_confirm_passkey"),
+                                          new Array(passkey,
+                                            specialCharEscape(dev_name,'e')
+                                           )),
+                            function()
+                            {
+                                confirm_passkey(dev_address, passkey, true);
+                            },
+                            function()
+                            {
+                                confirm_passkey(dev_address, passkey, false);
+                            }
+                        );
+                    }
+                } else if ((status == "not_pairing") || (status == "success") ||
+                           (status == "fail")){
+                    /* The pairing has completed */
+
+                    /* Stop polling */
+                    clearInterval(pair_timer);
+
+                    /*
+                     * Error msg shown on failure. On success just unblock the
+                     * the UI.
+                     */
+                    if (status == "fail") {
+                        var bz_error_msg = get_bz_error_msg(result[1]);
+                        var err_str = lang_sentence(_("bluetooth_pair_fail"),
+                                                    new Array(bz_error_msg));
+                        blockUI_alert(err_str);
+                    } else {
+                        $.unblockUI();
+                    }
+                    pair_prompt_shown = false;
+
+                    /*
+                     * Update the device lists. If the pairing succeeded the
+                     * newly paired device will move from the Available list to
+                     * the Paired list.
+                     */
+                    fill_dev_lists_ajax();
+                }
+            }
+        }
+    );
+}
+
+/*
+ * Click handler for the "Pair" button.
+ *
+ * Parameters
+ *    dev_address: Address of the device
+ *    dev_name: Name of the device
+ */
+function pair_click (dev_address, dev_name)
+{
+    $.blockUI({ message: null });
+
+    $.post(
+           "cgi-bin/bluetooth.cgi",
+           {
+              command:"pair",
+              address:dev_address
+           },
+           function(res) {
+               if (res.rval == 0) {
+                   /* Start a timer to poll the pair status */
+                   pair_timer = setInterval(function()
+                                            {
+                                                pair_poll(dev_address, dev_name)
+                                            },
+                                            ONE_SEC_MSEC);
+               } else {
+                   var bz_error_msg = get_bz_error_msg(result[1]);
+                   var err_str = lang_sentence(_("bluetooth_pair_fail"),
+                                               new Array(bz_error_msg));
+                   blockUI_alert(err_str);
+               }
+           });
+}
+
+/*
+ * Click handler for the "Unpair" button.
+ *
+ * Parameters
+ *    dev_idx: Address of the device
+ */
+function unpair_click (dev_address)
+{
+    $.blockUI({ message: null });
+    $.post(
+           "cgi-bin/bluetooth.cgi",
+           {
+              command:"unpair",
+              address:dev_address
+           },
+           function(res) {
+               if (res.rval != 0) {
+                   var bz_error_msg = get_bz_error_msg(res.data);
+                   var err_str = lang_sentence(_("bluetooth_unpair_fail"),
+                                               new Array(bz_error_msg));
+                   blockUI_alert(err_str);
+               } else {
+                   $.unblockUI();
+               }
+
+               /*
+                * Update the device lists. If the unpairing succeeds the newly
+                * unpaired device will be removed from the Paired list.
+                */
+               fill_dev_lists_ajax();
+           });
+}
+
+/*
+ * Generates the html table entries for both the paired and available devices.
+ *
+ * Parameters:
+ *    dev_list: A device list string as returned by the get_devices btmgr
+ *              RPC command.
+ */
+function fill_dev_lists (dev_list)
+{
+    var available_devices = [];
+    var paired_devices = [];
+    var devices = "";
+
+    if (dev_list.length > 0) {
+        devices = dev_list.split("&");
+    }
+
+    for (dev_ix = 0; dev_ix < devices.length; dev_ix++) {
+        var properties = devices[dev_ix].split(";");
+        var address = undefined;
+        var name = undefined;
+        var paired = undefined
+
+        for (prop_ix = 0; prop_ix < properties.length; prop_ix++) {
+            var property = properties[prop_ix].split("=");
+            var prop_name = property[0];
+            var prop_value = percent_decode(property[1]);
+
+            if (prop_name == "Address") {
+                address = prop_value;
+            } else if (prop_name == "Name") {
+                name = prop_value;
+            } else if (prop_name == "Paired") {
+                paired = prop_value;
+            }
+        }
+
+        if ((address === undefined) || (name === undefined) ||
+            (paired === undefined)) {
+            continue;
+        }
+
+        var device = new Device(address, name, paired);
+        if (paired == "false") {
+            available_devices[available_devices.length] = device;
+        } else {
+            paired_devices[paired_devices.length] = device;
+        }
+    }
+
+    /*
+     * Data for generating the required device tables. Each array entry is an
+     * an object that describes a seperate table to be generated and has these
+     * fields.
+     *     dev_list: An array of device objects (created above).
+     *               A table row is generated for each device in this list.
+     *     tbody: tbody id of the table for which rows will be inserted.
+     *     button_label: Each device row has a button with this label.
+     *     button_click: Each button has this click handler. The handler is
+     *                   passed the index of the device within the dev_list.
+     */
+    var table_data = [
+                         { dev_list:paired_devices,
+                           tbody:"#paired_devs_list",
+                           button_label:_("bluetooth_unpair"),
+                           button_click:"unpair_click" },
+                         { dev_list:available_devices,
+                           tbody:"#available_devs_list",
+                           button_label:_("bluetooth_pair"),
+                           button_click:"pair_click" }
+                     ];
+
+    /* Loop through each table's data */
+    for (data_idx = 0; data_idx < table_data.length; data_idx++) {
+        var num_devs_in_list = table_data[data_idx].dev_list.length;
+        var click_handler = table_data[data_idx].button_click;
+        var h = "";
+
+        if (num_devs_in_list == 0) {
+            /* No devices for this table */
+            var h = '<tr> <td colspan="3" align="center">' +
+                    _("bluetooth_no_devs") + '</td> </tr>';
+        } else {
+            /*
+             * At least one device for this table. Loop through each device and
+             * generate a table row for each device.
+             */
+            for (ix = 0; ix < num_devs_in_list; ix++) {
+                var dev = table_data[data_idx].dev_list[ix];
+                /*
+                 * Note that we need to escape special characters in dev.name
+                 * in the following two places.
+                 * 1) Within <td> </td>. this needs html entity encoding.
+                 * 2) For onClick handler expression. this is more complicated.
+                 *    the variable h will first be passed to jquery.html(),
+                 *    which will place the string h within <tbody> </tbody>.
+                 *    so it should be html entity encoded.
+                 *    furthermore, bt_name will be passed into click_handler(),
+                 *    which is subject to javascript quoting rule.
+                 *    so it should be ascii escaped.
+                 *    The order should be ascii encoding then entity encoding.
+                 */
+                h += '<tr>' +
+                     '    <td>' + dev.address + '</td>' +
+                     '    <td>' + specialCharEscape(dev.name, 'e') + '</td>' +
+                     '    <td>' +
+                     '        <button type="button" class="secondary fr sml"' +
+                     '                style="margin-left:20px"' +
+                     '                onClick="' + click_handler + '(\'' +
+                                          dev.address + '\', \'' +
+                                          specialCharEscape(
+                                              specialCharEscape(dev.name, 'a'),
+                                              'e') +
+                                          '\')">' +
+                                  table_data[data_idx].button_label +
+                     '        </button>' +
+                     '    </td>' +
+                     '</tr>';
+            }
+        }
+        $(table_data[data_idx].tbody).html(h);
+    }
+}
+
+/*
+ * Gets the current BT device list via ajax and updates the on page device lists.
+ */
+function fill_dev_lists_ajax ()
+{
+    $.post(
+           "cgi-bin/bluetooth.cgi",
+           {
+               command:"get_devices",
+           },
+           function(res) {
+               fill_dev_lists(res.data);
+           });
+}
+
+$(document).ready(function() {
+    var bt_enable="<% get_single_direct('bluetooth.conf.enable'); %>";
+
+	if (bt_enable != "1") {
+        /* Bluetooth disabled. Display message and hide the rest of the page */
+		var h= "<table><tr><th style='text-align:center'>" +
+               _("bluetooth_disabled_msg")+"</th></tr></table>";
+		$("#bluetooth_disabled").html(h);
+		$("#devices_content").css("display", "none");
+		return;
+	}
+
+    /*
+     * Get discoverable status from btmgr to initialise the discoverable
+     * on/off and discoverable timeout count down UI elements. stderr of rdb
+     * invoke is discarded as there is an error message if bluetooth is
+     * currently disabled (expected behaviour).
+     */
+    var discoverable_status = '<% exec_cmd('rdb invoke ' + RPC_SVC +
+                              ' discoverable_status ' + RPC_TIMEOUT_SECS +
+                              ' ' + RPC_RESULT_LEN + ' 2> /dev/null'); %>';
+
+    /*
+     * 0 discoverable_status means discoverable off.
+     * >0 discoverable_status means discoverable on with timeout.
+     * <0 discoverable_status means discoverable on with no timeout.
+     */
+    if (discoverable_status != 0) {
+        $("#discoverable_on").attr("checked", "checked");
+        discoverable_start_timer(discoverable_status);
+    } else {
+        $("#discoverable_off").attr("checked", "checked");
+    }
+
+    /*
+     * get_devices could return string containing special characters such as
+     * double quote, apostrophe, backslash, etc. we have to escape them before
+     * using in java script
+     */
+    var dev_list = '<% write(str_escape(exec_cmd_str('rdb invoke ' + RPC_SVC +
+                   ' get_devices ' + RPC_TIMEOUT_SECS + ' ' +
+                   MAX_DEVICE_STR_LEN + ' 2> /dev/null'), 'a')); %>';
+    fill_dev_lists(dev_list);
+});
+
+</script>
+
+</body>
+</html>

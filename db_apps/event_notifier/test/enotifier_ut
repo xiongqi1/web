@@ -1,0 +1,46 @@
+#!/bin/sh
+
+###############################################################################
+#
+# enotifier_ut
+#
+# This is a unit test version of enotifier. Used to simulate different
+# notification behaviours.
+#
+##############################################################################
+
+NOTI_IDX=$1
+NOTI_CLIENT=$2
+EVENT_TYPE=`rdb_get service.eventnoti.event.$NOTI_IDX.type`
+EVENT_TEXT=`rdb_get service.eventnoti.event.$NOTI_IDX.text`
+
+set_notification_result()
+{
+	rdb_set service.eventnoti.cmd.result $1
+}
+
+case $NOTI_CLIENT in
+	log)
+        # The UT script puts the desired enotifier return value (0 or 1)
+        # within the event text. Extract it and use it for notification_result
+        # to simulate notification success or failure.
+        #
+        # Event text example:
+        #     2014-08-29 10:43:45 <ENOTI_UT30487:0retry_first_fail_test1>
+        # So to extract the return value first remove start of string up to "<". Then
+        # remove start of string up to first ":". Finally, get the first character.
+        result=${EVENT_TEXT#*<}
+        result=${result#*:}
+        result=`echo ${result} | cut -c 1`
+
+        logger -puser.alert ${EVENT_TEXT}
+
+        set_notification_result ${result}
+        ;;
+	*)
+        # Ignore all other notification clients
+        set_notification_result 1
+        ;;
+esac
+
+exit 0

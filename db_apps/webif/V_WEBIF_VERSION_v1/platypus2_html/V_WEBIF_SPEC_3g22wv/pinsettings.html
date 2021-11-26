@@ -1,0 +1,546 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>PIN Settings</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	simpin = get_single('wwan.0.sim.pin');
+	mypin = form['pin'];
+	set_single('wwan.0.sim.cmd.param.pin='+mypin);
+	mystatus = form['SIMStatus'];
+	tempval="";
+	set_single('wwan.0.sim.cmd.status=');
+	set_single('wwan.0.sim.status.result_of_user_operation=');
+	if( mystatus=='SIM locked' ) {
+		set_single('wwan.0.sim.cmd.command=verifypin');
+		//check last operation
+		esp_sleep(6000);
+		// workaround for those SIM cards that take longer than 15 seconds - BIP 1024 Telstra memory SIM card and some Vodafone SIM cards
+		esp_wait_for_chg('wwan.0.sim.status.status','SIM BUSY',30)
+		tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+		if(tempval=="N/A" || tempval=="")
+			tempval = get_single('wwan.0.sim.cmd.status');
+	}
+	else if( mystatus=="PUK" ) {
+		mypuk = form['confirmPUK'];
+		set_single('wwan.0.sim.cmd.param.newpin='+mypin);
+		set_single('wwan.0.sim.cmd.param.puk='+mypuk);
+		set_single('wwan.0.sim.cmd.command=verifypuk');
+		//check last operation
+		esp_sleep(6000);
+		// workaround for those SIM cards that take longer than 15 seconds - BIP 1024 Telstra memory SIM card and some Vodafone SIM cards
+		esp_wait_for_chg('wwan.0.sim.status.status','SIM BUSY',30)
+		tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+		if(tempval=="N/A" || tempval=="")
+			tempval = get_single('wwan.0.sim.cmd.status');
+	}
+	else if( mystatus=="PH-NET PIN" || mystatus=="SIM PH-NET" || mystatus=="SIM MEP locked") {
+		meppin = form['mepCode'];
+		set_single('wwan.0.sim.cmd.param.mep='+meppin);
+		set_single('wwan.0.sim.cmd.command=unlockmep');
+		esp_sleep(5000);
+		redirect('/pinsettings.html?PH-NET');
+		return;
+	}
+	else {
+		mystatus = form['action'];
+		if( mystatus == 'changepin' ) {
+//			if(  simpin != "" )
+//				set_single('wwan.0.sim.cmd.param.pin='+simpin);
+//			else
+				set_single('wwan.0.sim.cmd.param.pin='+mypin);
+
+			mypin = form['newPin'];
+			retval=set_single('wwan.0.sim.cmd.param.newpin='+mypin);
+			retval=set_single('wwan.0.sim.cmd.command=changepin');
+
+			//check last operation
+			esp_sleep(6000);
+			tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+			if(tempval=="N/A" || tempval=="")
+				tempval = get_single('wwan.0.sim.cmd.status');
+			form['lastOpFailed'] = tempval;
+			if( tempval == "Operation succeeded" ) {
+				//only change the settings if last operation is successful
+				retval=set_single('wwan.0.sim.pin='+mypin);
+			}
+		}
+		else if( mystatus == 'disablepin' ) {
+			retval=set_single('wwan.0.sim.cmd.command=disablepin');
+			form['rememberSIMPIN']=0;
+
+			esp_sleep(6000);
+			tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+			if(tempval=="N/A" || tempval=="")
+				tempval = get_single('wwan.0.sim.cmd.status');
+		}
+		else if( mystatus == 'enablepin' ) {
+			retval=set_single('wwan.0.sim.cmd.command=enablepin');
+
+			esp_sleep(6000);
+			tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+			if(tempval=="N/A" || tempval=="")
+				tempval = get_single('wwan.0.sim.cmd.status');
+		}
+		else {
+			mystatus="";
+		}
+//		esp_sleep(6000);
+	}
+
+	// change auto pin setting only when last operation successful
+	if (tempval == "Operation succeeded") {
+		//check remember pin
+		tempval = form['rememberSIMPIN'];
+		set_single('wwan.0.sim.autopin='+tempval);
+		if( tempval == '1' ) {
+			set_single('wwan.0.sim.pin='+mypin);
+		}
+		else {
+			set_single('wwan.0.sim.pin=');
+			form['pin'] = "";
+			form['confirmPIN'] = "";
+		}
+		esp_sleep(1000);
+	}
+	redirect('/pinsettings.html?'+mystatus)
+}
+else { //GET
+	tempval = get_single('wwan.0.if');
+	if (tempval == 'at' && request['QUERY_STRING'] == "") {
+		set_single('wwan.0.sim.cmd.command=check');
+		esp_sleep(1000);
+	}
+}
+
+tempval = get_single('wwan.0.sim.autopin');
+form['rememberSIMPIN'] = tempval;
+if( tempval == '1' ) {
+	tempval = get_single('wwan.0.sim.pin');
+	form['pin'] = tempval;
+	form['confirmPIN'] = tempval;
+}
+else {
+	form['pin'] = "";
+	form['confirmPIN'] = "";
+	form['puk'] = "";
+	form['confirmPUK'] = "";
+}
+esp_sleep(2000);
+form['PINProtectionText']=get_single('wwan.0.sim.status.pin_enabled');
+form['numRetriesRem']=get_single('wwan.0.sim.status.retries_remaining');
+tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+if(tempval=="N/A" || tempval=="")
+	tempval = get_single('wwan.0.sim.cmd.status');
+form['lastOpFailed']=tempval;
+form['pukRetries']=get_single('wwan.0.sim.status.retries_puk_remaining');
+form['SIMStatus']=get_single('wwan.0.sim.status.status');
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("pinsettings");
+var query_str = <%_r=request['QUERY_STRING'];%>"@@_r";
+var initPIN;
+function submitF() {
+	if( document.form.SIMStatus.value.indexOf("PH-NET")==-1 && document.form.SIMStatus.value.indexOf("MEP")==-1 && document.form.PINaction.value!="changepin" && document.form.PINaction.style.display!='none') {
+		if( document.form.disablePIN.value==document.form.PINaction.value ) {
+			//if no change has been made, doing nothing
+			if ((document.form.rememberPIN[1].checked==true ) && (document.form.rememberPINtext.value != _("enabled")) ) {
+				return;
+			}
+			else if ((document.form.rememberPIN[0].checked==true ) && (document.form.rememberPINtext.value == _("enabled")) && (initPIN == document.form.pin.value)) {
+				return;
+			}
+
+			if (document.form.rememberPIN[1].checked==true) {
+				if(confirm(_("SIMwarningMsg4 3g22wv")) ) { //PIN will be lost.\nDo you wish to continue?
+					$.get("/cgi-bin/rdb.cgi?wwan.0.sim.autopin=0&wwan.0.sim.pin=", function() {
+						document.form.rememberPINtext.value=_("disabled");
+						document.form.pin.value = "";
+						document.form.confirmPIN.value = "";
+						document.form.puk.value = "";
+						document.form.confirmPUK.value = "";
+						alert(_("operation successful"));
+					});
+				}
+				return;
+			}
+			else {
+				if (document.form.pin.value.length < 4 || document.form.pin.value.length > 8 )
+					alert(_("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+				else if (document.form.pin.value != document.form.confirmPIN.value)
+					alert(_("wan warningMsg12"));//PINs do not match!
+				else if (confirm(_("SIMwarningMsg5")) ) //The PIN will be saved without verification.\nDo you wish to continue?
+					$.get("/cgi-bin/rdb.cgi?wwan.0.sim.autopin=1&wwan.0.sim.pin="+document.form.pin.value, function(){document.form.rememberPINtext.value=_("enabled");alert(_("operation successful"));});
+				return;
+			}
+		}
+	}
+	if( document.form.SIMStatus.value.indexOf("PH-NET")!=-1 || document.form.SIMStatus.value.indexOf("MEP")!=-1 ) {
+		if (document.form.mepCode.value.length != 8) {
+			alert(_("MEPlength sierra"));//The length of the MEP unlock code must be 8 digits!
+			return;
+		}
+		if (document.form.mepCode.value != document.form.mepCode2.value) {
+			alert(_("MEPPins"));//MEP unlock code are not matching each other
+			return;
+		}
+	}
+	else {
+		if ((document.form.PINaction.value=="changepin")&&document.form.PINProtectionText.value=="Disabled") {
+			alert(_("SIMwarningMsg7"));//Please Enable the \"PIN Protection\" first!
+			return;
+		}
+		if (document.form.pin.value != document.form.confirmPIN.value) {
+			alert(_("wan warningMsg12"));//PINs do not match!
+			return;
+		}
+		if ((document.form.PINaction.value=="changepin")&&(document.form.newPin.value != document.form.confirmnewPin.value)) {
+			alert(_("SIMwarningMsg8"));//NewPINs do not match!
+			return;
+		}
+		if ((document.form.SIMStatus.value=="PUK") && (document.form.puk.value != document.form.confirmPUK.value)) {
+			alert(_("wwan warningMsg13"));//PUK codes do not match!
+			return;
+		}
+		if ((document.form.SIMStatus.value=="PUK") && (document.form.puk.value.length != 8)) {
+			alert(_("wwan warningMsg19"));
+			return;
+		}
+		if (document.form.pin.value == "") {
+			alert(_("wwan warningMsg20"));//you must input PIN code
+			return;
+		}
+		if (document.form.pin.value.length < 4 || document.form.pin.value.length > 8 || ( (document.form.PINaction.value=="changepin")&&(document.form.newPin.value.length < 4 || document.form.newPin.value.length > 8 )) ) {
+			alert(_("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+			return;
+		}
+	}
+	document.form.saveButton.disabled = true;
+	document.form.submit();
+}
+
+
+function checkSIMStatus() {
+var simStatusID=document.getElementById('simID');
+	document.form.action.value = document.form.PINaction.value;
+	simStatusID.style.color = "RED";
+<%mepStatus=get_single('meplock.status');%>
+	if( "@@mepStatus"=="locked" ) {
+		document.form.SIMStatus.value="MEP Locked";
+	<%skin=get_single('system.product.skin'); if(skin=='ro') {%>
+		alert(_("mep warningMsg1_ro")+" "+_("mep warningMsg2"));
+	<%} else if(skin=='MOB') {%>
+		alert(_("mep warningMsg1_mob")+" "+_("mep warningMsg2"));
+	<%}else{%>
+		alert(_("mepLocked")+"\n"+_("mep warningMsg6"));
+	<%}%>
+		window.location=('mepUnlocking.html');
+		return;
+	}
+
+	if(document.form.rememberPIN[1].checked==true) {
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+	}
+
+	if( (document.form.SIMStatus.value=="SIM PIN")||(document.form.SIMStatus.value.indexOf("SIM locked")!= -1)
+	||(document.form.SIMStatus.value.indexOf("incorrect SIM")!= -1)||(document.form.SIMStatus.value.indexOf("SIM PIN Required")!= -1) ) {
+		document.form.SIMStatus.value = "SIM locked";
+		row_display("PINaction", 0);
+	}
+	else if ( document.form.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		document.form.SIMStatus.value="PUK";
+	}
+
+	if(query_str.indexOf("%4d%45%50%4c%6f%63%6b")!=-1) {
+		alert(_("SIMwarningMsg10"));
+	}
+
+	switch(document.form.SIMStatus.value) {
+	case "SIM locked":
+		simStatusID.value = _("SIMlocked");
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		if(query_str.indexOf("locked")!=-1) {
+			if (document.form.numRetriesRem.value > 1)
+				alert(_("SIMwarningMsg1")+" "+document.form.numRetriesRem.value+" "+_("wan attempts")); //"You need to enter the PIN code again since the last code was incorrect.
+			else if (document.form.numRetriesRem.value == 1)
+				alert(_("SIMwarningMsg1")+" "+document.form.numRetriesRem.value+" "+_("wan attempt"));
+		}
+	break;
+	case "PUK":
+		simStatusID.value = _("status pukLocked");
+		row_display("PINaction", 0);
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		row_display("puk1", 1);
+		row_display("puk2", 1);
+		if (query_str.indexOf("PUK")!=-1 || query_str.indexOf("locked")!=-1)
+			alert(_("SIMwarningMsg11"));//"You need to enter the correct PUK code and PIN."
+		document.form.numRetriesRem.value = document.form.pukRetries.value;
+	break;
+	case "PH-NET PIN":
+	case "SIM PH-NET":
+	case "SIM MEP locked":
+		simStatusID.value = _("mepLocked 3g22wv");
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		document.getElementById( "pin_puk_form" ).style['display']='none';
+		document.getElementById( "meplock_form" ).style['display']='';
+		if (query_str.indexOf("NET")!=-1)
+			alert(_("MEP unsuccessful 3g22wv"));
+	break;
+	case "SIM OK":
+		simStatusID.value = _("simOK");
+		simStatusID.style.color = 'GREEN';
+		if(query_str.length>=3) {//check last opration
+			if (query_str.indexOf("locked")!=-1 || query_str.indexOf("PUK")!=-1) {
+				alert(_("wwan warningMsg18"));//Unlock operation successful
+				setTimeout( "window.location = '/status.html'", 100);
+			} else if (query_str.indexOf("NET")!=-1) {
+				alert(_("MEP successful"));//The unlock code is correct.
+				setTimeout( "window.location = '/status.html'", 100);
+			} else if(document.form.lastOpFailed.value=='Operation succeeded') {
+				alert(_("operation successful"));
+				setTimeout( "window.location = '/status.html'", 100);
+			} else if( (document.form.PINProtectionText.value=="Disabled" && query_str.indexOf("enablepin")!=-1) || (document.form.PINProtectionText.value=="Enabled" && query_str.indexOf("disablepin")!=-1) ) {
+				alert(_("SIMwarningMsg3"));
+			} else if(document.form.lastOpFailed.value != "") {
+				alert(_("SIMwarningMsg3"));
+			}
+		}
+	break;
+	case "SIM not inserted":
+		simStatusID.value = _("sim not inserted");
+	break;
+	default:
+		simStatusID.value = document.form.SIMStatus.value;
+	break;
+	}
+	if (document.form.SIMStatus.value == "SIM not inserted" || document.form.SIMStatus.value == "SIM removed") {
+		document.form.numRetriesRem.value = _("unknown");
+	}
+}
+
+function enablePINFields2() {
+// This is not a bug. "rememberSIMPIN" should be always enabled due to Defect #4990.
+// If you have any question, please talk to Joe Zhou.
+//	document.form.rememberPIN[1].checked = true;
+//	document.form.rememberPIN.value=0;
+
+	if (document.form.SIMStatus.value.indexOf("Required")!=-1 || document.form.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		document.form.disablePIN.value="enablepin";
+		alert(_("warningMsg14"));//"You need to unlock the SIM by inputing PIN before disable"
+	}
+	else {
+		enablePINFields();
+	}
+}
+
+function enablePINFields() {
+	document.form.pin.disabled = false;
+	document.form.confirmPIN.disabled = false;
+}
+
+function enablePINFieldsforRemPIN() {
+	document.form.pin.disabled = false;
+	document.form.confirmPIN.disabled = false;
+}
+
+function PINFieldsChange(me) {
+	document.form.action.value = me.value;
+	switch( me.value ) {
+	case "enablepin":
+		row_display("newpin1", 0);
+		row_display("newpin2", 0);
+		enablePINFields();
+	break
+	case "disablepin":
+		row_display("newpin1", 0);
+		row_display("newpin2", 0);
+		enablePINFields2();
+	break
+	case "changepin":
+		row_display("newpin1", 1);
+		row_display("newpin2", 1);
+	break;
+	}
+}
+
+$(document).ready(function() {
+	checkSIMStatus();
+// This is not a bug. "rememberSIMPIN" should be always enabled due to Defect #4990.
+// If you have any question, please talk to Joe Zhou.
+	if(document.form.rememberSIMPIN.value=="1") {
+		document.form.rememberPIN[0].checked=true;
+		document.form.rememberPINtext.value =  _("enabled");
+		document.getElementById("rememberPINtext").style.color="GREEN";
+	}
+	else {
+		document.form.rememberPIN[1].checked=true;
+		document.form.rememberPINtext.value =  _("disabled");
+		document.getElementById("rememberPINtext").style.color="RED";
+	}
+
+	document.form.rememberSIMPIN.value=1
+	document.form.rememberPIN[0].checked=true;
+
+// <start> Original routine
+// 	if(document.form.rememberSIMPIN.value=="1") {
+// 		document.form.rememberPIN[0].checked=true;
+// 		document.form.rememberPINtext.value =  _("enabled");
+// 		document.getElementById("rememberPINtext").style.color="GREEN";
+// 	}
+// 	else {
+// 		document.form.rememberPIN[1].checked=true;
+// 		document.form.rememberPINtext.value =  _("disabled");
+// 		document.getElementById("rememberPINtext").style.color="RED";
+// 	}
+// <end> Original routine
+
+	initPIN = document.form.pin.value;
+	if(document.form.PINProtectionText.value=="Disabled") {
+		document.form.PINProtectionText.value=_("disabled");
+		document.form.disablePIN.value="disablepin";
+		document.getElementById("PINProtectionText").style.color="RED";
+	}
+	else {
+		document.form.PINProtectionText.value=_("enabled");
+		document.form.disablePIN.value="enablepin";
+		document.getElementById("PINProtectionText").style.color="GREEN";
+	}
+	document.form.PINaction.options.selectedIndex=0;
+	document.form.action.value = document.form.PINaction.value;
+	//document.form.pin.focus();
+	document.form.saveButton.disabled = false;
+	document.form.saveButton.value=_("CSsave");
+});
+</script>
+
+<style>alert { direction:rtl; }</style>
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("mobile broadband")+" > "+_("simSecurity"));</script></h3>
+
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']" autocomplete="off" >
+<input type="hidden" name="lastOpFailed" value="@@form['lastOpFailed']"/>
+<input type="hidden" name="rememberSIMPIN" value="@@form['rememberSIMPIN']"/>
+<input type="hidden" name="disablePIN" value="@@form['disablePIN']"/>
+<input type="hidden" name="action" value="@@form['action']"/>
+<input type="hidden" name="SIMStatus" value="@@form['SIMStatus']"/>
+<input type="hidden" name="pukRetries" value="@@form['pukRetries']"/>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("pinSettings"))</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("simStatus"))</script></td>
+	<td><input type="text" name="SIMStatusTest" id="simID" size="80" style="border-style:none; background:#F0EFEB" value="" readonly/></td>
+</tr>
+</table>
+
+<div id="pin_puk_form">
+<table width="75%">
+<tr id=trRetryCount>
+	<td width="30%"><script language="JavaScript">document.write(_("numberRetriesRemaining"))</script></td>
+	<td><input type="text" name="numRetriesRem" size="60" style="border-style:none; background:#F0EFEB" value="@@form['numRetriesRem']" readonly/></td>
+</tr>
+<!--- hide count tr if count does not exist --->
+<script language="JavaScript">
+	if("@@form['numRetriesRem']" == "")
+		document.getElementById("trRetryCount").style.display="none";
+</script>
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("CSpin"))</script></td>
+	<td><input type=password name="pin" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " size=8 maxlength=8 value="@@form['pin']">&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("confirmPin"))</script></td>
+	<td><input type=password name="confirmPIN" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " size=8 maxlength=8 value="@@form['confirmPIN']">&nbsp;</td>
+</tr>
+<tr id="newpin1" style="display:none;">
+	<td width="30%"><script language="JavaScript">document.write(_("newPin"))</script></td>
+	<td><input type=password name="newPin" onkeyup="this.value=this.value.replace(/[^\d]/g,'')" size=8 maxlength=8 >&nbsp;</td>
+</tr>
+<tr  id="newpin2" style="display:none;">
+	<td><script language="JavaScript">document.write(_("confirmNewPin"))</script></td>
+	<td><input type=password name="confirmnewPin" onkeyup="this.value=this.value.replace(/[^\d]/g,'')" size=8 maxlength=8 >&nbsp;</td>
+</tr>
+<tr id="puk1" style="display:none;">
+	<td><script language="JavaScript">document.write(_("puk"))</script></td>
+	<td><input type=password name=puk onkeyup="this.value=this.value.replace(/[^\d]/g,'')" size=8 maxlength=8 >&nbsp;</td>
+</tr>
+<tr id="puk2" style="display:none;">
+	<td><script language="JavaScript">document.write(_("wwan confirmPUK"))</script></td>
+	<td><input type=password name=confirmPUK onkeyup="this.value=this.value.replace(/[^\d]/g,'')" size=8 maxlength=8 >&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("rememberPin"))</script>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="text" name="rememberPINtext" id="rememberPINtext" size="10" style="border-style:none; background:#F0EFEB;" readonly /></td>
+	<td><input type=radio name=rememberPIN onclick="document.form.rememberSIMPIN.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;<input type=radio name=rememberPIN onclick="document.form.rememberSIMPIN.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("pinProtection"))</script>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="text" name="PINProtectionText" id="PINProtectionText" size="10" style="border-style:none; background:#F0EFEB;" value="@@form['PINProtectionText']" readonly/></td>
+	<td>
+	<select id="PINaction" name="PINaction" onchange="javascript:PINFieldsChange(this)" >
+		<option value="enablepin"><script language="JavaScript">document.write(_("enablePin"))</script></option>
+	<% tempval = get_single('wwan.0.sim.gui.no_disable_PIN'); if( tempval == '1' ) {%>
+		<option value="disablepin" style="display:"><script language="JavaScript">document.write(_("wwan disablePIN"))</script></option>
+	<%}else{%>
+		<option value="disablepin"><script language="JavaScript">document.write(_("wwan disablePIN"))</script></option>
+	<%}%>
+		<option value="changepin"><script language="JavaScript">document.write(_("changePIN"))</script></option>
+	</select>
+	</td>
+</tr>
+</table>
+</div>
+
+<div id="meplock_form" style="display:none">
+<table width="75%">
+<tr>
+	<td><script language="JavaScript">document.write(_("status CSimei"));</script></td>
+	<td style="color:#000">&nbsp;<%_v=get_single('wwan.0.imei');%>@@_v</td>
+</tr>
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("MEP unlock code"))</script></td>
+	<td><input type=password name="mepCode" size=16 maxlength=12 onkeyup="this.value=this.value.replace(/[^\d]/g,'')"></td>
+</tr>
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("wwan confirmMEP"))</script></td>
+	<td><input type=password name="mepCode2" size=16 maxlength=12 onkeyup="this.value=this.value.replace(/[^\d]/g,'')">&nbsp;</td>
+</tr>
+</table>
+</div>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+<div align="center">
+<p></p><input type="Button" style="width:120px;" value="Save"  name="saveButton" onClick="javascript:submitF()">
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

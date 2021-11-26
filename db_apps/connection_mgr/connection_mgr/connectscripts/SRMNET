@@ -1,0 +1,220 @@
+#!/bin/sh -f
+#
+# Connect script for Qualcomm integrated radio
+#
+# This script is called by wwand_deamon as follows:-
+#
+# SRMNET <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+#
+# <action> is only used for internal purpose
+#
+
+
+PROFILE=$1
+INSTANCE=$2
+
+BIN=$0
+ACTION=$3
+
+SERVICE_TYPE=`rdb_get "wwan.${INSTANCE}.system_network_status.service_type"`
+NETWORK_PROVIDER=`rdb_get "wwan.${INSTANCE}.system_network_status.network"`
+SIGNAL_STRENGTH=`rdb_get "wwan.${INSTANCE}.radio.information.signal_strength"`
+
+MODULE_NAME=`rdb_get "wwan.${INSTANCE}.model"`
+FIRMWARE_VERSION=`rdb_get "wwan.${INSTANCE}.firmware_version"`
+DETECT_NAME=`rdb_get "wwan.${INSTANCE}.module_name"`
+ROUTER_VERSION=`head -n 1 /etc/version.txt`
+
+CONNECTION_TIMEOUT=60
+
+# do not try Telstra bigpond and extranet in autapn mode
+PLMN_MCC=`rdb_get wwan.0.imsi.plmn_mcc`
+PLMN_MNC=`rdb_get wwan.0.imsi.plmn_mnc`
+
+test -z "$ACTION" && ACTION=start
+
+log() {
+    logger SRMNET -- $@
+    echo SRMNET -- $@
+}
+
+getRmNetIp() {
+    LINE=`ifconfig rmnet0 | grep "inet addr"`
+    LINE=${LINE##*addr:}
+    echo ${LINE%% Bcast*}
+}
+
+startRmNet() {
+    # get connection information
+    APN=`rdb_get link.profile.${PROFILE}.apn`
+    USER=`rdb_get link.profile.${PROFILE}.user`
+    PASS=`rdb_get link.profile.${PROFILE}.pass`
+    AUTH=`rdb_get link.profile.${PROFILE}.auth_type`
+
+    log "APN name=$APN #/ provider=$NETWORK_PROVIDER / signal=$SIGNAL_STRENGTH / service=$SERVICE_TYPE"
+    #log "rv=$ROUTER_VERSION / comp=$DETECT_NAME"
+    #log "dongle=$MODULE_NAME / ver=$FIRMWARE_VERSION"
+
+    OPTUSER=""
+    OPTPASS=""
+    OPTAUTH=""
+
+    # clear apn if auto apn selected
+    auto_apn=$(rdb_get "webinterface.autoapn")
+    if [ "$auto_apn" = "1" ]; then
+        log "auto-apn is enabled in 'webinterface.autoapn' rdb"
+        APN=""
+    fi
+
+    if [ -z "$APN" ]; then
+        while true; do
+            # read wwan.0.apn.simICCID before wwan_check_apn running which
+            # clears this variable
+            LAST_ICCID=`rdb_get wwan.0.system_network_status.simICCID`
+            LAST_APN=`rdb_get wwan.0.apn.${LAST_ICCID}`
+            eval `wwan_check_apn`
+            log "auto APN: '$APN' USER: '$USER' PASS: '$FAKE_PASS' AUTH: '$AUTH'"
+
+            # do not try Telstra bigpond and extranet in auto apn mode
+            # if current ICCID is matching with previous historic ones and
+            # previous connection was extranet or bigpond, allow connection.
+            if [ "$PLMN_MCC" = "505" -a "$PLMN_MNC" = "01" ]; then
+                if [ "$APN" = "telstra.extranet" -o "$APN" = "telstra.bigpond" ];then
+                    #log "current ICCID = $LAST_ICCID, LAST_APN = $LAST_APN, APN = $APN"
+                    if [ "$LAST_APN" = "" -o "$LAST_APN" != "$APN" ]; then
+                        log "auto APN: '$APN' is ignored in autoapn mode"
+                        continue
+                    fi            
+                fi
+            fi
+            break
+        done
+
+        if [ -z "$APN" ]; then
+            log "Can't autodetect APN. SIM not ready?"
+            exit 1
+        fi
+
+        rdb_set wwan.0.apn.current "$APN"
+        rdb_set wwan.0.username.current "$USER"
+        rdb_set wwan.0.pass.current "$PASS"
+        rdb_set wwan.0.auth.current "$AUTH"
+        rdb_set wwan.0.profile.current "$PROFILE"
+        rdb_set wwan.0.connection.status connecting
+        # Update profile's current APN
+        rdb_set link.profile.$PROFILE.apn.current "$APN"
+    fi
+    test -n "$USER" && OPTUSER="-user $USER"
+    test -n "$PASS" && OPTPASS="-pass $PASS"
+    #test -n "$AUTH" && OPTAUTH="-auth $AUTH"
+    test "$AUTH" = "PAP" && OPTAUTH="-auth 1"
+    test "$AUTH" = "pap" && OPTAUTH="-auth 1"
+    test "$AUTH" = "CHAP" && OPTAUTH="-auth 2"
+    test "$AUTH" = "chap" && OPTAUTH="-auth 2"
+
+    echo "NetCfg setapn -apn "$APN" $OPTUSER $OPTPASS $OPTAUTH" > /tmp/setapn
+
+    NetCfg setapn -apn "$APN" $OPTUSER $OPTPASS $OPTAUTH
+
+    # get the radio online
+    if ! NetCfg start; then
+        log "NetCfg - activation failure"
+        return 1
+    fi
+
+    WAIT_TIMER=0
+    IF_FLAGS=0
+    IF_UP=0
+    while [ $WAIT_TIMER -lt $CONNECTION_TIMEOUT ]; do
+        IF_FLAGS=`cat /sys/class/net/rmnet0/flags`
+        IF_UP=$((IF_FLAGS & 1))
+        if [ $IF_UP -eq "1" ]; then
+            break
+        fi
+        sleep 1
+        WAIT_TIMER=$((WAIT_TIMER +1))
+    done
+
+    if [ $IF_UP -eq "0" ]; then
+        log "Unable to start WWAN interface after $WAIT_TIMER seconds"
+        NetCfg stop
+        return 1
+    fi
+
+    log "WWAN interface is UP"
+
+    # Configure nameservers
+    echo "nameserver `getprop net.rmnet0.dns1`" > /etc/resolv.conf
+    echo "nameserver `getprop net.rmnet0.dns2`" >> /etc/resolv.conf
+
+    # Run NtpClient
+    /system/bin/NtpClient `rdb_get service.ntp.server_address`
+
+    # build environment variables for ip-up script
+    PPP_IFACE="rmnet0"
+    PPP_TTY=""
+    PPP_SPEED=""
+    PPP_LOCAL=`getRmNetIp`
+    PPP_REMOTE="0.0.0.0"
+    PPP_IPPARAM="$PROFILE"
+
+    rdb_set "wwan.${INSTANCE}.ifname"	"rmnet${INSTANCE}"
+    rdb_set "link.profile.${PROFILE}.pid" "$$"
+    rdb_set "service.ddns.trigger" "1"
+    echo "$$" > "/var/lock/rmnet-${PROFILE}.pid"
+    /etc/ppp/ip-up "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+    log "ip-up script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+stopRmNet() {
+    if ifconfig rmnet0 > /dev/null; then
+        # get the module down
+        if ! NetCfg stop; then
+            log "NetCfg - deactivation failure"
+        fi
+
+        log "rmnet connection down"
+    fi
+
+    rm -f "/var/lock/rmnet-${PROFILE}.pid"
+
+    # build environment variables for ip-down script
+    PPP_IFACE="rmnet"
+    PPP_TTY=""
+    PPP_SPEED=""
+    PPP_LOCAL=`getRmNetIp`
+    PPP_REMOTE="0.0.0.0"
+    PPP_IPPARAM="$PROFILE"
+
+    /etc/ppp/ip-down "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+    log "ip-down script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+
+case $ACTION in
+    'start')
+                log "Start rmnet - stop previous connection"
+                NetCfg stop
+                rm -f "/var/lock/rmnet-*.pid"
+                sleep 3
+
+        # start rmnet
+        log "Start rmnet"
+        if startRmNet; then
+            # stopRmNet on term signal
+            exec runonterm "$BIN $PROFILE $INSTANCE stop"
+        fi
+        ;;
+
+    'stop')
+        stopRmNet;
+        ;;
+esac
+

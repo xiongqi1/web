@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# get package status
+
+grep_remove_comment() {
+	grep -v 'Successfully terminated.'
+}
+
+sed_to_sms_format() {
+	sed '
+		/^[[:blank:]]*$/d
+		/^Successfully terminated$/d
+		=
+	' |  sed -nr '
+
+		# merge every 2 lines
+		N
+		s/\n/ /
+
+		# append "package version format" to hold space
+		/([^ ]+) ([^ ]+) \- ([^ ]+) .*/ {
+			s/([^ ]+) ([^ ]+) \- ([^ ]+) .*/#\1 \2\ v\3/
+			H
+		}
+
+		# replace carrige return with comma
+		$ {
+			x
+			s/\n/\; /g
+			s/^\; //
+			s/\; $//
+			p
+		}
+	'
+}
+
+ipkg_cl_list_installed() {
+	ipkg-cl list_installed 2>&1 | grep_remove_comment
+}
+
+
+list_installed=$(ipkg_cl_list_installed)
+
+if [ "$list_installed" = "" ]; then
+	echo "no package installed"
+else
+	ipkg_cl_list_installed | sed_to_sms_format
+fi
+
+exit 0

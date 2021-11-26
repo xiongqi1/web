@@ -1,0 +1,36 @@
+#!/bin/sh
+
+log() {
+	logger -t "wmmd_launcher" "$*"
+}
+
+clean_up_child() {
+	pkill -9 -P $$
+	wait
+	exit
+}
+
+trap clean_up_child SIGTERM
+
+# Qualcomm's libqmi.so is missing a required library soname from
+# its header: libqmi_client_qmux.so. This ensures that the entire
+# library is already mapped at start time.
+ELIBS=$(ls /lib/libqmi_client_qmux.so /usr/lib/libqmi_client_qmux.so 2> /dev/null)
+
+if [ -z "$ELIBS" ]; then
+	log "libqmi_client_qmux.so not found"
+fi
+
+pid="$$"
+log "remove launcher from OOM (pid=$pid)"
+echo "-17" > "/proc/$pid/oom_adj"
+
+while true; do
+	log "starting wmmd"
+	LD_PRELOAD=$ELIBS lua /usr/bin/wmmd_start.lua 2>&1 | logger -t "wmmd_launcher" 2> /dev/null > /dev/null &
+	wait
+
+	log "sleep for 60 seconds"
+	sleep 60
+done
+

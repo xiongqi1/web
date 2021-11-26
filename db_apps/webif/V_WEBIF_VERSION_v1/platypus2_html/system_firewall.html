@@ -1,0 +1,71 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<title>System Security Settings</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<%   
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['spiFWEnabled'];
+	retval = set_single( 'service.firewall.SPIFWEnabled='+tempval, '-p');
+}
+%>
+<body onLoad="updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("system_firewall");
+function updateState() {
+	var spi = <%val='\"'+get_single('service.firewall.SPIFWEnabled')+'\"';%>@@val;
+	if(spi == "0")
+		document.websSysFirewall.spiFWEnabled.options.selectedIndex = 0;
+	else
+		document.websSysFirewall.spiFWEnabled.options.selectedIndex = 1;
+}
+
+function resetState() {
+	document.websSysFirewall.spiFWEnabled.options.selectedIndex = 1;
+}
+
+$(document).ready(function() {
+	document.websSysFirewall.sysfwApply.value = _("CSsave");
+	document.websSysFirewall.sysfwReset.value = _("reset");
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("routing")+" > "+_("treeapp system firewall"));</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<form name="websSysFirewall" method="POST" action="@@request['SCRIPT_NAME']">
+
+<table width="85%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<th class="title" colspan="3"><script language="JavaScript">document.write(_("sysfw remote management title"))</script></th>
+</tr>
+</table>
+<table width="85%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td width="42%"><span class="title"><script language="JavaScript">document.write(_(""))</script>Stateful Packet Inspection (SPI) Firewall</span></td>
+	<td>
+	<select name="spiFWEnabled" size="1">
+	<option value=0 ><script language="JavaScript">document.write(_("disable"))</script></option>
+	<option value=1 ><script language="JavaScript">document.write(_("enable"))</script></option>
+	</select>
+	</td>
+</tr>
+</table>
+<div align="center">
+<br/>
+	<input type="submit" value="&nbsp;Save&nbsp;" name="sysfwApply" style="width:120px;"> &nbsp;&nbsp;
+	<input type="button" value="Default" name="sysfwReset" onClick="resetState()" style="width:120px;">
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# try to send failed tx messages when router enters to coverage area
+# apply this logic to Cinterion module only because smart modules like
+# Sierra Wireless modules sends failed message after recovering network
+# status even though UNSENT messages are removed from its memory.
+#
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This is shell script is for internal system use only."
+	echo "It is used for sending previously failed SMS messages."
+    echo "Please do not run this script manually."
+    echo ""
+	exit 0
+fi
+
+log() {
+	logger -t "sms_send_failed_msg.template" -- $@
+}
+
+#log "started"
+
+#?<wwan.0.system_network_status.registered>;
+REG_ST=`rdb_get wwan.0.system_network_status.registered`
+
+# check module manufacturer name
+MANU=`rdb_get wwan.0.manufacture | awk -F "," '{print $1}'`
+if [ -z "$MANU" -o "$MANU" != "Cinterion" ]; then
+	# Sierra module does not send unsent msg with CNS interface mode, so
+	# still this template needs to run.
+	IF_NAME=`rdb_get wwan.0.if`
+	if [ "$IF_NAME" != "cns" ]; then
+		#log "don't need to run this template for this manufacture $MANU"
+		exit
+	fi
+fi
+
+#log "triggered registered status = $REG_ST"
+LAST_REG_ST=`rdb_get wwan.0.system_network_status.registered.last`
+if [ "$REG_ST" = "$LAST_REG_ST" ]; then
+	#log "registered status is not changed"
+	exit
+fi
+rdb_set wwan.0.system_network_status.registered.last $REG_ST
+if [ -z "$REG_ST" -o "$REG_ST" = "0" ]; then
+	#log "nothing to do at the moment"
+	exit
+fi
+
+# call sendsms to send failed tx messages
+send_failed_msg &
+
+log "launching send_failed_msg"

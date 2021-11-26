@@ -1,0 +1,24 @@
+#!/bin/sh
+
+script=$(basename $0)
+print_usage() {
+	cat << EOF
+$script - return runontime processes by timer name
+
+usage>
+	$script <timer name>
+options>
+	-h|--help : Displays this help message.
+
+EOF
+}
+
+if [ $# != 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ] ; then
+	print_usage >&2
+	exit 1
+fi
+
+timer_name="$1"
+
+# list all runontime processes for disconnection schedule
+pgrep -f "^runontime $timer_name"

@@ -1,0 +1,62 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Wireless Station List</title>
+</head>
+
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" /> 
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/wlStations.cgi'></script>
+<body onload="initTranslation()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript">
+Butterlate.setTextDomain("wireless");
+function initTranslation() {
+	document.getElementById("refresh").value = "   "+_("refresh")+"   ";
+/*document.getElementById("").innerHTML = _("");
+<script language="JavaScript">document.write(_(""))</script*/
+}
+</script>
+<form name="form" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("stationInfo"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+    <tr><th><script language="JavaScript">document.write(_("stationInfo"))</script></th></tr>
+</table>
+
+<table width="80%">
+<tr>
+	<td><script language="JavaScript">document.write(_("macAddress"))</script>:</td>
+	<td><script language="JavaScript">document.write(_("mesh hostname"))</script></td>
+	<td><script language="JavaScript">document.write(_("ip address"))</script></td>   
+</tr>
+<script language=Javascript>
+function makelist()
+{   
+	for(i=0; i<st.length; i++)
+	{
+		document.write("<tr bgcolor='#DEE3EF'>"); 
+		document.write("<td>"+st[i].mac+"</td>");		
+		document.write("<td>"+st[i].host+"</td>");
+		document.write("<td>"+st[i].ip+"</td>");
+		document.write("</tr>");
+	}
+}
+makelist();
+</script>
+</table>
+<br>
+<p></p>
+<div align="right" style="margin-right:20%">
+<input value="Refresh" id="refresh" onClick="document.location.reload()" type="button">
+<!--input onClick="alert('This page shows the MAC address of the authenticated wireless stations.')" value="Help" type="button"-->
+</div><p></p>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight()</script>
+</body>
+</html>

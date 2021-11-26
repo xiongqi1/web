@@ -1,0 +1,338 @@
+<!doctype html>
+<html class="no-js" lang="en" style="height:100%;">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Login</title>
+<% include topinc_v2.inc %>
+
+<%
+	// Check if we are yet to change the passwords from the factory default.
+
+	response = get_single('admin.factory_default_passwords_in_use');
+	using_factory_passwords = (response == "1");
+	if (using_factory_passwords) {
+		redirect("./landing.html");
+	}
+%>
+
+<style>body{min-height:400px;} .footer {position:fixed;}</style>
+
+<script language="JavaScript">
+function formF() {
+	#ifdef V_WEBIF_SPEC_vdf
+	/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+	#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+	#endif
+	$("button").attr("disabled", true);
+	$("#browser_time").val(HostDate());
+	document.form.submit();
+}
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<div class="grid-9 omega" style="margin:30px 93px;">
+		<form name="form" id="form" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="src_page" id="src_page">
+		<input type="hidden" name="browser_time" id="browser_time">
+		<div class="pad white-box">
+			<h2><script language=Javascript>document.write(_("log in"))</script></h2>
+			<div class="form-row">
+				<label for="username"><script language=Javascript>document.write(_("user name"))</script></label>
+				<div class="field">
+					<select class="med" name="username" id="username">
+						<option value="root">root</option>
+#ifdef V_WEBIF_SPEC_vdf
+						<option value="user">user</option>
+#else
+						<option value="admin">admin</option>
+#endif
+					</select>
+				</div>
+			</div>
+			<div class="form-row">
+				<label for="password"><script language=Javascript>document.write(_("password"))</script></label>
+				<div class="field">
+					<input class="large validate[required] required" type="password" name="password" id="password">
+				</div>
+			</div>
+			<div class="submit-row">
+				<button type="submit" onClick="javascript:formF()"><script language=Javascript>document.write(_("log in"))</script></button>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language="JavaScript">
+set_menu("Login", "", <%_val = base64_encode(session["user"]);%>htmlNumberEncode(Base64.decode("@@_val")));
+VALIDATOR.config.errors["title"]=_("loginErrTitle");
+VALIDATOR.config.errors["summary"]="";
+document.form.username.focus();
+$("#logOff").css("display","none");
+
+$(document).ready(function() {
+	// If the query has the source page set extract it and set the form element so that
+	// the server can redirect back to that page after logging in.
+	<% query = base64_encode(request['QUERY_STRING']); %>
+	var query = Base64.decode("@@query");
+	if (/^src=\/[a-zA-Z0-9_\-]+\.html$/.test(query)) {
+		$("#src_page").val(query.substr(4));
+	}
+});
+</script>
+
+<%
+
+useSession();
+
+#ifdef V_WEB_LOGIN_LOCKING_y
+
+// convert string to number in ESP
+function convertStr2Num(str) {
+	return (str=str+0);
+}
+
+// Update account locking feature
+// Four RDB variables are used for account locking mechanism.
+// If one of these variables is not exist then stop working.
+//
+// return for get mode :
+//      when locked : remaining locking time in seconds
+//      when unlocked : return -1
+// return for other modes :
+//      update relative variables and return 0
+function updateLoginStatus(mode) {
+
+	// maximum login attempt to lock login
+	temp=get_single('admin.user.login.maxattempt');
+	if (temp == '' || temp == 'N/A') return -1;
+	lockMaxAttempt=convertStr2Num(temp);
+
+	// current consecutive login failure count
+	temp=get_single('admin.user.login.failcnt');
+	if (temp == '' || temp == 'N/A') return -1;
+	lockFailCount=convertStr2Num(temp);
+
+	// duration in minutes how long to lock login
+	temp=get_single('admin.user.login.lockduration');
+	if (temp == '' || temp == 'N/A') return -1;
+	lockDuration=convertStr2Num(temp);
+
+	// system time when unlock login again
+	temp=get_single('admin.user.login.unlocktime');
+	if (temp == '' || temp == 'N/A') return -1;
+	lockUnlockTime=convertStr2Num(temp);
+
+	// get current system time from /proc/uptime
+	cmd="awk -F '.' '{print $1}' /proc/uptime"
+	// exec_cmd_str() returns a result string with trailing LF character so need to trim it.
+	currTime=convertStr2Num(trim_string(exec_cmd_str(cmd), '\n'));
+
+	// check current locking status
+	if (mode == 'get') {
+		if (lockFailCount >= lockMaxAttempt) {
+			// unlock if locking time elapsed
+			if (currTime >= lockUnlockTime) {
+				retval=set_single('admin.user.login.failcnt=0');
+				retval=set_single('admin.user.login.unlocktime=0');
+				return -1;
+			}
+			// otherwise keep locking
+			else {
+				remainSecs=(lockUnlockTime-currTime);
+				return remainSecs;
+			}
+		} else {
+			return -1;
+		}
+	}
+
+	// when login attempt fails
+	else if (mode == 'fail') {
+		lockFailCount=lockFailCount+1;
+		retval=set_single('admin.user.login.failcnt='+lockFailCount);
+
+		// if failure count exceeds limit then set unlock time
+		if (lockFailCount >= lockMaxAttempt) {
+			lockUnlockTime=(currTime+(lockDuration*60));
+			retval=set_single('admin.user.login.unlocktime='+lockUnlockTime);
+		}
+	}
+
+	// reset variables when login succeeds
+	else if (mode == 'success') {
+		retval=set_single('admin.user.login.failcnt=0');
+		retval=set_single('admin.user.login.unlocktime=0');
+	}
+	return 0;
+}
+
+// first of all, check locking status when entering this page.
+// if lock condition meets then display warning message
+remaining_time=updateLoginStatus('get');
+if (remaining_time >= 0) {
+
+	%>
+	<script language='JavaScript'>
+	// Login locked for xxx seconds (attempt x of x)
+	warningMsg=_("loginLockedWarning")+@@remaining_time+" "+_("seconds");
+	warningMsg+=". ("+_("attemptStr")+" "+@@lockMaxAttempt+" / "+@@lockMaxAttempt+")";
+	validate_alert("", warningMsg);
+	</script>
+	<%
+
+}
+
+#endif
+
+if (request['REQUEST_METHOD'] == "POST") {
+	//check username and password
+	user = form['username'];
+	pass = get_single( 'admin.user.'+user );
+	mypassword = form['password'];
+
+	// If unlock time is left then do not allow login
+#ifdef V_WEB_LOGIN_LOCKING_y
+	if (updateLoginStatus('get') >= 0) {
+		redirect('/index.html');
+		exit(-1);
+	}
+#endif
+
+#if defined(V_PRODUCT_ntc_220)
+function check_passwd(password, hash) {
+    var cmd = '/sbin/check_passwd "$(echo ' + base64_encode(password) + ' | base64 -d)" ' + hash;
+    return exec_cmd_str(cmd);
+}
+    if( ( pass != 'N/A' ) && ( check_passwd(mypassword, pass) == "good") ) { //password ok
+#else
+	if( ( pass != 'N/A' ) && ( mypassword == pass) ) { //password ok
+#endif
+		session["sessionid"] = request["SESSION_ID"];
+		session["user"] = user;
+		if( user == 'root')
+			session["userlevel"] = '0';
+		else
+			session["userlevel"] = '1';
+		model_type=get_single('system.product.model');
+
+#ifdef V_WEB_LOGIN_LOCKING_y
+		// reset locking variables
+		updateLoginStatus('success');
+#endif
+		cmd = "logger -p auth.info -t appweb[$$] \"WEBUI login succeeded for user '$(echo -n \"" + base64_encode(user) + "\" | base64 -d)'\"";
+		exec_cmd(cmd);
+
+		// No validation required here as this variable is only used by timedaemon and it does its own validation.
+		set_single('system.browser.time='+form["browser_time"]);
+#ifdef V_EVENT_NOTIFICATION
+		cmd="elogger 10 \"WEBUI login succeeded, username '$(echo -n \""+base64_encode(user)+"\" | base64 -d)', password '******'\" 2>/dev/null >/dev/null";
+		exec_cmd(cmd);
+#endif
+		// redirect back to the source page if requested, otherwise to the status page.
+		if (form["src_page"] != undefined) {
+			redirect(form["src_page"]);
+		} else {
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+			// A part of password strength enforcement
+			// Prompt user to change the password if the user is 'root' and
+			// hasn't changed the default password.
+			if( user == 'root') {
+				cmd="grep admin.user.root /etc/cdcs/conf/default.conf | tail -1 | sed 's/admin.user.root;0;0;0;96;//'"
+				// exec_cmd_str() returns a result string with trailing LF character so need to trim it.
+				defPass=trim_string(exec_cmd_str(cmd), '\n');
+				if (pass == defPass) {
+					redirect('/administration.html?setpassword');
+				} else {
+					redirect('/status.html');
+				}
+			} else {
+				redirect('/status.html');
+			}
+#else
+			redirect('/status.html');
+#endif
+		}
+	}
+	else {
+		form['username']=base64_encode(form['username']);
+		form['password']=base64_encode(form['password']);
+		%>
+		<script language="JavaScript">
+		$("#username").val(Base64.decode("@@form['username']"));
+		$("#password").val(Base64.decode("@@form['password']"));
+		</script>
+		<%
+		form['username']="";
+		form['password']="";
+
+#ifdef V_WEB_LOGIN_LOCKING_y
+		// update locking status
+		// if lock condition meets then redirect to display warning message
+		updateLoginStatus('fail');
+		if (updateLoginStatus('get') >= 0) {
+			redirect('/index.html');
+		}
+#endif
+		cmd = "logger -p auth.warn -t appweb[$$] \"WEBUI login failed for user '$(echo -n \"" + base64_encode(user) + "\" | base64 -d)'\"";
+		exec_cmd(cmd);
+
+#ifdef V_EVENT_NOTIFICATION
+		cmd="elogger 10 \"WEBUI login failed\" 2>/dev/null >/dev/null";
+		exec_cmd(cmd);
+#endif
+		%>
+		<script language='JavaScript'>
+#ifdef V_WEB_LOGIN_LOCKING_y
+		warningMsg=_("admin passWarning");
+		warningMsg+=" ("+_("attemptStr")+" "+@@lockFailCount+" / "+@@lockMaxAttempt+")";
+		validate_alert(_("loginFailed"),warningMsg);
+#else
+		validate_alert(_("loginFailed"),_("admin passWarning"));
+#endif
+		</script>
+		<%
+	}
+}
+else {
+	if(request['QUERY_STRING']=='logoff') {
+
+		user = session["user"];
+		cmd = "logger -p auth.info -t appweb[$$] \"WEBUI user '$(echo -n \"" + base64_encode(user) + "\" | base64 -d)' logged out\"";
+		exec_cmd(cmd);
+
+#ifdef V_EVENT_NOTIFICATION
+		cmd="elogger 10 \"WEBUI logged off , username '$(echo -n \""+base64_encode(user)+"\" | base64 -d)'\" 2>/dev/null >/dev/null";
+		exec_cmd(cmd);
+#endif
+
+		session["sessionid"] = '';
+		session["user"] = '';
+		destroySession();
+		redirect('/index.html');
+	}
+	else if( request["SESSION_ID"]!="" && session["sessionid"]==request["SESSION_ID"] ) {
+		redirect('/status.html');
+	}
+}
+%>
+</body>
+</html>

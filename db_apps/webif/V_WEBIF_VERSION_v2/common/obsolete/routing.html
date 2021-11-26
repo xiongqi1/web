@@ -1,0 +1,452 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Static Routing</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/routes.cgi"></script>
+
+<script language="JavaScript">
+#include "net_util.js"
+
+function submitStaticRoute() {
+	var f=document.form;
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		validate_group("dstIP");
+		validate_group("subMask");
+		validate_group("gatewayIP");
+		return;
+	}
+#endif
+	if ( (f.dstIP1.value == "") || (f.dstIP2.value == "") || (f.dstIP3.value == "") || (f.dstIP4.value == "")  ) {
+		validate_alert("",_("routing warningMsg08"));
+		f.editindex.value = '-1';
+		return;
+	}
+
+	empty_gateway_ip= (f.gatewayIP1.value == "") || (f.gatewayIP2.value == "") || (f.gatewayIP3.value == "") || (f.gatewayIP4.value == "");
+	auto_network_interface=f.networkInf.value=="auto";
+	if (auto_network_interface && empty_gateway_ip) {
+		validate_alert("",_("routing warningMsg10"));
+		f.editindex.value = '-1';
+		return;
+	}
+
+	f.dstIP.value = f.dstIP1.value + "."  + f.dstIP2.value + "." + f.dstIP3.value + "." + f.dstIP4.value;
+	f.subMask.value = f.subMask1.value + "."  + f.subMask2.value + "." + f.subMask3.value + "." + f.subMask4.value;
+
+	clear_alert();
+	switch(isValidSubnetMask(f.subMask.value)) {
+		case -1:
+			validate_alert("", _("invalidSubnetMask"));
+		return;
+		break;
+		case -2:
+			validate_alert("", _("wlan warningMsg16"));//The subnet mask has to be contiguous. Please enter a valid mask
+		return;
+		break;
+	}
+
+	if(empty_gateway_ip)
+		f.gatewayIP.value = ""
+	else
+		f.gatewayIP.value = f.gatewayIP1.value + "."  + f.gatewayIP2.value + "." + f.gatewayIP3.value + "." + f.gatewayIP4.value;
+	value = parseInt(f.routenum.value);
+	if( isNaN(value)==true || value < 0 || value > st_routes.length ) {
+		//f.editindex.value = st_routes.length+1;
+		i=st_routes.length;
+		makeCmd();
+		f.rdbCmd.value += "service.router.static.route."+i+"="+escape(f.routeName.value)+","+f.dstIP.value+","+f.subMask.value+","+f.gatewayIP.value+","+f.metric.value+","+f.networkInf.value+"&";
+		document.form.delindex.value = i+1;
+	}
+	else {
+		//f.editindex.value = f.routenum.value;
+		if (value < 1 || value > 65535) {
+			validate_alert("",_("nat warningMsg06"));//Invalid item number.
+			f.editindex.value = '-1';
+			return;
+		}
+		i=f.routenum.value-1;
+		st_routes[i].routeName = escape($("#routeName").val());
+		st_routes[i].dstIP = f.dstIP.value;
+		st_routes[i].subMask = f.subMask.value;
+		st_routes[i].gatewayIP = f.gatewayIP.value;
+		st_routes[i].metric = f.metric.value;
+		st_routes[i].networkInf = f.networkInf.value;
+		makeCmd();
+	}
+	f.rdbCmd.value += "service.router.static.route.trigger=1";
+	f.submitForm.disabled=true;
+	f.BtDel.disabled=true;
+	f.BtCancel.disabled=true;
+	blockUI_wait(_("GUI pleaseWait"));
+	f.submit();
+}
+
+function makeCmd() {
+	document.form.rdbCmd.value = "";
+	k=0;
+	for (var i=0; i<st_routes.length; i++) {
+		if( st_routes[i].routeName != "" ) {
+			if( k>0 ) document.form.rdbCmd.value += "&";
+			document.form.rdbCmd.value += "service.router.static.route."+k+"="+st_routes[i].routeName+","+st_routes[i].dstIP+","+st_routes[i].subMask+","+st_routes[i].gatewayIP+","+st_routes[i].metric+","+st_routes[i].networkInf;
+			k++;
+		}
+	}
+	document.form.delindex.value = k;
+	if(k>0) document.form.rdbCmd.value += "&";
+}
+
+function delentry(idx) {
+var f=document.form;
+	if(idx<0) { //delete current
+		idx=parseInt(f.routenum.value)>0?parseInt(f.routenum.value)-1:0;
+	}
+	st_routes[idx].routeName = "";
+	makeCmd();
+	f.rdbCmd.value += "service.router.static.route.trigger=1";
+	f.submitForm.disabled=true;
+	f.BtDel.disabled=true;
+	f.BtCancel.disabled=true;
+	blockUI_wait(_("GUI pleaseWait"));
+	f.submit();
+}
+
+function add_edit(idx) {
+var f=document.form;
+	if(idx<0) { //add
+		idx=routingtable.length;
+	}
+	else {
+		$("#routeName").val(st_routes[idx].routeName);
+		RevIpBlocks(st_routes[idx].dstIP, "document.form.dstIP");
+		RevIpBlocks(st_routes[idx].subMask, "document.form.subMask");
+		RevIpBlocks(st_routes[idx].gatewayIP, "document.form.gatewayIP");
+		f.metric.value=st_routes[idx].metric;
+		f.networkInf.value=st_routes[idx].networkInf;
+	}
+	f.routenum.value=idx+1;
+	$("#route_list").css("display", "none");
+	$("#route_setup").css("display", "");
+	clear_alert();
+	(function(){this.VALIDATOR={}}).call(this);
+}
+
+$(document).ready(function() {
+var netInfo_text={"auto":_("auto"), "wwan":_("wwan interface"), "br0":"br0"};
+var h="";
+	if (st_routes.length == 0) {
+		h="<tr><th colspan=\"9\"><div align=\"center\">"+_("routing list empty")+"</div></th></tr>";
+		$("#title-head").css("display","none");
+		$("#TBlist").html(h);
+		return ;
+	}
+	function shortenedName(name){
+		var len = name.length;
+		if (len<32) {
+			return name;
+		}
+		return name.substring(0,10)+'...'+name.substring(len-10,len);
+	}
+	for (var i=0; i<st_routes.length;i++) {
+		h+="<tr>\
+		<td>"+shortenedName(st_routes[i].routeName)+"</td>\
+		<td>"+st_routes[i].dstIP+"</td>\
+		<td>"+st_routes[i].subMask+"</td>\
+		<td>"+st_routes[i].gatewayIP+"</td>\
+		<td>"+netInfo_text[st_routes[i].networkInf]+"</td>\
+		<td>"+st_routes[i].metric+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+		h+="<td class='last'><a href='javascript:add_edit("+i+")' class='secondary sml'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+		h+="<td class='last'><a href='javascript:add_edit("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+		h+="<td class='last'><a href='javascript:delentry("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close'></i></a></td>\
+		</tr>";
+	}
+	$("#TBlist").html(h);
+});
+</script>
+
+<%
+if ( request['REQUEST_METHOD'] == "POST" ) {
+#if 0
+	// Syntax of rdbCmd:
+	// service.router.static.route.I=routeName,dstIP,subMask,gatewayIP,metric,networkInf&...&service.router.static.route.trigger=1
+	// I: index, a decimal number
+	// routeName, of which maxlength is 64, is required and filtered by function isNameUnsafe which allows !()*-/0123456789;?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz
+	//  In case of Add or Edit, routeName is escaped by javascript function escape which encodes special characters, with the exception of * @ - _ + . /
+	//  Existing routes are read from RDB variables and preprocessed by the function "escape" in routes.cgi which only backslash-escapes \ " and '.
+	//  Existing routes, which are not editted, are not escaped by javascript function escape. WARNING: inconsistent!
+	//  " and ' are not permitted by function isNameUnsafe so those backslash-escapes are not considered in valid pattern.
+	// dstIP: IP address, required
+	// subMask: netmask
+	// gatewayIP: IP address, required
+	// metric: decimal number
+	// networkInf is selected from "auto", "wwan", "br0"
+	// TODO: validate range of I and metric
+#endif
+	var validNumber = "[0-9]+";
+	var validRouteName = "[!()*/0-9;?A-Z_a-z-]{1,64}";
+	var validIpNumber = "([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])";
+	var validIpAddress = "(" + validIpNumber + "\\.){3}" + validIpNumber;
+	var leadingOnes="(0|1(28|92)|2(24|40|48|52|54))";
+	var allOnes="(255\\.)";
+	var validSubnetMask = "((" + allOnes + "{3}255)|(" + allOnes + "{3}" + leadingOnes + ")|(" + allOnes + "{2}" + leadingOnes + "\\.0" + ")|(" + allOnes + "{1}" + leadingOnes + "(\\.0){2}" + ")|(" + leadingOnes + "(\\.0){3}))";
+	var validNetworkInf = "(auto|wwan|br0)";
+	var validRoute = "service\\.router\\.static\\.route\\." + validNumber + "=" + validRouteName + "," + validIpAddress + "," + validSubnetMask + "," + validIpAddress + "," + validNumber + "," + validNetworkInf;
+	var validCmd1 = "^(" + validRoute + "&)+service\\.router\\.static\\.route\\.trigger=1$";
+	var validCmd2 = "^service\\.router\\.static\\.route\\.trigger=1$";
+#if 0
+	// As routeName may be escaped by javascript function escape, it needs to be unescaped before checking valid pattern. It is safe to do because other fields do not contain %.
+#endif
+	var unescapedRdbCmd = unescape_string(form['rdbCmd']);
+	if (string_regex_match(unescapedRdbCmd, validCmd1) == false && string_regex_match(unescapedRdbCmd, validCmd2) == false) {
+		onBadRequest();
+	}
+
+	/*static--add/delete */
+	set_single( 'service.router.static.route.'+form['delindex']+'=', '-p'); //delete last
+
+	tempval = form['rdbCmd'];
+	set_escapedlist( tempval, '-p' );
+	esp_sleep(5000);
+	redirect('/routing.html?success');
+}
+else { /*GET*/
+	;
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box hide_for_pppoe_en">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<div class="pad" id="route_setup" style="display:none">
+				<input type="hidden" name="editindex" value="">
+				<input type="hidden" name="dstIP" value="">
+				<input type="hidden" name="subMask" value="">
+				<input type="hidden" name="gatewayIP" value="">
+				<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+				<input type="hidden" name="delindex" value="@@form['delindex']">
+				<input type="hidden" name="routenum" id="routenum">
+
+				<h2><script language=Javascript>document.write(_("static route"))</script></h2>
+
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="routeName"><script language=Javascript>document.write(_("route name"))</script></label>
+						<input type=text name='routeName' id='routeName' class="validate[required] large" maxlength=64 value="@@form['routeName']" onKeyUp="nameFilter(this);">
+					</div>
+					<div class="form-row">
+						<fieldset>
+							<label for="networkInf"><script language=Javascript>document.write(_("network interface"))</script></label>
+							<div class="field">
+								<select id="networkInf" name="networkInf">
+#ifndef V_WAN_INTERFACE_none
+									<option value="auto"><script language="JavaScript">document.write(_("auto"))</script></option>
+									<option value="wwan"><script language="JavaScript">document.write(_("wwan interface"))</script></option>
+#endif
+									<option value="br0">br0</option>
+								</select>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-row">
+						<label for="dstIP"><script language=Javascript>document.write(_("destipaddr"))</script></label>
+						<script language=javascript>htmlGenIpBlocks0("dstIP");</script>
+					</div>
+					<div class="form-row">
+						<label for="subMask"><script language=Javascript>document.write(_("destsubnetmask"))</script></label>
+						<script language=javascript>htmlGenIpBlocks0("subMask");</script>
+					</div>
+					<div class="form-row">
+						<label for="gatewayIP"><script language=Javascript>document.write(_("gatewayip"))</script></label>
+						<script language=javascript>htmlGenIpBlocks("gatewayIP");</script>
+					</div>
+					<div class="form-row">
+						<label for="metric"><script language=Javascript>document.write(_("routing del metric"))</script></label>
+						<div class="field">
+							<input type="text" name='metric' id='metric' class="validate[required,funcCall[validate_metric]] required metric sml" maxLength="5" onkeyup="NumfieldEntry(this);" value="@@form['metric']" data-prompt-position='bottomLeft:-5,0'>
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("0-65535"))</script>)</span>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row multi-button">
+					<button type="button" name='submitForm' onClick="submitStaticRoute();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" name='BtDel' class="secondary" onClick="add_edit($('#routenum').val()-1);"><script language=Javascript>document.write(_("refresh"))</script></button>
+					<button type="button" name='BtCancel' class="secondary" onClick="window.location='routing.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+			<div class="pad" id="route_list">
+			<form class="validate" novalidate="novalidate">
+				<div class="grid-33">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("staticRoutingList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-66">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="add_edit(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<table class="above-5-column name-list">
+					<colgroup>
+						<col width="120px">
+						<col width="160px">
+						<col width="160px">
+						<col width="160px">
+						<col width="100px">
+						<col width="100px">
+						<col width="auto">
+						<col width="auto">
+					</colgroup>
+					<thead id="title-head">
+					<tr>
+						<th class="align10"><script language=Javascript>document.write(_("route name"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("destipaddr"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("subnet mask"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("gatewayip"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("network interface"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("routing del metric"))</script></th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+					<tbody id="TBlist"></tbody>
+					</thead>
+				</table>
+			</form>
+
+			<form class="validate" action="#" novalidate="novalidate">
+				<div class="row">
+#ifdef V_WEBIF_SPEC_ntc_v2
+					<div class="grid-40">
+#else
+					<div class="grid-33">
+#endif
+						<div class="pad alpha">
+							<h2><script language=Javascript>document.write(_("activeRoutingList"))</script></h2>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<table class="above-5-column">
+					<colgroup>
+						<col width="110px">
+						<col width="110px">
+						<col width="110px">
+						<col width="60px">
+						<col width="70px">
+						<col width="70px">
+						<col width="70px">
+						<col width="100px">
+					</colgroup>
+					<thead>
+						<tr>
+							<th class="align10"><script language=Javascript>document.write(_("destination"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("gateway"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("netmask"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("routing del flags"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("routing del metric"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("ref"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("routing del use"))</script></th>
+							<th class="align10" style="padding-right:5px;"><script language=Javascript>document.write(_("interface"))</script></th>
+						</tr>
+					</thead>
+					<tbody>
+					<script language=Javascript>
+					function makeRouteList() {
+						if (routingtable.length == 0) {
+							document.write("<tr><th colspan=\"8\"><div align=\"center\">"+_("routing list empty")+"</div></th></tr>");
+							return ;
+						}
+						for (var i=0; i< routingtable.length;i++) {
+							document.write("<tr>");
+							document.write("<td>"+routingtable[i].Destination+"</td>");
+							document.write("<td>"+routingtable[i].Gateway+"</td>");
+							document.write("<td>"+routingtable[i].Genmask+"</td>");
+							document.write("<td>"+routingtable[i].Flags+"</td>");
+							document.write("<td>"+routingtable[i].Metric+"</td>");
+							document.write("<td>"+routingtable[i].Ref+"</td>");
+							document.write("<td>"+routingtable[i].Use+"</td>");
+							document.write("<td>"+routingtable[i].Iface+"</td>");
+							document.write("</tr>");
+						}
+					}
+					makeRouteList();
+					</script>
+					</tbody>
+				</table>
+			</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "STATIC_ROUTING", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('routingSubmitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["metric"]=_("Msg48");
+	$.validator.addMethod("metric",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.metric);
+#else
+/********* NTC ValidationEngine **********/
+function validate_metric(field) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("Msg48");
+	}
+}
+//$("#form").validationEngine("attach", {showOneMessage: true});
+#endif
+</script>
+</body>
+</html>

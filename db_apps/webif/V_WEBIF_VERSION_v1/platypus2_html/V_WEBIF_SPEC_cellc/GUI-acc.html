@@ -1,0 +1,145 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/GUI-login.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Basic Wireless</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script type="text/javascript" src="/ussd.js"></script>
+<script language="javascript" src="util.js"></script>
+<!-- <script type="text/javascript" src="sms.js"></script> -->
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript">
+Butterlate.setTextDomain("GUI-acc");
+var UssdMsgBody_prv="";
+uiBase = "basic";
+
+function initTranslation() {
+	$("#sToAdv").html(_("GUI sToAdv"));
+}
+function check_recharge() {
+	if(document.USSD.recharge_input.value=="") {
+		alert("Please enter voucher code!");
+		return;
+	}
+	UssdAction('*102*'+document.USSD.recharge_input.value+'#');
+}
+function check_buy() {
+	if(document.USSD.recharge_text.value=="") {
+		alert("Please enter an R value!");
+		return;
+	}
+	UssdAction('*147*200*'+document.USSD.recharge_text.value+'#');
+}
+
+function DisplayControl_basic( button_control ) {
+	document.getElementById("checkbal").disabled = button_control;
+	document.getElementById("recharge").disabled = button_control;
+	document.getElementById("buy").disabled = button_control;
+	document.getElementById("checkinfo").disabled = button_control;
+	document.getElementById("login").disabled = button_control;
+	document.getElementById("compose").disabled = button_control;
+	document.getElementById("inbox").disabled = button_control;
+	document.getElementById("outbox").disabled = button_control;
+	if(button_control == 'disabled') {
+		document.getElementById( "sending" ).innerHTML="Sending:&nbsp;&nbsp;"+document.USSD.ussd_cmd.value;
+		document.getElementById( "sending" ).style['display']="";
+		document.getElementById( "response" ).style['display']="none";
+	}
+	else {
+		document.getElementById( "sending" ).style['display']="none";
+		document.getElementById( "response" ).style['display']="";
+	}
+}
+var ajaxerror = 0;
+var counter = 50;
+function ajaxUpdate(response) {
+	var unread=0;
+	ajaxerror = 0;
+	eval(response);
+	$("#inbox").val("INBOX("+unread+")");
+	if(unread>0)
+		document.getElementById( "inbox" ).style['color']="GREEN";
+	else
+		document.getElementById( "inbox" ).style['color']="#000";	
+}
+var ajaxInterval=50;//start from 5 sec
+$(document).ready(function() {
+	init_moveGUI();
+	initTranslation();
+	UssdConfigGet();
+	var startPoll = function() {	
+		if(++counter>ajaxInterval) {
+			counter=0;
+			ajaxInterval+=ajaxerror*50;
+			if( ++ajaxerror<=5)
+				$.get('/cgi-bin/sms.cgi?CMD=GET_UNREADMSG_CNT',ajaxUpdate );
+			else
+				location.reload();
+			
+		}
+		else
+			moveGUI();
+	}	
+	setInterval(startPoll, 100);
+});
+</script>
+
+</head>
+<body>
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+</div>
+<form name="USSD" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<input type="hidden" name='wlKeyBit' value="@@form['wlKeyBit']">
+<input type="hidden"  name='wep_encryption' value="@@form['wep_encryption']"/>
+<div id="basicGUI" style="left:558px; top:120px">
+	<div style="position:absolute; font-size:12px; left:34px; top:544px" ><a class="a1" href="JavaScript:toAdvV('/login.html')" id="sToAdv">Switch to Advanced View</a></div>
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+	
+	<img style="position:absolute; top:0px; left:0px" src="/images/button3.gif" />
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>	
+	<img style="position:absolute; top:100px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wlan"><a style="text-decoration:none; left:4px;" href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:200px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-3gwwan"><a style="text-decoration:none" href="/GUI-3gwwan.html">APN/SIM</a></div> 
+	<img style="position:absolute; top:300px; left:0px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-acc"><a style="text-decoration:none; color:#d00010;" href="/GUI-acc.html">Account</a></div>	
+	<img style="position:absolute; top:400px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-app"><a style="text-decoration:none" href="/GUI-app.html">Applications</a></div>
+
+    <img style="position:absolute; top:270px; left:44px" src="/images/strip.png" />
+  
+	<div style="position:absolute; top:15px; left:54px; font-size:14px; font-weight:bold;">Balance Enquiry and Customer Information:</div>
+    <div style="position:absolute; top:40px; left:54px"> <input type="button" name="checkbal" id="checkbal" value="CHECK" onClick="UssdAction('*101#')"> your account balance</div>
+	<div style="position:absolute; top:70px; left:54px"> <input type="button" name="recharge" onClick="check_recharge();" id="recharge" value="RECHARGE"> your Prepaid/Topup account</div>
+	<input type="text" width="40" style="position:absolute; top:100px; left:54px" name="recharge_input" id="recharge_input" value="">
+	<div style="position:absolute; top:125px; left:54px; width:380px; height: 18px;">Enter voucher code above to recharge your account with airtime (R value)</div>
+
+	<div style="position:absolute; top:160px; left:54px"> <input type="button" name="buy" onClick="check_buy();" id="buy" value="BUY"> data bundles</div>
+	<div style="position:absolute; top:190px; left:54px">R <input type="text" width="40" name="recharge_text" id="recharge_text" value=""></div>
+	<div style="position:absolute; top:220px; left:54px; width:380px; height:18px;">Enter R value in the field above to convert airtime into a corresponding data bundle.<br/>Click <a style="color:#d00010;text-decoration:underline"  href="http://www.cellc.co.za/internet/data_prepaid/smartdata-bundles" target="_blank"> here </a>to view the data bundle tariffs.</div>
+
+	<div style="position:absolute; top:282px; left:54px"> <input type="button" name="checkinfo" onClick="UssdAction('*147*100#')" id="checkinfo" value="CHECK"> customer information</div>
+	<div style="position:absolute; top:312px; left:54px"> <input type="button" name="login" onClick="window.open('http://www.cellc.co.za/login/page/login ')" id="login" value="LOGIN"> to access your mobile account</div>
+	
+	<div style="position:absolute;top:340px; left:54px;font-weight:bold;" id="sending">Sending:</div>
+	<img id="waitanimation" style="position:absolute;top:357px; left:54px;" src="/images/colorbar-wait.gif" width="358" height="6"/>
+	
+	<div style="position:absolute;font-weight:bold; top:345px; left:54px; display:none;" id="response" >Response:</div>
+	<textarea type="text" rows="3" cols="42" name="ussd_message" value="" style="position:absolute;left:54px;top:370px; font-weight:bold;" readonly="readonly"></textarea>
+	<input type="hidden" name="ussd_status" size="10" value="" readonly="readonly"/>
+	<input type="hidden" name="ussd_cmd" id="ussd_cmd" size="25" value=""/>
+	
+	<img style="position:absolute; top:445px; left:44px" src="/images/strip.png" />
+	<div style="position:absolute;top:453px; left:54px; font-size:14px; font-weight:bold;" id="sending">SMS Messages:</div>
+	<div style="position:absolute; top:480px;left:54px"><input type="button" name="compose" onClick="window.location='sms.html?newmsg'" id="compose" value="COMPOSE"></div>
+	<div style="position:absolute; top:480px;left:195px"><input type="button" name="inbox" onClick="window.location='sms.html?inbox'" id="inbox" value="INBOX"></div>
+	<div style="position:absolute; top:480px;left:325px"><input type="button" name="outbox" onClick="window.location='sms.html?outbox'" id="outbox" value=" OUTBOX "></div>
+</div>
+</form>
+</body>
+</html>

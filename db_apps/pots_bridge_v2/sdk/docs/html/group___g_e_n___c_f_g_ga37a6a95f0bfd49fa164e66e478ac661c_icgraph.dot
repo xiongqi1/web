@@ -1,0 +1,9 @@
+digraph "ProSLIC_Init_MultiBOM"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir="LR";
+  Node1 [label="ProSLIC_Init_MultiBOM",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 -> Node2 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node2 [label="ProSLIC_VerifyControlInterface",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___d_i_a_g_n_o_s_t_i_c_s.html#ga7897eac241a4a76cae6d9755a83110d7",tooltip="This function can be used to verify that the SPI interface is functioning properly by performing a se..."];
+}

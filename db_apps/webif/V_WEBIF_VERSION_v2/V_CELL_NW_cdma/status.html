@@ -1,0 +1,1047 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<%useSession();%>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Status</title>
+<% include topinc_v2.inc %>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<style>
+td {
+	border:0px;
+}
+</style>
+<script language='javascript'>
+
+var imageidx = 6;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var pincounter = 0;
+var ajaxerror = 0;
+var show_duration = new Array();
+var currentSession="";
+var usageHistory="";
+var max_enabled_profiles="1";
+var lan_ip=<%_v=get_single("link.profile.0.address");%>"@@_v";
+var lan_mask=<%_v=get_single("link.profile.0.netmask");%>"@@_v";
+var hw_ver=<%_v=get_single("uboot.hw_ver");%>"@@_v";
+if(hw_ver=="")
+	hw_ver="1.0";
+var user=<%_u=session["user"];%>"@@_u";
+/* Decodes a Unicode string into ASCII ready for printing on status page */
+function UrlDecode(str) {
+	var output = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1, i + 3));
+		output += String.fromCharCode(val);
+	}
+	return output;
+}
+
+function addcomma( myval ) {
+retval="";
+cm=parseInt((myval.length-1)/3);
+	for( xx=0; xx<cm; xx++ ) retval+=myval.substring( retval.length-xx, myval.length-(cm-xx)*3)+',';
+	retval+=myval.substring(retval.length-xx, myval.length);
+	return retval;
+}
+
+function update_ipsec(st,ipsecSt) {
+	var ipsec_enable=ipsecSt.length>0;
+
+	// get wwan online status
+	var wwan_online;
+	$.each(st,function(idx,pf){
+		return !(wwan_online=pf.type.match(/^wwan\.[0-9]+$/) && (pf.pppStatus=="up"));
+	});
+
+	// show or hide ipsec status
+	$("#ipsec-div").toggle(ipsec_enable);
+
+	var ipsec_status_table;
+	$.each(ipsecSt,function(idx,pf){
+		if(ipsec_status_table===undefined) {
+			ipsec_status_table=$("<table class='above-5-column'>").append(
+				"<tr>"
+				+"<th class='align10-2'>#</th>"
+				+"<th class='align10-2'>"+_("name")+"</th>"
+				+"<th class='align10-2'>"+_("interface")+"</th>"
+				+"<th class='align10-2'>"+_("localLAN")+"</th>"
+				+"<th class='align10-2'>"+_("remoteGateway")+"</th>"
+				+"<th class='align10-2'>"+_("remoteLAN")+"</th>"
+				+"<th class='align10-2'>"+_("status")+"</th>"
+				+"</tr>"
+			);
+		}
+
+		// get ipsec online status
+		var ipsec_online=pf.ipsecStatus==1;
+
+		// get ipsec online message
+		var ipsec_status;
+		if(wwan_online) {
+			if(ipsec_online)
+				ipsec_status=_("connected");
+			else
+				ipsec_status=_("connecting")+"<i class='progress-sml'></i>";
+		}
+		else {
+			ipsec_status=_("waiting");
+		}
+
+		ipsec_status_table.append(
+			"<tr>"
+				+"<td>"+(idx+1)+"</td>"
+				+"<td>"+pf.ipsecProfile+"</td>"
+				+"<td>"+pf.ipsecInterface+"</td>"
+				+"<td>"+pf.local_lan+"</td>"
+				+"<td>"+pf.remote_gateway+"</td>"
+				+"<td>"+pf.remote_lan+"</td>"
+				+"<td>"+ipsec_status+"</td>"
+			+"</tr>"
+		);
+	});
+
+	if(ipsec_status_table!==undefined) {
+		$("#ipsec-status").html(ipsec_status_table);
+	}
+}
+
+function update_pptp(pptpSt) {
+var i;
+	$("#pptpProfile").html("");
+	$("#serveraddress").html("");
+	$("#pptpLocal").html("");
+	$("#pptpRemote").html("");
+
+	if(!pptpSt.length) {
+		$("#pptpStatus").html(_("disconnected"));
+		$("#pptp-div").css("display", "none");
+	}
+	else {
+		$("#pptp-div").css("display", "");
+		for( i=0; i<pptpSt.length; i++ ) {
+			if(pptpSt[i].pptpStatus != "up") {
+				//if(simStatus == "SIM OK") {
+					$("#pptpStatus").html(_("connecting"));
+				//}
+				/*else {
+					$("#pptpStatus").html(_("waiting"));
+				}*/
+			}
+			else {
+				$("#pptpStatus").html(_("connected"));
+				$("#pptpProfile").html(pptpSt[i].pptpProfile);
+				$("#serveraddress").html(pptpSt[i].serveraddress);
+				$("#pptpLocal").html(pptpSt[i].iplocal);
+				$("#pptpRemote").html(pptpSt[i].ipremote);
+				break;
+			}
+		}
+	}
+}
+
+var openvpn_clients=[];
+
+function update_openvpn(st) {
+	// collect openvpn profiles
+	var openvpn_profiles=new Array();
+
+	$.each(st,function(idx,pf){
+		if( pf.type.match(/^openvpn\.[0-9]+$/) && pf.enable ) {
+			openvpn_profiles.push(pf);
+		}
+	});
+
+	var openvpn_enable=openvpn_profiles.length>0;
+
+	if(openvpn_enable) {
+		$("#openvpn-div").css("display","");
+	}
+	else {
+		$("#openvpn-div").css("display","none");
+	}
+
+	// list up openvpn connection
+	var table_openvpn_profiles;
+
+	$.each(openvpn_profiles,function(idx,pf) {
+
+		table_openvpn_profiles="<tr>"
+			+"<th class='align10-2'>"+_("profile name")+"</th>"
+			+"<th class='align10-2'>"+_("status connection")+"</th>"
+			+"<th class='align10-2'>"+_("local IP")+"</th>"
+			+"<th class='align10-2'>"+_("remote IP")+"</th>"
+			//+"<th>"+_("vpnServerIP")+"</th>"
+		+"</tr>";
+
+		// get openvpn progress status
+		var openvpn_connected=$.inArray(pf.pppStatus.toLowerCase(),["up","ready"])>=0;
+
+		// get ppp status
+		var openvpn_status;
+
+		if(openvpn_connected) {
+			if(pf.pppStatus.toLowerCase()=="up") {
+				openvpn_status=_("status up");
+			}
+			else {
+				openvpn_status=_("ready");//pf.pppStatus;
+			}
+		}
+		else {
+			openvpn_status=parseInt(pf.enable)>0?_("connecting")+"<i class='progress-sml'></i>":_("disconnected");
+		}
+
+		table_openvpn_profiles+="<tr>"
+			+"<td>"+pf.name+"</td>"
+			+"<td>"+openvpn_status+"</td>"
+			+"<td>"+(openvpn_connected?pf.iplocal:_("na"))+"</td>"
+			+"<td>"+(openvpn_connected?pf.ipremote:_("na"))+"</td>"
+		+"</tr>";
+	});
+
+	// add client status if the array exists
+	var table_openvpn_clients="";
+	$.each(openvpn_clients,function(idx,row){
+		if(!table_openvpn_clients.length) {
+			table_openvpn_clients+="<tr>"
+			+"<th class='align10-2'>"+_("name")+"</th>"
+			+"<th class='align10-2'>"+_("clientPublicIP")+"</th>"
+			+"<th class='align10-2'>"+_("vpnClientIP")+"</th>"
+			+"<th class='align10-2'>"+_("dataReceived")+"</th>"
+			+"<th class='align10-2'>"+_("dataSent")+"</th>"
+			+"<th class='align10-2'>"+_("sessionStart")+"</th></tr>";
+		}
+		// get cells
+		cells=row.split(",");
+
+		table_openvpn_clients+="<tr>";
+		$.each(cells, function(idx,cell) {
+			// add a new td to the tr
+			if((idx>=1) && (idx<=6))
+				table_openvpn_clients+="<td><font style='font-weight:normal;'>"+cell+"</font></td>";
+		});
+		table_openvpn_clients+="</tr>";
+	});
+
+	$("#vpn-server").html(table_openvpn_profiles);
+	$("#vpn-client").html(table_openvpn_clients);
+}
+
+var autopin=<%_p=get_single('wwan.0.sim.autopin');%>"@@_p";
+var autopintried=<%_p=get_single('wwan.0.sim.autopin.tried');%>"@@_p";
+var registrationStr=[_("unregisteredNoSearch"), _("registeredHome"), _("unregisteredSearching"), _("registrationDenied"), _("unknown"), _("registeredRoaming"), _("registeredSMShome"), _("registeredSMSroaming"), _("emergency"), _("na")];
+var activation_cancel=false;
+
+#if defined(V_WIFI_CLIENT)
+function update_wlan(clientSt)
+{
+	$("#wrssid").html(clientSt[0].wlanRssid);
+	$("#wbssid").html(clientSt[0].wlanBssid);
+	$("#wsecurity").html(clientSt[0].wlanSecurity);
+	$("#wstatus").html(clientSt[0].wlanStatus);
+
+	if(clientSt[0].wlanStatus == "Connected")
+		$("#wlocalIP").html(clientSt[0].wlanLocalIP);
+	else
+		$("#wlocalIP").html("");
+}
+#endif
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	eval(response);
+
+	csq = csq.substring(0, csq.indexOf("dBm") );
+	csqstr = _("not available");
+
+	if(csq == 0)
+		imageidx = 6;
+	else if(csq >= -77 ) {
+		csqstr = _("high");
+		imageidx = 1;
+	}
+	else if(csq >= -91 ) {
+		csqstr = _("medium");
+		if(csq >= -85 )
+			imageidx = 2;
+		else
+			imageidx = 3;
+	}
+	else if(csq >= -109 ) {
+		csqstr = _("low");
+		if(csq >= -101)
+			imageidx = 4;
+		else
+			imageidx = 5;
+	}
+	else {
+		imageidx = 6;
+	}
+
+	if(csq=="") {
+		imageidx = 6;
+	}
+	else {
+		$("#umtsss").html( csq+" dBm     "+csqstr);
+	}
+
+	if(imageidx < 6) {
+		$("#csqImg").html("<i class='connection-sml connection-sml-level"+imageidx+"'></i>");
+	}
+	else {
+		$("#umtsss").html("");
+		$("#csqImg").html("");
+	}
+
+	function getEnableStr(str) {
+		if(typeof(str)=="undefined" || str==null || str=="N/A")
+			return str;
+		var enableStr;
+		if(hasSubStr(str,/enable/i))
+			enableStr=_("enabled");
+		else
+			enableStr=_("disabled");
+		var phoneM=str.match(/[\+][0-9]+/);
+		var phoneNo="";
+		if(phoneM!=null)
+			phoneNo=phoneM[0];
+		if(phoneNo=="")
+			return enableStr;
+		return enableStr + "  ( " + phoneNo + " )";
+	}
+
+	$("#uptime").html(toUpTime( uptime ));
+	$("#pppoeStatus").html(pppoeStatus);
+	if(pppoeStatus=="DISABLED") {
+		$("#pppoeIP").html("");
+		$("#pppoe-div").css("display", "none");
+		$("#wwan-div").css("display", "");
+	}
+	else {
+		$("#pppoeIP").html(pppoeAddress+" / 255.255.255.255");
+		$("#pppoe-div").css("display", "")
+		$("#wwan-div").css("display", "none");
+		$("#pppoe_service").html(pppoeService);
+		if($("#pppoe_service").html()=="" || $("#pppoe_service").html()=="N/A") {
+			$("#pppoe_service").css("fontStyle","italic");
+			$("#pppoe_service").html(_("blank"));
+		}
+		else {
+			$("#pppoe_service").css("fontStyle","normal");
+		}
+	}
+
+	if( typeof(hint)!="undefined" && hint!="N/A" && hint!="" ) {
+		var patt=/%[0-1][0-9a-f]%/gi
+		hint = hint.replace(patt, "%20%") // Some SIM cards have character less than %20. This ruins decoding rules.
+		roaming = UrlDecode(hint);
+	}
+	else {
+		roaming = "";
+	}
+
+	if(br0mac!="N/A") {
+		$("#ethmac").html(br0mac);
+	}
+	else {
+		$("#ethmac").html(eth0mac);
+	}
+	$("#coverage").html(coverage);
+	$("#meid").html(meid);
+
+	$("#networkRegistration").html(registrationStr[networkRegistration]);
+
+	switch(parseInt(networkRegistration)) {
+		case 0:
+		case 2:
+		case 9:
+		freq=_("na");
+		break;
+	}
+
+	$("#freq").html(freq.replace("IMT2000", "WCDMA 2100"));
+
+	// roaming
+	if(typeof(networkRegistration)!="undefined" && (networkRegistration==5)) {
+		if(roaming!="")
+			roaming = roaming+"&nbsp;&nbsp;-&nbsp;&nbsp;";
+		roaming = roaming+"<font style='color:red'>"+_("roaming")+"</font>";
+	}
+	else {
+		roaming = _("not roaming");
+	}
+	$("#roaming_status").html(roaming);
+
+	var dataRoamingBlockedStatus=dataRoamingBlocked;  // 1 - connection is blocked due to data roaming. 0 - not blocked
+
+	if(st.length==0) {
+		$("#none-profile").css("display","");
+		$("#roaming-block").css("display","none");
+		for( i=1; i<max_enabled_profiles; i++ ) {
+			if( i>=st.length || st[i].enable=="0") {
+				$("#wwan-div"+i).css("display","none");
+			}
+		}
+	}
+	else if (dataRoamingBlockedStatus == '1') {
+		$("#none-profile").css("display","none");
+		$("#roaming-block").css("display","");
+		for( i=1; i<max_enabled_profiles; i++ ) {
+			$("#wwan-div"+i).css("display","none");
+		}
+	}
+	else {
+		$("#none-profile").css("display","none");
+		$("#roaming-block").css("display","none");
+		for( i=0; i<max_enabled_profiles; i++ ) {
+			// bypass all other types of connection
+			if( i>0 && ( i>=st.length || st[i].enable=="0" || st[i].type.match(/^openvpn\.[0-9]+$/)) ) {
+				$("#wwan-div"+i).css("display","none");
+				continue;
+			}
+			if(pppoeStatus=="DISABLED")
+				$("#wwan-div"+i).css("display","");
+			if( (st[i].pppStatus!="up" && st[i].pppStatus!="ready") && st[i].enable == 1 ) {
+				if(st[i].pppStatus == "disconnecting" ) {
+					$("#wwanStatus"+i).html(_("disconnecting"));
+				}
+				if(st[i].pppStatus == "waiting" ) {
+					$("#wwanStatus"+i).html(_("waiting"));
+					$("#wwanIP"+i).html("&nbsp;");
+				}
+				else if(st[i].pppStatus == "waiting_dod" ) {
+					$("#wwanStatus"+i).html(_("waitingDemand"));
+					$("#wwanIP"+i).html("<br/>&nbsp;<br/>");
+				}
+				else {
+					$("#wwanStatus"+i).html(_("connecting")+"&nbsp;&nbsp;<i class='progress-sml'></i>");
+					$("#wwanIP"+i).html("&nbsp;");
+				}
+			}
+			else {
+				interface=st[i].interface.replace("usb1", "wwan0");
+				interface=interface.replace("ppp", "wwan");
+
+				if(st[i].pppStatus == "up") {
+					$("#wwanStatus"+i).html(_("connected"));
+					if(st[i].iplocal=="") {
+						$("#wwanIP"+i).html("&nbsp;");
+					}
+					else {
+						$("#wwanIP"+i).html(st[i].iplocal);
+					}
+				}
+				else if(st[i].pppStatus == "down") {
+					$("#wwanStatus"+i).html(_("status down"));
+					$("#wwanIP"+i).html("&nbsp;");
+				}
+				else {
+					$("#wwanStatus"+i).html(st[i].pppStatus);
+					$("#wwanIP"+i).html("&nbsp;");
+				}
+			}
+			if(st[i].pppStatus == "up") {
+				dnsServer=st[i].dnsserver.replace(/ /,"<br/>");
+				if( dnsServer=="" ) {
+					dnsServer=_("na");
+				}
+			}
+			else {
+				dnsServer=_("na");
+			}
+			$("#dnsServer"+i).html(dnsServer);
+
+			currentSession=current_session;
+			usageHistory=usage_history;
+			updata_usage(i);
+			$("#iptype"+i).html(cdma_mip_mode);
+		}
+	}
+	/* Advanced Status Elements */
+	$("#rttPN").html(cdma_rttpn);
+	$("#edvoPN").html(cdma_evdopn);
+	$("#CellId").html(CellId);
+	$("#ChannelNumber").html(ChannelNumber);
+	$("#MCC").html(MCC);
+	$("#MNC").html(MNC);
+	$("#moduleModel").html(moduleModel);
+	$("#moduleHardwareVersion").html(moduleHardwareVersion);
+	$("#moduleFirmwareVersion").html(moduleFirmwareVersion);
+	var val="";
+	if( PRIID_REV != "" )
+		val = _("Revision")+": "+PRIID_REV + "&nbsp;&nbsp;&nbsp;&nbsp;";
+	if( PRIID_PN != "" )
+		val += _("PRI part number")+": "+PRIID_PN;
+	$("#PRIID_REV").html(val);
+
+	$("#mipinfo").html(cdma_mipinfo.replace(/&/g, "<br/>"));
+	if( ecio0!="N/A") {
+		$("#ecios").html(_("carrier")+"-" + ecio0 + " dBm");
+	}
+	else {
+		if(ECIOs0=="0") {
+			$("#ecios").html(_("na"));
+		}
+		else {
+			$("#ecios").html("-"+ECIOs0+(ECIOs0=="N/A"?"":" dBm"));
+		}
+	}
+
+	// show cid
+	var fw_ver_ext=$.type(moduleFirmwareVerExt)!="undefined" && moduleFirmwareVerExt!="" && moduleFirmwareVerExt!="N/A";
+	if(fw_ver_ext)
+		$("#moduleFirmwareVersionExt").html(moduleFirmwareVerExt);
+	$("#cid").toggle(fw_ver_ext);
+
+	if( dcvoltage != "N/A" && dcvoltage!=0) {
+		$("#dcvoltage").html(dcvoltage+"V");
+	}
+	else {
+		$("#dcvoltage").html(_("na"));
+	}
+
+	$("#powersource").html(powersource);
+
+	update_openvpn(st);
+	update_ipsec(st,ipsecSt);
+	update_pptp(pptpSt);
+
+#if defined(V_WIFI_CLIENT)
+	if(wlan_wifi_mode =="STA") {
+		$("#wlan-div").show();
+		update_wlan(wifiClientSt);
+	} else {
+		$("#wlan-div").hide();
+	}
+#endif
+
+/* ================= Ports Status ================= */
+	$("#port1_text").html(portStatus);
+	if(portStatus.indexOf("Up")!= -1) {
+		$("#port1_text").html(_("status up")+portStatus.substr(3, portStatus.indexOf("Mbps")+4)+" / FDX <i class='success-sml'/>");
+	}
+	else {
+		$("#port1_text").html(_("status down")+"<i class='warning-sml'></i>");
+	}
+/***************************************************/
+	if(cdma_activated=="1") {
+		$("#activate_status").html(_("activated"));
+		$("#mdn-text").html(cdma_mdn);
+		$("#mdn-div").css("display", "");
+		if(pppoeStatus=="DISABLED")
+			$("#wwan-div").css("display", "");
+		$("#adv-div").css("display", "");
+	}
+	else {
+		$("#activate_status").html(_("deactivated"));
+		$("#mdn-div").css("display", "none");
+		$("#wwan-div").css("display", "none");
+	//	$("#adv-div").css("display", "none");
+	}
+	$("#sid-nid").html(cdma_sid+" / "+cdma_nid);
+	$("#mipIP").html(cdma_mip_ip);
+	$("#PN1x").html(cdma_rttpn);
+	$("#PNevdo").html(cdma_evdopn);
+	$("#channel_1x").html(module_1xrttchannel);
+	$("#channel_evdo").html(module_1xevdochannel);
+
+	<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+
+	/* cdma otasp programming */
+	if(!activation_cancel && cdma_activated!==undefined && cdma_activated=="0") {
+		$.blockUI( {
+		css: {width: "50%", left: "300px"},
+		message: "<div style='padding: 10px 20px 20px 20px;text-align:left;line-height:22px;'><i class='caution-sml' style='padding:0 20px 10px 0;margin-left:-8px;'/>"+_("init prog req")+"\
+			<div style='padding:16px 0 10px 33%;'>\
+			<button class='secondary' style='width:100px' onClick='$(location).attr(\"href\",\"/service.html?auto=1\");'>"+_("CSok")+"</button>\
+			<button class='secondary' style='width:100px' onClick='$.unblockUI();'>"+_("cancel")+"</button>\
+			</div>\
+		</div>"});
+		activation_cancel=true;
+	}
+	<%}%>
+}
+
+function updata_usage(idx) {
+	var ray = new Array();
+	ray = currentSession.split(",");
+
+	var h="";
+	if(ray.length == 4 ) {
+		startDate = new Date(ray[0]*1000);
+		$("#connectionUpTime"+idx).html(toUpTime(ray[1]*1-ray[0]*1));
+		h="<tr><td>"+startDate.toLocaleString()+"</td><td>";
+		if(show_duration[idx]) {
+			h += toUpTime(ray[1]*1-ray[0]*1);
+		}
+		else {
+			h += _("currentSession");
+		}
+		h += "</td><td>"+addcomma(ray[2]);
+		h += "</td><td>"+addcomma(ray[3]);
+		var total = parseInt(ray[2])+parseInt(ray[3]);
+		h += "</td><td>"+addcomma(total.toString())+"</td></tr>";
+	}
+
+	var history = new Array();
+	history = usageHistory.split("&");
+	for( var j=0; j<history.length; j++) {
+		ray = history[j].split(",");
+		if(ray.length == 4 ) {
+			startDate = new Date(ray[0]*1000);
+			h += "<tr><td>"+startDate.toLocaleString()+"</td><td>";
+			if(show_duration[idx]) {
+				h += toUpTime( ray[1]*1-ray[0]*1 );
+			}
+			else {
+				endDate = new Date(ray[1]*1000);
+				h += endDate.toLocaleString();
+			}
+			h += "</td><td>"+addcomma(ray[2]);
+			h += "</td><td>"+addcomma(ray[3]);
+			var total = parseInt(ray[2])+parseInt(ray[3]);
+			h += "</td><td>"+addcomma(total.toString())+"</td></tr>";
+		}
+		else {
+			break;
+		}
+	}
+	$("#TBusage"+idx).html(h);
+}
+
+function switchDuration( idx, action ) {
+	if( action ) {
+		$("#data_usage_duration_toggle"+idx).html("<a href='javascript:switchDuration("+idx+",0)'>"+_('showEndTime')+"</a>");
+		$("#SessionEndDuration"+idx).html(_("sessionDuration"));
+	}
+	else {
+		$("#data_usage_duration_toggle"+idx).html("<a href='javascript:switchDuration("+idx+",1)'>"+_('showDuration')+"</a>");
+		$("#SessionEndDuration"+idx).html(_("sessionEnd"));
+	}
+	show_duration[idx]=action;
+	updata_usage(idx);
+}
+
+function switchUsage( idx ) {
+	if( $("#data_usage_table"+idx).css("display")=="none" ) {
+		$("#data_usage_table"+idx).css("display", "");
+		$("#showUsageButton"+idx).html(_("hideDataUsage"));
+		$("#data_usage_duration_toggle"+idx).css("display", "");
+	}
+	else {
+		$("#data_usage_table"+idx).css("display", "none");
+		$("#data_usage_duration_toggle"+idx).css("display", "none");
+		$("#showUsageButton"+idx).html(_("showDataUsage"));
+	}
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	var startPoll = function() {
+		if( ++ajaxerror<=18) //3 mins
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 10000);
+        set_menu("Status", "", <%_val = session["user"];%>"@@_val");
+
+	var h='<div class="box-content" id="none-profile" style="display:none"><i class="caution-sml"></i>'+_("noProfileEnabled")+'</div>';
+	h += '<div class="box-content" id="roaming-block" style="display:none"><i class="caution-sml"></i>'+_("admin warningMsg9-1")+'<a style="color:black" href="/Profile_Settings.html">'+_("admin warningMsg9-2")+'</a>'+_("admin warningMsg9-3")+'</div>';
+	for( i=0; i<max_enabled_profiles; i++ ) {
+	/*	if(st[i].type.match(/^openvpn\.[0-9]+$/) ) {
+			continue
+		}*/
+		h += '<div class="row" id="wwan-div'+i+'" style="display:none">';
+		if( i>0 ) {
+			h+='<div class="hr" style="top:0; margin:0;"></div>';
+		}
+		h+='<div class="box-content">\
+		<button class="secondary sml toggle-area inline-right-button" id="showUsageButton'+i+'" onclick="switchUsage('+i+')">'+_('showDataUsage')+'</button>\
+		<div class="each-box alpha" style="padding-top:3px;">\
+			<dl>\
+				<dt>'+_("status")+'</dt>\
+				<dd id="wwanStatus'+i+'"></dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("ipType")+'</dt>\
+				<dd id="iptype'+i+'"></dd>\
+			</dl>\
+		</div>\
+		<div class="each-box">\
+			<dl>\
+				<dt>'+_("wwan ipaddr")+'</dt>\
+				<dd id="wwanIP'+i+'">&nbsp;</dd>\
+			</dl>\
+			<dl>\
+				<dt>'+_("dnsServer")+'</dt>\
+				<dd id="dnsServer'+i+'">&nbsp;</dd>\
+			</dl>\
+		</div>\
+		<div class="each-box omega">\
+			<dl>\
+				<dt>'+_("connectionUpTime")+'</dt>\
+				<dd id="connectionUpTime'+i+'">0:00</dd>\
+			</dl>\
+		</div>\
+	</div>\
+	<div id="data_usage_duration_toggle'+i+'" class="show-option" style="padding-right:20px; display:none">\
+		<a href="javascript:switchDuration('+i+',1)">'+_("showDuration")+'</a>\
+	</div>\
+	<table id="data_usage_table'+i+'" style="display:none">\
+		<colgroup>\
+			<col width="23%">\
+			<col width="23%">\
+			<col width="20%">\
+			<col width="17%">\
+			<col width="18%">\
+		</colgroup>\
+		<thead>\
+			<tr>\
+				<th class="sml">'+_("sessionStart")+'</th>\
+				<th class="sml" id="SessionEndDuration'+i+'">'+_("sessionEnd")+'</th>\
+				<th class="sml">'+_("dataReceivedBytes")+'</th>\
+				<th class="sml">'+_("dataSentBytes")+'</th>\
+				<th class="sml">'+_("totalDataBytes")+'</th>\
+			</tr>\
+			<tbody id="TBusage'+i+'"></tbody>\
+		</thead>\
+	</table></div>';
+	}
+	$("#wwan-subdiv").html(h);
+	if(serialnum=="" || serialnum=="N/A") {
+		$("#serialnum-div").css("display","none");
+	}
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	$("#logOff").css("display","none");
+<%}%>
+});
+
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container dashboard">
+		<div class="grid-9 alpha">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("sysInfo"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="system-information" class="box-content">
+						<div class="each-box alpha">
+							<h3><script language=Javascript>document.write(_("status system up time"))</script></h3>
+							<div class="a-center">
+								<span class="time" id="uptime"></span>
+							</div>
+						</div>
+						<div class="each-box">
+							<h3><script language=Javascript>document.write(_("routerVersion"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("boardVersion"))</script></dt>
+								<dd><script language=Javascript>document.write(hw_ver);</script></dd>
+							</dl>
+							<dl id="serialnum-div">
+<!-- 								<div id="serialnum-div"> -->
+								<dt><script language=Javascript>document.write(_("routerSerialNumber"))</script></dt>
+								<dd><script language=Javascript>document.write(serialnum);</script></dd>
+<!-- 								</div> -->
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("software"))</script></dt>
+								<dd><script language=Javascript>document.write(version);</script></dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<h3><script language=Javascript>document.write(_("advStatus phoneModule"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("model"))</script></dt>
+								<dd><script language=Javascript>document.write(moduleModel);</script></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("firmware"))</script></dt>
+								<dd id="moduleFirmwareVersion" style="display:inline-block;word-wrap:break-word;width:180px;"><%var _fw=get_single( 'wwan.0.firmware_version');%>@@_fw</dd>
+							</dl>
+							<dl id="mdn-viv">
+								<dt><script language=Javascript>document.write(_("mdn"))</script></dt>
+								<dd id="mdn-text"></dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("cellularConnectionStatus"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="connection-status" class="box-content" >
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("activation status"))</script></dt>
+								<dd id="activate_status"></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CScoverage"))</script></dt>
+								<dd id="coverage">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("signal strength"))</script></dt>
+								<dd><span id="umtsss">&nbsp;</span><span id="csqImg">&nbsp;</span></dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<!--dl>
+								<dt><script language=Javascript>document.write(_("provider"))</script></dt>
+								<dd id="provider">&nbsp;</dd>
+							</dl-->
+							<dl>
+								<dt><script language=Javascript>document.write(_("roaming status"))</script></dt>
+								<dd id="roaming_status">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("sid"))</script> / <script language=Javascript>document.write(_("nid"))</script></dt>
+								<dd id="sid-nid"></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("mipIP"))</script></dt>
+								<dd id="mipIP">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("meid"))</script></dt>
+								<dd id="meid">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("status CSfrequency"))</script></dt>
+								<dd id="freq">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("networkRegistrationStatus"))</script></dt>
+								<dd id="networkRegistration">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="box" id="wwan-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wwanStatus"))</script></h2>
+				</div>
+				<div class="row" id='wwan-subdiv'></div>
+			</div>
+
+#if defined(V_WIFI_CLIENT)
+			<div class="box" id="wlan-div">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wlanStaStatus"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="wlan-connection-status" class="box-content" >
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("remoteSSID"))</script></dt>
+								<dd><span id="wrssid">&nbsp;</span></dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("bssid"))</script></dt>
+								<dd><span id="wbssid">&nbsp;</span></dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<dl>
+								<dt><script language=Javascript>document.write(_("treeapp security"))</script></dt>
+								<dd id="wsecurity">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("ip address"))</script></dt>
+								<dd id="wlocalIP">&nbsp;</dd>
+							</dl>
+
+						</div>
+						<div class="each-box omega">
+							<dl>
+								<dt><script language=Javascript>document.write(_("status"))</script></dt>
+								<dd id="wstatus">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+#endif
+
+			<div class="box" id="pppoe-div" style="display:none">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("wan connection type pppoe"))</script></h2>
+				</div>
+				<div class="box-content">
+					<dl>
+						<dt><script language=Javascript>document.write(_("status"))</script></dt>
+						<dd id="pppoeStatus">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("IP"))</script></dt>
+						<dd id="pppoeIP">&nbsp;</dd>
+					</dl>
+					<!--dl class="inline">
+						<dt><script language=Javascript>document.write(_("apnName"))</script></dt>
+						<dd id="pppoe_apn"></dd>
+					</dl-->
+					<dl>
+						<dt><script language=Javascript>document.write(_("serviceName"))</script></dt>
+						<dd id="pppoe_service">&nbsp;</dd>
+					</dl>
+				</div>
+			</div>
+			<div class="box" id="ipsec-div" style="display:none">
+				<div class="box-header open">
+					<h2><script language=Javascript>document.write(_("status ipsec"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="ipsec-status" style="margin-top:2px"></div>
+				</div>
+			</div>
+			<div class="box" id="openvpn-div" style="display:none">
+				<div class="box-header open">
+					<h2><script language=Javascript>document.write(_("OpenVPN"))</script></h2>
+				</div>
+				<div class="row">
+					<table id="vpn-server" style="margin-top:2px"></table>
+					<table id="vpn-client"></table>
+				</div>
+			</div>
+			<div class="box" id="adv-div">
+				<div class="box-header close">
+					<h2><script language=Javascript>document.write(_("advStatus advancedStatus"))</script></h2>
+				</div>
+				<div class="row hide">
+					<div id="advanced-status" class="box-content" >
+						<div class="each-box alpha">
+							<dl>
+								<dt><script language=Javascript>document.write(_("country code"))</script></dt>
+								<dd id="MCC">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus networkCode"))</script></dt>
+								<dd id="MNC">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("powerSource"))</script></dt>
+								<dd id="powersource">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("dcInputVoltage"))</script></dt>
+								<dd id="dcvoltage">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("advStatus cellID"))</script></dt>
+								<dd id="CellId">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box">
+							<dl>
+								<dt><script language=Javascript>document.write(_("cdmaPN1x"))</script></dt>
+								<dd id="PN1x">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("cdmaPNevdo"))</script></dt>
+								<dd id="PNevdo">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("channel1x"))</script></dt>
+								<dd id="channel_1x">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("channelevdo"))</script></dt>
+								<dd id="channel_evdo">&nbsp;</dd>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("signalQualityEcIo"))</script></dt>
+								<dd id="ecios">&nbsp;</dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<!--dl>
+								<dt><script language=Javascript>document.write(_("receivedSignalCodePower"))</script></dt>
+								<dd id="rscps">&nbsp;</dd>
+							</dl-->
+							<dl>
+								<dt><script language=Javascript>document.write(_("mipInfo"))</script></dt>
+								<dd id="mipinfo">&nbsp;</dd>
+							</dl>
+							<dl id="cid">
+								<dt><script language=Javascript>document.write(_("cid"))</script></dt>
+								<dd id="moduleFirmwareVersionExt" style="display:inline-block;word-wrap:break-word;width:180px;"><%var _fw=get_single( 'rdb_get wwan.0.firmware_version_cid');%>@@_fw</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="grid-3 omega">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("lan"))</script></h2>
+				</div>
+				<div class="box-content">
+					<dl>
+						<dt><script language=Javascript>document.write(_("IP"))</script></dt>
+						<dd><script language=Javascript>document.write(lan_ip+" / "+lan_mask);</script></dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("macAddress"))</script></dt>
+						<dd id="ethmac">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("ethernet port status"))</script></dt>
+						<dd style="padding-top:8px;"><span id="port1_text">&nbsp;</span></dd>
+					</dl>
+				</div>
+			</div>
+			<div class="box" id="pptp-div" style="display:none">
+				<div class="box-header close">
+					<h2><script language=Javascript>document.write(_("wan connection type pptp"))</script></h2>
+				</div>
+				<div class="box-content hide">
+					<dl>
+						<dt><script language=Javascript>document.write(_("status"))</script></dt>
+						<dd id="pptpStatus">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("profileName"))</script></dt>
+						<dd id="pptpProfile">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("remoteServerAddress"))</script></dt>
+						<dd id="serveraddress">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("PtPLocal"))</script></dt>
+						<dd id="pptpLocal">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("PtPRemote"))</script></dt>
+						<dd id="pptpRemote">&nbsp;</dd>
+					</dl>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,168 @@
+{
+
+    "device/model_num":"cfw1314"
+
+
+    , "deviceInformationService/deviceVersionCharacteristic":
+    {
+        "Hardware":"0.1",
+        "Software":"0.1",
+        "GATT":"0.1"
+    }
+
+
+    , "deviceInformationService/deviceFamilyCharacteristic":0
+
+
+    , "deviceInformationService/stateCharacteristic":1
+
+
+    , "deviceInformationService/errorCharacteristic":"OK"
+
+
+    , "deviceInformationService/simApnCharacteristic":
+    {
+        "SIM Status":"OK",
+        "APN":"MyAPN",
+        "IP Connectivity":"IPv4"
+    }
+
+
+    , "deviceInformationService/connectivityCharacteristic":
+    {
+        "Ethernet Link":"1000Mbit",
+        "CloudConnect":"N/A"
+    }
+
+
+    , "deviceInformationService/ipAddressesCharacteristic":
+    {
+        "WAN IP":"0.0.0.0",
+        "LAN IP":"0.0.0.0",
+        "Connected Devices":0
+    }
+
+
+    , "deviceInformationService/tr069StatusCharacteristic":
+    {
+        "ACS Server":"10.0.0.123",
+        "Last Connect":"2019-08-24 14:40:22"
+    }
+
+
+    , "deviceInformationService/gpsMagneticCharacteristic":
+    {
+        "Latitude":64.89945983886719,
+        "Longitude":-128.95755004882813,
+        "Height":1214,
+        "MagneticStatus":1,
+        "Antenna Azimuth":274,
+        "Antenna Downtilt":-22
+    }
+
+
+    , "deviceInformationService/batteryCharacteristic":
+    {
+        "Battery Level":63,
+        "Battery Voltage":4.015515327453613
+    }
+
+
+    , "currentConnectionService/connectionParametersCharacteristic":
+    {
+        "CQI 0/1":47,
+        "MCS":30,
+        "Rank Indicator":56,
+        "TX Power":423
+    }
+
+
+    , "currentConnectionService/connectedRatCharacteristic": "LTE"
+
+
+    , "currentConnectionService/connectionStatusCodeCharacteristic":0
+
+
+    , "currentConnectionService/antennaBarsCharacteristic": 4
+
+
+    , "visibleCellService/visibleCellListCharacteristic":"256,290,302"
+
+
+    , "visibleCellService/visibleCellInfoCharacteristic": [
+    {
+        "Cell Type":"??",
+        "Cell Technology":"??",
+        "Cell ID":22062,
+        "PCI":256,
+        "EARFCN":14337,
+        "RSRP":-20,
+        "RSRQ":0,
+        "SINR":13,
+        "Role":"P"
+    },
+    {
+        "Cell Type":"??",
+        "Cell Technology":"??",
+        "Cell ID":34929,
+        "PCI":290,
+        "EARFCN":59232,
+        "RSRP":-28,
+        "RSRQ":0,
+        "SINR":16,
+        "Role":"S"
+    },
+    {
+        "Cell Type":"??",
+        "Cell Technology":"??",
+        "Cell ID":55350,
+        "PCI":302,
+        "EARFCN":26230,
+        "RSRP":-34,
+        "RSRQ":0,
+        "SINR":19,
+        "Role":"N"
+    }
+    ]
+
+
+    , "ledService/ledColourCharacteristic":"FF0000"
+
+
+    , "ledService/ledFlashCharacteristic":
+    {
+        "flash":true,
+        "fastflash":false
+    }
+
+
+    , "rssiService/rssiCharacteristic":
+    {
+        "RSSI":-77
+    }
+
+
+    , "speedTestService/speedTestResultCharacteristic":
+    {
+        "Downstream (Mbps)":1799,
+        "Upstream (Mbps)":799,
+        "Latency":20,
+        "Experience":"Excellent"
+    }
+
+
+    , "deviceInformationService/supportedBandsCharacteristic":
+    {
+        "LTE":"AAAAAAAAAAAAAACACAAARQ==",
+        "NR1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA=",
+        "NR2":"AAAC"
+    }
+
+
+    , "deviceInformationService/bandLockCharacteristic":
+    {
+        "LTE":"AAAAAAAAAAAAAACACAAARQ==",
+        "NR1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA=",
+        "NR2":"AAAC"
+    }
+}

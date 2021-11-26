@@ -1,0 +1,768 @@
+#-------------------------------------------------------------------------------
+#
+#   SUNROUTINES for SMS TOOLS GENERAL FUNCTIONALITIES
+#
+#-------------------------------------------------------------------------------
+sms_log()
+{
+	logger "smstools-`basename ${0}`: ${1}"
+}
+
+sms_rdb_var_clear()
+{
+	rdb_set wwan.0.sms.read.receivedtime
+	rdb_set wwan.0.sms.cmd.param.message_id
+	rdb_set wwan.0.sms.cmd.param.to
+	rdb_set wwan.0.sms.cmd.send.status
+	rdb_set wwan.0.sms.cmd.command.status
+	rdb_set wwan.0.sms.cmd.status
+	rdb_set wwan.0.sms.read.dstno
+	rdb_set wwan.0.sms.cmd.command.last
+	rdb_set wwan.0.sms.storage.status
+	#rdb_set wwan.0.sms.received_message.status
+	rdb_set wwan.0.sms.read.dstscno
+	rdb_set wwan.0.sms.fifo.command
+	rdb_set wwan.0.sms.cmd.command
+	rdb_set wwan.0.sms.read.message
+	rdb_set wwan.0.sms.cmd.param.message
+	#rdb_set wwan.0.sms.received_message.status2
+	rdb_set wwan.0.sms.read.time_stamp
+}
+
+check_and_create_sms_dirs()
+{
+	if [ ! -d "$IN_SPOOL_PATH" ];then
+		mkdir -p "$IN_SPOOL_PATH"
+	fi
+	if [ ! -d "$OUT_SPOOL_PATH" ];then
+		mkdir -p "$OUT_SPOOL_PATH"
+	fi
+
+	# check if the system is read-only as Platypus
+	if [ "$platform" = "Platypus" ] || [ "$platform" = "Platypus2" ]; then
+		USE_SIM_STORAGE="YES"
+	fi
+	if [ "$platform" != "Avian" ]; then
+		mkdir -p "$SMS_CONF_PATH"
+		test ! -e ${SMS_CONF_PATH}/sms.cfg && cp /usr/etc/sms/sms.cfg ${SMS_CONF_PATH}/sms.cfg
+		test ! -e ${SMS_CONF_PATH}/sms_common.cfg && cp /usr/etc/sms/sms_common.cfg ${SMS_CONF_PATH}/sms_common.cfg
+		test ! -e ${SMS_CONF_PATH}/sms_diag.cfg && cp /usr/etc/sms/sms_diag.cfg ${SMS_CONF_PATH}/sms_diag.cfg
+		mkdir -p "$SSMTP_CONF_PATH"
+		test ! -e ${SSMTP_CONF_PATH}/ssmtp.conf && cp /usr/etc/ssmtp/ssmtp.conf ${SSMTP_CONF_PATH}/ssmtp.conf
+	fi
+
+	if [ ! -d "$LOCAL_INBOX" ];then
+	mkdir -p "$LOCAL_INBOX"
+	fi
+	if [ ! -d "$LOCAL_OUTBOX" ];then
+	mkdir -p "$LOCAL_OUTBOX"
+	fi
+	if [ ! -d "$LOCAL_TXFAILED" ];then
+	mkdir -p "$LOCAL_TXFAILED"
+	fi
+
+	if [ "$DIAG_INBOX" != "" ] && [ ! -d "$DIAG_INBOX" ];then
+	mkdir -p "$DIAG_INBOX"
+	fi
+	if [ "$DIAG_OUTBOX" != "" ] && [ ! -d "$DIAG_OUTBOX" ];then
+	mkdir -p "$DIAG_OUTBOX"
+	fi
+	if [ "$DIAG_TXFAILED" != "" ] && [ ! -d "$DIAG_TXFAILED" ];then
+	mkdir -p "$DIAG_TXFAILED"
+	fi
+}
+
+is_unread_msg_left()
+{
+	MSG_CNT=`rdb_get wwan.0.sms.message.status | awk '/unread:/ {print $3}' | sed 's/unread://'`
+	if [ "$MSG_CNT" = "0" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+read_one_rx_msg()
+{
+	sms_rdb_var_clear
+	rdb_set wwan.0.sms.cmd.command "$1"
+	let "TIMEOUT=5"
+	while true; do
+		READ_RESULT=`rdb_get wwan.0.sms.cmd.status`
+		if [ "$READ_RESULT" = "[done]" ]; then
+				return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$READ_RESULT" = "[error] err1:Not Found" ]; then
+				sms_log "no more [$1] msg"
+				return 0
+			fi
+			if [ "$READ_RESULT" = "[error]" ]; then
+				sms_log "reading $1 msg failed, try again next time"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+# readall : simple_at_manager dedicated command
+read_all_msgs()
+{
+	if [ "$1" != "FORCE" ]; then
+		test -e "$MSGFILE" && return
+	fi
+	rdb_set wwan.0.sms.cmd.status
+	rdb_set wwan.0.sms.cmd.command readall
+	let "TIMEOUT=20"
+	while true; do
+		READ_RESULT1=`rdb_get wwan.0.sms.cmd.status | awk '{print $1}'`
+		READ_RESULT2=`rdb_get wwan.0.sms.cmd.status | awk '{print $2}'`
+		if [ "$READ_RESULT1" = "[done]" ] && [ "$READ_RESULT2" = "readall" ]; then
+				return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$READ_RESULT1" = "[error]" ]; then
+				sms_log "readall command failed, try again next time"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+save_one_msg()
+{
+	# sms msg file name does not have any meaning for the model using SIM/ME memory
+	# because it always rebuild inbox/outbox contents from SIM/ME memory when read inbox/outbox
+	# but for other models we need to give some index to sort out.
+	if [ "$USE_SIM_STORAGE" = "YES" ]; then
+		FILE=`mktemp $IN_SPOOL_PATH/GSM1.MSGXXXXXX` 2>/dev/null
+	else
+		atmgr_ready=`rdb_get atmgr.status`
+		if [ "$atmgr_ready" != "ready" ]; then
+			get_new_file_index "$LOCAL_INBOX" "$IN_SPOOL_PATH"
+		else
+			get_new_file_index "$LOCAL_INBOX"
+		fi
+		sms_log "set new file index - $NEW_FILE_IDX"
+		FILE=$IN_SPOOL_PATH/rxmsg_${NEW_FILE_IDX}_unread
+		# delete old file with same file index in local inbox
+		rm $LOCAL_INBOX/rxmsg_${NEW_FILE_IDX}_* 2>/dev/null
+		touch $FILE 2>/dev/null
+	fi
+	echo "From: "`rdb_get wwan.0.sms.read.dstno` > $FILE
+	rdb_temp=`rdb_get wwan.0.sms.read.dstscno`
+	test "$rdb_temp" = "" && return 0
+	echo "From_SMSC: "`rdb_get wwan.0.sms.read.dstscno` >> $FILE
+	rdb_temp=`rdb_get wwan.0.sms.read.time_stamp`
+	test "$rdb_temp" = "" && return 0
+	echo "Sent: "`rdb_get wwan.0.sms.read.time_stamp` >> $FILE
+	#echo "Received: "`rdb_get wwan.0.sms.read.receivedtime` >> $FILE
+	echo "Subject: GSM1" >> $FILE
+	echo "Alphabet:  ISO" >> $FILE
+	echo "UDH: false" >> $FILE
+	echo "" >> $FILE
+	#echo -n `rdb_get wwan.0.sms.read.message` >> $FILE
+	# use awk to keep control characters                                  
+	rdb_get wwan.0.sms.read.message | awk '{print $0}' >> $FILE
+	return 1
+}
+
+delete_read_msg()
+{
+	rdb_set wwan.0.sms.cmd.status
+	rdb_set wwan.0.sms.cmd.command delete
+	let "TIMEOUT=5"
+	while true; do
+		DEL_RESULT=`rdb_get wwan.0.sms.cmd.status | awk '{print $1}'`
+		if [ "$DEL_RESULT" = "[done]" ]; then
+				return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$DEL_RESULT" = "[error]" ]; then
+				sms_log "deleting read msg failed"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+display_sms_status()
+{
+	echo "-----------------------------------------------"
+	rdb_get -L sms.
+}
+
+# only 6908 use below function at the moment
+read_and_save_sms()
+{
+	# get unread msg from SIM/ME memory
+	while true; do
+		read_one_rx_msg "readunread"
+		return_val=$?
+		if [ "$return_val" -eq "1" ];then
+			save_one_msg
+			test "$?" != "0" && delete_read_msg
+			is_unread_msg_left
+			return_val=$?
+			if [ "$return_val" -eq "0" ];then
+				break
+			fi
+		else
+			break
+		fi
+	done
+
+	# only for 6908
+		atmgr_ready=`rdb_get atmgr.status`
+	if [ "$atmgr_ready" != "ready" ]; then
+		# get read msg from SIM/ME memory
+		while true; do
+			read_one_rx_msg "readread"
+			return_val=$?
+			if [ "$return_val" -eq "1" ];then
+				save_one_msg
+				test "$?" != "0" && delete_read_msg
+			else
+				return
+			fi
+		done
+	fi
+}
+
+# used for platform which uses SIM/ME memory for SMS
+# $1 : indexes separated with space
+delete_one_msg()
+{
+	rdb_set wwan.0.sms.cmd.status
+	# replace - with space to support concatenated msg indexes
+	DEL_INDEXES=`echo "$1" | sed 's/-/\ /g'`
+	rdb_set wwan.0.sms.cmd.param.message_id "$DEL_INDEXES"
+	rdb_set wwan.0.sms.cmd.command delete
+	sms_log "deleting msg index $DEL_INDEXES..."
+	let "TIMEOUT=5"
+	while true; do
+		DEL_RESULT1=`rdb_get wwan.0.sms.cmd.status | awk '{print $1}'`
+		DEL_RESULT2=`rdb_get wwan.0.sms.cmd.status | awk '{print $2}'`
+		if [ "$DEL_RESULT1" = "[done]" ] && [ "$DEL_RESULT2" = "delete" ]; then
+			sms_log "msg index $DEL_INDEXES deleted successfully"
+			return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$DEL_RESULT1" = "[error]" ]; then
+				sms_log "msg index #$DEL_INDEXES failed to delete"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+# used for platform which uses SIM/ME memory for SMS
+delete_all_msgs()
+{
+	rdb_set wwan.0.sms.cmd.status
+	rdb_set wwan.0.sms.cmd.command delall
+	let "TIMEOUT=5"
+	while true; do
+		DEL_RESULT1=`rdb_get wwan.0.sms.cmd.status | awk '{print $1}'`
+		DEL_RESULT2=`rdb_get wwan.0.sms.cmd.status | awk '{print $2}'`
+		if [ "$DEL_RESULT1" = "[done]" ] && [ "$DEL_RESULT2" = "delall" ]; then
+			sms_log "deleting all msgs succeeded"
+			return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$DEL_RESULT1" = "[error]" ]; then
+				sms_log "deleting all msgs failed"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+# save new SMSC address to SIM/ME memory
+save_smsc_addr()
+{
+	rdb_set wwan.0.sms.cmd.status
+	rdb_set wwan.0.sms.cmd.param.to "$1"
+	rdb_set wwan.0.sms.cmd.command setsmsc
+	let "TIMEOUT=5"
+	while true; do
+		DEL_RESULT1=`rdb_get wwan.0.sms.cmd.status | awk '{print $1}'`
+		DEL_RESULT2=`rdb_get wwan.0.sms.cmd.status | awk '{print $2}'`
+		if [ "$DEL_RESULT1" = "[done]" ] && [ "$DEL_RESULT2" = "setsmsc" ]; then
+			sms_log "Changing SMSC address succeeded"
+			return 1
+		else
+			let "TIMEOUT-=1"
+			if [ "$TIMEOUT" -eq "0" ] || [ "$DEL_RESULT1" = "[error]" ]; then
+				sms_log "Changing SMSC address failed"
+				return 0
+			fi
+			sleep 1
+		fi
+	done
+}
+
+#-------------------------------------------------------------------------------
+#
+#   SUNROUTINES for SMS DIAGNOSTICS and COMMAND EXECUTION
+#
+#-------------------------------------------------------------------------------
+check_storage()
+{
+	# check if nvram utility exist to determine to use nvram or rdb
+	if [ "$DB_SET_CMD" = "" ] || [ "$DB_GET_CMD" = "" ]; then
+		has_nvram=`ls /bin | grep nvram_daemon | grep -v "grep"`
+		if [ "$has_nvram" = "" ]; then
+			DB_SET_CMD="rdb_set"
+			DB_GET_CMD="rdb_get"
+		else
+			DB_SET_CMD="nvram_set"
+			DB_GET_CMD="nvram_get"
+		fi
+
+		# store to rdb variable to use later
+		rdb_set db_get_cmd $DB_GET_CMD
+		rdb_set db_set_cmd $DB_SET_CMD
+	fi
+}
+
+# read a variable from nvram or rdb
+# $1 : variable name, $2 : default value
+read_variable()
+{
+	if [ "$DB_GET_CMD" = "" ]; then
+		check_storage
+	fi
+	RD_VAL=`$DB_GET_CMD ${1}` 2>/dev/null
+	# if has default nvram value, then set default value
+	if [ "${2}" != "" ] && [ "$DB_GET_CMD" = "nvram_get" ] && [ "$RD_VAL" = "" ]; then
+		$DB_SET_CMD "${1}" "${2}" >/dev/null
+		RD_VAL="${2}"
+	fi
+	#sms_log "$DB_GET_CMD ${1} $RD_VAL"
+}
+
+# write a variable to nvram or rdb
+# $1 : variable name, $2 : default value, $3 : batch nv
+write_variable()
+{
+	if [ "$DB_SET_CMD" = "" ]; then
+		check_storage
+	fi
+	sms_log "$DB_SET_CMD ${1} ${2}"
+	if [ "$DB_SET_CMD" = "nvram_set" ] && [ "$3" = "BATCH" ]; then
+		echo "${1} ${2}" >> /tmp/nv_list 2>/dev/null
+	else
+		$DB_SET_CMD "${1}" "${2}" >/dev/null
+	fi
+}
+
+pre_batch_nv_write()
+{
+	check_storage
+	if [ "$DB_GET_CMD" = "nvram_get" ]; then
+		sms_log "batch nv write start"
+		nvflag="BATCH"
+		test -e "/tmp/nv_list" && rm "/tmp/nv_list"
+		touch "/tmp/nv_list"
+	fi
+}
+
+post_batch_nv_write()
+{
+	check_storage
+	if [ "$DB_GET_CMD" = "nvram_get" ]; then
+		/usr/bin/batch_nv "/tmp/nv_list" >/dev/null
+		sms_log "batch nv write end"
+	fi
+}
+
+# create sms.cfg file
+create_sms_cfg_file()
+{
+	sms_log "creating SMS configure file"
+	dt=`date`
+	mv $config_file $config_file.old
+	touch $config_file 2>/dev/null
+	# check if nvram utility exist to determine to use nvram or rdb
+	check_storage
+
+	# read all config variables
+	read_variable "smstools.conf.redirect_mob" && REDIRECT_MOB=${RD_VAL}
+	read_variable "smstools.conf.redirect_email" && REDIRECT_EMAIL=${RD_VAL}
+	read_variable "smstools.conf.redirect_tcp" && REDIRECT_TCP=${RD_VAL}
+	read_variable "smstools.conf.redirect_tcp_port" && REDIRECT_TCP_PORT=${RD_VAL}
+	read_variable "smstools.conf.redirect_udp" && REDIRECT_UDP=${RD_VAL}
+	read_variable "smstools.conf.redirect_udp_port" && REDIRECT_UDP_PORT=${RD_VAL}
+	read_variable "smstools.conf.enable_remote_cmd" "0" && ENABLE_REMOTE_CMD=${RD_VAL}
+	read_variable "smstools.conf.msg_no_per_page" "20" && MSG_NO_PER_PAGE=${RD_VAL}
+	read_variable "smstools.conf.coding_scheme" "GSM7" && CODING_SCHEME=${RD_VAL}
+	read_variable "smstools.conf.use_ext_client" && USE_EXT_SMS_CLIENT=${RD_VAL}
+	read_variable "smstools.conf.ext_client_ip1" && EXT_SMS_CLIENT_IP1=${RD_VAL}
+	read_variable "smstools.conf.ext_client_ip2" && EXT_SMS_CLIENT_IP2=${RD_VAL}
+	read_variable "smstools.conf.ext_client_port" && EXT_SMS_CLIENT_PORT=${RD_VAL}
+	read_variable "smstools.conf.mo_service" && MO_SERVICE=${RD_VAL}
+
+	# write to config file
+cat << EOF > $config_file
+# Generated on $dt
+REDIRECT_MOB="$REDIRECT_MOB"
+REDIRECT_EMAIL="$REDIRECT_EMAIL"
+REDIRECT_TCP="$REDIRECT_TCP"
+REDIRECT_TCP_PORT="$REDIRECT_TCP_PORT"
+REDIRECT_UDP="$REDIRECT_UDP"
+REDIRECT_UDP_PORT="$REDIRECT_UDP_PORT"
+ENABLE_REMOTE_CMD="$ENABLE_REMOTE_CMD"
+MSG_NO_PER_PAGE="$MSG_NO_PER_PAGE"
+CODING_SCHEME="$CODING_SCHEME"
+DB_GET_CMD="$DB_GET_CMD"
+DB_SET_CMD="$DB_SET_CMD"
+USE_SIM_STORAGE="$USE_SIM_STORAGE"
+USE_EXT_SMS_CLIENT="$USE_EXT_SMS_CLIENT"
+EXT_SMS_CLIENT_IP1="$EXT_SMS_CLIENT_IP1"
+EXT_SMS_CLIENT_IP2="$EXT_SMS_CLIENT_IP2"
+EXT_SMS_CLIENT_PORT="$EXT_SMS_CLIENT_PORT"
+MO_SERVICE="$MO_SERVICE"
+EOF
+
+	echo "created=\"$dt\";"
+	sms_log "SMS configure file created"
+}
+
+# create sms_diag.cfg file
+create_sms_diag_cfg_file()
+{
+	sms_log "creating SMS Diagnostics configure file"
+	dt=`date`
+	mv $diag_config_file $diag_config_file.old
+	touch $diag_config_file
+
+	# read all config variables
+	read_variable "smstools.diagconf.use_whitelist" "1" && USE_WHITELIST=${RD_VAL}
+	read_variable "smstools.diagconf.enable_set_cmd_ack" "0" && ENABLE_SET_CMD_ACK=${RD_VAL}
+	read_variable "smstools.diagconf.use_fixed_ack_dest" "0" && USE_FIXED_ACK_DEST=${RD_VAL}
+	read_variable "smstools.diagconf.fixed_ack_dest_no" && FIXED_ACK_DEST_NO=${RD_VAL}
+	read_variable "smstools.diagconf.enable_error_noti" "1" && ENABLE_ERROR_NOTI=${RD_VAL}
+	read_variable "smstools.diagconf.use_fixed_error_noti_dest" "0" && USE_FIXED_ERROR_NOTI_DEST=${RD_VAL}
+	read_variable "smstools.diagconf.fixed_error_noti_dest_no" && FIXED_ERROR_NOTI_DEST_NO=${RD_VAL}
+	read_variable "smstools.diagconf.max_diag_sms_tx_limit" "100" && MAX_DIAG_SMS_TX_LIMIT=${RD_VAL}
+	read_variable "smstools.diagconf.max_diag_sms_tx_limit_per" "DAY" && MAX_DIAG_SMS_TX_LIMIT_PER=${RD_VAL}
+	read_variable "smstools.diagconf.access_generic_rdb_vars" "0" && ACCESS_GENERIC_RDB_VARS=${RD_VAL}
+	read_variable "smstools.diagconf.allow_generic_cmds" "0" && ALLOW_GENERIC_CMDS=${RD_VAL}
+	read_variable "smstools.max_wl_dst_no_idx" "0" && MAX_WL_TX_IDX=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no0" && DIAG_USER_NO0=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no1" && DIAG_USER_NO1=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no2" && DIAG_USER_NO2=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no3" && DIAG_USER_NO3=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no4" && DIAG_USER_NO4=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no5" && DIAG_USER_NO5=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no6" && DIAG_USER_NO6=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no7" && DIAG_USER_NO7=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no8" && DIAG_USER_NO8=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no9" && DIAG_USER_NO9=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no10" && DIAG_USER_NO10=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no11" && DIAG_USER_NO11=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no12" && DIAG_USER_NO12=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no13" && DIAG_USER_NO13=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no14" && DIAG_USER_NO14=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no15" && DIAG_USER_NO15=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no16" && DIAG_USER_NO16=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no17" && DIAG_USER_NO17=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no18" && DIAG_USER_NO18=${RD_VAL}
+	read_variable "smstools.diagconf.diag_user_no19" && DIAG_USER_NO19=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password0" && DIAG_PASSWORD0=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password1" && DIAG_PASSWORD1=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password2" && DIAG_PASSWORD2=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password3" && DIAG_PASSWORD3=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password4" && DIAG_PASSWORD4=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password5" && DIAG_PASSWORD5=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password6" && DIAG_PASSWORD6=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password7" && DIAG_PASSWORD7=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password8" && DIAG_PASSWORD8=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password9" && DIAG_PASSWORD9=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password10" && DIAG_PASSWORD10=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password11" && DIAG_PASSWORD11=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password12" && DIAG_PASSWORD12=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password13" && DIAG_PASSWORD13=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password14" && DIAG_PASSWORD14=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password15" && DIAG_PASSWORD15=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password16" && DIAG_PASSWORD16=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password17" && DIAG_PASSWORD17=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password18" && DIAG_PASSWORD18=${RD_VAL}
+	read_variable "smstools.diagconf.diag_password19" && DIAG_PASSWORD19=${RD_VAL}
+
+	# write to config file
+cat << EOF > $diag_config_file
+# Generated on $dt
+USE_WHITELIST="$USE_WHITELIST"
+ENABLE_SET_CMD_ACK="$ENABLE_SET_CMD_ACK"
+USE_FIXED_ACK_DEST="$USE_FIXED_ACK_DEST"
+FIXED_ACK_DEST_NO="$FIXED_ACK_DEST_NO"
+ENABLE_ERROR_NOTI="$ENABLE_ERROR_NOTI"
+USE_FIXED_ERROR_NOTI_DEST="$USE_FIXED_ERROR_NOTI_DEST"
+FIXED_ERROR_NOTI_DEST_NO="$FIXED_ERROR_NOTI_DEST_NO"
+MAX_DIAG_SMS_TX_LIMIT="$MAX_DIAG_SMS_TX_LIMIT"
+MAX_DIAG_SMS_TX_LIMIT_PER="$MAX_DIAG_SMS_TX_LIMIT_PER"
+ACCESS_GENERIC_RDB_VARS="$ACCESS_GENERIC_RDB_VARS"
+ALLOW_GENERIC_CMDS="$ALLOW_GENERIC_CMDS"
+# add white list below as DIAG_USER_NO0, DIAG_PASSWORD0,...
+DIAG_USER_NO0="$DIAG_USER_NO0"
+DIAG_PASSWORD0="$DIAG_PASSWORD0"
+DIAG_USER_NO1="$DIAG_USER_NO1"
+DIAG_PASSWORD1="$DIAG_PASSWORD1"
+DIAG_USER_NO2="$DIAG_USER_NO2"
+DIAG_PASSWORD2="$DIAG_PASSWORD2"
+DIAG_USER_NO3="$DIAG_USER_NO3"
+DIAG_PASSWORD3="$DIAG_PASSWORD3"
+DIAG_USER_NO4="$DIAG_USER_NO4"
+DIAG_PASSWORD4="$DIAG_PASSWORD4"
+DIAG_USER_NO5="$DIAG_USER_NO5"
+DIAG_PASSWORD5="$DIAG_PASSWORD5"
+DIAG_USER_NO6="$DIAG_USER_NO6"
+DIAG_PASSWORD6="$DIAG_PASSWORD6"
+DIAG_USER_NO7="$DIAG_USER_NO7"
+DIAG_PASSWORD7="$DIAG_PASSWORD7"
+DIAG_USER_NO8="$DIAG_USER_NO8"
+DIAG_PASSWORD8="$DIAG_PASSWORD8"
+DIAG_USER_NO9="$DIAG_USER_NO9"
+DIAG_PASSWORD9="$DIAG_PASSWORD9"
+DIAG_USER_NO10="$DIAG_USER_NO10"
+DIAG_PASSWORD10="$DIAG_PASSWORD10"
+DIAG_USER_NO11="$DIAG_USER_NO11"
+DIAG_PASSWORD11="$DIAG_PASSWORD11"
+DIAG_USER_NO12="$DIAG_USER_NO12"
+DIAG_PASSWORD12="$DIAG_PASSWORD12"
+DIAG_USER_NO13="$DIAG_USER_NO13"
+DIAG_PASSWORD13="$DIAG_PASSWORD13"
+DIAG_USER_NO14="$DIAG_USER_NO14"
+DIAG_PASSWORD14="$DIAG_PASSWORD14"
+DIAG_USER_NO15="$DIAG_USER_NO15"
+DIAG_PASSWORD15="$DIAG_PASSWORD15"
+DIAG_USER_NO16="$DIAG_USER_NO16"
+DIAG_PASSWORD16="$DIAG_PASSWORD16"
+DIAG_USER_NO17="$DIAG_USER_NO17"
+DIAG_PASSWORD17="$DIAG_PASSWORD17"
+DIAG_USER_NO18="$DIAG_USER_NO18"
+DIAG_PASSWORD18="$DIAG_PASSWORD18"
+DIAG_USER_NO19="$DIAG_USER_NO19"
+DIAG_PASSWORD19="$DIAG_PASSWORD19"
+EOF
+
+	echo "created=\"$dt\";"
+	sms_log "SMS Diagnostics configure file created"
+}
+
+
+# create ssmtp.conf file
+create_ssmtp_conf_file()
+{
+	sms_log "creating SMS SSMTP configure file"
+	dt=`date`
+	mv $ssmtp_config $ssmtp_config.old
+	touch $ssmtp_config
+
+	# read all config variables
+	read_variable "smstools.ssmtpconf.mailhub" && mailhub=${RD_VAL}
+	read_variable "smstools.ssmtpconf.hostname" && hostname=${RD_VAL}
+	read_variable "smstools.ssmtpconf.AuthUser" && AuthUser=${RD_VAL}
+	read_variable "smstools.ssmtpconf.AuthPass" && AuthPass=${RD_VAL}
+	read_variable "smstools.ssmtpconf.FromSender" && FromSender=${RD_VAL}
+	if [ "$AuthUser" != "" ]; then
+		user_str=""
+		pass_str=""
+	else
+		user_str="AuthUser=$AuthUser"
+		pass_str="AuthPass=$AuthPass"
+	fi
+
+	# write to config file
+cat << EOF > $ssmtp_config
+# Generated by on $dt
+# /usr/etc/ssmtp/ssmtp.conf -- a config file for SSMTP sendmail.
+#
+# The person who gets all mail for userids < 1000
+# Make this empty to disable rewriting.
+root=postmaster
+# The place where the mail goes. The actual machine name is required
+# no MX records are consulted. Commonly mailhosts are named mail.domain.com
+# The example will fit if you are in domain.com and you mailhub_ is so named.
+mailhub=$mailhub
+# Where will the mail seem to come from?
+#rewriteDomain=
+# The full hostname
+hostname=$hostname
+#
+# UseTLS=YES
+#
+$user_str
+$pass_str
+AuthMethod=CRAM-MD5
+#from user (not part of the orignal configuration variables)
+FromSender=$FromSender
+EOF
+
+	echo "created=\"$dt\";"
+	sms_log "SMS SSMTP configure file created"
+}
+
+
+# after boot, read nvram/rdb variables and create new config files
+read_vars_n_create_cfg_files()
+{
+	configured=`rdb_get "smstools.configured"`
+	if [ "$configured" = "YES" ]; then
+		#sms_log "already created config files, skip."
+		return 0
+	fi
+
+	if [ "$configured" = "READY_TO_REBOOT" ]; then
+		rdb_set smstools.configured
+		return 0
+	fi
+
+	sms_log "Read NVRAM/RDB variables and create SMS configure files"
+
+	check_and_create_sms_dirs >/dev/null
+
+	# check if nvram utility exist to determine to use nvram or rdb
+	check_storage
+
+	# create sms.cfg file
+	create_sms_cfg_file
+
+	# create sms_diag.cfg file
+	create_sms_diag_cfg_file
+
+	# create ssmtp.conf file
+	create_ssmtp_conf_file
+
+	# mark as configured
+	# read-only system (Platypus, Platypus2) : use rdb variable
+	# read-write system (Bovine, Avian) : use persist rdb variable to skip
+	#                                     creation at next boot time
+	if [ "$platform" = "Platypus" ] || [ "$platform" = "Platypus2" ]; then
+		rdb_set "smstools.configured" "YES"
+	else
+		rdb_set "smstools.configured" "YES" -p
+	fi
+}
+
+# block sms rx processing
+block_sms_rx_processing()
+{
+	rdb_set wwan.0.sms.received_message.blocked 1
+}
+
+# unblock sms rx processing
+unblock_sms_rx_processing()
+{
+	rdb_set wwan.0.sms.received_message.blocked 0
+}
+
+# process latest rx msg
+process_latest_rx_msg()
+{
+	atmgr_ready=`rdb_get atmgr.status`
+	MSG_ST_VAR="wwan.0.sms.message.status"
+	NEW_MSG_ST=`rdb_get $MSG_ST_VAR`
+	rdb_set $MSG_ST_VAR "\"$NEW_MSG_ST\""
+}
+
+# get new file index to be stored as a file name in inbox or outbox
+# $1 : local inbox or outbox path name
+# $2 : spool path name
+get_new_file_index()
+{
+	rdb_set wwan.0.sms.new_msg_index
+	get_file_index ${1} ${2}
+	NEW_FILE_IDX=`rdb_get wwan.0.sms.new_msg_index` 2>/dev/null
+	test -z "$NEW_FILE_IDX" && NEW_FILE_IDX=09999
+	#sms_log "get new file index ${1} - $NEW_FILE_IDX"
+}
+
+# rebuild msg index in target folder
+# $1 : local inbox or outbox path name
+rebuild_msg_box_index()
+{
+	cur_dir=`pwd`
+	cd ${1}
+	let "start_idx=1"
+	file_list=`ls | sort` 2>/dev/null
+	for fname in $file_list; do
+		test ! -f $fname && continue;
+		test "$prefix" = "" && prefix=`echo $fname | awk -F "_" '{print $1}'`
+		cur_idx=`echo $fname | awk -F "_" '{print $2}'`
+		test "$prefix" = "rxmsg" && read_tag=`echo $fname | awk -F "_" '{print $3}'`
+		#sms_log "start_idx = $start_idx, cur_idx = $cur_idx, rtag = $read_tag"
+		if [ $start_idx -lt $cur_idx ]; then
+			new_idx=`printf "%05d" $start_idx`
+			if [ "$prefix" = "rxmsg" ]; then
+				new_name="$prefix"_"$new_idx"_"$read_tag"
+			else
+				new_name="$prefix"_"$new_idx"
+			fi
+			#sms_log "new_idx = $new_idx, newname = $new_name"
+			mv -f $fname $new_name
+			#sms_log "mv $fname $new_name"
+		fi
+		let "start_idx+=1"
+	done
+	cd $cur_dir
+}
+
+# change file name of read msg in inbox folder
+change_read_file_name()
+{
+	cd $LOCAL_INBOX
+	fname=$1
+	if [ ! -e "$fname" ]; then
+		sms_log "Can not find $1 in $LOCAL_INBOX, cancel renaming for read msg"
+		NEW_FILE_NAME=$fname
+		return
+	fi
+	cur_idx=`echo $fname | awk -F "_" '{print $2}'`
+	NEW_FILE_NAME=rxmsg_"$cur_idx"_read
+	mv -f $fname $NEW_FILE_NAME
+}
+
+restart_sms_server()
+{
+	sms_server_running=`ps | grep sms_server | grep -v grep` 2>/dev/null
+	if [ "$sms_server_running" != "" ]; then
+		killall sms_server 2>/dev/null
+	fi
+	sms_server_running=`ps | grep sms_server | grep -v grep` 2>/dev/null
+	if [ "$sms_server_running" != "" ]; then
+		sms_server_pid=`pidof sms_server`
+		kill -9 $sms_server_pid 2>/dev/null
+	fi
+
+	if [ "$USE_EXT_SMS_CLIENT" != "1" ];then
+		sms_log "use ext. sms client is off..."
+		return
+	fi
+
+	if [ "$EXT_SMS_CLIENT_IP1" = "" ] && [ "$EXT_SMS_CLIENT_IP2" = "" ];then
+		sms_log "ext. sms client primary & secondary IP address are empty"
+		return
+	fi
+
+	if [ "$EXT_SMS_CLIENT_PORT" = "" ];then
+		sms_log "ext. sms client port number is empty"
+		return
+	fi
+
+	if [ ! -e "$SMS_BIN_PATH/sms_server" ]; then
+		sms_log "SMS_BIN_PATH = $SMS_BIN_PATH"
+		sms_log "Can not find ext. sms server"
+		return
+	fi
+
+	sms_log "Starting SMS server..."
+	$SMS_BIN_PATH/sms_server "$EXT_SMS_CLIENT_PORT" "$EXT_SMS_CLIENT_IP1" "$EXT_SMS_CLIENT_IP2" &
+}

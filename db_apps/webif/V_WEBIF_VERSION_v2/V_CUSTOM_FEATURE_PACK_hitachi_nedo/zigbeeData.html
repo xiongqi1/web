@@ -1,0 +1,330 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+
+<style>
+.list-col-hdr {text-align:left;}
+.ajax_loader {background: url("spinner_squares_circle.gif") no-repeat center center transparent;width:100%;height:100%;}
+</style>
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Zigbee Data</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<link class="include" rel="stylesheet" type="text/css" href="jquery.jqplot.min.css" />
+<script class="include" type="text/javascript" src="jquery.jqplot.min.js"></script>
+<script class="include" language="javascript" type="text/javascript" src="plugins/jqplot.highlighter.min.js"></script>
+<script class="include" language="javascript" type="text/javascript" src="plugins/jqplot.cursor.min.js"></script>
+<script class="include" language="javascript" type="text/javascript" src="plugins/jqplot.dateAxisRenderer.min.js"></script>
+
+<link class="include" rel="stylesheet" type="text/css" href="daterangepicker.css" />
+<script class="include" type="text/javascript" src="moment.min.js"></script>
+<script class="include" type="text/javascript" src="jquery.daterangepicker.js"></script>
+
+<script language="JavaScript">
+
+var deviceTypes=[];
+
+function submitF() {
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+#else
+#endif
+}
+
+var isAjaxComplete = true;
+
+var request_type;
+var current_device;
+var first_date;
+var last_date;
+var plot1;
+var options;
+var ajax_spinner;
+
+/*
+* Ajax overlay 1.0
+* Author: Simon Ilett @ aplusdesign.com.au
+* Descrip: Creates and inserts an ajax loader for ajax calls / timed events 
+* Date: 03/08/2011 
+*/
+function ajaxLoader (el, options) {
+	// Becomes this.options
+	var defaults = {
+		bgColor 		: '#fff',
+		duration		: 800,
+		opacity			: 0.7,
+		classOveride 	: false
+	}
+	this.options 	= jQuery.extend(defaults, options);
+	this.container 	= $(el);
+	
+	this.init = function() {
+		var container = this.container;
+		// Delete any other loaders
+		this.remove(); 
+		// Create the overlay 
+		var overlay = $('<div></div>').css({
+				'background-color': this.options.bgColor,
+				'opacity':this.options.opacity,
+				'width':container.width(),
+				'height':container.height(),
+				'position':'absolute',
+				'top':'0px',
+				'left':'0px',
+				'z-index':99999
+		}).addClass('ajax_overlay');
+		// add an overiding class name to set new loader style 
+		if (this.options.classOveride) {
+			overlay.addClass(this.options.classOveride);
+		}
+		// insert overlay and loader into DOM 
+		container.append(
+			overlay.append(
+				$('<div></div>').addClass('ajax_loader')
+			).fadeIn(this.options.duration)
+		);
+    };
+	
+	this.remove = function(){
+		var overlay = this.container.children(".ajax_overlay");
+		if (overlay.length) {
+			overlay.fadeOut(this.options.classOveride, function() {
+				overlay.remove();
+			});
+		}	
+	}
+
+    this.init();
+}	
+	
+function makechart(v) {
+    if (typeof ajax_spinner !== "undefined") {
+	ajax_spinner.remove()
+	ajax_spinner = null
+    }
+    if (v.rval !== 'OK') {
+    } else if (request_type === 'db_report' &&
+        v.data.length > 1) {
+       // plot v.data;
+        if (plot1) {
+            plot1.destroy();
+        }
+        var ymax = 0
+        var ymin = 0
+        for (i = v.data.length-1 ; i >= 0 ; i--) {
+            v.data[i][0] *= 1000
+            if (i == 0) {
+                v.data[i][1] = v.data[i+1][1]
+            } else {
+                v.data[i][1] -= v.data[i-1][1]
+            }
+            if (ymax < v.data[i][1]) ymax = v.data[i][1];
+            if (ymin > v.data[i][1]) ymin = v.data[i][1];
+        }
+        plot1.series[0].data = v.data;
+        options.axes.xaxis.min = v.data[0][0];
+        options.axes.xaxis.max = v.data[v.data.length - 1][0];
+        options.axes.yaxis.min = 0
+        options.axes.yaxis.max = ymax - ymin + 10
+        plot1 = $.jqplot('chart1', [v.data], options);
+    } else if (request_type === 'db_devices') {
+       // make a list from v.data.meter
+       $('#devices').empty();
+       $.each(v.data.meter, function (key, v) {
+          $('#devices').append($('<option/>', { 
+             value: v.device_id,
+             text : v.sub_type + ' SN:' + v.serial_number + ' ZMAC:' + v.eui
+         }));
+         if (typeof current_device === 'undefined') current_device = v.device_id;
+       });    
+    }
+    isAjaxComplete = true;
+}
+
+function makeRequest(request, data) {
+    if (isAjaxComplete) {
+        isAjaxComplete = false;
+        request_type = request;
+	ajax_spinner = new ajaxLoader($('#chart1'))
+        var rline = '/cgi-bin/hth_cgi.lua?command='+request;
+        if (typeof data !== "undefined") {
+            $.each(data, function(k, v) {
+                rline = rline + '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+            });
+        }
+        $.get(rline, makechart);
+    }
+}
+
+function request_data() {
+   // console.log('device '+current_device +' first time '+first_date+' second time '+last_date);
+   if (typeof first_date === "undefined" ||
+     typeof current_device === "undefined" ||
+     isAjaxComplete !== true) {
+     return;
+   }
+   makeRequest('db_report', {"device_id": current_device,  
+      "first" : first_date, 
+      "last" : last_date });
+}
+
+var prev_length = 0;
+
+$(document).ready(function() {
+ 
+    makeRequest('db_devices');
+    // setInterval(makeRequest, 5000);
+
+
+    //refresh time (in millisec)
+    var t = 1000;
+    //samples to draw
+    var n = 20;
+    var x = (new Date()).getTime(); // current time
+    //buffer of n samples
+    var data = [];
+    for (i = 0; i < n; i++) {
+        data.push([x - (n - 1 - i) * t, 0]);
+    }
+
+    options = {
+        axes: {
+            xaxis: {
+                numberTicks: 4,
+                renderer: $.jqplot.DateAxisRenderer,
+                tickOptions: {
+                    formatString: '%Y:%m:%d %H:%M:%S'
+                },
+                min: data[0][0],
+                //max : data[19][0]
+                max: data[data.length - 1][0]
+            },
+            yaxis: {
+                min: 0,
+                max: 1,
+                numberTicks: 6,
+                tickOptions: {
+                    formatString: '%.1f'
+                }
+            }
+        },
+        highlighter: {
+            show: true,
+            sizeAdjust: 7.5
+        },
+        cursor: {
+            show: false
+        },
+        seriesDefaults: {
+            rendererOptions: {
+                smooth: true
+            }
+        }
+    };
+    plot1 = $.jqplot('chart1', [data], options);
+
+    var is_updating = false;
+    var view = 'Hour';
+
+    function doUpdate() {
+
+        if (!is_updating) return;
+        if (data.length > n - 1) {
+            data.shift();
+        }
+
+        var y = Math.random();
+        var x = (new Date()).getTime();
+
+        data.push([x, y]);
+        if (plot1) {
+            plot1.destroy();
+        }
+        plot1.series[0].data = data;
+        // the problem is that now the values of y of ticks are no longer static
+        // and change with each update, then change the underlying logic
+        // I have to take action on the values in options .
+        options.axes.xaxis.min = data[0][0];
+        options.axes.xaxis.max = data[data.length - 1][0];
+        plot1 = $.jqplot('chart1', [data], options);
+        setTimeout(doUpdate, t);
+    }
+
+    $('#devices').change(function() {
+        current_device = $("#devices option:selected").val()
+	request_data()
+    });
+    $('#view').change(function() {
+        var optionSelected = $(this).find("option:selected");
+        var val  = optionSelected.val();
+        if (val === 'Continuous') {
+            if (!is_updating) {
+                is_updating = true;
+                doUpdate();
+            }
+        } else {
+            if (is_updating) {
+                is_updating = false;
+            }
+        }
+    });
+
+    $('#date-range').dateRangePicker({
+        shortcuts : 
+        {
+             'prev-days': [3,5,7],
+             'prev': ['week','month','year'],
+             'next-days':null,
+             'next':null
+        }
+    })
+    .bind('datepicker-apply',function(event,obj)
+    {
+	first_date = (new Date(obj.date1).getTime() / 1000).toFixed(0)
+	last_date = (new Date(obj.date2).getTime() / 1000).toFixed(0)
+        request_data();
+    });
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<!-- form id should be always 'form' for embedded validation engine -->
+			<div id="chart1" style="height:450px; width:590; align:center;"></div>
+			<input id="date-range" size="60" value="">
+			<select id="devices">
+			</select>
+		</div>	<!-- div class="right-column white-box" -->
+
+	</div>		<!-- div class="grid-9 omega" -->
+	</div>		<!-- div class="container" -->
+</div>			<!-- div id="content" -->
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Internet", "zigbeeSubmenu3", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("","");
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+#else
+function validate_new_mac_addr(field) {
+}
+#endif
+</script>
+
+</body>
+</html>

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rm -f /etc/init.d/rc2.d/S102loggerdump

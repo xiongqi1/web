@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset=utf-8 http-equiv="Content-Language" content="en"/>
+ <script src="jquery-3.2.1.min.js"></script>
+ <style>
+   table, th, td 
+   {
+     margin:10px 0;
+     border:solid 1px #333;
+     padding:2px 4px;
+     font:15px Verdana;
+   }
+   th {
+     font-weight:bold;
+   }
+ </style>
+</head>
+
+<body>
+<div id="ws_status">
+</div>
+<div id="showData"></div>
+<script>
+var headers = [ "Name", "Value" ];
+var rdbvals = [
+  [ "wwan.0.system_network_status." , [
+    [ "attached",          "UE Attached" ],
+    [ "registered",        "UE Registered" ],
+    [ "reg_stat",          "UE Registration Status" ],
+    [ "current_band",      "Current Band" ],
+    [ "eNB_ID",            "EnodeB Id" ],
+    [ "network",           "Network" ] ]
+  ],
+  [ "wwan.0.servcell_info." , [
+    [ "rsrp",              "Receive Power (RSRP)" ],
+    [ "rsrq",              "Receive Quality (RSRQ)" ],
+    [ "rssinr",            "Signal to Interference Noise Ratio (SINR)" ],
+    [ "rssnr",             "RSS NR" ],
+    [ "mac_i_bler_received",  "I RX Bit Loss Error Rate" ],
+    [ "mac_i_bler_sent",      "I TX Bit Loss Error Rate" ],
+    [ "mac_r_bler_received",  "R RX Bit Loss Error Rate" ],
+    [ "mac_r_bler_sent",      "R TX Bit Loss Error Rate" ] ]
+  ], 
+  [ "wwan.0.signal." , [
+    [ "rssinr",            "RSS INR" ] ]
+  ]
+];
+
+function rdbqs(t) {
+ var qs = "RDB "
+ for (var i = 0; i < t.length; i++) {
+   r = t[i]
+   if (r && r[0] && r[1]) {
+     if (i > 0) {
+       qs += "&"
+     } 
+     qs += r[0]
+  }
+ }
+ return qs
+}
+
+function buildTable(h,t,d) {
+ var table = document.createElement("table")
+ var tr = table.insertRow(-1)
+ for (var i = 0; i < h.length; i++) {
+   var th = document.createElement("th")
+   th.innerHTML = h[i];
+   tr.appendChild(th);
+ }
+ for (var i = 0; i < t.length; i++) {
+   var r = t[i]
+   if (r && r[0] && r[1]) {
+     var nv = r[1]
+     for (var j = 0; j < nv.length; j++) {
+       var nvl = nv[j]
+       var q = "" + r[0] + nvl[0]
+       if (q in d) {
+         tr = table.insertRow(-1)
+         var tc = tr.insertCell(-1)
+         tc.innerHTML = nvl[1]
+         tc = tr.insertCell(-1)
+         tc.innerHTML = d[q]
+       }
+     }
+   }
+ }
+ return table
+}
+
+var sckt
+var data
+var gmsg
+function send(sckt, cmd){
+  if (!sckt) return;
+  try{
+      sckt.send(cmd);
+      $('#ws_status').html('<p><b>websocket cmd '+cmd+'</b></p>')
+  } catch(exception){
+    $('#ws_status').html('<p><b>websocket send failed '+cmd+'</b></p>')
+  }
+}
+function ws_define() {
+  var url = "ws://192.168.1.1:7681"
+  sckt = new WebSocket(url, "netc_netstat")
+  try {
+    sckt.onopen = function() {
+      $('#ws_status').html('<p><b>websocket connection opened</b></p>')
+      var q = rdbqs(rdbvals)
+      send(sckt, q)
+    }
+
+    sckt.onmessage = function got_packet(msg) {
+      gmsg = msg
+      if (msg.data) {
+        console.log(msg.data)
+        data = JSON.parse(msg.data)
+        if (data.IFACE) {
+        }
+        if (data.LIST) {
+        }
+        if (data.RDB) {
+          var divContainer = document.getElementById("showData");
+          var t = buildTable(headers, rdbvals, data.RDB)
+          divContainer.innerHTML = ""
+          divContainer.appendChild(t)
+        }
+      }
+    }
+
+    sckt.onclose = function(){
+      $('#ws_status').html('<p><b>websocket closed</b></p>')
+      sckt = false
+    }
+  } catch(exception) {
+    alert('<p>Error' + exception);
+  }
+}
+
+function readyFn(jQuery) {
+  ws_define()
+}
+
+$( document ).ready(readyFn)
+
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Sierra Wireless AirCard Hub</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>
+input {
+	background:transparent;
+	border-style:none;
+	color:#000;
+}
+</style>
+<script language="JavaScript">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+document.cookie='language='+<%lang=get_single('webinterface.language');%>"@@lang";
+<%}%>
+Butterlate.setTextDomain("index");
+
+function initTranslation() {
+	//$("#pleaseWait").html(_("GUI pleaseWait"));
+	$("#csq").html(_("signalStrength"));
+	//$("#3gconnection").html(_("status connection"));
+	$("#CSprovide").html(_("provider"));
+	$("#simstatusid").html(_("simStatus"));
+	$("#simstatusid2").html(_("simStatus"));
+	$("#insertSim").html(_("GUI insertSim"));
+	$("#SIMnotInserted").val(_("sim not inserted"));
+ 	//$("#GUI_sToAdv").html(_("GUI sToAdv"));
+}
+var imageidx = 0;
+var http_request = 0;
+var counter = 30;
+var pincounter = 0;
+var prvSimStatus = "0";
+var ajaxerror = 0;
+
+function UrlDecode(str) {
+var unicode = 0;
+var ret = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1 , i + 3) );
+		if(val > 127 || val < 32) {
+			unicode = 1;
+			break;
+		}
+	}
+	for (var i = 0; i < str.length; i++) {
+	var chr = str.charAt(i);
+		if (chr == "+") {
+			ret += " ";
+		}
+		else {
+			if (chr == "%") {
+				var asc = str.substring(i + 1 , i + 3);
+				if (unicode) {
+					temp = parseInt("0x" + str.substring(i + 4 , i + 6) + asc );
+					rt = "&#"+temp.toString()+";";
+					ret += rt;
+					i += 5;
+				}
+				else {
+					rt = "&#x"+asc+";";
+					ret += rt;
+					i += 2;
+				}
+			}
+			else {
+				ret += chr;
+			}
+		}
+	}
+	return ret;
+}
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	if(response.length<10) return;
+	eval(response);
+	document.form.simStatus.value = simStatus; 
+	if(mhs_docked=="1") {
+		if(mhs_chargingonly=="1")
+			document.form.docked.value = _("docked")+" ("+_("charging only")+")";
+		else
+			document.form.docked.value = _("docked");
+	}
+	else {
+		document.form.docked.value = _("undocked");
+	}
+	switch(mhs_operationmode) {
+	case "simple":
+		document.form.opmode.value = _("easy");
+	break;
+	case "soho":
+		document.form.opmode.value = _("small office");
+	break;
+	case "poweruser":
+		document.form.opmode.value = _("power user");
+	break;
+	}
+	if(pdp_stat=="down")
+		document.form.pdp_stat.value = _("status down");
+	else if(pdp_stat=="up")
+		document.form.pdp_stat.value = _("status up");
+	else
+		document.form.pdp_stat.value = pdp_stat;
+	
+	if(simStatus == "SIM OK") {
+		document.form.simStatus.value = _("simOK");
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+		document.getElementById('simID').style.color = '#107010'; //GREEN
+		csq = csq.substring(0, csq.indexOf("dBm") );		
+		csqstr = _("not available");
+		if(csq == 0)
+			imageidx = 0;	
+		else if(csq >= -86 ) {
+			csqstr = _("high");
+			if(csq >= -77)
+				imageidx = 6;
+			else
+				imageidx = 5;
+		}
+		else if(csq >= -101 ) {
+			csqstr = _("medium");
+			if(csq >= -92 )
+				imageidx = 4;
+			else
+				imageidx = 3;
+		}
+		else if(csq >= -110 ) {
+			csqstr = _("low");
+			if(csq >= -108)
+				imageidx = 2;
+			else
+				imageidx = 1;
+		}	
+		else
+			imageidx = 0;
+		document.form.csq.value = csq+" dBm         "+csqstr;	
+		$("#GUI-CSQ").html("<img src='/images/GUI-csq"+imageidx + ".GIF'/>");	
+		if( typeof(hint) == "undefined" || hint=="N/A" || hint=="" )	
+			$("#provider").html(UrlDecode(provider));
+		else
+			$("#provider").html(UrlDecode(hint));
+	}
+	else if(simStatus != "SIM not inserted") {
+		document.getElementById('simID').style.color = '#ff0000'; //RED
+		$("#GUI-CSQ").html("");
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+		if( prvSimStatus != simStatus ) {
+			if( ++ pincounter >= 2 ) {
+				prvSimStatus = simStatus;
+				switch(simStatus) {
+				case "SIM general failure":
+					alert( _("admin warningMsg2") );//SIM general failure
+					break;
+				case "SIM locked":
+					alert( _("admin warningMsg3") );//You need to enter the PIN code to unlock the SIM before use
+					break;		
+				case "SIM CHV1 blocked":
+					alert( _("admin warningMsg4") );//You need to enter the PUK code to unlock the SIM before use
+					break;
+				/*case "MEP locked":
+					alert( _("mepLocked") );//MEP locked
+					break;*/
+				case "Network reject - Account":
+					alert( _("admin warningMsg6") );//Network reject - Account
+					break;
+				case "Network reject":
+					alert( _("admin warningMsg7") );//Network reject
+					break;
+				case "MEP Locked":
+					if(confirm(_("mep warningMsg1")+" "+_("mep warningMsg2")))
+					{
+						http_request.responseText.clear;
+						http_request.close;	 
+						http_request=0;
+						window.location=('mepUnlocking.html');
+						return;
+					}
+					break;
+				default:
+					pincounter = 0;	
+				break;
+				}
+			}
+		}
+		//document.form.wwanStatus.value = "";
+		document.form.csq.value = "";
+		$("#GUI-CSQ").html("<img src='/images/GUI-csq0.GIF'/>");
+		document.getElementById("provider").innerHTML="";
+	}
+	else {
+		$("#GUI-CSQ").html("");
+		document.getElementById("sim_status_div0").style.display='none';
+		document.getElementById("sim_status_div1").style.display='';
+	}
+}
+
+$(document).ready(function() {
+	var startPoll = function() {
+		if( ++ajaxerror>5)
+			location.reload();
+		else
+			$.get("/cgi-bin/ajax.cgi",ajaxUpdate);
+	}
+	setInterval(startPoll, 3000);
+	initTranslation();
+	if("@@request['QUERY_STRING']"=="setdate") {
+		$.get('/cgi-bin/setdate.cgi?'+HostDate());
+	}
+});
+</script>
+</head>
+<body>
+
+<form name="form">
+<% include GUI-extra.html %>
+<div id="basicGUI">
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+<%
+_m=get_single('mhs.operationmode');
+if(_m=='poweruser') {
+  if( request["SESSION_ID"]!=session['sessionid'] ) {%>  
+	<img style="position:absolute; top:0px; left:-5px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-status" style="left:4px;"><a  href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<img style="position:absolute; top:121px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-login"><a href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+<%}else{%>
+	<img style="position:absolute; top:0px; left:-5px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-status" style="left:4px;"><a href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<img style="position:absolute; top:121px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wlan"><a href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:242px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wan"><a href="/GUI-wan.html">LAN 1 / WAN</a></div>
+ <%}
+}else{%>
+	<img style="position:absolute; top:0px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-status" style="color:#fff"><script language="JavaScript">document.write(_("status"));</script></div>
+<%}%>
+	<div class="div_text" style="top:30px" ><script language="JavaScript">document.write(_("hsStatus"));</script></div>
+
+	<div class="div_text" style="color:#888; top:60px" ><script language="JavaScript">document.write(_("device"));</script></div>
+	<div class="div_input" style="top:60px" ><input type="text" id="docked" size="30" class="finchAjax" value="" readonly/></div>  
+	
+	<div class="div_text" style="color:#888; top:95px" ><script language="JavaScript">document.write(_("operation mode"));</script></div>
+	<div class="div_input" style="top:95px" ><input type="text" id="opmode" size="30" class="finchAjax" value="" readonly/></div>  
+	
+	<div class="div_text" style="color:#888; top:130px" ><script language="JavaScript">document.write(_("wwanConnection"));</script></div>
+	<div class="div_input" style="top:130px" ><input type="text" id="pdp_stat" size="30" class="finchAjax" value="" readonly/></div>
+	
+	<img style="position:absolute; top:170px; left:44px" src="/images/strip.png" />
+	<div id="GUI-CSQ"><font class="div_text"  style="top:50px; width:80px" id="pleaseWait"></font></div>
+	<div id="sim_status_div0" >
+		<div class="div_text" style="top:195px" id="csq">3G Signal Strength</div>
+		<div class="div_input" style="top:193px" >
+			<input type="text" size="30" class="finchAjax" name="csq" value="-88 dbm" readonly/>
+		</div>
+		<img style="position:absolute; top:370px; left:44px" src="/images/strip.png" />
+		<div class="div_text" style="top:410px" id="CSprovide">Provide</div>
+		<div class="div_input" style="top:410px; color:#000" id="provider" ></div>
+		<div class="div_text" style="top:458px" id="simstatusid">SIM Status</div>
+		<div class="div_input" style="top:455px" >
+			<input type="text" id="simID" name="simStatus" value="" readonly/>
+		</div>
+	</div>
+	<div id="sim_status_div1" style="display:none" >
+		<div class="div_text" style="top:215px" id="simstatusid2">SIM Status</div>
+		<div class="div_input" style="top:213px" ><input type="text" id="SIMnotInserted" value="SIM not inserted" style="color:#FF0000" readonly/></div>
+		<div class="div_text" style="top:260px; width:345px; left:52px" id="insertSim"><div>
+	</div>
+</div>
+<script language="JavaScript">initTranslation();</script>
+</form>  
+</body>
+</html>

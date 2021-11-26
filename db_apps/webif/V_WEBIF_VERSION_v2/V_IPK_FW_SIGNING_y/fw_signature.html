@@ -1,0 +1,172 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Firmware Signature</title>
+<% include topinc_v2.inc %>
+#define CHECK_ROOT_USER		// Instruct redirectOnSessionTimeout.inc to also check user is root.
+#include "redirectOnSessionTimeout.inc"
+<script type="text/javascript" src="/js/password_lock_elements.js">
+//  strings used by password_lock_elements (placed here to be collected into i18n XML file
+// _("incorrectPassword")  _("httpreq err")  _("enterRootPasswordToConfirmAction")
+</script>
+<script language="JavaScript">
+
+#include "net_util.js"
+
+// retrive the enable/disable option from system.update.enableFirmwareSignatureCheck
+function getSavedCheckOption() {
+        var tmp="<%get_single_direct('system.update.enableFirmwareSignatureCheck');%>";
+	if(tmp != 1) {
+		tmp = 0;
+	}
+	$("#enableFirmwareSignatureCheckHidden").val(tmp);
+
+	if ($("#enableFirmwareSignatureCheckHidden").val() == 1) {
+		$("#enableFirmwareSignatureCheck-0").prop('checked', true);
+	} else {
+		$("#enableFirmwareSignatureCheck-1").prop('checked', true);
+	}
+}
+
+function formF() {
+	if ($("#enableFirmwareSignatureCheck-0").prop('checked')) {
+		$("#enableFirmwareSignatureCheckHidden").val(1);
+		$("button").attr("disabled",true);
+		document.form.submit();
+	} else {
+		$("#enableFirmwareSignatureCheckHidden").val(0);
+		blockUI_confirm_l(
+			_("noFirmwareSignatureCheckWarning"),
+			function(){$("button").attr("disabled",true); document.form.submit();},
+			function(){getSavedCheckOption();} // restore the option based on RDB setting on click "Cancel"
+		);
+	}
+}
+
+// delete the public key from rbd list, and remove the key file from /usr/local/cdcs/config/pubkey
+function delEntry( idx ) {
+	var rdbIdx= $("#tdIndex-"+idx).text();
+	$.getJSON("./cgi-bin/fw_signature.cgi",{csrfTokenGet: "@@session[csrfTokenName]", cmd:"delEntry", index:rdbIdx},
+		function(res,stat,req) {
+			window.location.href="/fw_signature.html?deletePublicKeySuccess"
+		}
+	);
+	return;
+}
+
+// update the key list display
+function updateList() {
+	$.getJSON("./cgi-bin/fw_signature.cgi",{cmd:"getList"}, function(res,stat,req) {
+		var h="";
+		$.each(res.publicKeyList, function(idx, val) {
+			h+="<tr id=trEntry-"+idx+">\
+			    <td id=tdIndex-"+idx+" style=\"display:none\">"+val.rdbIndex+"</td>\
+			    <td id=tdName-"+idx+">"+val.fileName+"</td>";
+
+			h+="<td class='last'><a href='javascript:delEntry("+idx+")' class=\"secondary sml\" style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close sml'></i></a></td>\
+			    </tr>";
+		});
+
+		$("#RulesList").html(h);
+	});
+}
+
+
+$(document).ready(function() {
+//get the enable/disalable option
+	getSavedCheckOption();
+	apply_password_lock_to_inputs("@@session[csrfTokenName]");
+
+//update the key list display
+	updateList();
+});
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+// save the option change
+	if(request['QUERY_STRING']=="form") {
+		set_single( 'system.update.enableFirmwareSignatureCheck='+validate_number(form['enableFirmwareSignatureCheckHidden']), '-p' );
+		redirect('/fw_signature.html?signatureCheckChangeSuccess');
+	}
+}
+else { /*GET*/
+
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+                <form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']?form" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="enableFirmwareSignatureCheckHidden" id="enableFirmwareSignatureCheckHidden" value="@@form['enableFirmwareSignatureCheckHidden']"/>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("firmwareSignature"))</script></h2>
+				<div class="form-row">
+					<label for="enableFirmwareSignatureCheck"><script language=Javascript>document.write(_("EnableFirmwareSignatureCheck"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch password-locked">
+								<input type="radio" id="enableFirmwareSignatureCheck-0" name='enableFirmwareSignatureCheck' class="access">
+								<label for="enableFirmwareSignatureCheck-0" class="on"><script>document.write(_("on"))</script></label>
+								<input type="radio" id="enableFirmwareSignatureCheck-1" name='enableFirmwareSignatureCheck' class="access">
+								<label for="enableFirmwareSignatureCheck-1" class="off"><script>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button name="saveButton" type="button" onClick="javascript:formF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+		<div class="pad" id="circular_list">
+		<form class="validate" action="#" novalidate="novalidate">
+			<div class="grid-33">
+				<div class="pad alpha">
+					<h2><script language=Javascript>document.write(_("publicKeyList"))</script></h2>
+				</div>
+			</div>
+			<table class="above-5-column">
+				<colgroup>
+					<col width="500px">
+					<col width="50px">
+				</colgroup>
+				<thead id="list-head">
+					<tr>
+						<th class="align10"><script language=Javascript>document.write(_("publicKeyFileName"))</script></th>
+						<th >&nbsp;</th>
+					</tr>
+				<thead>
+				<tbody id="RulesList"></tbody>
+			</table>
+		</form>
+		</div> <!-- id="circular_list" -->
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script type="text/javascript">
+        set_menu("System", "FW_SIGNATURE", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="signatureCheckChangeSuccess") {%>
+		success_alert("",_("firmwareSignatureCheckChangeSubmitSuccess"));
+<%	}%>
+
+<%	if(request['QUERY_STRING']=="deletePublicKeySuccess") {%>
+		success_alert("",_("firmwareSignatureDeletePublicKeySuccess"));
+<%	}%>
+</script>
+</body>
+</html>

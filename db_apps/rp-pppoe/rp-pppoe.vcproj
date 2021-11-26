@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="9.00"
+	Name="rp-pppoe"
+	ProjectGUID="{6E0F37EC-5BE6-49C7-B5E3-2E7BA992E290}"
+	RootNamespace="rp-pppoe"
+	Keyword="MakeFileProj"
+	TargetFrameworkVersion="131072"
+	>
+	<Platforms>
+		<Platform
+			Name="Win32"
+		/>
+	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
+	<Configurations>
+		<Configuration
+			Name="Debug|Win32"
+			OutputDirectory="$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName)&quot;"
+				ReBuildCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName) rebuild&quot;"
+				CleanCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName) clean&quot;"
+				Output="rp-pppoe"
+				PreprocessorDefinitions="WIN32;_DEBUG"
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName)&quot;"
+				ReBuildCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName) rebuild&quot;"
+				CleanCommandLine="C:\cygwin\bin\ssh.exe %SSHUSER%@%SSHHOST% &quot;sshbuild &apos;$(ProjectDir)&apos; $(ConfigurationName) clean&quot;"
+				Output="rp-pppoe"
+				PreprocessorDefinitions="WIN32;NDEBUG"
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+		<Filter
+			Name="Source Files"
+			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
+			>
+			<File
+				RelativePath=".\common.c"
+				>
+			</File>
+			<File
+				RelativePath=".\debug.c"
+				>
+			</File>
+			<File
+				RelativePath=".\if.c"
+				>
+			</File>
+			<File
+				RelativePath=".\md5.c"
+				>
+			</File>
+			<File
+				RelativePath=".\pppoe-serial.c"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
+			>
+			<File
+				RelativePath=".\config.h"
+				>
+			</File>
+			<File
+				RelativePath=".\md5.h"
+				>
+			</File>
+			<File
+				RelativePath=".\pppoe.h"
+				>
+			</File>
+		</Filter>
+		<File
+			RelativePath=".\Makefile"
+			>
+		</File>
+	</Files>
+	<Globals>
+	</Globals>
+</VisualStudioProject>

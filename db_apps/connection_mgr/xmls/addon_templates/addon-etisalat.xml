@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+	<Include>
+		<Country country="Egypt" mcc="602">
+			<Carrier carrier="MobiNil Egypt" mnc="001">
+				<APN apn="mobinilweb">
+					<UserName>guest</UserName>
+					<Password>guest</Password>
+				</APN>
+			</Carrier>
+			<Carrier carrier="Vodafone Egypt" mnc="002">
+				<APN apn="internet.vodafone.net">
+					<UserName>internet</UserName>
+					<Password>internet</Password>
+				</APN>
+			</Carrier>
+			<Carrier carrier="Etisalat" mnc="03">
+				<APN apn="etisalat">
+				</APN>
+			</Carrier>
+		</Country>
+	</Include>
+</Rt>

@@ -1,0 +1,216 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC >
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<title>DMZ Settings</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<script language="JavaScript" type="text/javascript">
+
+
+function checkDmzIPAddr(field) {
+    if(field.value == ""){
+        alert("Error. IP address is empty.");
+        field.value = field.defaultValue;
+        field.focus();
+        return false;
+    }
+
+	if (isAllNumAndSlash(field.value) == 0){
+		alert('IP format error.');
+		field.focus();
+        return false;
+	}
+
+	var ip_pair = new Array();
+	ip_pair = field.value.split("/");
+
+	if(ip_pair.length > 2){
+		alert('IP format error.');
+		field.focus();
+        return false;
+	}
+
+	if(ip_pair.length == 2){
+		// sub mask
+		if(!ip_pair[1].length) {
+			alert('IP format error.');
+			field.focus();
+			return false;
+		}
+		if(!isNumOnly(ip_pair[1])){
+			alert('IP format error.');
+			field.focus();
+			return false;
+		}
+		tmp = parseInt(ip_pair[1], 10);
+		if(tmp < 0 || tmp > 32){
+			alert('IP format error.');
+			field.focus();
+			return false;
+		}
+	}
+
+    if( (!checkRange(ip_pair[0],1,0,255)) ||
+		(!checkRange(ip_pair[0],2,0,255)) ||
+		(!checkRange(ip_pair[0],3,0,255)) ||
+		(!checkRange(ip_pair[0],4,0,255)) ){
+		alert('IP format error.');
+		field.focus();
+		return false;
+    }
+
+	var mymask="<%val=get_single('link.profile.0.netmask');%>@@val";
+	var dmzAr = new Array();
+	var maskAr = new Array();
+	dmzAr = ip_pair[0].split('.');
+	maskAr = mymask.split('.');
+
+	var firstAr = new Array();
+	var negAr = new Array();
+	var lastAr = new Array();
+	for (i = 0; i < 4; i++) {
+		firstAr[i] = dmzAr[i] & maskAr[i];
+		negAr[i] = 255 - maskAr[i];
+		lastAr[i] = firstAr[i] | negAr[i];
+	}
+
+	if ((dmzAr[0] == firstAr[0] && dmzAr[1] == firstAr[1] && dmzAr[2] == firstAr[2] && dmzAr[3] == firstAr[3]) ||
+		(lastAr[0] == 255 && lastAr[1] == 255 && lastAr[2] == 255 && lastAr[3] == 255) ||
+		(dmzAr[0] == lastAr[0] && dmzAr[1] == lastAr[1] && dmzAr[2] == lastAr[2] && dmzAr[3] == lastAr[3]))
+	{
+		alert('Error: The DMZ address is invalid.');
+		field.focus();
+		return false;
+	}
+
+	return true;
+}
+
+function formCheck()
+{
+	
+	if((document.DMZ.dmzEnable.value=='1')&&(!checkDmzIPAddr(document.DMZ.DMZIPAddress) )){
+		return;
+	}
+	document.DMZ.submit();
+}
+
+
+function display_on()
+{
+  if(window.XMLHttpRequest){ // Mozilla, Firefox, Safari,...
+    return "table-row";
+  } else if(window.ActiveXObject){ // IE
+    return "block";
+  }
+}
+
+function disableTextField (field)
+{
+  if(document.all || document.getElementById)
+    field.disabled = true;
+  else {
+    field.oldOnFocus = field.onfocus;
+    field.onfocus = skip;
+  }
+}
+
+function enableTextField (field)
+{
+  if(document.all || document.getElementById)
+    field.disabled = false;
+  else {
+    field.onfocus = field.oldOnFocus;
+  }
+}
+
+function updateState()
+{
+	if(document.DMZ.DMZEnabled[0].checked==true){
+		enableTextField(document.DMZ.DMZIPAddress);
+	}else{
+		disableTextField(document.DMZ.DMZIPAddress);
+	}
+}
+
+</script>
+</head>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+        tempval = form['dmzEnable'];
+        retval=set_single( 'service.firewall.dmz.enable='+tempval ); 
+        if(tempval=='1')
+        {
+            tempval = form['DMZIPAddress'];
+            retval = set_single( 'service.firewall.dmz.address='+tempval ); 
+        }
+	} 
+	else /*GET*/
+	{
+		form['dmzEnable'] = get_single( 'service.firewall.dmz.enable');  
+	}
+    myip = get_single( 'service.firewall.dmz.address' );
+	form['DMZIPAddress'] = myip;
+%>
+
+
+<body onLoad="updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+<div class="content" >
+<h3>Firewall > DMZ</h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+    <tr><th>DMZ Settings</th></tr>
+</table>
+<!--% checkIfUnderBridgeModeASP(); %-->
+
+<form name="DMZ" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="dmzEnable" value="@@form['dmzEnable']"/>
+
+<table width="80%">
+<tr>
+	<td class="head" id="dmzSet">
+		DMZ Settings	</td>
+	<td>
+    <input type=radio name='DMZEnabled' onClick="javascript:document.DMZ.dmzEnable.value='1'; updateState()">&nbsp;Enable &nbsp;&nbsp;
+    <input type=radio name='DMZEnabled' onClick="javascript:document.DMZ.dmzEnable.value='0'; updateState()">&nbsp;Disable
+    
+	<!--select onChange="updateState()" name="DMZEnabled" size="1">
+	<option value=0 >Disable</option>
+    <option value=1 >Enable</option>
+    </select-->    </td>
+</tr>
+<script type="text/javascript">   
+if( parseInt(document.DMZ.dmzEnable.value)==1  )
+	document.DMZ.DMZEnabled[0].checked=true;
+else
+	document.DMZ.DMZEnabled[1].checked=true;
+</script>  
+<tr>
+	<td class="head" id="dmzIPAddr">
+		DMZ IP Address	</td>
+	<td>
+  		<input type="text" size="24" name="DMZIPAddress" value="@@form['DMZIPAddress']" >	</td>
+</tr>
+</table>
+
+<div align="center" style="margin-right:20% ">
+<p></p>
+	<input type="button" value="Save" id="dmzApply" name="addDMZ" onClick="return formCheck()"> &nbsp;&nbsp;
+    <input type="reset" value="Reset" id="dmzReset" name="reset"  onClick="window.location.reload()">
+</div>
+</form>
+</div>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

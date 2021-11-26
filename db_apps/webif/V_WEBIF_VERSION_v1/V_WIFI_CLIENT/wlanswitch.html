@@ -1,0 +1,103 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Wireless Mode</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	mydata="wlan.0.wifi_mode="+form['wifiModeH'];
+	set_list( mydata );
+}
+else {
+	form['wifiModeH']=get_single('wlan.0.wifi_mode');
+}
+%>
+
+<body onload="formLoad()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript">
+Butterlate.setTextDomain("wlanswitch");
+
+function formLoad() {
+	var f=document.formA;
+	with ( f[0] ) {
+		if(f.wifiModeH.value=="AP")
+			f.wifiModeS[0].checked = 1;
+		else
+			f.wifiModeS[1].checked = 1;
+	}
+	//var e = document.getElementById("WifiModeSwitchIntro");
+	//e.innerHTML = _("WifiModeSwitchIntro");
+}
+
+function CheckValue() {
+	var f=document.formA;
+	var wifi_mode =  <%val='\"'+get_single('wlan.0.wifi_mode')+'\"';%>@@val;
+	if(f.wifiModeS[0].checked == true && wifi_mode == "AP")
+		return true;
+	else if(f.wifiModeS[1].checked == true && wifi_mode == "STA")
+		return true;
+	//else{
+		//if(wifi_mode == "AP"){
+			//if ( !confirm(_("ApToClientConfirm"))) {return;}
+		//}
+		//else{
+			//if ( !confirm(_("ClientToAPConfirm"))) {return}
+		//}
+	//}
+
+	if(f.wifiModeS[0].checked == true){
+		f.wifiModeH.value="AP";
+		pageToGo="wlan.html"
+	}
+	else{
+		f.wifiModeH.value="STA";
+		pageToGo="wlan_sta.html"
+	}
+	document.formA.wifiModeApply.disabled=true;
+	document.formA.submit();
+}
+
+</script>
+
+<form name="formA" method='POST' action="@@request['SCRIPT_NAME']">
+<input type="hidden" name='wifiModeH' value="@@form['wifiModeH']">
+
+
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("wlmode"))</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write( _("wlmode"))</script></th></tr>
+</table>
+
+<table width="80%" >
+<tr>
+	<td width="35%" id="wifimode"><script language="JavaScript">document.write( _("wlmode"))</script></td>
+	<td>
+		<input type=radio name=wifiModeS value="AP">&nbsp;<font id="wifiModeS"><script language="JavaScript">document.write( _("AP"))</script></font>&nbsp;&nbsp;
+		<input type=radio name=wifiModeS value="STA">&nbsp;<font id="wifiModeS"><script language="JavaScript">document.write( _("Client"))</script></font>
+	</td>
+</tr>
+</table>
+
+
+
+<table width = "540" border = "0" cellpadding = "2" cellspacing = "1">
+<tr align="center">
+	<td>
+		<input type=button style="width:120px;" value="Apply" id="wifiModeApply" onClick="CheckValue();"> &nbsp; &nbsp;
+	</td>
+</tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

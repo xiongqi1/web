@@ -1,0 +1,128 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<%
+        set_single( 'wwan.0.cdma.perfset.stat=')
+	esp_sleep(1000);
+	if (request['REQUEST_METHOD'] == "POST") {
+		set_single('wwan.0.cdma.prefset.roam_mode='+form['hidden_bandList']);
+		set_single('wwan.0.cdma.prefset.network_mode='+form['hidden_netMode']);
+		set_single( 'wwan.0.cdma.prefset.cmd=set' );
+	}
+	else {
+		set_single( 'wwan.0.cdma.prefset.cmd=get' );
+	}
+	tempval='';
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.cdma.perfset.stat'); }
+	if (request['REQUEST_METHOD'] == "POST") {
+		redirect('/setband.html?success');
+	}
+	else {
+		var _stat=tempval;
+		var _roam_mode=get_single('wwan.0.cdma.prefset.roam_mode');
+		var _network_mode=get_single('wwan.0.cdma.prefset.network_mode');
+	}
+%>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Band Menu</title>
+
+<%include topinc_v2.inc%>
+#define CHECK_ROOT_USER		// Instruct redirectOnSessionTimeout.inc to also check user is root.
+#include "redirectOnSessionTimeout.inc"
+
+<script type="text/javascript">
+
+/* jquery ready */
+$(document).ready( function() {
+	$("#bandList").val("@@_roam_mode");
+	$("#netMode").val("@@_network_mode");
+
+/* submit button */
+	$("#save").click(function(){
+		/*var rdb;
+		/// reset stat
+		rdb=new rdb_tool();
+		rdb.add("wwan.0.cdma.otasp.stat","");
+		rdb.mset(function(res){
+			// start otasp 
+			rdb=new rdb_tool();
+			rdb.add("wwan.0.cdma.prefset.roam_mode", $("#bandList").val());
+			rdb.add("wwan.0.cdma.prefset.network_mode", $("#netMode").val());
+			// submit 
+			rdb.mset(success_alert("",_("bandSubmitSuccess")));
+		});*/
+		$("#hidden_bandList").val($("#bandList").val());
+		$("#hidden_netMode").val($("#netMode").val());
+		$.blockUI({message:_("GUI pleaseWait")});
+		$("#form").submit();
+	});
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_("bandSubmitSuccess"));
+<%	}%>
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<input type="hidden" id="hidden_bandList" name="hidden_bandList" value="@@form['hidden_bandList']"/>
+		<input type="hidden" id="hidden_netMode" name="hidden_netMode" value="@@form['hidden_netMode']"/>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("band settings"))</script></h2>
+				<div class="form-row">
+					<label for="bandList"><script language=Javascript>document.write(_("roamingPreference"))</script></label>
+					<div class="field">
+						<select class="med" id="bandList">
+							<option value="AutoA"><script language=Javascript>document.write(_("a side"));</script></option>None</option>
+							<option value="AutoB"><script language=Javascript>document.write(_("b side"));</script></option>00</option>
+							<option value="Any"><script language=Javascript>document.write(_("auto"));</script></option>01</option>
+						</select>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="netMode"><script language=Javascript>document.write(_("modePreference"))</script></label>
+					<div class="field">
+						<select class="med" id="netMode">
+							<option value="1x"><script language=Javascript>document.write(_("oneXonly"));</script></option>None</option>
+							<option value="HDR"><script language=Javascript>document.write(_("hdrOnly"));</script></option>00</option>
+							<option value="1x/HDR"><script language=Javascript>document.write(_("hybrid"));</script></option>01</option>
+						</select>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" id="save" ><script language=Javascript>document.write(_("apply"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	/* set menu gui */
+        set_menu("Internet", "BAND", <%_val = session["user"];%>"@@_val");
+</script>
+
+</body>
+</html>

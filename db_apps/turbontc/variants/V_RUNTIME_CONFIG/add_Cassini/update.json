@@ -1,0 +1,270 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA-NIT late config API",
+        "description": "OWA-NIT RESTful API",
+        "version": "1.0.0"
+    },
+    "basePath": "/api/v2/update",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/rdb": {
+            "get": {
+                "summary": "Retrieve rdb config status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/Status"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/cert": {
+            "get": {
+                "summary": "Retrieve cert config status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/Status"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/mbn": {
+            "get": {
+                "summary": "Retrieve MBN config status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/Status"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/efs": {
+            "get": {
+                "summary": "Retrieve EFS/NV config status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/Status"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/config": {
+            "get": {
+                "summary": "Retrieve late config status of all config types",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/StatusAll"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "apply a late config",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Config file error"
+                    },
+                    "401": {
+                        "description": "Unauthorised to apply configs"
+                    },
+                    "405": {
+                        "description": "Invalid file name"
+                    },
+                    "500": {
+                        "description": "Failed to apply configs",
+                        "schema": {
+                            "$ref": "#/definitions/FailedConfigs"
+                        }
+                    }
+                }
+            }
+        },
+        "/firmware": {
+            "get": {
+                "summary": "Retrieve firmware status",
+                "description": "",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "schema": {
+                            "$ref": "#/definitions/Status"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Upgrade a firmware",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Firmware image error"
+                    },
+                    "401": {
+                        "description": "Unauthorised to upgrade firmware"
+                    },
+                    "405": {
+                        "description": "Invalid file name"
+                    },
+                    "500": {
+                        "description": "Failed to upgrade firmware",
+                        "schema": {
+                            "$ref": "#/definitions/FailedConfigs"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "Status": {
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "Config type"
+                },
+                "ids": {
+                    "type": "array",
+                    "description": "A list of config IDs",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "StatusAll": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/Status"
+            }
+        },
+        "Error": {
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "string"
+                }
+            }
+        },
+        "FailedConfigs": {
+            "properties": {
+                "error": {
+                    "type": "array",
+                    "description": "A list of config types that failed to apply",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

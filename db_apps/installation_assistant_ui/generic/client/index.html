@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<!-- Generic IA UI page: waiting indicator -->
+
+<head>
+    <title>Loading...</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            getKeepAlive(function(){ window.location = "/index.html"; }, setupPeriodicKeepAlive);
+        });
+    </script>
+
+</head>
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+</body>
+</html>

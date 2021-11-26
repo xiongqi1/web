@@ -1,0 +1,385 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SMS New Message</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script type="text/javascript" src="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=GET_MAX_TX_IDX"></script>
+<script language="JavaScript">
+
+var queryParams = parseQueryString( window.location.search.substring(1) );
+
+var sms_onoff="<%get_single_direct('smstools.enable');%>";
+var encoding_scheme="<%get_single_direct('smstools.conf.coding_scheme');%>";
+var sim_status="<%get_single_direct('wwan.0.sim.status.status');%>";
+
+var mob_num = new Array();
+var tx_result = new Array();
+var TxMsgBody;
+var manufacturer="<%get_single_direct('wwan.0.manufacture');%>";
+var is_sierra = 0;
+var tx_concat_en="<%tx_concat_en=get_single('wwan.0.sms.txconcat_en');%>@@tx_concat_en";
+
+if (manufacturer.search("Sierra Wireless") != -1) {
+	is_sierra = 1;
+}
+
+function DisplayCharCount() {
+	var msg = document.SMS.txmsg.value;
+	var gsm7_char_set="@£$¥èéùÇØøÅåΔ_ΦΓΛΩΠΨΣΘÆæßÉ!\"\#¤%&'()*+,-./:;<=>?¡ÄÖÑÜ§¿äöñüà \n\r";
+	var gsm7_char_set_ext="@£$¥èéùÇØøÅåΔ_ΦΓΛΩΠΨΣΘÆæßÉ!\"\#¤%&'()*+,-./:;<=>?¡ÄÖÑÜ§¿äöñüà \n\rìòΞ^\\[]{}~|€";
+	var t1, t2;
+	var max_limit, i, ch;
+	if (tx_concat_en == '0') {
+		if (encoding_scheme == 'UCS2') {
+			max_limit = 70;
+		}
+		else {
+			max_limit = 160;
+			for (i=0; i<msg.length; i++) {
+				ch = msg.charAt(i);
+				if (is_sierra) {
+					t1 = ch.search(/[@£$¥èéùÇØøÅåΔ_ΦΓΛΩΠΨΣΘÆæßÉ!"\#¤%&'()*+,-./:;<=>?¡ÄÖÑÜ§¿äöñüà \n\r]/g);
+				} else {
+					t1 = ch.search(/[@£$¥èéùÇØøÅåΔ_ΦΓΛΩΠΨΣΘÆæßÉ!"\#¤%&'()*+,-./:;<=>?¡ÄÖÑÜ§¿äöñüà \n\rìòΞ^\\\[\]{}~|€]/g);
+				}
+				t2 = ch.search(/[a-zA-Z0-9]/g);
+				if (t1 < 0 && t2 < 0) {
+					max_limit = 70;
+					break;
+				}
+			}
+		}
+		document.getElementById( "CharCount" ).style.color="Black";
+		var smss=parseInt((msg.length-1)/max_limit)+1;
+		document.getElementById( "CharCount" ).innerHTML = msg.length+" / "+smss+_("willSent")+" ("+max_limit+_("charsPerSMS")+")";
+	} else {
+		document.getElementById( "CharCount" ).innerHTML = msg.length;
+	}
+}
+
+function IsSameNumber(num1, num2) {
+	var num1_len = num1.length;
+	var num2_len = num2.length;
+	var comp_num1 = num1;
+	var comp_num2 = num2;
+	if (num1_len > 9) {
+		comp_num1 = num1.substr(num1_len-9);
+	}
+	if (num2_len > 9) {
+		comp_num2 = num2.substr(num2_len-9);
+	}
+	return (comp_num1 == comp_num2);
+}
+
+/* Unsafe characters in UTF-8 mode page, add more characters when needed */
+//var unsafeSmsString = "&#";
+var unsafeSmsString = "\"<>%\\^[]`\+\$\,'#&\n\r";
+
+function isUnsafeSmsMsg(compareChar) {
+	if (unsafeSmsString.indexOf(compareChar) == -1)
+		return false;
+	else
+		return true;
+}
+
+function encodeSpecialChars(val) {
+	var len = val.length;
+	var i = 0;
+	var newStr = "";
+	var original = val;
+	for ( i = 0; i < len; i++ ) {
+		if (isUnsafeSmsMsg(val.substring(i,i+1)) == false)
+			newStr = newStr + val.substring(i,i+1);
+		else
+			newStr = newStr + convert(val.substring(i,i+1));
+	}
+	return newStr;
+}
+
+function CheckDuplicatedSendList() {
+	var i, j, r, val;
+	for(i=0; i<max_tx_dst_idx; i++) {
+	//	if (!$("#tx_sel"+i).attr("checked"))
+	//		continue;
+		val=$("#mob_num"+i).val();
+		for(j=i+1; j<=current_dst_top_idx; j++) {
+			if (i == j || val == '')
+				continue;
+		//	if (!$("#tx_sel"+i).attr("checked"))
+		//		continue;
+			if (IsSameNumber(val, $("#mob_num"+j).val())) {
+				alert(_("destination")+" "+_("number")+" ["+(i+1)+"] "+val+" "+_("sms warning05")+" "+_("destination")+" "+_("number")+" ["+(j+1)+"] "+$("#mob_num"+j).val()+".\n"+_("destination")+" "+_("number")+" ["+(j+1)+"]"+$("#mob_num"+j).val()+" "+_("cancelled")+" !");
+				document.SMS.selectall.checked=false;
+			}
+		}
+	}
+}
+
+function SendMsgHandler(v) {
+	var i;
+	$.unblockUI();
+	$("#SmsNswMsgSend").blur();
+	eval(v)
+	for(i=0; i<=current_dst_top_idx; i++) {
+		id="#tx_result"+i;
+		$(id).html(tx_result[i]);
+		if (tx_result[i]=="Failure") {
+			$(id).css("color", "RED");
+		}
+		else {
+			$(id).css("color", "Black");
+			$("#txmsg").val("");
+		}
+	}
+}
+
+function SendMsg() {
+	var i;
+	var dst_cnt = 0;
+	clear_alert();
+	
+	/*if (document.SMS.txmsg.value == "") {
+		validate_alert("",_("sms warning06"));// Message body is empty !
+		return;
+	}*/
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	if (CheckDuplicatedSendList() == false)
+		return;
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SEND_MSG&";
+
+	// send mobile numbers via content type bacause it could be up to 100 destination
+	contents_body="";
+	for(i=0; i<=current_dst_top_idx; i++) {
+		if($("#mob_num"+i).val().length>=3) {
+			$("#tx_result"+i).html("");
+			contents_body+="MobileNo"+i+"=\""+$("#mob_num"+i).val()+"\"&";
+			dst_cnt++;
+		}
+	}
+	if (dst_cnt == 0) {
+		validate_alert("",_("dstNumberRequired"));
+		return;
+	}
+	$.blockUI({centerY: false, css: {top:"320px"}, message:_("sendingMessage")});
+	// do not encode message body
+	//TxMsgBody=EncodeMsgBody(document.SMS.txmsg.value);
+	TxMsgBody=document.SMS.txmsg.value;
+	TxMsgBody=encodeSpecialChars(TxMsgBody);
+	if (encoding_scheme == 'GSM7') {
+		cmd_line+="TxMsg="+TxMsgBody+"&";
+	}
+	else {
+		contents_body+="TxMsg=\""+TxMsgBody+"\"&";
+	}
+	$.post(cmd_line, contents_body, SendMsgHandler);
+}
+
+var max_tx_dst_idx=1;
+var current_dst_top_idx=0;
+var num_list=new Array();
+
+function IncreaseMaxTxDstIdx() {
+	if( $("#mob_num"+current_dst_top_idx).val()=="" ) {
+		validate_alert("",_("mustEnterDstNumber"));
+		return;
+	}
+	current_dst_top_idx++;
+	if( current_dst_top_idx >= max_tx_dst_idx ) {
+		validate_alert("",_("smsMaximumExceeded"));
+		current_dst_top_idx--;
+		return;
+	}
+	clear_alert();
+	$("#newmsglist"+current_dst_top_idx).css("display", "");
+}
+
+function DecreaseMaxTxDstIdx() {
+	clear_alert();
+	$("#mob_num"+current_dst_top_idx).val("");
+	if(current_dst_top_idx==0) {
+		return;
+	}
+	$("#newmsglist"+current_dst_top_idx).css("display", "none")
+	current_dst_top_idx--;
+}
+
+function make_destination_list(m) {
+	var i;
+	var DestNumText;
+	var AddRecipientText;
+	var DelRecipientText;
+
+	DestNumText = _("dest number");
+	AddRecipientText = _("add recipient");
+	DelRecipientText = _("del recipient");
+	var h="";
+	for(i=0; i<m; i++){
+		h += "<div class='form-row' id='newmsglist"+i+"' style='display:none'>";
+		h += "<label for='mob_num"+i+"'>"+DestNumText+"</label>";
+		h+="<input type='text' class='large validate[required] required' id='mob_num"+i+"' name='mob_num"+i+"' maxLength='32' value='' onkeyup='check_phoneRegex(this)'>\
+			<label class='field-right-desc' id='tx_result"+i+"' style='color:BLUE;padding-left:10px;'></label>";
+		if( i==0 ) {
+			h+="<div class='field-btn-group'>\
+				<button type='button' class='secondary minimum' name='add_dst' value='&nbsp;+&nbsp;' onclick='IncreaseMaxTxDstIdx()' title='"+AddRecipientText+"'><i class='icon plus'></i></button>\
+				<button type='button' class='secondary minimum' name='del_dst' value='&nbsp;-&nbsp;' onclick='DecreaseMaxTxDstIdx()' title='"+DelRecipientText+"'>\
+				<i class='icon reduce'></i></button>\
+			</div>";
+		}
+		h+="</div>";
+	}
+	$("#destination_list").html(h);
+	for(i=0; i<m; i++) {
+		if($("#tx_result"+i).html()=="Failure") {
+			$(id).css( "color", "RED");
+		}
+	}
+	flash_destination_list();
+}
+
+function flash_destination_list() {
+	var start_num=0;
+	$("#newmsglist0").css("display", "");
+	var sms_num_list=queryParams.getParamByName('sms_num_list' );
+	num_list=sms_num_list.split(",");
+	for (i=0, j=0; i<(num_list.length-start_num) && j<max_tx_dst_idx; i++) {
+		if(num_list[i]=="") {
+			continue;
+		}
+		$("#mob_num"+(j+start_num)).val(num_list[i]);
+		$("#newmsglist"+(j+start_num)).css("display", "");
+		j++;
+	}
+	if(j>0) {
+		current_dst_top_idx=j-1;
+	}
+	var msg = unescape(queryParams.getParamByName('sms_draft'));
+	msg=msg.replace(/\\n/g, '\n');
+#if 0
+	// correct sms_draft is base64-encoded
+#endif
+	msg=Base64.decode(msg).substring(5);
+	msg=msg.replace(/\\n/g, '\r\n');
+	$("#txmsg").val(msg);
+}
+
+$(document).ready( function() {
+
+	#if defined(V_MODULE_PRI_BASED_OPERATION_y)
+	/* plus sign (+) is not supposed by VZW - firmware is shared with ATT, SPRING and VZW */
+	var pri_carrier="<%get_single_direct('link.profile.wwan.pri');%>".replace(/\(.*\)/,"");
+	if(pri_carrier=="VZW")
+		$("#sms_intnl_num_desc").html(_("sms intnl num desc3"));
+	#endif	
+	
+	if (sms_onoff != "1") {
+		h="<table class='border-top white-box' style='height:39px'><tr><th style='text-align:center'>"+_("smsDisabled")+"</th></tr></table>";
+		$("#form").html(h);
+		return;
+	}
+	if( sim_status!="SIM OK" ) {
+		switch(sim_status) {
+			case "SIM removed":
+			case "SIM not inserted":
+				validate_alert("", _("sim removed warning"));
+			break;
+			case "":
+			case "N/A":
+				validate_alert("", _("sim detecting warning"));
+			break;
+			case "SIM PIN":
+				validate_alert("", _("sim pinlock warning"));
+			break;
+			case "SIM PUK":
+				validate_alert("", _("sim puklock warning"));
+			break;
+			default:
+				validate_alert("", _("sim try warning"));
+			break;
+		}
+		$(".div-all").css("display","none");
+		return;
+	}
+	max_tx_dst_idx = MaxTxDstIdx;
+	make_destination_list(max_tx_dst_idx);
+	var smsc_addr="<%get_single_direct('wwan.0.sms.smsc_addr');%>";
+	if (smsc_addr == '') {
+		DisplaySmscAddrError();
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="SMS" id="form" class="validate" novalidate="novalidate">
+		<div class="right-column white-box div-all">
+			<h2><script language=Javascript>document.write(_("newmsg"))</script></h2>
+			<div class="pad">
+				<div class="form-row" id="sms_intnl_num_desc">
+#ifdef V_CELL_NW_cdma
+					<script language=Javascript>document.write(_("sms intnl num desc2"))</script>
+#elif !defined(V_WEBIF_SPEC_vdf)
+#ifdef V_PRODUCT_ntc_nwl25
+					<script language=Javascript>document.write(_("sms intnl num desc3"))</script>
+#else
+					<script language=Javascript>document.write(_("sms intnl num desc"))</script>
+#endif
+#endif
+				</div>
+				<div id="destination_list"></div>
+				<div class="form-row" style="padding-top:20px;">
+					<label for="txmsg"><script language=Javascript>document.write(_("newmsg"))</script></label>
+					<div class="field">
+						<textarea type="text" class='validate[required] required txmsg' id="txmsg" name="txmsg" cols="52" rows="10" value="" onkeyup=javascript:DisplayCharCount() data-prompt-position='bottomRight:-120,10'></textarea>
+					</div>
+					<div class="field-des" style="margin:5px 0 0 235px;">
+						<span id="CharCount" style="text-align:left;"></span>&nbsp;
+						<span id="MsgCountDesc" style="text-align:left;display:none"></span>
+					</div>
+<%if (tx_concat_en == '0') {%>
+					<div class="field-des message">
+						<script language=Javascript>document.write(_("sms msg count desc"))</script>
+					</div>
+<%}%>
+				</div>
+				<div class="submit-row">
+					<button type="button" id="SmsNswMsgSend" onClick="SendMsg()"><script language=Javascript>document.write(_("send msg"))</script></button>
+					<button type="reset" class="secondary" onclick="clear_alert();"><script language=Javascript>document.write(_("clear"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "SMS_NewMag", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	VALIDATOR.config.errors["summary"]=_("InputFieldRequired");
+#else
+	$("#form").validationEngine("attach", {scroll: false});
+#endif
+</script>
+</body>
+</html> 

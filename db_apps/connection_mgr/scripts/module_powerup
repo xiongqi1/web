@@ -1,0 +1,17 @@
+#!/bin/sh
+
+V250_IF_LIST=`rdb_get -l V250_if`
+V250_IF=""
+for ifname in $V250_IF_LIST; do
+        V250_IF=$V250_IF`rdb_get $ifname`
+done
+if [ "$V250_IF" = "" ]; then
+		ERR_CNT=`rdb_get debug.missing_usb_port_recover`
+		let "ERR_CNT+=1"
+		rdb_set debug.missing_usb_port_recover $ERR_CNT
+        sys -m 0
+        sleep 3
+fi
+sys -m 1
+/usr/bin/cdcs_init_wwan_pm
+exit 0

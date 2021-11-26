@@ -1,0 +1,212 @@
+#!/bin/sh
+
+nof=${0##*/}                        # Name of file/script.
+source /lib/utils.sh
+
+usage() {
+	cat <<EOM
+
+Usage: dbcfg_default [-f] [-r] [-m] [-x]
+
+	Resets system to factory defaults and (optionally) reboots it.
+
+	-f = Force operation. Won't do anything without this option.
+	-r = Reboot after factory reset.
+	-m = Reset modem config to factory defaults.
+	-x = Full factory reset, all RDB variables except factoryreset-reason-restore will be reset.
+
+EOM
+	exit 1
+}
+
+FORCE=''
+REBOOT=''
+MODEM=''
+FULL=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+	'-f') FORCE=1; ;;
+	'-r') REBOOT=1; ;;
+	'-m') MODEM=1; ;;
+	'-x') FULL=1; ;;
+	*) usage; ;;
+	esac
+	shift
+done
+
+if [ -z "$FORCE" ]; then usage; fi
+
+source /etc/variant.sh
+
+getRDB() {
+	ps | grep "rdb_manager" | grep -- "-c" | awk '{print $1}'
+}
+
+stopRDB() {
+	PID=`getRDB`
+	test -n "$PID" && kill -9 $PID
+}
+
+# delete all SMS messages
+delete_sms_files() {
+  # SMS incoming directory has been moved from "/usr/local/cdcs/sms/incoming" to
+  # "/usr/local/cdcs/conf/sms/incoming". We still need to remove the old location to remove
+  # the left-over
+
+  # delete all SMS messages
+  OLD_MSG_LOC="/usr/local/cdcs/sms/incoming"
+  DEF_MSG_LOC="/usr/local/cdcs/conf/sms/incoming"
+  WMMDCONF="/usr/share/lua/5.1/wmmd/config.lua"
+  MSGLOC=$(grep incoming_sms_dir $WMMDCONF | sed "s/.*\"\(.*\)\",/\1/" 2>/dev/null)
+  test -z $MSGLOC && MSGLOC="$DEF_MSG_LOC"
+  test -n "$MSGLOC" && rm -fr "$MSGLOC" > /dev/null 2> /dev/null
+  # delete old SMS location
+  rm -fr "$OLD_MSG_LOC" 2> /dev/null
+}
+
+# delete files for FastMile products per customer requirement
+delete_fastmile_files() {
+	rm -f /opt/nokia/var/common/data/ltthd.conf
+	rm -f /opt/nokia/ltth/etc/ltthd.ota.variant.cfg
+}
+
+# delete all turbo ntc historical data files
+delete_historyDB() {
+	local historyLocation=$(rdb get service.turbontc.historyrepo)
+	if [ -d "$historyLocation" ]; then
+		rm -f $historyLocation/api.*
+		rm -f $historyLocation/.metadata
+	fi
+}
+
+# set factory reset reason if it's executed from CLI
+tty -s > /dev/null
+if [ "0" = "$?" ]; then
+	rdb_set "service.factoryreset.reason" "cli"
+fi
+
+# store factory reset reason rdb variable.
+schedule_at_startup_factoryreset_reason_restore.sh
+
+# store default telnet/ssh encrypted password rdb variable
+schedule_at_startup_default_password_restore.sh
+
+if [ "$V_CBRS_SAS" = "y" ]; then
+	# store band selection rdb variable.
+	schedule_at_startup_band_selection_restore.sh
+	schedule_at_startup_sas_restore.sh
+fi
+
+if [ "$V_RUNTIME_CONFIG" = "y" ]; then
+	schedule_at_startup_runtime_config_restore.sh
+fi
+
+logNotice "factory reset..."
+# FR-2421: "Device Reset" is supposed to "reset...preference settings to...default values"
+# For us this means that RDB and other config files should go, but user data, keys and
+# certificates should stay
+# Note that "factory reset" deletes everything in /usr/local except /usr/local/keep
+# and all of /var_rw, so it is a superset of this. It's done in recovery mode though
+stopRDB
+rm -f /usr/local/cdcs/conf/system.conf
+rm -f /usr/local/cdcs/conf/system.stat
+
+# erase sshd config, but keep keys
+cp /dev/null /usr/local/cdcs/conf/sshd_config 2>/dev/null
+#rm -fr "/usr/local/cdcs/ssh-hostkeys" > /dev/null 2> /dev/null
+
+if [ -n "$FULL" ]; then
+	## Delete all schedule files for RDB variable restore, except factoryreset-reason-restore and runtime-config-restore
+	logNotice "Removing schedule files..."
+	find /usr/local/cdcs/schedules/queue/ -type f \
+		'!' -regex '.*\(runtime-config\|factoryreset-reason\)-restore$' -delete
+fi
+
+if [ -n "$MODEM" ]; then
+	## Modem EFS factory default
+	if [ "$V_FACTORY_RESET_MODEM_CFG" = "y" ]; then
+		# kill modem configuration manager
+		manager_name="modem_configuration_manager"
+		killall $manager_name
+		sleep 2
+		# kill by force
+		pgrep $manager_name | while read pid; do
+			kill -9 $pid
+		done
+
+		logNotice "setting modem config to factory defaults..."
+		# Reset modem EFS with no reboot.
+		# If requested, reboot will be initiated below after factory reset is complete.
+		modem_configuration_manager -r -s 1>/dev/null 2>&1
+	fi
+fi
+
+# In Fisher, restore module profile with default config file when factory reset.
+# It should be done before rebooting in order to avoid race condition with OMA-DM.
+if [ "$V_RESTORE_MODULE_PROFILE" = "fisher" ]; then
+	# This is original code committed with svn version #74532
+	DEF_CONF="/etc_ro/cdcs/conf/default.conf"
+	if [ "$V_CUSTOM_FEATURE_PACK" = "whp" -o ! -f "$DEF_CONF" ]; then
+			DEF_CONF="/etc/cdcs/conf/default.conf"
+	fi
+	/usr/bin/module_profile_restore "$DEF_CONF" default 2>/dev/null
+
+	if [ "$V_RUNTIME_CONFIG" = "y" -a -n "$(rdb get service.runtime_config.current)" ]; then
+		if [ -f "/usr/local/cdcs/conf/keep/runtime.conf" ]; then
+			DEF_CONF="/usr/local/cdcs/conf/keep/runtime.conf"
+			logNotice "restore module setting from runtime config"
+			/usr/bin/module_profile_restore "$DEF_CONF" default 2>/dev/null
+		fi
+	fi
+fi
+
+if [ "$V_CUSTOM_FEATURE_PACK" = "whp" ]; then
+  # delete all SMS messages
+  delete_sms_files
+fi
+
+# Delete data usage
+echo "erasing wwan statistics..."
+mtd_statistics -e
+
+if [ "$V_CUSTOM_FEATURE_PACK" = "fastmile" ]; then
+	delete_fastmile_files
+fi
+
+if [ "$V_RESTFULWEBIF" = "y" ]; then
+	pkill -f turbontc.lua
+	delete_historyDB
+fi
+
+if [ -d "$V_FACTORY_RESET_CLEAN_FW_DIR" ]; then
+	# delete all files with zip and star extensions.
+	find $V_FACTORY_RESET_CLEAN_FW_DIR -type f \( -name "*.zip" -o -name "*.star" \) -delete
+fi
+
+## Added shared keep directory.
+## Keep schedules folder to restore reboot reason and band selection(in Magpie)
+find /usr/local '!' -path '/usr/local' '!' -path '/usr/local/keep*' \
+	'!' -path '/usr/local/cdcs' \
+	'!' -path '/usr/local/cdcs/conf' \
+	'!' -path '/usr/local/cdcs/conf/keep*' \
+	'!' -path '/usr/local/cdcs/schedules*' -delete
+
+sync
+
+if [ -n "$REBOOT" ]; then
+	if [ "$V_PARTITION_LAYOUT" = "fisher_ab" ]; then
+		# Normal reboot. Reset BOOT_COUNT
+		flashtool --accept
+	fi
+	if [ -x "/sbin/_reboot" ]; then
+		# Do not overwrite reboot cause which set by other application before
+		reboot_cause=$(get_reboot_reason.sh)
+		if [ -z "$reboot_cause" ]; then
+			/sbin/_reboot "factory reset"
+		else
+			/sbin/_reboot "$reboot_cause"
+		fi
+	else
+		reboot
+	fi
+fi

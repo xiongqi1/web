@@ -1,0 +1,49 @@
+#!/bin/sh
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "This shell script is for internal system use only."
+	echo "It is used for setting the SMS Inbox pathname."
+    echo "Please do not run this script manually."
+    echo ""
+	exit 0
+fi
+
+start() {
+	echo "Initialising SMS inbox path."
+	/usr/bin/sms_set_inbox_path.sh
+	
+	# reconstruct sms config files every booting time from DB variables
+	# to ensure updated contents
+	rdb_set smstools.configured
+}
+
+stop() {
+	echo "Stop SMS inbox path: no action taken."
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
+
+exit $?

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+for item in $(rdb dump service.tr069.FaultMgmt | cut -f1); do
+    rdb_del $item
+done

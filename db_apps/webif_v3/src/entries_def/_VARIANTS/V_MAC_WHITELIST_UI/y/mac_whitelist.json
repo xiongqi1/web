@@ -1,0 +1,7 @@
+{
+    "id": "MacWhitelist",
+    "title": "MAC whitelist",
+    "url": "/mac_whitelist.html",
+    "path": [ "Networking", "Firewall" ],
+    "position": 20
+}

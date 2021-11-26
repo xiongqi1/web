@@ -1,0 +1,7 @@
+html{ font-family: Verdana,Geneva,sans-serif; font-size: 16px; }
+
+body{
+    display:block; width:100%; height:100%; min-height:640px;
+    padding:0; margin:0 auto 0; position:relative; z-index:0;
+    color: #1a171b; background: #f0f0f0;
+}

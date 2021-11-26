@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# This relies on an earlier rc2.d item (loggerdump)
+# and needs /opt, and RDB persistent settings.
+
+if [ -f /tmp/console.log ]; then
+	LTF=$(rdb_get service.syslog.option.logtofile)
+
+	LOGFILE=/opt/messages
+	CLOGFILE=/opt/console.log
+
+	CTEMPF=/tmp/console.log
+	TTEMPF=/tmp/tconsole.log
+
+	# Secondary temp file
+	echo "$(date '+%b %d %H:%M:%S') platform user.notice console_log: Logger dump follows" >"$TTEMPF"
+	cat "$CTEMPF" | tr -d '\r' >>"$TTEMPF"
+	echo "" >>"$TTEMPF"
+	echo "$(date '+%b %d %H:%M:%S') platform user.notice console_log: Logger dump finished" >>"$TTEMPF"
+	rm -f "$CTEMPF"
+
+	# Limit size of console log to about 30 entries
+	touch "$CLOGFILE"
+	if [ $(stat -c '%s' "$CLOGFILE") -gt 1000000 ]; then
+		echo "Rotating console log"
+		mv "$CLOGFILE" "$CLOGFILE.old"
+		gzip "$CLOGFILE.old"
+	fi
+
+	# Append to console log file
+	cat "$TTEMPF" >>"$CLOGFILE"
+
+	# Append to system log file if enabled
+	if [[ $LTF == 1 ]]; then
+		echo 'Appending to log file'
+		cat "$TTEMPF" >>"$LOGFILE"
+	fi
+
+	rm "$TTEMPF"
+else
+	echo 'No logger fitted'
+fi

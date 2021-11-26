@@ -1,0 +1,6 @@
+#!/bin/sh
+
+echo 'Module FW Version=' && rdb_get wwan.0.firmware_version
+echo ' LAN IP Address=' && rdb_get link.profile.0.address
+echo ' Network State=' && rdb_get link.profile.1.status
+echo ' RSSI=' && rdb_get wwan.0.radio.information.signal_strength

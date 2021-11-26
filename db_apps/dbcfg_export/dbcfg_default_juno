@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# Copyright (C) 2019 Casa Systems.
+
+nof=${0##*/}          # Name of file/script.
+source /lib/utils.sh
+
+usage() {
+    cat <<EOM
+
+Usage: dbcfg_default [-f] [-r] [-x]
+
+    Resets system to factory defaults and reboots it.
+
+    -f = Force operation. Won't do anything without this option.
+    -x = Full factory reset, all RDB variables except factoryreset-reason-restore will be reset.
+    -r = Reboot after factory reset.
+
+EOM
+    exit 1
+}
+
+FORCE=''
+FULL=''
+REBOOT=''
+while [ $# -gt 0 ]; do
+    case "$1" in
+        '-f')
+            FORCE=1
+            ;;
+        '-x')
+            FULL=1
+            ;;
+        '-r')
+            REBOOT=1
+            ;;
+        *)
+            usage
+            ;;
+    esac
+    shift
+done
+
+[ -z "$FORCE" ] && usage
+
+# stop rdb_manager persistent daemon
+stopRDB() {
+    local PID=$(pgrep -f 'rdb_manager -c')
+    [ -z "$PID" ] && return 0
+    local cnt=0
+    while [ $cnt -lt 5 ]; do
+        kill $PID
+        kill -0 $PID || return 0
+        sleep 1
+        cnt=$((cnt+1))
+    done
+    kill -9 $PID
+}
+
+# delete all SMS messages
+delete_sms_files() {
+    local DEF_MSG_LOC="/usr/local/cdcs/conf/sms/incoming"
+    local WMMDCONF="/usr/share/lua/5.1/wmmd/config.lua"
+    local MSGLOC=$(grep incoming_sms_dir $WMMDCONF | sed "s/.*\"\(.*\)\",/\1/" 2>/dev/null)
+    [ -z "$MSGLOC" ] && MSGLOC="$DEF_MSG_LOC"
+    rm -fr "$MSGLOC" > /dev/null 2>&1
+}
+
+# store factory reset reason rdb variable.
+schedule_at_startup_factoryreset_reason_restore.sh
+
+logNotice "factory reset ..."
+
+# delete RDBs
+stopRDB
+rm -f /usr/local/cdcs/conf/system.conf
+rm -f /usr/local/cdcs/conf/system.stat
+
+if [ -n "$FULL" ]; then
+    ## Delete all schedule files for RDB variable restore, except factoryreset-reason-restore
+    logNotice "Removing schedule files..."
+    find /usr/local/cdcs/schedules/queue/ -type f \
+        '!' -name factoryreset-reason-restore -delete
+fi
+
+delete_sms_files
+
+# If necessary, delete bluetoothd storage directory
+test -d "/usr/local/cdcs/conf/bluetooth/" && rm -rf "/usr/local/cdcs/conf/bluetooth/"
+
+# Delete the following file so find_partitions.sh will overwrite /data with
+# /data_swap on next boot. Anything non-existing in /data_swap, such as
+# /data/cdcs, will not be removed.
+rm -f /data/quectel-project-version
+
+# delete /cache
+rm -rf /cache/*
+
+sync
+
+if [ -n "$REBOOT" ]; then
+    reboot
+fi

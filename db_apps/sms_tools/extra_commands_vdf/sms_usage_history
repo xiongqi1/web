@@ -1,0 +1,108 @@
+#!/usr/bin/awk -f
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+function process_usage(usage, current) {
+	if( split(usage, a, ",") >= 4) {
+		start_time = strftime("%d/%m/%Y %H:%M:%S", a[1]);
+		end_time = (current)?"Now":strftime("%d/%m/%Y %H:%M:%S", a[2]);
+		total_usege = (a[3]+a[4])/1000000;
+		print start_time"-"end_time", "total_usege"(MB) "
+		history_counter++;
+		return 1;
+	}
+	return 0;
+}
+
+BEGIN {
+
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "Usage: ./sms_usage_history <profile> <starting_entry>"
+		print "This AWK script is used by SMS tools to get the data usage"
+        print "history for a given profile. This will return a list of"
+        print "usage entries. The second argument specifies the index of"
+        print "the entry to begin with."
+		exit (0);
+	}
+
+	if( ARGC < 3 ) {
+		print "ERROR - missing parameter:" ARGC;
+		exit (0);
+	}
+	if( !ARGV[1] || ARGV[1]==0 ) {
+		idx=1;
+		for(i=1; i<=6; i++) {
+			def_route=exec("rdb_get link.profile."i".defaultroute" );
+			if(def_route=="1") {
+				idx=i;
+				break;
+			}
+		}
+	}
+	else {
+		idx=ARGV[1];
+	}
+	if(!(idx>=1 && idx<=6)) {
+		print "Profile number out of range:" idx;
+		exit (0);
+	}
+
+	# WARNING: tricky structure - multiple pdp session is not compatible with single
+	# get multiple profile V variable
+	multiple_pdpsessions=exec(". /etc/variant.sh; echo $V_MULTIPLE_WWAN_PROFILES")
+
+	history_counter=0;
+	CONVFMT = "%.4f";
+	start_history = ARGV[2];
+	if(!start_history)
+		start_history = 0;
+	FS = "&";
+
+	if(multiple_pdpsessions=="y")
+		usage_current = exec("rdb_get link.profile."idx".usage_current");
+	else
+		usage_current = exec("rdb_get statistics.usage_current");
+
+	counter=0;
+	if(start_history==0) {
+		if(process_usage(usage_current, 1))
+			counter++;
+		start_history++;
+	}
+	# increment start_history when current usage was invalid which means
+	# first call of this function with (0,0,0) arguments skipped current usage.
+	else if(split(usage_current, a, ",") < 4) {
+		start_history++;
+	}
+
+	if(multiple_pdpsessions=="y")
+		cmd = "rdb_get link.profile."idx".usage_history";
+	else
+		cmd = "rdb_get statistics.usage_history";
+
+	if ( cmd | getline) {
+		if(ARGV[3]) {
+			history_length = ARGV[3];
+		}
+		else {
+			history_length = NF+1;
+		}
+		for(i=start_history; history_counter<history_length; i++) {
+			if(process_usage($i, 0)==0)
+				break;
+			counter++;
+		}
+	}
+	if(counter==0 && start_history==0) {
+		print "Usage history (Profile "idx") is empty.";
+	}
+	close (cmd);
+	exit (0);
+}

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Data Entry</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script>
+        // polling installation state to consider to enable Apply button
+        // when confirmation from server is received or after a polling period (< 3 seconds)
+        var queryInstallationStateCount = 0;
+        function getInstallationState() {
+            ajaxGetRequest("/installation_state", true, function(data) {
+                if (data.state == "data_entry" || queryInstallationStateCount >= 3) {
+                    document.getElementById("apply_button").disabled = false;
+                } else {
+                    queryInstallationStateCount++
+                    setTimeout(getInstallationState, 1000);
+                }
+            });
+        }
+
+        // set installation state Data Entry and start polling confirmation from OWA
+        function setDataEntryState() {
+            ajaxPostRequest("/installation_state", "state=data_entry", function (resp) {
+                // request is sent, start polling feedback
+                setTimeout(getInstallationState, 200);
+            }, function (code, resp) {
+                // error, should not occur, enable Apply button anyway
+                document.getElementById("apply_button").disabled = false;
+            });
+        }
+
+        // check registration method is supported.
+        function getRegModeSupport () {
+            ajaxGetRequest("/reg_method", true, function(data) {
+                if(!data) {
+                    return;
+                }
+                // console.log(data);
+
+                // support single step only
+                if(data.multi_step_reg_support != "1"){
+                    document.getElementById("reg_method").style.display = "none";
+                    document.getElementById("reg_method_select").value = "single";
+                    return;
+                }
+
+                // multi support, but no configured
+                if(data.multi_step_reg_support == "1" && data.reg_method_config == "") {
+                     // selected already, re-entering into the entry page.
+                    if(data.reg_method_selected != "") {
+                        document.getElementById("reg_method_select").value = data.reg_method_selected;
+                    }
+                    else {
+                        document.getElementById("reg_method_select").value = "single";
+                    }
+                   document.getElementById("reg_method").style.display =" block";
+                   return;
+                }
+
+                // multi support, and configured
+                if(data.multi_step_reg_support == "1" && data.reg_method_config != "") {
+                    document.getElementById("reg_method").style.display = "none";
+                    document.getElementById("reg_method_select").value = data.reg_method_config;
+                }
+            });
+        }
+
+        // Helper function to get text content of a XML node
+        // @param parentNode parent node
+        // @param tagName tag name
+        // @return text content of node or empty string if not found
+        function getXmlNodeContent(parentNode, tagName) {
+            var elList = parentNode.getElementsByTagName(tagName);
+            if (elList.length >=1) {
+                return elList[0].textContent;
+            } else {
+                return "";
+            }
+        }
+
+        /**
+         * Purpose   : Populates UI fields with Quick-Copy contents.
+         * Arg       : xml_text an XML text written in Quick-Copy schema that carries data for the UI fields.
+         * Return    : None.
+         */
+        function populate_fields(xml_text) {
+            var parser, xmlDoc, formObject, text;
+
+            text = xml_text.trim();
+            if (text.length == 0 || text.charAt(0) == '*') return;
+
+            parser = new DOMParser();
+
+            try {
+                xmlDoc = parser.parseFromString(text, "text/xml");
+            } catch (error) {
+                return;
+            }
+            // in case of failed parsing, browsers may not throw exception, but instead return an error document
+            if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                return;
+            }
+
+            var formObject = document.dataEntryIds;
+
+            // process GroupingParams
+            var groupingParamsList = xmlDoc.getElementsByTagName("GroupingParams");
+            // there should be only one
+            var i = 0;
+            if (groupingParamsList.length >= 1) {
+                var groups = groupingParamsList[0].getElementsByTagName("Group");
+                for (i = 0; i < groups.length; i++) {
+                    // currently only 2 groups are supported (fixed in UI)
+                    if (i >= 2) {
+                        alert("Maximum number of CBRS group supported is 2");
+                        break;
+                    }
+
+                    var groupID = groups[i].getElementsByTagName("GroupID");
+                    var groupType = groups[i].getElementsByTagName("GroupType");
+                    // as group params are not editable in UI, both group id and type should exist in quick copy
+                    if (groupID.length >= 1 && groupType.length >= 1) {
+                        formObject.elements["group_id"+(i+1)].value = groupID[0].textContent;
+                        formObject.elements["group_type"+(i+1)].value = groupType[0].textContent;
+                    } else {
+                        formObject.elements["group_id"+(i+1)].value = "";
+                        formObject.elements["group_type"+(i+1)].value = "";
+                    }
+                }
+            }
+            // erase groups that are not in quick copy content
+            while (i < 2) {
+                formObject.elements["group_id"+(i+1)].value = "";
+                formObject.elements["group_type"+(i+1)].value = "";
+                i++;
+            }
+
+            formObject.band_select.value = 48; // only b48 for myna
+            formObject.user_id.value = getXmlNodeContent(xmlDoc, "UserID");
+            formObject.call_sign.value = getXmlNodeContent(xmlDoc, "CallSign");
+
+            // Set CPI values in hidden fields
+            formObject.cpi_id.value = getXmlNodeContent(xmlDoc, "InstallerID");       // Lark-577, CPIID -> InstallerID
+            formObject.cpi_name.value = getXmlNodeContent(xmlDoc, "InstallerName");   // CPIName -> InstallerName
+            formObject.cpi_pem_key.value = getXmlNodeContent(xmlDoc, "CPICertificate");
+            formObject.ticket_number.value = getXmlNodeContent(xmlDoc, "TicketNumber");
+            formObject.allowed_plmn.value = getXmlNodeContent(xmlDoc, "AllowedPLMN");
+            formObject.rsrp_pass.value = getXmlNodeContent(xmlDoc, "RSRPPass");
+        }
+
+        /**
+         * Purpose   : Populates UI fields with Quick-Copy file
+         * Arg       : file input object
+         * Return    : None.
+         */
+        function populate_from_file(fileInput) {
+            var file = fileInput.files[0];
+            var textType = /text.*/;
+            document.getElementById("fileName").value = file.name;
+            if (file.type.match(textType)) {
+              var reader = new FileReader();
+              reader.onload = function(e) { populate_fields(reader.result); }
+              reader.readAsText(file);
+            }
+        }
+
+        function showDiv(divId, element){
+            document.getElementById(divId).style.display = element.value == 1 ? 'block' : 'none';
+        }
+
+        function getFieldData() {
+
+            ajaxGetRequest("/user_entry/landing", true, function(data) {
+                //console.log(data);
+                formObject = document.forms['dataEntryIds'];
+
+                // Something is wrong on server, alert user
+                if (data.err_msg != "") {
+                     alert(data.err_msg);
+                 }
+
+                formObject.elements["call_sign"].value = data.call_sign;
+                formObject.elements["user_id"].value = data.user_id;
+                formObject.elements["band_select"].value = data.band_select;
+                formObject.elements["sas_select"].value = data.sas_select;
+                formObject.elements["ticket_number"].value = data.ticket_number;
+                formObject.elements["allowed_plmn"].value = data.allowed_plmn;
+                formObject.elements["minimum_rsrp"].value = data.minimum_rsrp;
+                formObject.elements["reg_method"].value = data.reg_method_selected;
+                if ('ntc_ifwa661'.localeCompare(data.owa_prod_model) == 0) {
+                    document.getElementById('sas_enable').style.display = 'block';
+                }
+                document.getElementById('sas_data_entry').style.display = data.sas_select == '1' ? 'block' : 'none';
+
+                // Convert string to proper JSON format and set CBRS group ID/Type
+                try {
+                    grp_params = JSON.parse(data.grp_params);
+                    for (var i=0; i < grp_params.length; i++){
+                        if (i == 2) break;    // there are only two fields on the UI
+                        formObject.elements["group_id"+(i+1)].value = grp_params[i].groupId;
+                        formObject.elements["group_type"+(i+1)].value = grp_params[i].groupType;
+                    }
+                } catch (e) {
+                    grp_params = null;
+                }
+            });
+        }
+
+        // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_BATTERY|BITMASK_ORIENTATION);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("document is ready");
+
+            setDataEntryState();
+
+            setupPeriodicKeepAlive();
+
+            getRegModeSupport();
+
+            getFieldData();
+            // invalidate timestamps when this page is visited.
+            localStorage.setItem("testStart", "N/A");
+            // work out if this is iPhone, iPad or iPod touch to decide which HTML5 control to use
+            // (meter or progress)
+            g_is_html5_supported = is_html5_supported();
+            if (!g_is_html5_supported) {
+                console.log("Will use progress element instead of a HTML5 meter element");
+            }
+
+            // populate versions
+            getVersions();
+        });
+
+        // validate on User ID.
+        // Should be UTF-8 string. Max length of 253 octets.
+        // Mandatory field.
+        function validate_user_id(data) {
+            if (data != "") {
+                if (new Blob([data]).size < 254) {  // Max length is 253 octets
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // length check
+        function check_length(data, max_len) {
+            if (data != "") {
+                if (data.length > max_len) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // validate on Group ID.
+        // Should be UTF-8 string. Max length of 253 octets.
+        function validate_group_id(data) {
+            if (data != "") {
+                if (new Blob([data]).size < 254) {  // Max length is 253 octets
+                    return true;
+                }
+            }
+            return true;
+        }
+
+        // validate on CPI ID.
+        // Should be of maximum 256 octets.
+        function validate_cpi_id(data) {
+            return check_length(data, 256); // Max length is 256 octets
+        }
+
+        // validate on CPI Name.
+        // Should be of maximum 256 octets.
+        function validate_cpi_name(data) {
+            return check_length(data, 256); // Max length is 256 octets
+        }
+
+        function validate() {
+            formObject = document.dataEntryIds;
+            if (formObject.sas_select.value != "1") {
+              return true;
+            }
+            if (validate_user_id(formObject.user_id.value) == false) {
+                alert ("User ID should contain only UTF-8 string and not more than 253 octets");
+                return false;
+            } else if ((validate_group_id(formObject.group_id1.value) == false) ||
+                (validate_group_id(formObject.group_id2.value) == false)) {
+                alert ("Group ID should contain only UTF-8 string and not more than 253 octets");
+                return false;
+            }
+            if (validate_cpi_id(formObject.cpi_id.value) == false) {
+                alert ("CPI ID string should not be more than 256 octets");
+                formObject.cpi_id.value = "";  // Reset value to blank, ignore error
+            }
+            if (validate_cpi_name(formObject.cpi_name.value) == false) {
+                alert ("CPI Name string should not be more than 256 octets");
+                formObject.cpi_name.value = "";  // Reset value to blank, ignore error
+            }
+
+            // Create groups in JSON array from two group fields
+            var groupParams = [];
+            // Ensure blank group ID or Type is not passed on to the server
+            if ((formObject.group_id1.value.length > 0) && (formObject.group_type1.value.length > 0)) {
+                groupParams.push({groupId:formObject.group_id1.value, groupType:formObject.group_type1.value});
+            }
+            if ((formObject.group_id2.value.length > 0) && (formObject.group_type2.value.length > 0)) {
+                groupParams.push({groupId:formObject.group_id2.value, groupType:formObject.group_type2.value});
+            }
+            formObject.grp_params.value = JSON.stringify(groupParams);
+
+            if (check_length(formObject.ticket_number.value, 256) == false) {
+               alert("Ticket Number string should not be more than 256 octets");
+               formObject.ticket_number.value = "";  // Reset value to blank, ignore error
+            }
+            if (check_length(formObject.allowed_plmn.value, 256) == false) {
+               alert("Allowed PLMN list should not be more than 256 octets");
+               formObject.allowed_plmn.value = "";  // Reset value to blank, ignore error
+            }
+            if ((formObject.rsrp_pass.value != "") && isNaN(formObject.rsrp_pass.value)) {
+               alert("RSRP pass value must be a number");
+               formObject.rsrp_pass.value = "";  // Reset value to blank, ignore error
+            }
+            if (isNaN(formObject.minimum_rsrp.value)) {
+               alert("Minimum RSRP value must be a number");
+               return false;
+            }
+
+            return true;
+        }
+
+	// build versions
+	function buildVersions(data) {
+		var versions = data;
+		var res = "";
+
+		res += "<p>OA S/W Version: " + versions.sw_ver + "</p>";
+
+		return res;
+	}
+
+	// called when DOM is loaded before the page is first displayed
+	// Gets all relevant data from the server.
+	function getVersions() {
+		ajaxGetRequest("/versions/landing", true, function(data) {
+		    var res = buildVersions(data);
+		    document.getElementById("versions").innerHTML = res;
+		});
+	}
+
+    </script>
+</head>
+
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>Data Entry</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="dataEntryIds" class="content" method="POST" action="/user_entry/landing" onsubmit="return(validate());">
+                <div id="sas_enable" class="form-row" style="display:none;">
+                    <h3>SAS client</h3>
+                    <fieldset>
+                        <label for="sasEnableSelect"> </label>
+                        <div class="field">
+                            <select name="sas_select" onchange="showDiv('sas_data_entry', this)">
+                                <option value="0">disabled</option>
+                                <option value="1">enabled</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <div class="form-row top_delimiter"></div>
+                </div>
+
+                <!-- sas_data_entry BEGIN-->
+                <div id="sas_data_entry">
+                <!-- Quick Fill-->
+                <h3>Quick Fill</h3>
+                <div class="form-row">
+                    <fieldset>
+                        <label for="quick_copy">Data file in quick-copy format</label>
+                        <div class="field">
+                            <input type="text" id="fileName" readonly="readonly">
+                            <input type="hidden" id="grp_params" name="grp_params" value="">
+                            <input type="hidden" id="cpi_id" name="cpi_id" value="">
+                            <input type="hidden" id="cpi_name" name="cpi_name" value="">
+                            <input type="hidden" id="cpi_pem_key" name="cpi_pem_key" value="">
+                            <!-- support maximum 2 groups -->
+                            <input type="hidden" name="group_id1" value="">
+                            <input type="hidden" name="group_type1" value="">
+                            <input type="hidden" name="group_id2" value="">
+                            <input type="hidden" name="group_type2" value="">
+                            <input type="hidden" name="allowed_plmn" value="">
+                            <input type="hidden" name="minimum_rsrp" value="">
+                            <input type="hidden" name="rsrp_pass" value="">
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <div class="submit-row">
+                           <button class="med" type="button" onclick="document.getElementById('fileInput').click();">Choose file</button>
+                           <input type="file" id="fileInput" style="display:none;" onchange="populate_from_file(this)"/>
+                       </div>
+                    </fieldset>
+                    <div class="form-row top_delimiter"></div>
+                </div>
+
+                <div class="form-row" id="reg_method" style="display: block">
+                    <h3>Registration Method</h3>
+                    <fieldset>
+                        <label for="regModeSelect" >Select method</label>
+                        <div class="field">
+                           <select id="reg_method_select" name="reg_method">
+                               <option value="single" selected="selected">Single Step</option>
+                               <option value="multi">Multiple Steps</option>
+                           </select>
+                        </div>
+                    </fieldset>
+                    <div class="form-row top_delimiter"></div>
+                </div>
+
+                <!-- Band locking  -->
+                <h3 style="display:none">Operating Band</h3>
+                <div style="display:none" id="band_select" class="form-row">
+                    <fieldset>
+                        <label for="bandSelect"> </label>
+                        <div class="field">
+                            <select name="band_select">
+                                <option value="48">48</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <fieldset>
+                    <label for="ticket_number" style="display:none;">Ticket Number</label>
+                    <div class="field">
+                        <input type="text" name="ticket_number" id="ticket_number" size="16" style="display:none;">
+                    </div>
+                </fieldset>
+
+                <!-- CBRS data  -->
+                <div id="cbrs_data" class="form-row">
+                    <h3>CBRS Data</h3>
+                    <fieldset>
+                        <label for="call_sign">Call Sign</label>
+                        <div class="field">
+                            <input type="text" name="call_sign" id="call_sign" size="16" maxlength="12">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="user_id">User ID *</label>
+                        <div class="field">
+                            <input type="text" name="user_id" id="user_id" size="16" maxlength="63">
+                        </div>
+                    </fieldset>
+                    <div class="form-row top_delimiter"></div>
+                </div>
+
+                <!-- sas_data_entry END-->
+                </div>
+                <div class="submit-row">
+                    <button class="med" type="submit" disabled="true" id="apply_button">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Compass status -->
+    <div class="box" id="app-data-entry-compass">
+        <div class="box-header">
+            <h2>Compass Status</h2>
+        </div>
+        <div class="box-content">
+            <!-- <div id="compassStatus"></div> -->
+            <p><strong>Status: </strong><span id="orientation_status"></span></p>
+        </div>
+    </div>
+
+    <div class="box" id="app-data-entry-batt">
+        <div class="box-header">
+            <h2>Battery Status</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <div id="battResult"></div>
+        </div>
+    </div>
+
+    <!-- AT&T CR-7065 show the firmware version of the OWA -->
+    <div class="box" id="app-data-entry-versions">
+        <div class="box-header">
+            <h2>Firmware Version</h2>
+        </div>
+        <div class="box-content">
+            <div id="versions"></div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script src="js/orientation_data_handler.js"></script>
+<script>
+var orientationDataHandler = new OrientationDataHandler();
+</script>
+</html>

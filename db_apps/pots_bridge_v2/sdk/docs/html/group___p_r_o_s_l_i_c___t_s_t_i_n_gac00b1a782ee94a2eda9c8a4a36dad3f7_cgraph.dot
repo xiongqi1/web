@@ -1,0 +1,39 @@
+digraph "ProSLIC_destroyTestInObjs"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir="LR";
+  Node1 [label="ProSLIC_destroyTestInObjs",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 -> Node2 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node2 [label="ProSLIC_DCFeedSetupCfg",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga35bc002f2e716f800a6decba15d7c71d",tooltip="Configures the DC feed from a preset. "];
+  Node1 -> Node3 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node3 [label="ProSLIC_LineMonitor",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___d_i_a_g_n_o_s_t_i_c_s.html#gaff35c3a11de982ce429771fc2d3a24ce",tooltip="This function allows one to monitor the instantaneous voltage and loop current values seen on tip/rin..."];
+  Node1 -> Node4 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node4 [label="ProSLIC_ReadMADCScaled",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___d_i_a_g_n_o_s_t_i_c_s.html#gae8016077c6b046e2c1c03732595052b1",tooltip="This function reads the MADC a scaled value. "];
+  Node4 -> Node5 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node5 [label="ProSLIC_PrintDebugData",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html#gaefa138018f0ae65cb062d5a876a135a1",tooltip="This function dumps to console the register contents of several registers and RAM locations..."];
+  Node4 -> Node6 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node6 [label="ProSLIC_PrintDebugRAM",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html#gacadcf3f00e2b4ef17c69e44c86a42584",tooltip="This function dumps the RAM to the console using whatever I/O method is defined by LOGPRINT..."];
+  Node4 -> Node7 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node7 [label="ProSLIC_PrintDebugReg",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html#gaf2e76f26f3d73cb53e79857f82fe6085",tooltip="This function dumps the registers to the console using whatever I/O method is defined by LOGPRINT..."];
+  Node4 -> Node8 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node8 [label="ProSLIC_ReadRAM",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html#gaea814e8e2b4b80372fe7defb05ad8b25",tooltip="This function allows access to SPI read RAM function pointer from interface. "];
+  Node4 -> Node9 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node9 [label="ProSLIC_WriteRAM",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_e_b_u_g.html#ga6f9d87fca28a209ae685ef7b4387da7a",tooltip="This function allows access to SPI write RAM function pointer from interface. "];
+  Node1 -> Node8 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node1 -> Node10 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node10 [label="ProSLIC_SetLinefeedStatus",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___l_i_n_e_s_t_a_t_u_s.html#ga58f05791bfec1236a522264585a47779",tooltip="This function sets the linefeed state. "];
+  Node1 -> Node11 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node11 [label="ProSLIC_testInAudio",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#ga7812fc102eb880f065b72c77a2ce5c73",tooltip="Audio level inward test. pTstin->audioTest contains all control, limits and results. "];
+  Node1 -> Node12 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node12 [label="ProSLIC_testInBattery",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#gac31166e1303a2986029258e3bb5dfd18",tooltip="Battery Test - pTstin contains both the configuration data and test results. See **pTstin->batteryTes..."];
+  Node1 -> Node13 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node13 [label="ProSLIC_testInDCFeed",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#ga4c0b3737055c06cc4fc47365dea6834b",tooltip="DC Feed Test - the pTstin->dcFeedTest contains control, limits and test result information. "];
+  Node1 -> Node14 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node14 [label="ProSLIC_testInPCMLpbkDisable",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#gabecbe7c7de951abc7582ae75bd9265ed",tooltip="Disable PCM loopback. "];
+  Node1 -> Node15 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node15 [label="ProSLIC_testInPCMLpbkEnable",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#gace978d59dc964969beb7d7e973b689d1",tooltip="Enable PCM loopback. "];
+  Node1 -> Node16 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node16 [label="ProSLIC_testInRinging",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___t_s_t_i_n.html#gaf52ec1e74dce9dec799985a09703f8bf",tooltip="Ringing and Ringtrip Test. "];
+  Node1 -> Node9 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+}

@@ -1,0 +1,188 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Log Settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+useSession();
+
+function getLogRdb(variable) {
+	tempval=get_single('service.syslog.option.'+variable);
+	if(tempval=="N/A") {
+		return "";
+	}
+	return tempval;
+}
+
+function setLogRdb(variable, val) {
+	set_single_direct("","service.syslog.option."+variable,val);
+}
+
+g_capture_level = getLogRdb('capturelevel');
+
+if (request['REQUEST_METHOD'] == "GET") {
+
+	form['syslogServer'] = getLogRdb('remote');
+	form['captureLevel'] = g_capture_level;
+	form['loggingSize'] = getLogRdb('sizekb');
+}
+else if (request['REQUEST_METHOD'] == "POST") {
+
+	setLogRdb("logtofile", form['logToFile']);
+	if (form['logToFile'] == "1") // only apply logging size when logtofile
+		setLogRdb("sizekb", form['loggingSize']);
+	else // use default size if log to RAM. see syslog.sh and syslogd.template
+		setLogRdb("sizekb", '256');
+	setLogRdb("remote", form['syslogServer']);
+	setLogRdb("capturelevel", form['captureLevel']);
+	setLogRdb("trigger","1");
+	redirect(request['SCRIPT_NAME'] + "?success");
+}
+%>
+
+<style>
+.logfile td {font-size:10px; padding:6px 0 6px 12px;}
+</style>
+
+<script language="JavaScript">
+
+var g_capture_level = "@@g_capture_level";
+var g_log_to_file = "<%get_single_direct('service.syslog.option.logtofile');%>";
+
+function submitF() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if (!$("#form").validationEngine("validate")) {
+		validate_alert("", "");
+		return;
+	}
+#endif
+
+	en=$("#syslogSavetoFile-0").is(":checked")?"1":"0";
+	$("#logToFile").val(en);
+
+	function switchLog_func() {
+		document.form.submit();
+	}
+
+	if (g_log_to_file != en) {
+		if (en == '1')
+			blockUI_confirm(_("logmenuwarning1"), switchLog_func);
+		else
+			blockUI_confirm(_("logmenuwarning2"), switchLog_func);
+	} else {
+		switchLog_func();
+	}
+}
+
+$(document).ready( function() {
+	// set the non-volatile option to the one read from RDB
+	load_value_to_element("input:radio[name=syslogSavetoFile]", g_log_to_file);
+	// set the capture level to the one read from RDB
+	$("#captureLevel").val(g_capture_level);
+	});
+
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+	<div class="pad">
+		<form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="logToFile" id="logToFile"/>
+		<div class="right-column white-box">
+			<div class="form-row no-bg-form">
+			  <p id="dial_on_demand_desc">
+			  <h2><script>document.write(_("systemLogSettings"))</script></h2>
+			  <script>document.write(_("systemLogMsg"))</script></p>
+			<!-- logging into the log level selection -->
+			<div id="capture_level_sel" class="form-row no-bg-form">
+			  <h2><script>document.write(_("logCaptureSettings"))</script></h2>
+			  <label for="capture_level_sel_title"><script language=Javascript>document.write(_("log capture level"))</script></label>
+			  <div class="field">
+			    <select name="captureLevel" id="captureLevel">
+				<option value="8"><script language=JavaScript>document.write(_("log debug"))</script></option>
+				<option value="7"><script language=JavaScript>document.write(_("log info"))</script></option>
+				<option value="6"><script language=JavaScript>document.write(_("log notice"))</script></option>
+				<option value="5"><script language=JavaScript>document.write(_("log warning"))</script></option>
+				<option value="4"><script language=JavaScript>document.write(_("log Error"))</script></option>
+			    </select>
+			  </div>
+			</div>
+			<div class="hr"></div>
+			<h2><script>document.write(_("nonVolatilelogSettings"))</script></h2>
+			<div class="form-row no-bg-form">
+				<div class="form-row">
+					<label for="syslogSavetoFile"><script>document.write(_("syslog to file"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="syslogSavetoFile-0" name='syslogSavetoFile' class="access">
+								<label for="syslogSavetoFile-0" class="on"><script>document.write(_("on"))</script></label>
+								<input type="radio" id="syslogSavetoFile-1" name='syslogSavetoFile' class="access">
+								<label for="syslogSavetoFile-1" class="off"><script>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="loggingSize"><script>document.write(_("loggingSize"))</script></label>
+					<div class="field">
+						<input type="text" class="large validate[funcCall[validateLoggingSizeField]]" maxLength="7" name="loggingSize" id="loggingSize" value="@@form['loggingSize']" onkeyup="NumfieldEntry(this)">
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-1000000"))</script></span>
+					</div>
+				</div>
+			</div>
+
+			<div class="hr"></div>
+			<h2><script>document.write(_("remote syslog server"))</script></h2>
+			<div class="form-row no-bg-form">
+				<div class="form-row">
+					<label for="syslogServer"><script>document.write(_("ip hostname"))</script></label>
+					<div class="field">
+						<input type="text" class="large" name="syslogServer" id="syslogServer" value="@@form['syslogServer']" onkeyup="this.value=this.value.replace(/ /g,'')">
+					</div>
+				</div>
+			</div>
+			</div>
+			<div class="submit-row">
+				<button type="button" onClick="submitF()"><script>document.write(_("CSsave"))</script></button>
+			</div>
+		</div>
+		</form>
+	</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script type="text/javascript">
+  set_menu("System", "LOGSETTINGS", <%_val = session["user"];%>"@@_val");
+
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_("submitSuccess"));
+<%	}%>
+
+  function validateLoggingSizeField(field) {
+    if (field.val() < 1 || field.val() > 1000000) {
+      return _("field1and1000000");
+    }
+  }
+
+</script>
+</body>
+</html>

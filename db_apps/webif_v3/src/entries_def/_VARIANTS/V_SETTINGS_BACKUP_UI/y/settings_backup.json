@@ -1,0 +1,7 @@
+{
+    "id": "SettingsBackup",
+    "title": "Settings backup/restore",
+    "url": "/settings_backup.html",
+    "path": [ "System", "SystemConfig" ],
+    "position": 140
+}

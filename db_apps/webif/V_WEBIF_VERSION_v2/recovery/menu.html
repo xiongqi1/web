@@ -1,0 +1,27 @@
+<script language="JavaScript" src="/jquery-1.6.min.js"></script>
+<script src="stuHover.js" type="text/javascript"></script>
+	<div id="logo"><img src="/images/NetComm_GUI_banner.jpg" width="840" height="92" usemap="#netcomm"/></div>
+#ifdef V_BOARD_6908
+	<div id="productTitle"><h4>NTC-6000 Series Recovery Console</h4></div>
+#elif defined V_BOARD_5908
+	<div id="productTitle"><h4>NTC-5000 Series Recovery Console</h4></div>
+#elif defined (V_PRODUCT_mob_30wv) || defined (V_PRODUCT_mob_40wv)
+    <h4 id="productTitle"></h4>
+#else
+	<div id="productTitle"><h4>NetComm Cellular Router Recovery Console</h4></div>
+#endif
+	<div class="sideNav">
+		<ul id="nav">
+			<li class="top"><a href="status.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Status</span></a></li>
+			<li class="top"><a href="logfileRec.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Log</span></a></li>
+			<li class="top"><a href="AppUpload.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Application Installer</span></a></li>
+			<li class="top"><a href="settings.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Settings</span></a></li>
+			<li class="top"><a href="system_resetRec.html" class="top_link"><span>&nbsp;&nbsp;&nbsp;&nbsp;Reboot</span></a></li>
+		</ul>
+	</div>
+<script type="text/javascript">
+function setCopyRight() {
+	document.getElementById('copyRight').innerHTML="Copyright &copy; 2016 NetComm Wireless.&nbsp;&nbsp;|&nbsp;&nbsp;All Rights Reserved";
+}
+</script>
+<%session["sessionid"] = request["SESSION_ID"];session["userlevel"] = '0';%>

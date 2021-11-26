@@ -1,0 +1,10 @@
+.site-header h1,.power-btn {cursor:pointer;}
+.site-content {padding-bottom:50px !important;}
+i.icon {float:none;zoom:1;margin:0 5px !important;position:relative;top:-4px;}
+i.edit {top:0 !important;}
+i.close,.field-btn-group i.plus,i.reduce {margin:0 !important;top:0;}
+.sidemenu li a {width:200px;}
+.box-header h2 {margin-top: expression((parentNode.offsetHeight.offsetHeight/2)-(parseInt(this.offsetHeight)/2) <0 ? "0" :(parentNode.offsetHeight/2)-(parseInt(this.offsetHeight)/2) +'px');float:left;}
+.table-scroll-inside {overflow-x:hidden;}
+.multi-field {float:none;padding-top:5px;background:none;}
+.footer {position:static;}

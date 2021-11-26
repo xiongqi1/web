@@ -1,0 +1,24 @@
+#!/bin/sh -f
+#
+# Connect script for WIFI connections
+#
+# This script is called by connection_mgr as follows:-
+#
+# SUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+# export initial connect-script env variables
+CONNECTION_MGR_PROFILE="$1"
+CONNECTION_MGR_INSTANCE="$2"
+CONNECTION_MGR_ACTION="$3"
+CONNECTION_MGR_DEV=$(rdb_get "link.profile.$CONNECTION_MGR_PROFILE.dev")
+export CONNECTION_MGR_PROFILE CONNECTION_MGR_INSTANCE CONNECTION_MGR_ACTION CONNECTION_MGR_DEV
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+# SWIFI is identical to SETH
+exec "/etc/cdcs/connectscripts/SETH" "$@"

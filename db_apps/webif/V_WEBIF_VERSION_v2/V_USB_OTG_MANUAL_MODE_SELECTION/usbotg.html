@@ -1,0 +1,257 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>USB-OTG</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+#if 0
+<!-- server script -->
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+}
+%>
+#endif
+
+<!-- client script -->
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+
+var menu_main="System";
+var menu_sub="USBOTG";
+var menu_title=_("usb otg configuration");
+
+$(function(){
+	var $target_ctrl;
+	var tcgi=new cgi("./cgi-bin/usbotg.cgi", "@@session[csrfTokenName]");
+
+	var bus=null;
+	var setting_loaded=false;
+
+	function poll(interval) {
+		tcgi.reset();
+		tcgi.poll(interval,"info",function(r){
+
+			/*
+				do not remove the following files - for string resources
+				_("device mode")
+				_("host mode")
+				_("unknown mode")
+			*/
+#if defined (V_WEBIF_SPEC_vdf)
+			/*
+				_("down mode")
+			*/
+#endif
+
+			$.each(r.otg_bus,function(i,o){
+
+				/* apply default */
+				if(o.cfg=="")
+					o.cfg="otg";
+
+				/* store bus */
+				bus=o.bus;
+				/* show mode */
+				$target_ctrl.html(_(o.mode + " mode"));
+
+				/* load settings */
+				if(!setting_loaded) {
+					load_values_to_elements({
+#if defined (V_WEBIF_SPEC_vdf)
+#if 0
+						// || o.cfg=="down" to make OTG mode selected on UI while switching port from Disabled to Enabled state
+#endif
+						"input:radio.access[name=otg_auto_mode]":o.cfg=="otg" || o.cfg=="down",
+#else
+						"input:radio.access[name=otg_auto_mode]":o.cfg=="otg",
+#endif
+						"input:radio.access[name=otg_manual_mode]":o.cfg!="device"
+#if defined (V_WEBIF_SPEC_vdf)
+						,"input:radio.access[name=usbOtgEnablePort]":o.cfg!="down"
+#endif
+					});
+
+#if defined (V_WEBIF_SPEC_vdf)
+					$("#usbOtgConfig").toggle(o.cfg!="down");
+#endif
+#if defined (V_WEBIF_SPEC_vdf)
+#if 0
+					// && o.cfg!="down": As OTG mode appears as selected on UI while switching port from Disabled to Enabled state,
+					// Manual settings should be hidden in that case
+#endif
+					$("#div_manual_mode").toggle(o.cfg!="otg" && o.cfg!="down");
+#else
+					$("#div_manual_mode").toggle(o.cfg!="otg");
+#endif
+
+					setting_loaded=true;
+				}
+
+				return false;
+			});
+
+			enable_elements(true);
+		});
+
+	}
+
+	$("input:radio.access[name=otg_auto_mode]").click(function(){
+		var auto=$("input[name=otg_auto_mode]:checked").val();
+		$("#div_manual_mode").toggle(auto=="0");
+		clear_alert();
+	});
+
+	function enable_elements(en) {
+		$("div,button,input").css("cursor", en?"auto":"wait");
+	}
+
+	$("#button_save").click(function(){
+
+		var auto=$("input[name=otg_auto_mode]:checked").val();
+		var manual=$("input[name=otg_manual_mode]:checked").val();
+
+		var mode;
+
+		if(auto=="1")
+			mode="otg";
+		else
+			mode=manual;
+
+#if defined (V_WEBIF_SPEC_vdf)
+		var isPortEnabled = $("input[name=usbOtgEnablePort]:checked").val();
+		if (isPortEnabled == "0") {
+			mode="down";
+		}
+#endif
+
+		enable_elements(false);
+
+		tcgi.reset();
+		tcgi.add(mode);
+		tcgi.add(bus);
+		tcgi.run("set_mode",function(r){
+			poll();
+			success_alert("", "");
+		});
+	});
+
+	$(function(){
+		$target_ctrl=$("#usbotg_status");
+
+		enable_elements(false);
+		poll(5000);
+	});
+});
+
+function onTogglePort(v) {
+	$("#usbOtgConfig").toggle(v=="1");
+}
+</script>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" class="validate" method="POST" novalidate="novalidate" >
+#if 0
+<!--
+	##template## examples
+-->
+#endif
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(menu_title)</script></h2>
+ 				<div class="grey-box">
+#if defined (V_WEBIF_SPEC_vdf)
+					<div class="form-row">
+						<label><script language="Javascript">document.write(_("usbOtgEnablePort"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='usbOtgEnablePort' id='usbOtgEnablePort0' value="1" onClick="onTogglePort(this.value)">
+									<label for="usbOtgEnablePort0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='usbOtgEnablePort' id='usbOtgEnablePort1' value="0" onClick="onTogglePort(this.value)">
+									<label for="usbOtgEnablePort1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+#endif
+					<div id="usbOtgConfig"
+#if defined (V_WEBIF_SPEC_vdf)
+						style="display:none"
+#endif
+					>
+						<div class="form-row">
+							<label for="nameText"><script language=Javascript>document.write(_("usb otg status"))</script></label>
+							<span class="normal-text" id="usbotg_status"></span>
+						</div>
+
+						<input type="hidden" name="otg_mode" id="otg_mode">
+
+						<div class="form-row">
+							<label><script language="Javascript">document.write(_("automatic mode"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" class="access" name='otg_auto_mode' id='otg_auto_mode_0' value="1">
+										<label for="otg_auto_mode_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" class="access" name='otg_auto_mode' id='otg_auto_mode_1' value="0">
+										<label for="otg_auto_mode_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-row" id="div_manual_mode" style="display:none">
+							<label for="field-0"><script language=Javascript>document.write(_("usb otg mode"))</script></label>
+							<div class="field">
+								<div class="radio-box-group">
+									<div class="radio-box">
+										<input type="radio" class="access" name='otg_manual_mode' id='otg_manual_mode_0' value="host">
+										<label for="otg_manual_mode_0"><div class="radioText"><script language=Javascript>document.write(_("host"))</script></div></label>
+									</div>
+									<div class="radio-box">
+										<input type="radio" class="access" name='otg_manual_mode' id='otg_manual_mode_1' value="device">
+										<label for="otg_manual_mode_1"><div class="radioText"><script language=Javascript>document.write(_("device"))</script></div></label>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="submit-row">
+						<button id="button_save" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+</script>
+
+</body>
+</html>

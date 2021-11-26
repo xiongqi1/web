@@ -1,0 +1,107 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>WiFi Mode Switch</title>
+</head>
+
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("wlan_switch");
+
+var current_wifi_mode= <%val=get_single('wlan.0.wifi_mode');%>"@@val";
+
+function confirmChange()
+{
+	if(current_wifi_mode == document.form.wifiModeH.value)
+	{
+		return;
+	}
+	if(!confirm("Router WiFi will be switched to different mode (AP or Client). Press 'ok' to continue or press 'Cancel' to remain unchanged!"))
+		return;
+	// Only when the mode really changed, we write it to rdb variable
+	document.form.submit();	
+
+}
+
+function hideText()
+{
+	if (document.form.wifiModeH.value == "AP"){
+		document.getElementById("apintro" ).style['display']='';
+		document.getElementById("clientIntro" ).style['display']='none';
+	}
+	else{
+		document.getElementById("apintro" ).style['display']='none';
+		document.getElementById("clientIntro" ).style['display']='';
+	}
+}
+
+function formLoad()
+{
+	document.form.wifimode.value=document.form.wifiModeH.value;
+	if(document.form.wifimode.value == "AP")
+		document.form.wifimode[0].checked=true;
+	else
+		document.form.wifimode[1].checked=true;
+	hideText();
+}
+$(document).ready( function() {formLoad();} );
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST")
+{
+	tempval = form['wifiModeH'];
+	retval = set_single( 'wlan.0.wifi_mode='+tempval );
+}
+else /*GET*/
+{
+	temp = get_single( 'wlan.0.wifi_mode' );
+	form['wifiModeH'] = temp;
+}
+%>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<input type="hidden" name='wifiModeH' value="@@form['wifiModeH']">
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+_("WiFi Mode Switch"))</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("WiFi Mode Selection"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr> 
+	<td width="38%"><script language="JavaScript">document.write(_("WiFi Working Mode"));</script></td>
+	<td><input type=radio name='wifimode' value='AP' onClick="javascript:document.form.wifiModeH.value='AP';hideText();" >&nbsp;<script language="JavaScript">document.write(_("AP"));</script> &nbsp;&nbsp;
+	<input type=radio name='wifimode' value='STA' onClick="javascript:document.form.wifiModeH.value='STA'; hideText();" >&nbsp;<script language="JavaScript">document.write(_("Client"));</script>
+	</td>
+</tr>
+</table>
+
+<table id="apintro" cellpadding="2" cellspacing="1"><tr><td>
+<p id="apmode">In this AP mode, user PC can connect to router wirelessly. DHCP server will be turned on. WDS and WPS are both supported in this mode.</p>
+</td></tr></table>
+
+<table id="clientIntro" cellpadding="2" cellspacing="1"><tr><td>
+<p id="clientmode">In this Client mode, user can only connect to router through cable. To avoid IP address conflict with the AP, the DHCP server in this router will be turned off. To access and manage this router, user need to configure PC's IP manually.</p>
+</td></tr></table>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="center"><p></p><input TYPE="button" id="bottomButton" VALUE="Save" onClick="javascript:confirmChange()"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("bottomButton").value="   "+_("CSsave")+"   ";
+</script>
+</body>
+</html>

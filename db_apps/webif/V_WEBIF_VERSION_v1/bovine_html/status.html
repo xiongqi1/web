@@ -1,0 +1,1224 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>System | Status</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+</head>
+<%
+pots_disabled=get_single('potsbridge_disabled');pots_status=get_single('pots.status');
+if( request["SESSION_ID"]==session["sessionid"] )
+	set_single('wwan.0.sim.status.result_of_user_operation=0');
+%>
+<% wifi_mode=get_single('wlan.0.wifi_mode');%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language='javascript'>
+Butterlate.setTextDomain("status");
+var imageidx = 0;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var pincounter = 0;
+var ajaxerror = 0;
+var show_duration = 0;
+var currentSession = "";
+var usageHistory = "";
+var hw_ver = <%_v=get_single('uboot.hw_ver');%>"@@_v";
+if(hw_ver=="")
+	hw_ver="1.3";
+
+#include "port_status.js"
+
+/* Decodes a Unicode string into ASCII ready for printing on status page */
+function UrlDecode(str) {
+	var output = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1, i + 3));
+		output += String.fromCharCode(val);
+	}
+	return output;
+}
+
+function addcomma( myval ) {
+retval="";
+cm=parseInt((myval.length-1)/3);
+	for( i=0; i<cm; i++ ) retval+=myval.substring( retval.length-i, myval.length-(cm-i)*3)+',';
+	retval+=myval.substring(retval.length-i, myval.length);
+	return retval;
+}
+
+function showElementById(elementName,showStatus) {
+	targetElement=document.getElementById(elementName);
+	if(targetElement==null)
+		return;
+	if(showStatus)
+		targetElement.style['display']='';
+	else
+		targetElement.style['display']='none';
+}
+
+function showElementsByModuleType(moduleType,moduleModel) {
+	// module - default(sierra and etc)
+	visibleInfo=[
+		{element:"trProvider", show:true},	// 0
+		{element:"trESN", show:false},		// 1
+		{element:"trIMEI", show:true}		// 2
+	];
+	// module - fusioin
+	if (moduleType=="fusion") {
+		visibleInfo[0].show=false;
+		visibleInfo[1].show=true;
+		visibleInfo[2].show=false;
+	}
+	for(i=0;i<visibleInfo.length;i++)
+		showElementById(visibleInfo[i].element,visibleInfo[i].show);
+}
+
+// var ipsecSt=[];
+function update_ipsec(statusArr) {
+var ipsecSt = statusArr;
+var i;
+	for( i=0; i<10; i++ ) {
+		if(i<ipsecSt.length) {
+			document.getElementById( 'ipsec'+i ).style['display'] = '';
+			document.getElementById( 'ipsecwait' ).style['display'] = 'none';
+			if(ipsecSt[i].ipsecStatus != "1") {
+				if(document.form1.simStatus.value == "SIM OK") {
+					document.getElementById( 'ipsecStatus'+i ).value = "  "+_("connecting");
+					document.getElementById( 'ipsecwait' ).style['display'] = '';
+				}
+				else {
+					document.getElementById( 'ipsecStatus'+i ).value = "        "+_("waiting");
+				}
+			}
+			else
+				document.getElementById( 'ipsecStatus'+i ).value = "        "+_("status up");
+			document.getElementById( 'ipsecProfile'+i ).value = "  "+ipsecSt[i].ipsecProfile;
+			document.getElementById( 'ipsecInterface'+i ).value = "  "+ipsecSt[i].ipsecInterface;
+			document.getElementById( 'ipsecLocalLan'+i ).value = "  "+ipsecSt[i].local_lan;
+			document.getElementById( 'ipsecRemGateway'+i ).value = "  "+ipsecSt[i].remote_gateway;
+			document.getElementById( 'ipsecRemLan'+i ).value = "  "+ipsecSt[i].remote_lan;
+		}
+	}
+}
+
+var pptpSt=[];
+function update_pptp() {
+var i;
+	for( i=0; i<10; i++ ) {
+		if(i<pptpSt.length) {
+			document.getElementById( 'pptp'+i ).style['display'] = '';
+			document.getElementById( 'pptpwait' ).style['display'] = 'none';
+			if(pptpSt[i].pptpStatus != "up") {
+				if(document.form1.simStatus.value == "SIM OK") {
+					document.getElementById( 'pptpStatus'+i ).value = "  "+_("connecting");
+					document.getElementById( 'pptpwait' ).style['display'] = '';
+				}
+				else {
+					document.getElementById( 'pptpStatus'+i ).value = "        "+_("waiting");
+				}
+			}
+			else
+				document.getElementById( 'pptpStatus'+i ).value = "        "+_("status up");
+			document.getElementById( 'pptpProfile'+i ).value = "  "+pptpSt[i].pptpProfile;
+			document.getElementById( 'serveraddress'+i ).value = "  "+pptpSt[i].serveraddress;
+			document.getElementById( 'pptpLocal'+i ).value = "  "+pptpSt[i].iplocal;
+			document.getElementById( 'pptpRemote'+i ).value = "  "+pptpSt[i].ipremote;
+		}
+	}
+}
+
+var openvpn_clients=[];
+
+function update_openvpn() {
+	var total_client=openvpn_clients.length;
+	var client_info=[];
+	var tbody = document.getElementById("openvpn").getElementsByTagName("TBODY")[0];
+	var row;
+	var td;
+	var i;
+	var j;
+	var r;
+
+	for(i=0;i<total_client;i++) {
+		r=i+1;
+		client_info=openvpn_clients[i].split(",");
+		// update TDs
+		if(r<tbody.rows.length) {
+			row=tbody.rows[r];
+			for(j=0;j<6;j++) {
+				td=row.cells[j];
+				td.innerHTML="<font size=1>"+client_info[j+1]+"</font>"
+			}
+		}
+		// create TDs
+		else {
+			row = document.createElement("tr");
+			for(j=0;j<6;j++) {
+				td = document.createElement("td");
+				td.innerHTML="<font size=1>"+client_info[j+1]+"</font>"
+
+				row.appendChild(td);
+			}
+			tbody.appendChild(row);
+		}
+	}
+	// delete the rest
+	while(total_client+1<tbody.rows.length) {
+		tbody.deleteRow(tbody.rows.length-1)
+	}
+	showElementById("openVpnDiv1",total_client>0);
+}
+
+#if defined(V_WIFI_CLIENT)
+<%if( wifi_mode =="STA") {%>
+function update_wlan(clientSt)
+{
+	document.getElementById( 'wrssid' ).innerHTML=clientSt[0].wlanRssid;
+	document.getElementById( 'wbssid' ).innerHTML=clientSt[0].wlanBssid;
+	document.getElementById( 'wsecurity' ).innerHTML=clientSt[0].wlanSecurity;
+	document.getElementById( 'wstatus' ).innerHTML=clientSt[0].wlanStatus;
+
+	if(clientSt[0].wlanStatus == "Connected")
+		document.getElementById( 'wlocalIP' ).innerHTML=clientSt[0].wlanLocalIP;
+	else
+		document.getElementById( 'wlocalIP' ).innerHTML="";
+}
+<%}%>
+#endif
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	eval(response);
+	if( typeof(module_type)!="undefined" && module_type!=null && typeof(moduleModel)!="undefined" && moduleModel!=null)
+		showElementsByModuleType(module_type, moduleModel);
+	csq = csq.substring(0, csq.indexOf("dBm") );
+	csqstr = _("not available");
+	// Changed by Testra recommendation : Test Track #3794
+	if(csq == 0)
+		imageidx = 0;
+	else if(csq >= -77 ) {
+		csqstr = _("high");
+		imageidx = 5;
+	}
+	else if(csq >= -91 ) {
+		csqstr = _("medium");
+		if(csq >= -85 )
+			imageidx = 4;
+		else
+			imageidx = 3;
+	}
+	else if(csq >= -109 ) {
+		csqstr = _("low");
+		if(csq >= -101)
+			imageidx = 2;
+		else
+			imageidx = 1;
+	}
+	else
+		imageidx = 0;
+
+	if(csq=="")
+		$("#umtsss").html("");
+	else
+		$("#umtsss").html( csq+" dBm             "+csqstr+"<img style='margin-left:80px' src='/images/csq"+imageidx+".GIF' width='67' height='18'/>");
+
+/* ================= Ports Status ================= */
+	showPortStatus( portStatus );
+/* ================================================ */
+
+	e=document.getElementById("productTitle");
+	if(e.innerHTML=="NetComm Cellular Router" && moduleModel!="N/A") {
+		var title = <%val=get_single('system.product.title');%>"@@val";
+		if(moduleModel=="MC8792V") {
+			if(title.indexOf("6908")!=-1)
+				e.innerHTML="NetComm NTC-6909 Cellular Router";
+			else
+				e.innerHTML="NetComm NTC-5909 Cellular Router";
+		}
+		else {
+#if defined (V_PRODUCT_mob_30wv) || defined (V_PRODUCT_mob_40wv)
+            e.innerHTML='';
+#else
+            e.innerHTML=title;
+#endif
+		}
+	}
+
+	function getEnableStr(str) {
+		if(typeof(str)=="undefined" || str==null || str=="N/A")
+			return str;
+		var enableStr;
+		if(hasSubStr(str,/enable/i))
+			enableStr=_("enabled");
+		else
+			enableStr=_("disabled");
+		var phoneM=str.match(/[\+][0-9]+/);
+		var phoneNo="";
+		if(phoneM!=null)
+			phoneNo=phoneM[0];
+		if(phoneNo=="")
+			return enableStr;
+		return enableStr + "  ( " + phoneNo + " )";
+	}
+
+	document.form1.uptime.value = toUpTime( uptime );
+	document.form1.connuptime.value=toUpTime(connuptime);
+
+	$("#eth0mac").html(eth0mac);
+	$("#eth0mac2").html(eth0mac);
+	$("#moduleModel").html(moduleModel);
+
+	if(moduleFirmwareVersion.indexOf(" ")<0) {
+		tmp_ver=moduleFirmwareVersion;
+	} else {
+		tmp_ver=moduleFirmwareVersion.substring(0, moduleFirmwareVersion.indexOf(" "));
+		// check for Cinterion module
+		if (tmp_ver == 'REVISION') {
+			tmp_ver=moduleFirmwareVersion.substring(moduleFirmwareVersion.indexOf(" "));
+		}
+	}
+	$("#moduleFirmwareVersion").html(tmp_ver);
+
+	$("#pppoeStatus").html(pppoeStatus);
+	$("#pppoeAddress").html(pppoeAddress);
+
+	if( typeof(hint)!="undefined" && hint!="N/A" && hint!="" ) {
+		var patt=/%[0-1][0-9a-f]%/gi
+		hint = hint.replace(patt, "%20%") // Some SIM cards have character less than %20. This ruins decoding rules.
+		provider = UrlDecode(hint);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>"+_("roaming")+"</font>";
+		}
+	}
+	else if(provider=="Limited Service")
+		provider=_("limited service");
+	else if (provider=="N/A")
+		provider=_("na");
+	else if (provider.charAt(0) == "%") {
+		provider = UrlDecode(provider);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>"+_("roaming")+"</font>";
+		}
+	}
+	else {
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>"+_("roaming")+"</font>";
+		}
+	}
+
+	/* get numeric registration status */
+	var regstat;
+	if(typeof(networkRegistration) === "undefined")
+		regstat=-1;
+	else
+		regstat=parseInt(networkRegistration);
+
+	if(isNaN(regstat))
+		regstat=-1;
+
+	/* based on regstat, hide coverage - PHS8P is buggy and the module shows GSM when there is no coverage */
+	switch(regstat) {
+		case 1:	/* registered, home network */
+		case 3: /* registration defined */
+		case 5: /* registered, roaming */
+		case 6: /* registered for SMS only, home network */
+		case 7: /* registered for SMS only, roaming */
+		case 8: /* attached for emergency bearer services only */
+			break;
+			
+		case 0: /* registration status not available */
+		case 2: /* not registered, but MT is currently searhcing a new operator to register to */
+		case 4: /* unknown */
+			coverage=_("na");
+			break;
+	}
+
+	
+	provider=provider.replace("3Telstra", "Telstra");
+	provider=provider.replace("3TELSTRA", "Telstra");
+	$("#provider").html(provider.replace("Telstra Mobile", "Telstra"));
+	document.getElementById("coverage_div").style['display']=(coverage=="N/A" || coverage.indexOf("Invalid")!=-1)?'none':'';
+	$("#coverage").html(coverage);
+	$("#imei").html(imei);
+	$("#esn").html(imei);
+	$("#freq").html(freq.replace("IMT2000", "WCDMA 2100"));
+
+	simStatusID=document.getElementById('simID');
+
+	if( (simStatus == "PH-NET PIN") || (simStatus == "SIM PH-NET") ) {
+		document.form1.simStatus.value=_("mepLocked");
+	}
+	else {
+		document.form1.simStatus.value = simStatus.replace("incorrect SIM", _("incorrect SIM"));
+	}
+
+	if( (simStatus.indexOf("SIM locked")!= -1)||(simStatus.indexOf("incorrect SIM")!= -1)||(simStatus.indexOf("SIM PIN")!= -1) ) {
+		simStatus = "SIM locked";
+		document.form1.simStatus.value = _("SIMlocked");
+	}
+	else if( (simStatus.indexOf("CHV1")!= -1) || (simStatus.indexOf("PUK")!= -1) ) {
+		simStatus = "SIM PUK locked";
+		pincounter=3;
+		document.form1.simStatus.value = _("status pukLocked");
+	}
+	else if( (simStatus.indexOf("MEP")!= -1) ) {
+		simStatus = "MEP locked";
+		pincounter=3;
+		document.form1.simStatus.value = _("mepLocked");
+	}
+	if(document.form1.simStatus.value == "SIM OK") {
+		simStatusID.style.color = 'GREEN';
+		document.getElementById( "simwait" ).style['display']='none';
+		document.form1.simStatus.value = _("simOK");
+	}
+	else if(document.form1.simStatus.value == "N/A") {
+		document.form1.simStatus.value = _("negotiating");
+		simStatusID.style.color = 'Orange'
+		document.getElementById( "simwait" ).style['display']='';
+	}
+	else {
+		document.getElementById( "simwait" ).style['display']='none';
+		simStatusID.style.color = "RED";
+<% if( request["SESSION_ID"]==session["sessionid"] ) {%>
+		if( prvSimStatus != simStatus ) {
+			if( ++ pincounter >= 3 ) {
+				prvSimStatus = simStatus;
+				switch(simStatus) {
+				case "SIM removed":
+					alert( _("admin warningMsg9") );
+					break;
+				case "SIM general failure":
+					alert( _("admin warningMsg2") );
+					break;
+				case "SIM locked":
+					alert( _("admin warningMsg3") );
+					window.location="/pinsettings.html";
+					break;
+				case "SIM PUK locked":
+					alert( _("admin warningMsg4") );
+					window.location="/pinsettings.html";
+					break;
+				case "MEP locked":
+					if(confirm(_("mepLocked")+"\n"+_("mep warningMsg6"))) {
+						window.location="/pinsettings.html?%4d%45%50%4c%6f%63%6b";
+					}
+					break;
+				case "PH-NET PIN":
+				case "SIM PH-NET":
+					window.location="/pinsettings.html";
+					break;
+				case "Network reject - Account":
+					alert( _("admin warningMsg6") );
+					break;
+				case "Network reject":
+					alert( _("admin warningMsg7") );
+					break;
+				default:
+					pincounter = 0;
+				break;
+				}
+			}
+		}
+<%}%>
+	}
+
+	document.getElementById( 'pppwait' ).style['display'] = 'none';
+	for( i=0; i<6; i++ ) {
+		if(i<st.length && simStatus=="SIM OK") {
+			document.getElementById( 'ppp'+i ).style['display'] = '';
+			document.getElementById( 'profile'+i ).value = st[i].name;
+			if( (st[i].pppStatus!="up" && st[i].pppStatus!="Ready") && st[i].enable == 1 ) {
+				if(simStatus == "SIM OK") {
+					if(st[i].pppStatus == "disconnecting" ) {
+						document.getElementById( 'status'+i ).value = "  "+_("disconnecting");
+						document.getElementById( 'pppwait' ).style['display'] = '';
+					}
+					if(st[i].pppStatus == "waiting" ) {
+						document.getElementById( 'status'+i ).value = "  "+_("waiting");
+						//document.getElementById( 'pppwait' ).style['display'] = '';
+					}
+					else {
+						document.getElementById( 'status'+i ).value = "  "+_("connecting");
+						document.getElementById( 'pppwait' ).style['display'] = '';
+						if( autoapn == "1" ) {
+							if( current_apn != "" && current_apn != "N/A")
+								document.getElementById( 'apn'+i ).value = current_apn;
+							else
+								document.getElementById( 'apn'+i ).value = "";
+						}
+						else
+							document.getElementById( 'apn'+i ).value = st[i].apn;
+					}
+				}
+				else {
+					document.getElementById( 'status'+i ).value = "        "+_("waiting");
+				}
+			}
+			else {
+				interface=st[i].interface.replace("usb1", "wwan0");
+				interface=interface.replace("ppp", "wwan");
+				document.getElementById( 'interface'+i ).value = "  "+interface;
+				if(st[i].pppStatus == "up")
+					document.getElementById( 'status'+i ).value = '    '+_("status up")
+				else if(st[i].pppStatus == "down")
+					document.getElementById( 'status'+i ).value = '    '+ _("status down");
+				else
+					document.getElementById( 'status'+i ).value = '    '+st[i].pppStatus;
+				autoapn=<%_m=get_single('webinterface.autoapn'); %>"@@_m";
+				if( st[i].apn == "" || st[i].apn == "N/A" ||
+					(autoapn == "1" && current_apn != "" && current_apn != "N/A") )
+					document.getElementById( 'apn'+i ).value = current_apn;
+				else
+					document.getElementById( 'apn'+i ).value = st[i].apn;
+				document.getElementById( 'local'+i ).value = st[i].iplocal;
+#if defined(V_IPWAN_y)
+				document.getElementById( 'remote'+i ).value = st[i].ipremote;
+#endif
+			}
+
+			if(st[i].pppStatus != "up" && st[i].pppStatus != "disconnecting") {
+				document.getElementById( 'local'+i ).value = "";
+#if defined(V_IPWAN_y)
+				document.getElementById( 'remote'+i ).value = "";
+#endif
+			}
+
+		}
+		else {
+			document.getElementById( 'ppp'+i ).style['display'] = 'none';
+		}
+	}
+	currentSession=current_session;
+	usageHistory=usage_history;
+	updata_usage();
+	update_openvpn();
+#if defined(V_IPSEC_openswan2_6_32) || defined(V_IPSEC_openswan2_6_38)
+	update_ipsec(ipsecSt);
+#endif
+	update_pptp();
+
+#if defined(V_WIFI_CLIENT)
+<%if( wifi_mode =="STA") {%>
+	update_wlan(wifiClientSt);
+<%}%>
+#endif
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	if(document.getElementById("callwaiting")!=null) {
+		document.getElementById("callwaiting").innerHTML=getEnableStr(call_waiting);
+		document.getElementById("uncdcallforward").innerHTML=getEnableStr(call_forwarding_uncond);
+		document.getElementById("busycallforward").innerHTML=getEnableStr(call_forwarding_busy);
+		document.getElementById("noreplycdcallforward").innerHTML=getEnableStr(call_forwarding_noreply);
+		document.getElementById("notreachablecallforward").innerHTML=getEnableStr(call_forwarding_notreach);
+	}
+<%}%>
+#endif
+}
+
+function updata_usage() {
+	var ray = new Array();
+	ray = currentSession.split(",");
+	if(ray.length == 4 ) {
+		document.getElementById( "usage_current" ).style['display']='';
+		/*if(ray[0]*1<1234567890)
+		{
+			document.form1.usage_current_0.value = "System Up time:  "+toUpTime( ray[0]*1 );
+		}
+		else*/
+		{
+			startDate = new Date(ray[0]*1000);
+			$("#usage_current_0").html(startDate.toLocaleString());
+		}
+		if(show_duration) {
+			$("#usage_current_1").html(toUpTime( ray[1]*1-ray[0]*1 ));
+		}
+		else {
+			$("#usage_current_1").html(_("currentSession"));
+		}
+		$("#usage_current_2").html(addcomma(ray[2]));
+		$("#usage_current_3").html(addcomma(ray[3]));
+		var total = parseInt(ray[2])+parseInt(ray[3]);
+		$("#usage_current_4").html(addcomma(total.toString()));
+	}
+	else {
+		document.getElementById( "usage_current" ).style['display']='none';
+	}
+	var history = new Array();
+	history = usageHistory.split("&");
+	for( var i=0; i<5; i++) {
+		if( i < history.length ) {
+			document.getElementById( "usage"+i ).style['display']='';
+			ray = history[i].split(",");
+			if(ray.length == 4 ) {
+				/*if(ray[0]*1<1234567890)
+				{
+					eval('document.getElementById("usage'+i+'_0").innerHTML=\"System Up time:  '+toUpTime( ray[0]*1 )+'\"');
+				}
+				else*/
+				{
+					startDate = new Date(ray[0]*1000);
+					eval('document.getElementById(\"usage'+i+'_0\").innerHTML=\"'+startDate.toLocaleString()+'\"');
+				}
+				if(show_duration) {
+					eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+toUpTime( ray[1]*1-ray[0]*1 )+'\"');
+				}
+				else {
+					/*if(ray[1]*1<1234567890)
+					{
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"System Up time:  '+toUpTime( ray[1]*1 )+'\"');
+					}
+					else*/
+					{
+						endDate = new Date(ray[1]*1000);
+						eval('document.getElementById(\"usage'+i+'_1\").innerHTML=\"'+endDate.toLocaleString()+'\"');
+					}
+				}
+				eval('document.getElementById(\"usage'+i+'_2\").innerHTML=\"'+addcomma(ray[2])+'\"');
+				eval('document.getElementById(\"usage'+i+'_3\").innerHTML=\"'+addcomma(ray[3])+'\"');
+				total = parseInt(ray[2])+parseInt(ray[3]);
+				eval('document.getElementById(\"usage'+i+'_4\").innerHTML=\"'+addcomma(total.toString())+'\"');
+			}
+			else {
+				document.getElementById( "usage"+i ).style['display']='none';
+			}
+		}
+		else {
+			document.getElementById( "usage"+i ).style['display']='none';
+		}
+	}
+}
+
+var hideItems = 0;
+function hideItem( itemID, action ) {
+	if( action==1 ) {
+		document.getElementById( itemID+"0" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='';
+		if(--hideItems<=0) {
+			document.getElementById( "alldiv" ).style['display']='none';
+			document.getElementById( "statusdiv" ).style['display']='';
+		}
+	}
+	else {
+		++hideItems;
+		document.getElementById( "alldiv" ).style['display']='';
+		document.getElementById( "statusdiv" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='none';
+		document.getElementById( itemID+"0" ).style['display']='';
+	}
+}
+function showAllItems() {
+	hideItem('ipdiv', 1);
+	hideItem('sysInfodiv', 1);
+	hideItem('pppdiv', 1);
+	hideItem('pppoediv', 1);
+	hideItem('pptpdiv', 1);
+	hideItem('portstadiv', 1);
+	hideItem('connectiondiv', 1);
+	hideItem('ipsecdiv', 1);
+#if defined(V_WIFI_CLIENT)
+<%if( wifi_mode =="STA") {%>
+	hideItem('wlandiv', 1);
+<%}%>
+#endif
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	hideItem('callforwarddiv', 1);
+<%}%>
+#endif
+	hideItems = 0;
+}
+
+function showDefaultItems() {
+	hideItem('ipdiv', 0);
+	if(pppoeStatus!='DISABLED')
+		hideItem('pppdiv', 0);
+	else
+		hideItem('pppoediv', 0);
+	hideItem('pptpdiv', 0);
+	if(ipsecSt.length > 0)
+		hideItem('ipsecdiv', 1);
+	else
+		hideItem('ipsecdiv', 0);
+	if(pptpSt.length > 0)
+		hideItem('pptpdiv', 1);
+	else
+		hideItem('pptpdiv', 0);
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+	hideItem('callforwarddiv', 0);
+<%}%>
+#endif
+}
+
+var showUsage=false;
+
+function switchItem() {
+	showUsage=!showUsage;
+	if(showUsage) {
+		document.getElementById( "usageDiv1" ).style['display']='';
+		document.getElementById( "usageDivHref" ).innerHTML=_("hideDataUsage");
+	}
+	else {
+		document.getElementById( "usageDiv1" ).style['display']='none';
+		document.getElementById( "usageDivHref" ).innerHTML=_("showDataUsage");
+	}
+}
+
+function switchDuration( action ) {
+	if( action ) {
+		$("#Session_End").html(_("sessionDuration")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(0);>'+_("showEndTime")+'</a>');
+	}
+	else {
+		$("#Session_End").html(_("sessionEnd")+'&nbsp;&nbsp;<a style=\"font-size:11px; text-decoration:underline;\" href=javascript:switchDuration(1);>'+_("showDuration")+'</a>');
+	}
+	show_duration=action;
+	updata_usage();
+}
+
+var docs="";
+function init_help(responseText) {
+	eval(responseText);
+	if(typeof(doclist)==="undefined")
+		docs="";
+	else
+		docs=doclist;
+		
+	if (typeof(doclist)==="undefined" || !doclist.length)
+		$("#help_link").css("display","none");
+	else
+		$("#help_link").css("display","");
+}
+
+function help_src() {
+	if (docs.length==1)
+		window.open("/doc/"+docs[0].name, docs[0].name, "toolbar=no, location=yes, scrollbars=yes");
+	else
+		window.open("help.html","Help_PDF_Files_List","toolbar=no, location=yes, scrollbars=yes, resizable=no, width=500, height=480");
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	showDefaultItems();
+
+	$.get('/cgi-bin/get_files.cgi?getPDFfilelist', init_help );
+
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 10000);
+	$("#bottomButton").val(_("advStatus advancedStatus"));
+	if(serialnum=="" || serialnum=="N/A") {
+		$("#serialnum").css("display","none");
+	}
+});
+
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+
+<form name="form1" >
+<h3 id="statusdiv">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status"));</script></h3>
+<h3>
+<a id="alldiv" style="display:none" href="javascript:showAllItems();"><script language="JavaScript">document.write(_("status allstatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="sysInfodiv0" style="display:none" href="javascript:hideItem('sysInfodiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("sysInfo"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="ipdiv0" style="display:none" href="javascript:hideItem('ipdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("lan"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="portstadiv0" style="display:none" href="javascript:hideItem('portstadiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("portStatus"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="pppdiv0" style="display:none" href="javascript:hideItem('pppdiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("mobile broadband"));</script>&nbsp;&nbsp;&nbsp;</a>
+<a id="pppoediv0" style="display:none" href="javascript:hideItem('pppoediv', 1);">&nbsp;&nbsp;&nbsp;PPPoE&nbsp;&nbsp;&nbsp;</a>
+<a id="pptpdiv0" style="display:none" href="javascript:hideItem('pptpdiv', 1);">&nbsp;&nbsp;&nbsp;PPTP&nbsp;&nbsp;&nbsp;</a>
+<a id="ipsecdiv0" style="display:none" href="javascript:hideItem('ipsecdiv', 1);">&nbsp;&nbsp;&nbsp;IPsec&nbsp;&nbsp;&nbsp;</a>
+#if defined(V_WIFI_CLIENT)
+<%if( wifi_mode =="STA") {%>
+<a id="wlandiv0" style="display:none" href="javascript:hideItem('wlandiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("wlan"));</script>&nbsp;&nbsp;&nbsp;</a>
+<%}%>
+#endif
+<a id="connectiondiv0" style="display:none" href="javascript:hideItem('connectiondiv', 1);">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("status connection"));</script>&nbsp;&nbsp;&nbsp;</a>
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+<a id="callforwarddiv0" style="display:none; padding-left:20px" href="javascript:hideItem('callforwarddiv', 1);"><script language="JavaScript">document.write(_("status callforwarding"));</script></a>
+<%}%>
+#endif
+
+<div style="position:absolute;top:150px;right:40px">
+<a id="help_link" style="color:red;display:none" href="javascript:help_src();"><script language="JavaScript">document.write(_("help"));</script></a>
+</div>
+</ul>
+</h3>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('sysInfodiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%"><script language="JavaScript">document.write(_("sysInfo"));</script></th>
+</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status system up time"));</script></td>
+	<td><input type="text" name="uptime"  size="40" class='cdcsAjax' width="25%"  readonly/></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("routerVersion"));</script></td>
+	<td>
+	<script language="JavaScript">document.write(_("hardware"));</script>:&nbsp;<script language=Javascript>document.write(hw_ver);</script>&nbsp;&nbsp;
+	&nbsp;&nbsp;<script language="JavaScript">document.write(_("software"));</script>:&nbsp;
+	<script language=Javascript>document.write(version);</script>
+	</td>
+</tr>
+<tr id="serialnum">
+	<td><script language="JavaScript">document.write(_("routerSerialNumber"));</script></td>
+	<td><script language=Javascript>document.write(serialnum);</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("advStatus phoneModule"));</script></td>
+	<td>
+	<script language="JavaScript">document.write(_("model"));</script>:&nbsp;
+	<span id="moduleModel"></span>&nbsp;
+&nbsp;&nbsp;<script language="JavaScript">document.write(_("firmware"));</script>:&nbsp;
+	<span id="moduleFirmwareVersion"></span>&nbsp;
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("macAddress"));</script></td>
+	<td id="eth0mac"></td>
+</tr>
+</table>
+</div>
+<div id="ipdiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('ipdiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("lan"));</script></th>
+</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("IP"));</script></td>
+	<td >
+<%val=get_single('link.profile.0.address');%>@@val
+	&nbsp;&nbsp;/&nbsp;&nbsp;
+<%val=get_single('link.profile.0.netmask');%>@@val
+	</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("macAddress"));</script></td>
+	<td id="eth0mac2"></td>
+</tr>
+</table>
+</div>
+
+#if (defined V_ETH_PORT_1pl)
+#include "port_status.htm"
+#endif
+
+<div id="pppdiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('pppdiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%" id="usageDiv0">&nbsp;&nbsp;<script language="JavaScript">document.write(_("mobile broadband mbb"));</script><a href=javascript:switchItem(); name="usageDiv0" style="margin-left:60px" id="usageDivHref"><script language="JavaScript">document.write(_("showDataUsage"));</script></a></th>
+</tr>
+</table>
+<div>
+
+<table width="92%">
+<tr>
+<td width="15%"><b><script language="JavaScript">document.write(_("profileName"));</script></b></td>
+<td width="8%"><b><script language="JavaScript">document.write(_("interface"));</script></b></td>
+<td width="32%"><div align="center"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="pppwait" style="display:none"/></div></td>
+<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("apn"));</script></b></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("local IP"));</script></b></div></td>
+<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("remote IP"));</script></b></div></td>
+#else
+<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("ip address"));</script></b></div></td>
+#endif
+</tr>
+</table>
+</div>
+
+<table id="ppp0" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile0" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface0" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status0" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn0" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local0" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote0" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+<table id="ppp1" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile1" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface1" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status1" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn1" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local1" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote1" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+
+<table id="ppp2" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile2" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface2" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status2" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn2" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local2" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote2" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+
+<table id="ppp3" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile3" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface3" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status3" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn3" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local3" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote3" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+
+<table id="ppp4" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile4" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface4" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status4" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn4" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local4" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote4" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+
+<table id="ppp5" style="display:none" cellpadding="0" cellspacing="0">
+<tr>
+<td width="15%"><input type="text" size="15" id="profile5" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="8%"><input type="text" size="10" id="interface5" class='cdcsAjax' style='font-size:11px' readonly/></td>
+<td width="32%"><div align="center"><input type="text" id="status5" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="apn5" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+<td width="15%"><div align="center"><input type="text" size="14" id="local5" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#if defined(V_IPWAN_y)
+<td width="15%"><div align="center"><input type="text" size="14" id="remote5" class='cdcsAjax' style='font-size:11px' readonly/></div></td>
+#endif
+</tr>
+</table>
+
+<div id="openVpnDiv1" style="display:none">
+	<table width="92%" cols="6" id="openvpn">
+	<tr id="openvpn" style="font-weight:bold">
+		<td width="15%"><b><script language="JavaScript">document.write(_("name"));</script></b></td>
+		<td width="15%"><b><script language="JavaScript">document.write(_("address"));</script></b></td>
+		<td width="15%"><b><script language="JavaScript">document.write(_("status 3g_local"));</script></b></td>
+		<td width="15%"><b><script language="JavaScript">document.write(_("bytesReceived"));</script></td>
+		<td width="15%"><b><script language="JavaScript">document.write(_("bytesSent"));</script></td>
+		<td width="15%"><b><script language="JavaScript">document.write(_("sessionStart"));</script></td>
+	</tr>
+	</table>
+</div>
+
+<div id="usageDiv1" style="display:none">
+<table width="92%" cols="5">
+<tr style="font-weight:bold">
+	<td width="24%"><script language="JavaScript">document.write(_("sessionStart"));</script></td>
+	<td id="Session_End" width="26%"><script language="JavaScript">document.write(_("sessionEnd"));</script>&nbsp;&nbsp;<a style='font-size:11px; text-decoration:underline;' href=javascript:switchDuration(1);><script language="JavaScript">document.write(_("showDuration"));</script></a></td>
+	<td width="13%"><script language="JavaScript">document.write(_("dataReceived"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+	<td width="13%"><script language="JavaScript">document.write(_("dataSent"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+	<td width="18%"><script language="JavaScript">document.write(_("totalData"));</script><br/><script language="JavaScript">document.write(_("byte"));</script></td>
+</tr>
+<tr id="usage_current" style="display:none">
+	<td id="usage_current_0" style="font-size:9px"></td>
+	<td id="usage_current_1" style="font-size:9px; color:GREEN"><script language="JavaScript">document.write("Current Session");</script></td>
+	<td id="usage_current_2" style="font-size:10px"></td>
+	<td id="usage_current_3" style="font-size:10px"></td>
+	<td id="usage_current_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage0" style="display:none">
+	<td id="usage0_0" style="font-size:9px"></td>
+	<td id="usage0_1" style="font-size:9px"></td>
+	<td id="usage0_2" style="font-size:10px"></td>
+	<td id="usage0_3" style="font-size:10px"></td>
+	<td id="usage0_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage1" style="display:none">
+	<td id="usage1_0" style="font-size:9px"></td>
+	<td id="usage1_1" style="font-size:9px"></td>
+	<td id="usage1_2" style="font-size:10px"></td>
+	<td id="usage1_3" style="font-size:10px"></td>
+	<td id="usage1_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage2" style="display:none">
+	<td id="usage2_0" style="font-size:9px"></td>
+	<td id="usage2_1" style="font-size:9px"></td>
+	<td id="usage2_2" style="font-size:10px"></td>
+	<td id="usage2_3" style="font-size:10px"></td>
+	<td id="usage2_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage3" style="display:none">
+	<td id="usage3_0" style="font-size:9px"></td>
+	<td id="usage3_1" style="font-size:9px"></td>
+	<td id="usage3_2" style="font-size:10px"></td>
+	<td id="usage3_3" style="font-size:10px"></td>
+	<td id="usage3_4" style="font-size:10px"></td>
+</tr>
+<tr id="usage4" style="display:none">
+	<td id="usage4_0" style="font-size:9px"></td>
+	<td id="usage4_1" style="font-size:9px"></td>
+	<td id="usage4_2" style="font-size:10px"></td>
+	<td id="usage4_3" style="font-size:10px"></td>
+	<td id="usage4_4" style="font-size:10px"></td>
+</tr>
+</table>
+<table width="92%" cols="5">
+<tr style="text-align:right">
+	<td style="font-size:9px"><script language="JavaScript">document.write(_("data usage warning"));</script></td>
+</tr>
+</table>
+</div>
+</div>
+
+<div id="pppoediv1"  style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('pppoediv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;PPPoE</th>
+</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status statusPPPoE"));</script></td>
+	<td id="pppoeStatus" class="innerText"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status addrPPPoE"));</script></td>
+	<td id="pppoeAddress" class="innerText"></td>
+</tr>
+</table>
+</div>
+
+<div id="ipsecdiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('ipsecdiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;IPSec</th>
+</tr>
+</table>
+
+<table width="92%" cols="6" id="ipsec">
+<tr style="font-weight:bold">
+	<td width="8%"><div align="center"><b><script language="JavaScript">document.write(_("mapping no"));</script></b></div></td>
+	<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("profileName"));</script></b></div></td>
+	<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("interface"));</script></b></div></td>
+	<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("localLAN"));</script></b></div></td>
+	<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("remoteGateway"));</script></b></div></td>
+	<td width="15%"><div align="center"><b><script language="JavaScript">document.write(_("remoteLAN"));</script></b></div></td>
+	<td width="9%"><div align="center"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="ipsecwait" style="display:none"/></div></td>
+</tr>
+</table>
+
+<script type="text/javascript">
+for(i=0; i<10; i++) {
+	document.write("<table width=\"92%\" id=\"ipsec"+i+"\" cols=\"6\" style=\"display:none\" cellpadding=\"0\" cellspacing=\"0\">");
+
+	document.write("<tr>");
+	document.write("<td width=\"8%\"><div align=\"center\"><a href=\"/VPN_ipsec.html?"+i+"\">"+(i+1)+"</a></div></td>");
+	document.write("<td width=\"15%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"ipsecProfile"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"10%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"ipsecInterface"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"15%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"ipsecLocalLan"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"20%\"><div align=\"center\"><input type=\"text\" size=\"28\" id=\"ipsecRemGateway"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"15%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"ipsecRemLan"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"9%\"><div align=\"center\"><input type=\"text\" size=\"9\" id=\"ipsecStatus"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("</tr>");
+	document.write("</table>");
+}
+</script>
+</div>
+
+#if defined(V_WIFI_CLIENT)
+<%if( wifi_mode =="STA") {%>
+<div id="wlandiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('wlandiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("wlan"));</script></th>
+</tr>
+</table>
+
+<table width="95%" cols="6" id="wlan">
+<tr style="font-weight:bold">
+	<td width="20%"><div align="center"><b><script language="JavaScript">document.write(_("remoteSSID"));</script></b></div></td>
+	<td width="20%"><div align="center"><b>BSSID</b></div></td>
+	<td width="20%"><div align="center"><b><script language="JavaScript">document.write(_("treeapp security"));</script></b></div></td>
+	<td width="20%"><div align="center"><b><script language="JavaScript">document.write(_("ip address"));</script></b></div></td>
+	<td width="25%"><div align="center"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="wlanwait" style="display:none"/></div></td>
+</tr>
+</table>
+<table>
+<tr>
+	<td width="20%" id="wrssid" class="innerText"><div align="center"></div></td>
+	<td width="20%" id="wbssid" class="innerText"><div align="center"></div></td>
+	<td width="20%" id="wsecurity" class="innerText"><div align="center"></div></td>
+	<td width="20%" id="wlocalIP" class="innerText"><div align="center"></div></td>
+	<td width="25%" id="wstatus" class="innerText"><div align="center"></div></td>
+</tr>
+</table>
+</div>
+<%}%>
+#endif
+
+<div id="pptpdiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+ <td style="padding:0px 0px"><a href="javascript:hideItem('pptpdiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+ <th width="100%">&nbsp;&nbsp;PPTP</th>
+</tr>
+</table>
+<table width="92%" cols="6" id="pptp">
+<tr style="font-weight:bold">
+	<td width="8%"><div align="center"><b><script language="JavaScript">document.write(_("mapping no"));</script></b></div></td>
+	<td width="18%"><div align="center"><b><script language="JavaScript">document.write(_("profileName"));</script></b></div></td>
+	<td width="18%"><div align="center"><b><script language="JavaScript">document.write(_("remoteServerAddress"));</script></b></div></td>
+	<td width="18%"><div align="center"><b><script language="JavaScript">document.write(_("PtPLocal"));</script></b></div></td>
+	<td width="18%"><div align="center"><b><script language="JavaScript">document.write(_("PtPRemote"));</script></b></div></td>
+	<td width="12%"><div align="center"><b><script language="JavaScript">document.write(_("status"));</script>&nbsp;&nbsp;&nbsp;&nbsp;</b><img src="images/waiting.gif" width="18" height="18" id="pptpwait" style="display:none"/></div></td>
+</tr>
+</table>
+
+<script type="text/javascript">
+for(i=0; i<10; i++) {
+	document.write("<table width=\"92%\" id=\"pptp"+i+"\" cols=\"6\" style=\"display:none\" cellpadding=\"0\" cellspacing=\"0\">");
+
+	document.write("<tr>");
+	document.write("<td width=\"8%\"><div align=\"center\"><a href=\"/VPN_pptpc.html?"+i+"\">"+(i+1)+"</a></div></td>");
+	document.write("<td width=\"18%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"pptpProfile"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"18%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"serveraddress"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"18%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"pptpLocal"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"18%\"><div align=\"center\"><input type=\"text\" size=\"14\" id=\"pptpRemote"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("<td width=\"12%\"><div align=\"center\"><input type=\"text\" size=\"12\" id=\"pptpStatus"+i+"\" class='cdcsAjax' style='font-size:11px' readonly/></div></td>");
+	document.write("</tr>");
+	document.write("</table>");
+}
+</script>
+</div>
+
+<div id="connectiondiv1" style="padding-left:2px; padding-right:2px">
+<table border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('connectiondiv', 0);" ><img src="images/close_0.gif" alt="-"/></a></td>
+	<th width="100%">&nbsp;&nbsp;<script language="JavaScript">document.write(_("status connection"));</script></th>
+</tr>
+</table>
+<table width="92%">
+#ifdef V_PRODUCT_ntc_6908
+<tr style="display:none" >
+#else
+<tr>
+#endif
+	<td width="22%"><script language="JavaScript">document.write(_("status ip up time"));</script></td>
+	<td><input type="text" name="connuptime"  size="40" class='cdcsAjax' readonly/></td>
+</tr>
+<tr id=trProvider>
+	<td width="22%"><script language="JavaScript">document.write(_("provider"));</script></td>
+	<td id="provider" class="innerText"></td>
+</tr>
+<tr id="coverage_div" >
+	<td><script language="JavaScript">document.write(_("status CScoverage"));</script></td>
+	<td id="coverage" class="innerText"></td>
+</tr>
+<tr id=trIMEI>
+	<td><script language="JavaScript">document.write(_("status CSimei"));</script></td>
+	<td id="imei" class="innerText"></td>
+</tr>
+<tr id=trESN>
+	<td>ESN</td>
+	<td id="esn" class="innerText"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status CSfrequency"));</script></td>
+	<td id="freq" class="innerText"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("signal strength"));</script></td>
+	<td id="umtsss" class="innerText"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("simStatus"));</script></td>
+	<td><input type="text" name="simStatus" id="simID" size="40" style="border-style:none; background:#F0EFEB" />
+	<img src="images/waiting.gif" width="24" height="24" id="simwait" style="display:none" /></td>
+	</tr>
+</table>
+</div>
+#if (defined V_CALL_FORWARDING)
+<%if( pots_disabled!="1" && pots_status!="pots_disabled") {%>
+<!-- ================= Callforwarding Status ================= -->
+<div id="callforwarddiv1">
+<table width="92%" border="0" cellpadding="0" cellspacing="0">
+<tr>
+	<td style="padding:0px 0px"><a href="javascript:hideItem('callforwarddiv', 0);" ><img src="/images/close_0.gif" alt="-"/></a></td>
+	<th width="100%" class="title" id="statusCallForwarding">&nbsp;&nbsp;<script language="JavaScript">document.write(_("status callForwardingStatus"));</script></th>
+</tr>
+</table>
+<table width="92%">
+<tr>
+	<td width="22%"><script language="JavaScript">document.write(_("status statusCallwaiting"));</script></td>
+	<td id="callwaiting"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusUncdcallforward"));</script></td>
+	<td id="uncdcallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusBusycallforward"));</script></td>
+	<td id="busycallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusNoreplycdcallforward"));</script></td>
+	<td id="noreplycdcallforward"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("status statusNotreachablecallforward"));</script></td>
+	<td id="notreachablecallforward"></td>
+</tr>
+</table>
+</div>
+<%}%>
+#endif
+
+#if (defined V_ETH_PORT_8plllllllw_l)
+#include "port_status.htm"
+#endif
+
+#if defined(V_ADV_STATUS_lv1) || defined(V_ADV_STATUS_lv2)
+<% if( request["SESSION_ID"]==session["sessionid"] ) { %>
+<p></p>
+&nbsp;&nbsp;<input type="Button" value="Advanced Status" id="bottomButton" onClick="window.location='AdvancedStatus.html'">
+<%}%>
+#endif
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+if("@@request['QUERY_STRING']"=="setdate") {
+	$.get('/cgi-bin/setdate.cgi?'+HostDate());
+}
+</script>
+</body>
+</html>

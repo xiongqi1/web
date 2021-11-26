@@ -1,0 +1,9 @@
+digraph "Hardware/line initialization"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node0 [label="Hardware/line initialization",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 [label="Initialization",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___v_d_a_a___i_n_i_t.html"];
+  Node1->Node0 [shape=plaintext, dir="back", style="solid"];
+}

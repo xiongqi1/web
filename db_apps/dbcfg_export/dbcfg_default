@@ -1,0 +1,230 @@
+#!/bin/sh
+
+usage() {
+	cat <<EOM
+
+Usage: dbcfg_default [-f] [-r]
+
+	Resets system to factory defaults and (optionally) reboots it.
+
+	-f = Force operation. Won't do anything without this option.
+	-r = Reboot after factory reset.
+
+EOM
+	exit 1
+}
+
+FORCE=''
+REBOOT=''
+while [ $# -gt 0 ]; do
+	case "$1" in
+	'-f') FORCE=1; ;;
+	'-r') REBOOT=1; ;;
+	*) usage; ;;
+	esac
+	shift
+done
+
+if [ -z "$FORCE" ]; then usage; fi
+
+. /etc/variant.sh
+
+getRDB() {
+	ps | grep "rdb_manager" | grep -- "-c" | awk '{print $1}'
+}
+
+stopRDB() {
+	PID=`getRDB` 
+	test -n "$PID" && kill -SIGSTOP $PID
+}
+
+#-------------------------------------------------------------------------
+# delete all SMS messages
+#-------------------------------------------------------------------------
+delete_sms_files() {
+	# delete all SMS messages
+	if [ "$SYS" = "main" ]; then
+		SMS_COMMON_CFG_FILE="/etc/platform.txt"
+		if [ "$platform" = "Platypus" ] || [ "$platform" = "Platypus2" ]; then
+		SMS_COMMON_CFG_FILE="/var/sms/sms_common.cfg"
+		elif [ "$platform" = "Avian" ]; then
+		SMS_COMMON_CFG_FILE="/system/cdcs/usr/etc/sms/sms_common.cfg"
+		else
+		SMS_COMMON_CFG_FILE="/usr/local/cdcs/sms/conf/sms_common.cfg"
+		fi
+	else
+		SMS_COMMON_CFG_FILE="/usr/local/cdcs/sms/conf/sms_common.cfg"
+	fi
+	
+	if [ ! -e "$SMS_COMMON_CFG_FILE" ]; then
+		LOCAL_INBOX="/usr/local/cdcs/sms/inbox"
+		LOCAL_OUTBOX="/usr/local/cdcs/sms/outbox"
+		LOCAL_TXFAILED="/usr/local/cdcs/sms/txfailed"
+		SMS_CONF_PATH="/usr/local/cdcs/sms/conf/"
+		SSMTP_CONF_PATH="/usr/local/cdcs/sms/conf/"
+	else
+		. $SMS_COMMON_CFG_FILE
+	fi
+	
+	test -n "$LOCAL_INBOX" && rm -fr $LOCAL_INBOX/* > /dev/null 2> /dev/null
+	test -n "$LOCAL_OUTBOX" && rm -fr $LOCAL_OUTBOX/* > /dev/null 2> /dev/null
+	test -n "$LOCAL_TXFAILED" && rm -fr $LOCAL_TXFAILED/* > /dev/null 2> /dev/null
+	test -n "$SMS_CONF_PATH" && rm -fr $SMS_CONF_PATH/* > /dev/null 2> /dev/null
+	test -n "$SSMTP_CONF_PATH" && rm -fr $SSMTP_CONF_PATH/* > /dev/null 2> /dev/null
+	
+	# leave this line for old firmware routers : clean sms inbox/outbox
+	rm -fr /usr/sms/* > /dev/null 2> /dev/null
+}
+
+# delete files for FastMile products per customer requirement
+delete_fastmile_files() {
+	rm -f /opt/nokia/var/common/data/ltthd.conf
+	rm -f /opt/nokia/ltth/etc/ltthd.ota.variant.cfg
+}
+
+SYS=`systype.sh 2> /dev/null`
+
+# reset log file save mode to default
+rdb_set service.syslog.option.logtofile 0
+
+# setup default SMS folder
+
+# Select word from list
+pick() {
+	if [ $1 -le $# ]; then
+		shift $1; echo "$1";
+	fi
+}
+
+# Identify rootfs information (Devtype Devid fstype)
+ROOT=`sed -n 's@^\([^:]\+\):\([^ ]\+\) / \([^ ]\+\).*$@\1 \2 \3@p' /proc/mounts`
+RTYPE=`pick 3 $ROOT`
+# NAND page size
+MTDPAGE=$(mtd_debug info "/dev/mtd4" | sed -n 's/^mtd.writesize = \([0-9]\+\).*$/\1/p')
+
+echo "Factory reset (running on $SYS)..."
+case "$SYS" in
+'recovery')
+	# for ubifs we have to make sure ubi device ubi1 is attached before mount
+	if [ "$RTYPE" = "ubifs" ] && [ ! -e /sys/devices/virtual/ubi/ubi1 ]; then
+		ubiattach -d 1 -m 4 -O $MTDPAGE > /dev/null
+	fi
+	mount /main_root -o rw
+	cp /main_root/etc/cdcs/conf/passwd.default /main_root/etc/passwd
+	cp /main_root/etc/cdcs/conf/shadow.default /main_root/etc/shadow
+	if [ "$V_POWERSAVE" = "y" ]; then
+		# Remove ssh keys
+		if [ -e /main_root/root/.ssh ]; then
+			rm -rf /main_root/root/.ssh/*
+		fi
+	fi
+	if [ "$V_BLUETOOTH" != "none" ]; then
+		# delete all bluetooth settings and devices
+		rm -rf /main_root/var/lib/bluetooth/*
+	fi
+	umount /main_root  >/dev/null 2>&1
+	/etc/init.d/rc.d/ubisetup start 1>/dev/null 2>&1
+	if [ "$V_BLUETOOTH" != "none" ]; then
+		# delete all IPK bluetooth settings and devices
+		rm -rf /usr/local/var/lib/bluetooth/*
+	fi
+	# delete AG.conf
+	if [ "$V_POWERSAVE" = "y" ]; then
+		rm -fr /usr/local/cdcs/conf/AG.conf 2>/dev/null
+		opt_mounted=`rdb_get system.mounts.opt`
+		test "$opt_mounted" != "1" && /etc/init.d/rc.d/ubimount /opt opt 6 11
+		# For 8000C, also delete the PBV abd BV user storage files
+		if [ -e /opt/sftproot/home ]; then
+			rm -rf /opt/sftproot/home/*
+		fi
+	fi
+	rm -f /usr/local/cdcs/conf/system.conf
+	rm -f /usr/local/cdcs/conf/system.stat
+	# remove openvpn keys
+	rm -fr /usr/local/cdcs/openvpn-keys/
+	# remove ipsec configurations
+	rm -fr /usr/local/cdcs/ipsec.d
+	# erase sshd config
+	cp /dev/null /usr/local/cdcs/conf/sshd_config 2>/dev/null
+	
+	if [ "$V_SMS" = "y" ]; then
+		# delete all SMS messages
+		delete_sms_files
+	fi
+
+	echo "erasing wwan statistics..."
+	mtd_statistics -e
+
+	if [ "$V_CUSTOM_FEATURE_PACK" = "fastmile" ]; then
+		delete_fastmile_files
+	fi
+	;;
+'main')
+	cp /etc/cdcs/conf/passwd.default /etc/passwd
+	cp /etc/cdcs/conf/shadow.default /etc/shadow
+	stopRDB
+	rm -f /usr/local/cdcs/conf/system.conf
+	rm -f /usr/local/cdcs/conf/system.stat
+	# remove openvpn keys
+	rm -fr /usr/local/cdcs/openvpn-keys/
+	# remove ipsec configurations
+	rm -fr /usr/local/cdcs/ipsec.d
+	# erase sshd config
+	cp /dev/null /usr/local/cdcs/conf/sshd_config 2>/dev/null
+	# remove user-specific vodafone specific PRL list
+	# these files exist in a firmware directory as they have to be deleted when upgrade or factory reset performs
+	rm -fr /usr/local/cdcs/conf/plmn-[0-9]*.csv
+	# delete AG.conf
+	if [ "$V_POWERSAVE" = "y" ]; then
+		rm -f /usr/local/cdcs/conf/AG.conf 2>/dev/null
+		# For 8000C, also delete the PBV abd BV user storage files
+		if [ -e /opt/sftproot/home ]; then
+			rm -rf /opt/sftproot/home/*
+		fi
+		# Remove ssh keys
+		if [ -e /root/.ssh ]; then
+			rm -rf /root/.ssh/*
+		fi
+	fi
+	# set default https certificate
+	cp /etc/appweb/server.key.default /etc/appweb/server.key 2>/dev/null
+	cp /etc/appweb/server.crt.default /etc/appweb/server.crt 2>/dev/null
+	
+	if [ "$V_SMS" = "y" ]; then
+		# delete all SMS messages
+		delete_sms_files
+	fi
+
+	echo "erasing wwan statistics..."
+	mtd_statistics -e
+
+	# remove ssh-keys
+	rm -fr "/usr/local/cdcs/ssh-hostkeys" > /dev/null 2> /dev/null 
+	# remove SNMP file
+        rm -f "/var/net-snmp/snmpd.conf" > /dev/null 2> /dev/null
+
+	if [ "$V_BLUETOOTH" != "none" ]; then
+		# delete all bluetooth settings and devices
+		rm -rf /var/lib/bluetooth/*
+		rm -rf /usr/local/var/lib/bluetooth/*
+	fi
+
+	if [ "$V_CUSTOM_FEATURE_PACK" = "fastmile" ]; then
+		delete_fastmile_files
+	fi
+	;;
+'')
+	stopRDB
+	rm -f /usr/local/cdcs/conf/system.conf
+	rm -f /usr/local/cdcs/conf/system.stat
+	;;
+*)
+	echo "Can't detect system: '$SYS'"; exit 1
+	;;
+esac
+
+sync
+
+if [ -n "$REBOOT" ]; then
+	reboot
+fi

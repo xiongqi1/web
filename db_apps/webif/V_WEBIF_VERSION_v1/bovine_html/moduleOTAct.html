@@ -1,0 +1,188 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Module Activation</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+
+<script language='javascript'>
+function reload_timer() {
+	setTimeout("loadpage()", 100);
+}
+var TextBoxMsg="";
+var CIcmd="";
+var Is_OnProcessing="FALSE";
+
+var module_ESN=<%temp_val=get_single('wwan.0.imei');%>"@@temp_val";
+var one_touch_activation_box="This device has not yet been programmed. \
+Please ensure you have no other active network connections on this system during the programming process. \
+If you are having technical difficulties, please call OEM customer care at xxxxxxxxxx to ensure your account \
+is setup properly. Your Electronic Serial Number (ESN) is : "+module_ESN+
+". \n\nWould you like to have the network auto-program this device now?";
+var activation_complete_box="This device is now programmed, would you like to connect to Sprint Mobile Broadband now?"
+
+function loadpage() {
+var confirm_return=confirm(one_touch_activation_box);
+
+	document.form.confirm_return.value="previouspage";
+
+	if(confirm_return == true) {
+		CIcmd="CLIINIT";
+		ajaxFunction();
+	}
+	else {
+		document.form.submit();
+	}
+}
+
+function ajaxFunction() {
+	try {
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				xmlHttp=new XMLHttpRequest();
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+
+	if(CIcmd == "CLIINIT")
+	{
+		xmlHttp.open("GET","/cgi-bin/module_omadm.cgi?CIActivation&rnd_id=" + Math.random(),true);
+	}
+	else if (CIcmd == "QUERY")
+	{
+		xmlHttp.open("GET","/cgi-bin/module_omadm.cgi?query&rnd_id=" + Math.random(),true);
+	}
+	xmlHttp.send('a');
+	xmlHttp.onreadystatechange=function() {
+
+		if(xmlHttp.readyState==4) {
+			if(xmlHttp.responseText.length>0) {
+				eval( xmlHttp.responseText );
+				if(CIcmd == "QUERY") {
+			if(QueryStatus == 1) {
+			Is_OnProcessing="TRUE";
+			document.getElementById( "processwait" ).style['display']="";
+			document.getElementById( "processmsg" ).style['display']="";
+			setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			else if(QueryStatus == 0) {
+			document.getElementById( "processwait" ).style['display']="none";
+			document.getElementById( "processmsg" ).style['display']="none";
+			TextBoxMsg="";
+
+			if(Is_OnProcessing == "TRUE") {
+				alert("Complete");
+				Is_OnProcessing="FALSE";
+
+				if(confirm(activation_complete_box)) {
+				document.form.confirm_return.value="statuspage";
+				}
+				else {
+				document.form.confirm_return.value = "previouspage";
+				}
+				document.form.submit();
+			}
+			else {
+				alert("Client Initiated Session ERROR!!");
+				Is_OnProcessing="FALSE";
+				document.form.confirm_return.value = "previouspage";
+				document.form.submit();
+			}
+			}
+				}
+				else if(CIcmd == "CLIINIT") {
+			if(TriggerStatus.indexOf("done") >= 0) {
+			document.getElementById( "processwait" ).style['display']="";
+			document.getElementById( "processmsg" ).style['display']="";
+			TextBoxMsg=TextBoxMsg+"\n  Client Initiated Session Start.";
+			setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			else if(TriggerStatus.indexOf("error") >= 0) {
+			document.getElementById( "processwait" ).style['display']="none";
+			document.getElementById( "processmsg" ).style['display']="none";
+			TextBoxMsg="";
+			alert("Already Client Initiated Session Open");
+			document.form.confirm_return.value = "previouspage";
+			document.form.submit();
+			}
+				}
+			}
+			else {
+				setTimeout( 'CIcmd="QUERY"; ajaxFunction();', 2000);
+			}
+			document.getElementById( "processText_ID" ).value = TextBoxMsg;
+			xmlHttp.close;
+			xmlHttp=0;
+		}
+	}
+}
+
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(form['confirm_return'] == 'statuspage') {
+	redirect('/status.html');
+	}
+	else if(form['confirm_return'] == 'previouspage'){
+	redirect(form['redirectName']);
+	}
+}
+else {
+	form['redirectName'] = request['QUERY_STRING'];
+}
+%>
+
+</head>
+
+<body onLoad="reload_timer()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form name="form" method="POST">
+<input type="hidden" name="redirectName" value="@@form['redirectName']"/>
+<input type="hidden" name="confirm_return" value="@@form['confirm_return']"/>
+<h3>&nbsp;&nbsp;</h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+
+<table width="90%">
+	<tr><th>Client&nbsp;Initiated&nbsp;Activation</th></tr>
+</table>
+
+<table width="90%">
+<tr> 
+	<td width="15%"><img src="images/waiting.gif" align="right" width="20" height="20" id="processwait" style="display:none" /></td>
+	<td id="progress_ID">&nbsp;&nbsp;</td>
+</tr>
+</table>
+
+<div id="processmsg" style="display:none"> 
+<textarea id="processText_ID" cols="80" rows="20" style="background:#F0EFEB; border:2px;" tabindex="1" name="processText_name" readonly="readonly"></textarea>
+</div>
+
+<div id="sysInfodiv1" style="padding-left:2px; padding-right:2px">
+
+</div>
+</form>
+</div>
+<div id="footer"><div id="copyRight" style="text-align:right"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,238 @@
+<%
+rdbEnable='hgw.xems.enable';
+rdbAdapterId='hgw.xems.adapterid';
+rdbServerUrl='hgw.xems.server.url';
+rdbCustomerId='hgw.xems.customerid';
+
+function getRdb(rdb) {
+	var val=get_single(rdb);
+	if(val=="N/A") {
+		return "";
+	}
+	return val;
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(key, val) {
+		set_single_direct("-p",key, val);
+	}
+
+	function setRdbForm(rdbName,formName) {
+		var val=form[formName];
+		if (val!=undefined) {
+			setRdb(rdbName,val);
+		}
+	}
+
+	setRdbForm(rdbAdapterId,'adapterID');
+	setRdbForm(rdbServerUrl,'XEMS_URL');
+	setRdbForm(rdbCustomerId,'customerID');
+	setRdbForm(rdbEnable,'XEMS_enable');
+
+	exit(200);
+}
+
+xemsEnable = getRdb( rdbEnable );
+serverUrl = getRdb(rdbServerUrl);
+adapterId=getRdb(rdbAdapterId);
+customerId = getRdb(rdbCustomerId);
+%>
+
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>XEMS</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	function refresh() { window.location.href="@@request['SCRIPT_NAME']?success"; }
+
+	var f=document.form;
+	$.post("@@request['SCRIPT_NAME']?"
+		+"csrfTokenPost="+f.csrfTokenPost.value
+		+"&XEMS_enable="+f.XEMS_enable.value
+		+"&XEMS_URL="+f.XEMS_URL.value
+		+"&adapterID="+f.adapterID.value
+		+"&customerID="+f.customerID.value,
+		refresh
+	);
+}
+
+$(document).ready( function() {
+	var f=document.form;
+
+	var enable="@@xemsEnable";
+	f.XEMS_enable.value=enable;
+	if(enable=='1') {
+		$("#XEMSEnable-0").attr("checked", "checked");
+		$("#box_341_XEMS_configuration").css("display","");
+	}
+	else {
+		$("#XEMSEnable-1").attr("checked", "checked");
+		$("#box_341_XEMS_configuration").css("display","none");
+	}
+});
+
+// jquery body
+$(function() {
+	var pinging = false;
+	var pingServer="";
+
+	// set element activation
+	$("#XEMS_URL").keyup(function(e) {
+		var server=$("#XEMS_URL").val();
+
+		// bypass if no server is available
+		if(server.length==0) {
+			$("#ping_wait").hide();
+			$("#ping_stat").hide();
+			return;
+		}
+
+		// bypass if we have no change in the server
+		if(pingServer==server)
+			return;
+
+		// when the server changed from blank to something while pinging
+		$("#ping_wait").toggle(pinging);
+
+		// bypass if currently pinging or already pinged
+		if(pinging)
+			return;
+
+		// update ping info
+		pinging=true;
+		pingServer=server;
+
+		// show pinging icon
+		$("#ping_wait").toggle(true);
+		$("#ping_stat").toggle(false);
+
+		$.getJSON (
+			"./cgi-bin/ltph.cgi",
+			{reqtype:"ping",reqparam:server},
+			function(res){
+				$("#ping_stat").html( (res.cgiresult==0)?_("succ"):_("fail"));
+
+				pinging=false;
+				// hide pinging icon
+				$("#ping_wait").toggle(false);
+				$("#ping_stat").toggle(true);
+			}
+		);
+		return;
+	});
+
+	// trigger events
+	//$("#XEMS_URL").trigger("keyup");
+});
+
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form class="validate" name="form" id ="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+		<%appendCsrfToken();%>
+		<div class="right-column hide_for_pppoe_en white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("XEMS configuration"))</script></h2>
+				<input type="hidden" name="XEMS_enable"/>
+				<div class="form-row no-bg-form">
+					<label for="XEMSEnable"><script language=Javascript>document.write(_("enableXEMSService"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_341_XEMS_configuration">
+								<input type="radio" id="XEMSEnable-0" name="XEMSEnable" class="access" value=1 onClick="javascript:document.form.XEMS_enable.value='1';">
+								<label for="XEMSEnable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="XEMSEnable-1" name="XEMSEnable" class="access" value=0 onClick="javascript:document.form.XEMS_enable.value='0';">
+								<label for="XEMSEnable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="grey-box" id="box_341_XEMS_configuration" style="display: none">
+					<div class="form-row">
+						<label for="XEMSURL"><script language=Javascript>document.write(_("XEMS_URL"))</script></label>
+						<div class="field">
+							<input type="text" readonly class="large" name="XEMS_URL" id="XEMS_URL" value="@@serverUrl" onKeyUp="urlFilter(this);">
+						</div>
+#if 0
+						<div style="inline">
+							<i style="display:none" id="ping_wait" class="progress-sml"></i>
+							<label id="ping_stat" style="width:40px">here</label>
+						</div>
+#endif
+					</div>
+					<div class="form-row">
+						<label for="adapterID"><script language=Javascript>document.write(_("XEMSadapterID"))</script></label>
+						<div class="field">
+							<input type="text" readonly name="adapterID" id="adapterID" class="large adapterID" value="@@adapterId">
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="customerID"><script language=Javascript>document.write(_("XEMScustomerID"))</script></label>
+						<div class="field">
+							<input type="text" readonly name="customerID" id="customerID" class="large customerID" value="@@customerId">
+						</div>
+					</div>
+
+				</div>
+				<div class="submit-row">
+					<button type="button" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "XEMS", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('XEMSSubmitSuccess'));
+<%	}%>
+function validate_id(field) {
+	var str=field.val();
+	if( str.length != 32 || !isAllNum(str) ) {
+		return _("XEMSIDerror");
+	}
+}
+
+</script>
+</body>
+</html>

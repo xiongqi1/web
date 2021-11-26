@@ -1,0 +1,36 @@
+{
+ "vhosts": [ {
+     "name": "localhost",
+     "port": "7681",
+#     "interface": "lo",
+#     "host-ssl-key":  "/etc/pki/tls/private/libwebsockets.org.key",
+#     "host-ssl-cert": "/etc/pki/tls/certs/libwebsockets.org.crt",
+#     "host-ssl-ca":   "/etc/pki/tls/certs/libwebsockets.org.cer",
+     "access-log": "test-access-log",
+#     "sts": "on",
+     "mounts": [{
+       "mountpoint": "/",
+       "origin": "file://share/lwsws/netc_netstat",
+       "default": "test.html",
+       "cache-max-age": "60",
+       "cache-reuse": "1",
+       "cache-revalidate": "1",
+       "cache-intermediaries": "0"
+	}, {
+	"mountpoint": "/generator",
+	"origin": "cgi://share/lwsws/netc_netstat/ss.cgi",
+	"default": "ss.cgi"
+       }],
+     # which protocols are enabled for this vhost, and optional
+     # vhost-specific config options for the protocol
+     #
+     "ws-protocols": [{
+       "netc_netstat": {
+         "status": "ok",
+	 "update-ms": "5000"
+       }
+     }]
+    }
+  ]
+}
+

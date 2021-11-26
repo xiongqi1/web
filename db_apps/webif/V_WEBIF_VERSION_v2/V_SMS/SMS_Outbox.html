@@ -1,0 +1,316 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SMS Outbox</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<style>:lang(en) #dyn-bt1 {width:105px} :lang(jp) #dyn-bt1 {width:auto}</style>
+<script language="JavaScript">
+
+var sms_onoff="<%get_single_direct('smstools.enable');%>";
+var sim_status="<%get_single_direct('wwan.0.sim.status.status');%>";
+
+var MsgCnt, MsgsPp=20, TotalPages, RespMsgCnt;
+var MobNum = new Array();
+var SMSCNum = new Array();
+var TxTime = new Array();
+var RxTime = new Array();
+var MsgBody = new Array();
+var FileName = new Array();
+var DiagUserNo = new Array();
+var DiagPassword = new Array();
+var add_wl_num="";
+var page_select = new Array();
+
+function ReadOutBoxMsgHandler(v) {
+	var i;
+	var msgbody;
+	$.unblockUI();
+	eval(v);
+	$("#sent_title").html(_("tx msg")+" ("+MsgCnt+")");
+
+	//if (sim_status == "SIM OK") { }
+	var h="";
+	if(parseInt(MsgCnt)==0) {
+		h="<table><tr><th style='text-align:center'>"+_("outbox is empty")+"</th></tr></table>";
+		$("#sent-messages").html(h);
+		$("#delete-div").css("display", "none");
+	}
+	else {
+		if(parseInt(MsgCnt)>parseInt(MsgsPp)) {
+			current_page=parseInt($("#page_no").val());
+			$("#page-number").html( current_page+" "+_("of")+" "+TotalPages);
+			$("#nav_div").css("display", "");
+			if ( current_page==1 ) {
+				$("#previous_button").css("font-weight", "normal");
+				$("#previous_button-div").css("cursor", "default");
+				$("#previous_button-div").addClass("disabled");
+			}
+			else {
+				$("#previous_button").css("font-weight", "bold");
+				$("#previous_button-div").css("cursor", "pointer");
+				$("#previous_button-div").removeClass("disabled");
+			}
+			if ( current_page>=TotalPages ) {
+				$("#next_button").css("font-weight", "normal");
+				$("#next_button-div").css("cursor", "default");
+				$("#next_button-div").addClass("disabled");
+			}
+			else {
+				$("#next_button").css("font-weight", "bold");
+				$("#next_button-div").css("cursor", "pointer");
+				$("#next_button-div").removeClass("disabled");
+			}
+			$("#refresh-div").css("display", "none");
+		}
+		else {
+			$("#nav_div").css("display", "none");
+		}
+		for (i=0; i<RespMsgCnt; i++) {
+			unread=' class="unread"';
+			msgbody=Base64.decode(MsgBody[i]).substring(5);
+			var msgbodyAr=msgbody.split("\\n");
+			for (j=0, msgbody="";j<msgbodyAr.length;j++) {
+				msgbody+=htmlNumberEncode(msgbodyAr[j])+"<br>";
+			}
+			msgbody=msgbody.replace(/&#32;/g, "&nbsp;");
+			h+='<tr>\
+				<td style="border-bottom:0;"'+ unread+'><strong>'+ MobNum[i]+'</strong></td>\
+				<td class="purple" style="border-bottom:0;">'+TxTime[i]+'</td>\
+				<td style="border-bottom:0;"><p style="display:inline-block;word-wrap:break-all;width:270px;">'+msgbody+'</p></td>\
+				<td style="border-bottom:0;">\
+					<div class="table-button-group">\
+						<a href="javascript:ReplyForwardMsg( 0,'+i+')" class="sml" title="'+_("forward")+'"><i class="icon forward"></i></a>\
+						<a href="javascript:CheckAddList('+i+')" class="sml" title="'+_("addWhiteList")+'"><i class="icon white-list"></i></a>\
+					</div>\
+				</td>\
+				<td class="last" style="border-bottom:0;">\
+					<a href="javascript:selectSmsboxMsg('+i+')" class="sml" title="'+_("delete")+'"><div id="delete-select'+i+'"><i class="icon close"></i></div></a>\
+				</td>\
+			</tr>';
+			page_select[i]=false;
+		}
+		$("#msg_list").html(h);
+	}
+}
+
+function ReadOutBoxMsg() {
+	var i;
+	blockUI_wait(_("GUI pleaseWait"));
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=READ_SMSBOX&INOUT=OUTBOX&";
+	cmd_line+="PAGE_NO="+document.SMS.page_no.value;
+	$.get(cmd_line, ReadOutBoxMsgHandler);
+}
+
+var all_selected=false;
+
+function select_all() {
+	all_selected=!all_selected;
+	if( all_selected ) {
+		$("#select_all_text").html(_("deSelectAll"));
+		for (i=0; i<RespMsgCnt; i++) {
+			$("#delete-select"+i).html("<i class='icon delete'></i>");
+			page_select[i]=true;
+		}
+	}
+	else {
+		$("#select_all_text").html(_("selectAll"));
+		for (i=0; i<RespMsgCnt; i++) {
+			$("#delete-select"+i).html("<i class='icon close'></i>");
+			page_select[i]=false;
+		}
+	}
+}
+
+function selectSmsboxMsg(idx) {
+	page_select[idx]=!page_select[idx];
+	if(page_select[idx]) {
+		$("#delete-select"+idx).html("<i class='icon delete'></i>");
+	}
+	else {
+		$("#delete-select"+idx).html("<i class='icon close'></i>");
+	}
+}
+
+function DeleteSmsboxMsg(idx) {
+var dst_cnt = 0;
+
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=DELETE_MSG&INOUT=OUTBOX&"
+	// send file list via content type bacause it could be over 256 bytes which
+	// is default limit of url length defined in mpr.h
+	contents_body="PAGE_NO=\""+document.SMS.page_no.value+"\"&fnlist=\"";
+	for(i=0; i<RespMsgCnt; i++) {
+		if (page_select[i]) {
+			contents_body+=FileName[i]+" ";
+			dst_cnt++;
+		}
+	}
+	if (dst_cnt == 0) {
+		alert(_("sms warning11"));	// Please select messages to delete!
+		return;
+	}
+	else if (dst_cnt == RespMsgCnt && document.SMS.page_no.value > 1) {
+		// if delete all messages in this page, decrease page number to display
+		document.SMS.page_no.value--;
+	}
+	contents_body+="\"&";
+	blockUI_wait(_("GUI pleaseWait"));
+	$.post(cmd_line, contents_body, ReadOutBoxMsg);
+	all_selected=true;
+	select_all();
+}
+
+function ReplyForwardMsg(reply, idx) {
+	var url ="/SMS_New_Message.html?sms_num_list=";
+	if(reply)
+		url += MobNum[idx];
+	url += "&sms_draft="+escape(MsgBody[idx]);
+	window.location.href = url;
+}
+
+function IsSameNumber(num1, num2) {
+	var num1_len = num1.length;
+	var num2_len = num2.length;
+	var comp_num1 = num1;
+	var comp_num2 = num2;
+	if (num1_len > 9) {
+		comp_num1 = num1.substr(num1_len-9);
+	}
+	if (num2_len > 9) {
+		comp_num2 = num2.substr(num2_len-9);
+	}
+	return (comp_num1 == comp_num2);
+}
+
+function AddWhiteListHandler(v) {
+	eval(v);
+	clear_alert();
+	blockUI_confirm_l(_("sms warning21")+"\n\n"+created+"\n\n"+_("sms warning22"), function() {
+		window.location.replace("SMS_Diagnostics.html");
+	});
+}
+
+function CheckAddListHandler(v) {
+var i, j, val;
+var dst_cnt = 0, empty_wl_idx;
+	eval(v);
+
+	for(i=0; i<DiagUserNo.length; i++) {
+		if (IsSameNumber(add_wl_num, DiagUserNo[i])) {
+			validate_alert("", add_wl_num+" "+_("sms warning23"));
+			return;
+		}
+	}
+	cmd_line = "/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=DIAG_ADD_WL&";
+	for(i=0; i<=MaxWlTxDstIdx; i++) {
+		if(DiagUserNo[i]=="") {
+			contents_body="numlist="+add_wl_num+" ";
+			$.post(cmd_line, contents_body, AddWhiteListHandler);
+			return;
+		}
+	}
+	validate_alert("", _("sms warning35"));
+}
+
+function CheckAddList(idx) {
+	add_wl_num=MobNum[idx];
+	cmd_line = "/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=DIAG_CONF_GET";
+	$.get(cmd_line, CheckAddListHandler);
+}
+
+function nav_page(v) {
+	current_page=parseInt($("#page_no").val());
+	current_page+=v;
+	if( current_page>0 && current_page<=TotalPages ) {
+		$("#page_no").val( current_page );
+		ReadOutBoxMsg();
+	}
+	all_selected=true;
+	select_all();
+}
+
+$(document).ready( function() {
+	if (sms_onoff != "1") {
+		h="<table class='border-top white-box' style='height:39px'><tr><th style='text-align:center'>"+_("smsDisabled")+"</th></tr></table>";
+		$("#form").html(h);
+	}
+	else {
+		ReadOutBoxMsg();
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="SMS" class="validate" id="form" novalidate="novalidate">
+		<div class="right-column white-box">
+			<div class="pad">
+				<input type="hidden" name="page_no" id="page_no" value="1"/>
+				<div class="row">
+					<div class="grid-66">
+						<div class="pad alpha">
+							<h2 id="sent_title"><script language=Javascript>document.write(_("tx msg"))</script></h2>
+						</div>
+					</div>
+					<div class="grid-33">
+						<div class="pad omega" id="refresh-div">
+							<div class="submit-row-condensed">
+								<a class="secondary sml fr" style="padding:0;" title="Refresh" href="javascript:window.location.reload()"><i class="icon refresh"></i></a>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="page-navi above" id="nav_div" style="display:none">
+					<div class="inner-page-navi">
+						<a href="javascript:nav_page(-1)">
+							<div class="secondary mini pre-btn" id="previous_button-div">
+								<i class="arrow-l" id="previous_button"><script language=Javascript>document.write(_("previous"))</script></i>
+							</div>
+						</a>
+						<div class="page-info">
+							<span class="total-page-number" id="page-number"></span>
+						</div>
+						<a href="javascript:nav_page(1)">
+							<div class="secondary mini next-btn" id="next_button-div">
+								<i class="arrow-r" id="next_button"><script language=Javascript>document.write(_("GUI next"))</script></i>
+							</div>
+						</a>
+					</div>
+				</div>
+				<div  class="page-navi above" style="left:0;float:right;" id="delete-div">
+					<button type="button" class="secondary" onClick="select_all()" id="dyn-bt1"><div id="select_all_text"><script language=Javascript>document.write(_("selectAll"))</script></div></button>
+					<button type="button" class="secondary" onClick="DeleteSmsboxMsg()" style="width:100px"><script language=Javascript>document.write(_("delete"))</script></button>
+				</div>
+				<br/>
+				<table id="sent-messages" class="border-top">
+					<colgroup>
+						<col width="60px">
+						<col width="210px">
+						<col width="280px">
+						<col width="180px">
+						<col width="10px">
+					</colgroup>
+					<tbody id="msg_list"></tbody>
+				</table>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "SMS_Outbox", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

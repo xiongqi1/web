@@ -1,0 +1,334 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>ROUTER SERVICE MENU</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript" type="text/javascript">
+
+$(function(){
+	var interactive_atterm_readonly=0;
+	
+	var ajax_atresp_poll=null;
+	var atresp_poll_timeid=-1;
+
+	var atterm_running=false;
+
+	$("#interactive_atterm_clear").click(function(){
+			$("#interactive_atterm").val("").focus();
+		}
+	);
+
+	$("input:radio[name=term_type]").click(function(){
+			
+			var term_type_desc;
+
+			switch($(this).val()) {
+				case "direct":
+					term_type_desc="Direct port pccess mode provides completely pure access to the AT port of the module and any module related feature of the router will be suspended while the AT terminal is active";
+					break;
+
+				case "atmgr":
+					term_type_desc="Indirect access via AT manage mode is pass-through mode via AT manager and the router will be operational together with AT terminal. Although, those AT commands that take longer than 10 seconds may not be working";
+					break;
+			}
+
+			$("#term_type_desc").html(term_type_desc);
+		}
+	);
+
+	var cur_atterm_type=null;
+
+	function update_atterm_elements_status(atterm_type) {
+
+		if((cur_atterm_type==null) || (cur_atterm_type!=atterm_type)) {
+
+			var term_open;
+			var term_error;
+
+			var prev_disabled;
+	
+			term_open=(atterm_type=="atmgr") || (atterm_type=="direct");
+			term_error=(atterm_type!="none") && (atterm_type!="atmgr") && (atterm_type!="direct");
+
+			$("#term_type_elements input").attr("disabled",term_open || term_error);
+			$("input:radio[name=term_type][value=atmgr]").attr("checked",(atterm_type=="atmgr"));
+			$("input:radio[name=term_type][value=direct]").attr("checked",(atterm_type!="atmgr") && !term_error);
+			$("input:radio[name=term_type]:checked").trigger("click");
+
+			prev_disabled=$("#interactive_atterm_elements input,textarea").is(":disabled"); 
+
+			$("#interactive_atterm_elements input,textarea").attr("disabled",!term_open);
+
+			if(prev_disabled && !$("#interactive_atterm_elements input,textarea").is(":disabled"))
+				$("#interactive_atterm").focus();
+
+
+			$("#start_term").attr("disabled",term_open || term_error);
+			$("#stop_term").attr("disabled",!term_open || term_error);
+
+			cur_atterm_type=atterm_type;
+		}
+	}
+
+	update_atterm_elements_status();
+
+	// ajax setup - 10 second timeout and no cache
+	$.ajaxSetup({
+		timeout:10000,
+		cache:false,
+		error:function(req,stat,err) {
+			switch(stat) {
+				case "timeout":
+					alert("Disconnected from the router. Please check the connection and refresh the configuration page");
+					break;
+			}
+		}
+	})
+
+	$("#reboot_term").click(function() {
+			$(this).attr("disabled",true);
+
+			$.getJSON(
+				"./cgi-bin/routerservice.cgi",
+				{reqtype:"atterm_reboot"},
+				function() {
+					$("#reboot_term").attr("disabled",false);
+				}
+			);
+		}
+	);
+
+	$("input[name=attermctrl]").each(function() {
+			$(this).click(function(){
+
+					var reqtype;
+
+					switch(this.id) {
+						case "start_term":
+							reqtype="atterm_start";
+							break;
+
+						case "stop_term":
+							reqtype="atterm_stop";
+							break;
+					}
+
+					$("input[name=attermctrl]").attr("disabled",true);
+
+					enable_interactive_atterm(false);
+
+					$.getJSON(
+						"./cgi-bin/routerservice.cgi",
+						{reqtype:reqtype,termtype:$("input:radio[name=term_type]:checked").val()}
+					);
+
+					cur_atterm_type=null;
+				}
+			);
+		}
+	);
+
+	function enable_interactive_atterm(enable) {
+		if(enable) {
+			// apply normal curosr
+			if(interactive_atterm_readonly) {
+				interactive_atterm_readonly--;
+			}
+			else {
+				$("#interactive_atterm").css("cursor", "auto");
+			}
+		}
+		else {
+			// apply wait cursor
+			$("#interactive_atterm").css("cursor", "wait");
+
+			interactive_atterm_readonly=1;
+			if(ajax_atresp_poll)
+				interactive_atterm_readonly++;
+		}
+	}
+
+	// recieve AT result function
+	function recv_atresp_func() {
+		ajax_atresp_poll=$.getJSON(
+			"./cgi-bin/routerservice.cgi",
+			{reqtype:"atterm_recv",termtype:$("input:radio[name=term_type]:checked").val()},
+			function(res,stat,req) {
+				var interactive_atterm;
+
+				if(res.cgiresult<0) {
+					alert("error");
+				}
+				else {
+					// append atresp to the screen
+					interactive_atterm=$("#interactive_atterm");
+					interactive_atterm.val(interactive_atterm.val()+res.atresp);
+
+					$("#interactive_atterm").each(function() {
+						this.scrollTop = this.scrollHeight;
+					});
+
+					// update 
+					update_atterm_elements_status(res.termtype);
+				}
+
+				enable_interactive_atterm(true);
+
+				ajax_atresp_poll=null;
+				atresp_poll_timeid=setTimeout(recv_atresp_func,500);
+
+			}
+
+		);
+	}
+
+	// program the initial timeout
+	atresp_poll_timeid=setTimeout(recv_atresp_func,500);
+
+	// block special keys
+	$("#interactive_atterm").keydown(function(e) {
+
+		if(interactive_atterm_readonly)
+			return false;
+
+		// is a cursor move key?
+		if( (e.which>=33) && (e.which<=40))
+			return false;
+
+		return true;
+	});
+
+	// get user inputed AT command
+	var user_at_command="";
+	$("#interactive_atterm").keypress(function(e) {
+
+		if(interactive_atterm_readonly)
+			return false;
+
+		switch(e.which) {
+			
+			case 13:
+				user_at_command=$.trim(user_at_command);
+
+				if(user_at_command.length>0) {
+					enable_interactive_atterm(false);
+
+					$.getJSON(
+						"./cgi-bin/routerservice.cgi",
+						{reqtype:"atterm_send",atcmd:encodeURI(user_at_command),termtype:$("input:radio[name=term_type]:checked").val()},
+						function(res) {
+							if(res.cgiresult<0) {
+								alert("cgi error");
+							}
+						}
+					);
+
+					user_at_command="";
+				}
+
+				break;
+
+			case 8:
+				user_at_command=user_at_command.slice(0,-1);
+				break;
+
+			default:
+				user_at_command+=String.fromCharCode(e.which);
+				break;
+		}
+
+	});
+
+	// button - clear
+	$("#clear_interactive_atterm").click(function(){
+		$("#interactive_atterm").val("");
+		$("#interactive_atterm").focus();
+	});
+
+
+	$("#download_sys_info").click(function(e){
+			document.location.href="./cgi-bin/routerservice.cgi?"+$.param({reqtype:"download_sys_info"});
+		}
+	);
+})
+
+</script>
+
+<body>
+
+<p>
+</p>
+
+<table width="100%" id="troubleshoot_table">
+	<tr>
+		<th>SYSTEM INFORMATION (TROUBLESHOOTING LOG)</th>
+	</tr>
+
+	<tr>
+		<td>
+			<p>
+			</p>
+			<p>
+				To unzip the system information file, you will need the admin password of the router as following
+			</p>
+			<p>
+				cat "sys-info.gzip.des3" | openssl des3 -d -k "admin" | gunzip > sys-info.txt
+			</p>
+			<p>
+				<input  type="button" id="download_sys_info" value="Download System Information">
+			</p>
+		</td>
+	</tr>
+
+</table>
+
+
+
+<table width="100%" id="atterm_table">
+	<tr>
+		<th>AT COMMAND TERMINAL</th>
+	</tr>
+
+	<tr>
+		<td>
+			<div id=term_type_elements>
+			<p>
+			</p>
+			<p>
+				<input type=radio name="term_type" value="direct"> Direct Port Access
+				&nbsp&nbsp&nbsp&nbsp
+				<input type=radio name="term_type" value="atmgr"> Indirect Access via AT Manager
+			</p>
+			<p id="term_type_desc">
+			</p>
+			</div>
+			<p>
+					<input name="attermctrl" type=button id="start_term" value="Start Terminal">
+					&nbsp&nbsp&nbsp&nbsp
+					<input name="attermctrl" type=button id="stop_term" value="Stop Terminal">
+					&nbsp&nbsp&nbsp&nbsp
+				<input type=button id="reboot_term" value="Reboot Phone Module">
+			</p>
+
+			<div id=interactive_atterm_elements>
+			<p>
+				<textarea id="interactive_atterm" rows=25 cols=120></textarea>
+			</p>
+
+			<div>
+
+			<p>
+				<input  type="button" id="interactive_atterm_clear" value="Clear">
+			</p>
+		</td>
+	</tr>
+
+</table>
+
+</body>

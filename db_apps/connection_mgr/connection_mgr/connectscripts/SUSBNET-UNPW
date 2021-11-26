@@ -1,0 +1,57 @@
+#!/bin/sh
+
+#
+# * Vodafone requirement of user name and pasword
+#
+# This script uses user name and password based on "manualroam.custom_roam_simcard"
+#
+
+log2() {
+	logger -t "SUSBNET-UNPW" "$@"
+}
+
+SIM_AUTOAPN=""
+
+# load v variables
+if [ -e "/etc/variant.sh" ]; then
+	. /etc/variant.sh
+fi
+
+case "$V_WWAN_DEF_AUTH_TYPE" in
+
+	"guest")
+		# bypass if the SIM card is not a Vodafone global
+		roaming_sim_detected=$(rdb_get "manualroam.custom_roam_simcard")
+		if [ "$roaming_sim_detected" != "1" ]; then
+			return
+		fi
+		
+		log2 "custom SIM card detected"
+		
+		# fake user name
+		if [ "$USER" = "" ]; then
+			log2 "blank user name detected - using guest"
+			USER="guest"
+		elif [ "$USER" = "(blank)" ]; then
+			log2 "(blank) user name detected - using blank ''"
+			USER=""
+		fi
+		
+		# fake password
+		if [ "$PASS" = "" ]; then
+			log2 "blank password detected - using guest"
+			PASS="guest"
+		elif [ "$PASS" = "(blank)" ]; then
+			log2 "(blank) password detected - using blank ''"
+			PASS=""
+		fi
+		
+		# make sure that we have no auto apn 
+		SIM_AUTOAPN="0"
+		;;
+		
+	*)
+		;;
+esac		
+
+log2 "done."

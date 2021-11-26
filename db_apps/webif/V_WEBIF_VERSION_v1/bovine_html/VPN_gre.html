@@ -1,0 +1,536 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>VPN-GRE</title>
+<% include vpnCommon.inc %>
+<%
+// The following code assembles required link information from the RDB and puts it into an array called "st".
+// See vpnCommon.inc for more details
+var createStDevices=new Array ("pptp.0","gre.0");
+var createStArgs=new Array("name", new Array("enable","","0"), "user", "pass", "serveraddress", new Array("defaultgw","","0"),
+"local_ipaddr", "remote_ipaddr", "remote_nwaddr", "remote_nwmask", new Array("defaultroutemetric","metric","30"),
+new Array("authtype", "", "any"), new Array("snat", "", "0"), new Array("default.defaultroutemetric","sdefgw","0"),
+new Array("reconnect_delay", "", "30" ), new Array("reconnect_retries","0" ), new Array("default.dnstopptp","dnstopptp","0"),
+"verbose_logging", new Array("pppdebug","","0"), new Array("mppe_en","", "1"), "opt", new Array("ttl","","255" ) );
+stElements=createVpnElements( createStDevices, createStArgs);
+%>
+<script>
+var st=[@@stElements];
+</script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+
+<style>
+.bar_bg {
+	left:47px;
+	width:200px;
+	height:10px; 
+	font-size: 12px;	
+	background-color:lightgrey; 
+	border-top:1px solid white;
+	border-bottom:1px solid white;
+	border-left:1px solid white;
+	border-right:1px solid white;
+}
+
+.bar_fg {
+	height:10px; 
+	width:50%;
+	font-size: 12px;	
+	background-color:blue; 
+	align:center
+}
+</style>
+</head>
+<%
+
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['rdbCmd'];
+	if( tempval != "" )
+		set_list( tempval, '-p' );
+
+}
+else { /*GET*/
+	//form['editindex'] = -1;
+}
+if(request['QUERY_STRING']!="") {
+	form['curindex'] = request['QUERY_STRING'];
+}
+else {
+	form['curindex'] = -1;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("VPN_gre");
+function exitHandler() {
+	if(document.form.curindex.value >= 0)
+		window.location="/VPN_grec.html"
+	else
+		showedit( 'edit', false, st.length );
+}
+
+function checkGreForm() {
+	var f=document.form;
+	
+	if (f.vpnserver.value == "" ) {
+		alert(_("Msg90"));//Error: No server IP address entered or not entered correctly
+		return false;
+	}
+	if ( (f.reconnectDelay.value < 30 ) || (f.reconnectDelay.value > 65535) ) {
+		alert(_("Msg91"));//Error: Reconnect Delay must have a value between 30 and 65535
+		f.reconnectDelay.select();
+		return false;
+	}
+	if ( (f.reconnectRetries.value < 0 ) || (f.reconnectRetries.value > 65535) ) {
+		alert(_("Msg92"));//Error: Reconnect Retries must have a value between 0 and 65535
+		f.reconnectRetries.select();
+		return false;
+	}
+	if ( (f.ttl.value < 0 ) || (f.ttl.value > 255) ) {
+		alert(_("Msg93"));//Error: TTL must have a value between 0 and 255
+		f.ttl.select();
+		return false;
+	}
+	return true;
+}
+
+function submitGreForm() {
+	var f=document.form;
+	var header = "&link.profile."+i+".";
+
+	f.rdbCmd.value = "link.profile."+i+".dev=gre.0"+header+"name="+f.newname.value+header+"enable="+f.vpnenable.value+header+"serveraddress="+f.vpnserver.value+header+"reconnect_delay="+f.reconnectDelay.value+header+"reconnect_retries="+f.reconnectRetries.value+header+"ttl="+f.ttl.value+header+"verbose_logging="+f.pppdebug.value+header+"local_ipaddr="+f.greLocalAddr.value+header+"remote_ipaddr="+f.greRemoteAddr.value+header+"remote_nwaddr="+f.grePeerNwAddr.value
+		+header+"remote_nwmask="+f.grePeerNwMask.value+"&service.vpn.gre.profile="+i+header+"delflag=0";
+	f.submit();
+}
+
+function submitForm() {       
+	var f=document.form;
+	try {
+		document.form.rdbCmd.value = "";
+		if (f.vpnEnable[0].checked == true) {
+			if(!checkGreForm())
+				return;
+		}
+		value = parseInt(f.editindex.value);  
+		if( st.length==0 || isNaN(value)==true || value < 0 || value >= st.length ) {
+			i = newprofilenum; //add new	
+		}
+		else if( isNaN(st[value].profilenum)==true ) {
+			alert(_("Msg94"));	//Error: Profile number incorrectly
+			return;
+		}
+		else {
+			i=st[value].profilenum;
+		}
+		ungreyOutGREfields(0);
+		submitGreForm();
+		
+	}
+	catch(e) {
+		alert(e.message);
+	}
+} 
+
+function delentry( index ) {
+	try {
+		i=st[index].profilenum;
+		document.form.rdbCmd.value = "link.profile."+i+".name=&link.profile."+i+".enable=0&link.profile."+i+".delflag=1";
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function greyOutGREfields() {
+	try { 
+		document.form.vpnserver.disabled = true;
+		document.form.newname.disabled = true;	
+		document.form.reconnectDelay.disabled = true;
+		document.form.reconnectRetries.disabled = true;
+		document.form.ttl.disabled = true;
+		document.form.pppDebug[1].disabled = true;
+		document.form.grePeerNwAddr.disabled=true;
+		document.form.grePeerNwMask.disabled=true;
+		document.form.greRemoteAddr.disabled=true;
+		document.form.greLocalAddr.disabled=true;
+	
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function ungreyOutGREfields(ini) {
+	try { 
+		document.form.vpnserver.disabled = false;
+		document.form.newname.disabled = false;
+		document.form.reconnectDelay.disabled = false;
+		document.form.reconnectRetries.disabled = false;
+		document.form.ttl.disabled = false;
+		document.form.pppDebug[0].disabled = false;
+		document.form.pppDebug[1].disabled = false;
+		document.form.grePeerNwAddr.disabled=false;
+		document.form.grePeerNwMask.disabled=false;
+		document.form.greRemoteAddr.disabled=false;
+		document.form.greLocalAddr.disabled=false;
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function arrageGreForm(idx) {
+	var f=document.form;
+
+	pppDebug=st[idx].pppdebug;
+	if( parseInt(pppDebug)==1 )
+		f.pppDebug[0].checked=true;
+	else
+		f.pppDebug[1].checked=true;
+	if(f.vpnenable.value=='1') {
+		ungreyOutGREfields(0);
+		f.vpnEnable[0].checked=true;
+	}
+	else {
+		greyOutGREfields();
+		f.vpnEnable[1].checked=true;
+	}
+}
+
+function initGreForm(idx) {
+	var f=document.form;
+	f.vpnenable.value=st[idx].enable;
+	f.vpnserver.value=st[idx].serveraddress;
+	f.newname.value=st[idx].name;
+	f.greLocalAddr.value=st[idx].local_ipaddr;
+	f.greRemoteAddr.value=st[idx].remote_ipaddr;
+	f.grePeerNwAddr.value=st[idx].remote_nwaddr;
+	f.grePeerNwMask.value=st[idx].remote_nwmask;
+	f.reconnectDelay.value = st[idx].reconnect_delay;
+	f.reconnectRetries.value = st[idx].reconnect_retries;
+	f.ttl.value = st[idx].ttl;
+	arrageGreForm(idx);
+}
+
+function initEmptyForm(idx) {
+	var f=document.form;
+	// gre variables
+	f.vpnenable.value='1';
+	f.vpnEnable[0].checked=true;
+	f.vpnEnable[1].checked=false;
+	f.grePeerNwAddr.value="";
+	f.grePeerNwMask.value="";
+	f.greLocalAddr.value="";
+	f.greRemoteAddr.value="";
+	f.newname.value='';
+	f.vpnserver.value='';
+	f.vpnserver.value='';
+	f.reconnectDelay.value = "30";
+	f.reconnectRetries.value = "0";
+	f.ttl.value = '255';
+	f.pppDebug[1].checked=true;
+	f.pppdebug.value='0';
+}
+
+function showedit( myid, action, idx ) {
+	document.form.editindex.value=idx;
+	document.getElementById( myid+"Div" ).style['display']=action?"":"none";
+	document.getElementById( "listDiv" ).style['display']=action?"none":"";
+	document.getElementById( "saveDiv" ).style['display']=action?"":"none";
+
+	if( action ) {
+		initEmptyForm(idx);
+		if( idx < st.length ) {
+			initGreForm(idx);
+		}
+	}
+	else {
+		document.form.editindex.value=-1;
+	}
+	updateFormArrange();
+}
+
+function readElement(elementName) {
+	var element;
+
+	element=document.getElementById(elementName);
+	if( (typeof(element)=="undefined") || (element==null) ) {
+		alert("not found - " + elementName);
+		return "";
+	}
+	return document.getElementById(elementName).value;
+}
+
+function enableElement(elementName,ena) {
+	document.getElementById(elementName).disabled=!ena;
+}
+
+function checkElement(elementName,check) {
+	document.getElementById(elementName).checked=check;
+}
+
+function showElement(elementName,show) {
+	document.getElementById(elementName).style['display']=show?"":"none";
+}
+
+function updateFormArrange() {
+	vpnEnable=readElement("vpnenable");
+
+	// peripheral divisions
+	showElement("serverAddDiv",true);
+	showElement("miscDiv",true);
+	// gre
+	showElement("greDiv",true);	
+}
+
+function cretaeAjax() {
+	var ajaxHttp;    
+	try {
+		ajaxHttp = new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer  
+		try {
+			ajaxHttp = new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				ajaxHttp = new XMLHttpRequest();
+			}
+			catch (e) {
+				return false;
+			}
+		}
+	}      
+	return ajaxHttp;
+}
+
+function isIncorrect(xStr) {  
+	var regEx = /^[a-zA-Z0-9@_\-\. ]+$/;
+	return !xStr.match(regEx);  
+}  
+
+function getCheckedValue(radioObj) {
+	if(!radioObj)
+		return "";
+	var radioLength = radioObj.length;
+	if(radioLength == undefined)
+		if(radioObj.checked)
+			return radioObj.value;
+		else
+			return "";
+	for(var i = 0; i < radioLength; i++) {
+		if(radioObj[i].checked) {
+			return radioObj[i].value;
+		}
+	}
+	return "";
+}
+
+function FinalToDisplay() {   
+	var editIndex = document.form.editindex.value;
+	var curIndex = document.form.curindex.value;
+
+	if( curIndex >= 0) {
+		showedit("edit",true, ipsecTunnelMap[curIndex]);
+	}
+	else if( editIndex == "") {
+		showedit("edit",false, 0);
+	}
+	else if( editIndex >=0 ) {
+		showedit("edit",true, editIndex);
+	}
+	else
+		showedit("edit",false, 0);
+	$("#addBtn").val(" "+_("add")+" ");
+	$("#submitBtn").val(_("CSsave"));
+	$("#exitBtn").val(_("exit"));
+	$("#grePeerNwAddrText").val(_("network address")+":");
+	$("#grePeerNwMaskText").val(_("network mask")+":");
+	
+}
+
+$(document).ready( function() {
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+</script>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("VPN")+" > "+_("GRE"));</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="editindex" value="@@form['editindex']">
+<input type="hidden" name="curindex" value="@@form['curindex']">
+<input type="hidden" name="sdefGwEnable" value="@@form['sdefGwEnable']">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("VPN")+" > "+_("GRE"));</script></h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<div id="listDiv">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("gre client list"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="8%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("mapping no"));</script></b></td>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("name"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("gre remote address"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("local tunnel address"));</script></b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("remote tunnel address"));</script></b></td>
+<td width="4%" nowrap bordercolor="#0033cc"><div align="center"><b><script language="JavaScript">document.write(_("enable"));</script></b></td>
+<td width="16%" nowrap bordercolor="#0033cc"><div align="center">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function GRElist() {
+	var tunnel_num = 0;
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='6' align='center'>"+_("vpn empty")+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		if((st[i].type=="gre.0")) {
+			tunnel_num ++;
+			document.write("<tr>"); 
+			document.write("<td><div align=\"center\">"+tunnel_num+"</div></td>");
+			document.write("<td><div align=\"center\">"+st[i].name+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].serveraddress+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].local_ipaddr+"</div></td>");
+			document.write("<td ><div align=\"center\">"+st[i].remote_ipaddr+"</div></td>");
+			document.write("<td><div align=\"center\"><input type=checkbox "+(st[i].enable=='1'?'checked=true':'')+" name='Enable' disabled=true></div></td>");
+			document.write("<td><a href=javascript:showedit('edit',"+true+","+i+") >"+_("edit")+"</a>&nbsp;&nbsp;");
+			document.write("&nbsp;&nbsp;<a href=javascript:delentry("+i+");>"+_("delete")+"</a></td>");
+			document.write("</tr>");
+		}
+	}
+}
+GRElist();
+</script>
+</table>
+
+<div align="center" style="margin-right:10% ">
+<p></p>
+<input type="button" value="&nbsp;Add&nbsp;" id="addBtn" onClick="javascript:showedit( 'edit', true, st.length )" style="width:120px;">
+</div>
+</div>
+
+<div id="editDiv" style="display:none">
+<p style="margin-left:20px;margin-right:20px">
+<script language="JavaScript">document.write(_("Msg128"));</script>
+</p>
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("gre client edit"));</script></th></tr>
+</table>
+<input type="hidden" name="vpnenable" id="vpnenable" value="@@form['vpnenable']"/>
+<input type="hidden" name="pppdebug" value="@@form['pppdebug']">
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+<table width="90%">
+	<tr>
+		<td width="38%">
+			<div id="enableDiv"><script language="JavaScript">document.write(_("enable vpn"));</script></div>
+		</td>
+		<td>
+			<input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='1';ungreyOutGREfields(0)">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='0';greyOutGREfields()">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("profile name"));</script></td>
+		<td><input type="text" name="newname" id="newname" size=32 maxlength=64 value="@@form['newname']"></td>
+	</tr>
+	<tr id="serverAddDiv">
+		<td><div id="serverAddText"><script language="JavaScript">document.write(_("gre server address"));</script></div></td>
+		<td><input type="text" name="vpnserver" id="vpnserver" size=32 maxlength=64 value="@@form['vpnserver']"></td>
+	</tr>
+	<tr>
+		<td><div id="vpnLocalAddrText"><script language="JavaScript">document.write(_("local tunnel address"));</script></div></td>
+		<td><input type="text" id="greLocalAddr" name="greLocalAddr" size=32 maxlength=64 value=""></td>
+	</tr>
+	<tr>
+		<td><div id="vpnRemoteAddrText"><script language="JavaScript">document.write(_("remote tunnel address"));</script></div></td>
+		<td>
+			<input type="text" id="greRemoteAddr" name="greRemoteAddr" size=32 maxlength=64 value="">
+		</td>
+	</tr>
+	<tr>
+		<td><div id="vpnRemoteNwText"><script language="JavaScript">document.write(_("remoteNetwork"));</script></div></td>
+		<td>
+			<p></p>
+			<p>
+			<input id='grePeerNwAddrText' type="text" size=16 value="Network address:" class="certi_menu_item" readonly>
+			<input id='grePeerNwAddr' type="text" name="grePeerNwAddr" size=14 maxlength=24 >
+			</p>
+			<p>
+			<input id='grePeerNwMaskText' type="text" size=16 value="Network Mask:" class="certi_menu_item" readonly>
+			<input id='grePeerNwMask' type="text" name="grePeerNwMask" size=14 maxlength=24 >
+			</p>
+			<p></p>
+		</td>
+	</tr>
+</table>
+<table id="greDiv" width="90%">
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("TTL"));</script></td>
+		<td><input type=text name='ttl' size=8 maxLength=5 value="@@form['ttl']" onkeyup=NumfieldEntry(this);> &nbsp;( 0-255 )</td>
+	</tr>
+</table>
+<table width="90%" id="miscDiv">
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("verbose logging"));</script></td>
+		<td>
+			<input type=radio name='pppDebug' value=1 onClick="javascript:document.form.pppdebug.value='1';">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;&nbsp;
+			<input type=radio name='pppDebug' value=0 onClick="javascript:document.form.pppdebug.value='0';">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("reconnectDelay"));</script></td>
+		<td><input type=text name='reconnectDelay' size=8 maxLength=5 value="@@form['reconnectDelay']" onkeyup=NumfieldEntry(this);> &nbsp;( 30-65535 ) secs</td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("reconnectRetries"));</script></td>
+		<td><input type=text name='reconnectRetries' size=8 maxLength=5 value="@@form['reconnectRetries']" onkeyup=NumfieldEntry(this);> &nbsp;( 0-65535, 0=Unlimited )</td>
+	</tr>
+</table>
+</div>
+</form>
+
+<div class="line" style="margin: 20px 10% 16px 0;"></div>	
+	<div align="center" id=saveDiv style="margin-right:10% ">
+		<p></p>
+		<input type="button" value="Save" id="submitBtn" onClick="javascript:submitForm()" style="width:120px;">&nbsp;&nbsp;
+		<input type="button" value="&nbsp;Exit&nbsp;" id="exitBtn" onClick="javascript:exitHandler()" style="width:120px;">
+	</div>
+</div>  <!-- <div class="hide_for_pppoe_en"> -->
+</div>  <!-- <div id="contentWrapper"> -->
+
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+FinalToDisplay();
+</script>
+</body>
+</html>

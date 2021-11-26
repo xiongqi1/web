@@ -1,0 +1,361 @@
+#!/usr/bin/awk -f
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+BEGIN {
+	#system( "logger \"sms_dialondemand-----ARGV[1]="ARGV[1] "-----ARGV[2]=" ARGV[2]"\"");
+
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "This AWK script is for internal system use only."
+		print "It is used to support Dial-on-Demand functionality."
+        print "Please do not run this script manually."
+		exit (0);
+	}
+
+	if( ARGC < 2 ) {
+		print "Parameter ERROR:" ARGC;
+		exit (0);
+	}
+
+	CMD=ARGV[1];
+	gsub(/[0-9]/, "", CMD);
+	PFNO=ARGV[1];
+	gsub(/[a-zA-Z_]/, "", PFNO);
+	if(PFNO=="") {
+		PFNO=1;
+		for(i=1; i<=6; i++) {
+			def_route=exec("rdb_get link.profile."i".defaultroute" );
+			if(def_route=="1") {
+				PFNO=i;
+				break;
+			}
+		}
+	}
+
+	def_en=exec("rdb_get link.profile."PFNO".enable" );
+	list1="1,2,3,5,10,15,20,25,30,35,45,60";
+	list4="0,1,2,3,5,10,15,20,25,30,35,45,60";
+
+	if(CMD=="get_dod_enable") {
+		system("echo `rdb_get dialondemand.enable`");
+	}
+	else if(CMD=="set_dod_enable") {
+		if(ARGV[2]=="0" || ARGV[2]=="1") {
+			system("rdb_set dialondemand.enable "ARGV[2]);
+			system("sleep 1 && echo `rdb_get dialondemand.enable`");
+		}
+		else {
+			print "Parameter ERROR! usage: set cod=0-1";
+		}
+	}
+	else {
+		dod_en=exec("rdb_get dialondemand.enable" );
+		if(dod_en!="1") {
+			print "Parameter ERROR! The 'dial on demand' feature is currently disabled, please enable it first.";
+			exit (0);
+		}
+		else if(CMD=="set_dod_control") {
+			#if(ARGV[2]=="up") {
+			#	system("rdb_set dialondemand.profile "PFNO);
+			#}
+			system( "rdb_set dialondemand.enable 1 && diald-ctrl.sh "ARGV[2]" && echo ")
+		}
+		else if(CMD=="get_dod_status") {
+			status=exec("rdb_get dialondemand.status");
+			if(status=="1") {
+				system("echo 'Online'");
+			}
+			else {
+				system("echo 'Offline'");
+			}
+		}
+		else if(CMD=="set_coddialport") {
+			if(ARGV[2]=="off") {
+				system("rdb_set dialondemand.ports_en 0");
+				system("echo 'off'");
+			}
+			else {
+				len=split(ARGV[2], a, ",");
+				if (len > 0 &&  a[1]=="on") {
+					if (len==1 ) {
+						print "Parameter ERROR (portlist is empty)! usage: set coddialport=on,portlist/off";
+						exit (0);
+					}
+					plist="";
+					for (i=2; i<=len; i++) {
+						if(a[i]<1 || a[i]>65535) {
+							print "Parameter ERROR (Port number must have a value between 1 and 65535)! usage: set coddialport=on,portlist/off";
+							exit (0);
+						}
+						if(i==2) {
+							plist=a[2];
+						}
+						else {
+							plist=plist","a[i];
+						}
+					}
+					#disable all the ignored protocols
+					system("rdb_set dialondemand.ignore_icmp 0");
+					system("rdb_set dialondemand.ignore_tcp 0");
+					system("rdb_set dialondemand.ignore_udp 0");
+					system("rdb_set dialondemand.ignore_dns 0");
+					system("rdb_set dialondemand.ignore_tcp 0");
+					
+					system("rdb_set dialondemand.ports_en 1 && rdb_set dialondemand.ports_list "plist);
+					system("echo 'on,'`rdb_get dialondemand.ports_list`");
+				}
+				else {
+					print "Parameter ERROR! usage: set coddialport=on,portlist/off"
+				}
+			}
+		}
+		else if(CMD=="get_coddialport") {
+			port_en=exec("rdb_get dialondemand.ports_en 0");
+			if(port_en=="1") {
+				system("echo 'on,'`rdb_get dialondemand.ports_list`");
+			}
+			else {
+				system("echo 'off'");
+			}
+		}
+		else if(CMD=="set_codonline") {
+			len=split( list1, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]==a[i]) {
+					system("rdb_set dialondemand.traffic_online "ARGV[2]);
+					msg=ARGV[2];
+					m=exec("rdb_get dialondemand.min_online");
+					if( m<ARGV[2] ) {
+						system("rdb_set dialondemand.min_online "ARGV[2]);
+						msg=msg",minonline="ARGV[2];
+					}
+					print msg;
+					exit (0)
+				}
+			}
+			print "Parameter ERROR! usage: set codonline="list1"(minutes)";
+		}
+		else if(CMD=="get_codonline") {
+			system("echo `rdb_get dialondemand.traffic_online`");
+		}
+		else if(CMD=="set_codminonline") {
+			len=split( list1, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]==a[i]) {
+					m=exec("rdb_get dialondemand.traffic_online");
+					if( int(ARGV[2]) < int(m) ) {
+						print "Parameter ERROR! It is not possible to set the value to be less than the codonline value("m")"
+						exit (0);
+					}
+					system("rdb_set dialondemand.min_online "ARGV[2]);
+					print ARGV[2];
+					exit (0);
+				}
+			}
+			print "Parameter ERROR! usage: set codminonline="list1"(minutes)";
+		}
+		else if(CMD=="get_codminonline") {
+			system("echo `rdb_get dialondemand.min_online`");
+		}
+		else if(CMD=="set_codredial") {
+			list2="0,3,5,10,15,20,25,30,35,45,60,120,180,300";
+			len=split( list2, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]!="" && ARGV[2]==a[i]) {
+					system("rdb_set dialondemand.dial_delay "ARGV[2]);
+					msg=ARGV[2];
+					m=exec("rdb_get dialondemand.periodic_online");
+					if( m>0 && m*60<ARGV[2] ) {
+						system("rdb_set dialondemand.periodic_online "ARGV[2]);
+						msg=msg",regularly="ARGV[2];
+					}
+					print msg;
+					exit (0)
+				}
+			}
+			print "Parameter ERROR! usage: set codredial="list2"(seconds, 0=immediately)";
+		}
+		else if(CMD=="get_codredial") {
+			system("echo `rdb_get dialondemand.dial_delay`");
+		}
+		else if(CMD=="set_coddisconnect") {
+			len=split( list4, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]!="" && ARGV[2]==a[i]) {
+					system("rdb_set dialondemand.deactivation_timer "ARGV[2]);
+					msg=ARGV[2];
+					print msg;
+					exit (0)
+				}
+			}
+			print "Parameter ERROR! usage: set coddisconnect="list4"(minutes, 0=never)";
+		}
+		else if(CMD=="get_coddisconnect") {
+			system("echo `rdb_get dialondemand.deactivation_timer`");
+		}
+		else if(CMD=="set_codconnectreg") {
+			list3="0,1,2,3,5,10,15,20,25,30,35,45,60,120,180,240,300,360,720";
+			len=split( list3, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]!="" && ARGV[2]==a[i]) {
+					m=exec("rdb_get dialondemand.dial_delay");
+					if( ARGV[2]>0 && ARGV[2]*60 < m*1 ) {
+						print "Parameter ERROR! you can not set the value(non zero) less the redial value("m" seconds)";
+						exit (0);
+					}
+					system("rdb_set dialondemand.periodic_online "ARGV[2]);
+					print ARGV[2];
+					exit (0);
+				}
+			}
+			print "Parameter ERROR! usage: set codconnectreg="list3"(minutes, 0=never)";
+		}
+		else if(CMD=="get_codconnectreg") {
+			system("echo `rdb_get dialondemand.periodic_online`");
+		}
+		else if(CMD=="set_codrandomtime") {
+			len=split( list4, a, ",");
+			for(i=1; i<=len; i++) {
+				if(ARGV[2]==a[i]) {
+					system("rdb_set dialondemand.periodic_online_random "ARGV[2]);
+					msg=ARGV[2];
+					print msg;
+					exit (0)
+				}
+			}
+			print "Parameter ERROR! usage: set codrandomtime="list4"(minutes, 0=disable)";
+		}
+		else if(CMD=="get_codrandomtime") {
+			system("echo `rdb_get dialondemand.periodic_online_random`");
+		}
+		else if(CMD=="set_codverbose") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				system("rdb_set dialondemand.dod_verbose_logging "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codverbose=0-1";
+			}
+		}
+		else if(CMD=="get_codverbose") {
+			system("echo `rdb_get dialondemand.dod_verbose_logging`");
+		}
+		else if(CMD=="set_codprofile") {
+			if(int(ARGV[2])>=1 && int(ARGV[2])<=6) {
+				en=exec("rdb_get link.profile."ARGV[2]".enable");
+				if(en != "1") {
+					print "Parameter ERROR! The profile"ARGV[2]" is currently disabled, please enable it first.";
+					exit (0);
+				}
+				system("rdb_set dialondemand.profile "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codprofile=1-6";
+			}
+		}
+		else if(CMD=="get_codprofile") {
+			system("echo `rdb_get dialondemand.profile`");
+		}
+		else if(CMD=="set_codignore.icmp") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				en=exec("rdb_get dialondemand.ports_en");
+				if(en == "1") {
+					system("rdb_set dialondemand.ports_en 0");
+				}
+				system("rdb_set dialondemand.ignore_icmp "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.icmp=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.icmp") {
+			system("echo `rdb_get dialondemand.ignore_icmp`");
+		}
+		else if(CMD=="set_codignore.tcp") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				en=exec("rdb_get dialondemand.ports_en");
+				if(en == "1") {
+					system("rdb_set dialondemand.ports_en 0");
+				}
+				system("rdb_set dialondemand.ignore_tcp "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.tcp=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.tcp") {
+			system("echo `rdb_get dialondemand.ignore_tcp`");
+		}
+		else if(CMD=="set_codignore.udp") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				en=exec("rdb_get dialondemand.ports_en");
+				if(en == "1") {
+					system("rdb_set dialondemand.ports_en 0");
+				}
+				system("rdb_set dialondemand.ignore_udp "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.udp=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.udp") {
+			system("echo `rdb_get dialondemand.ignore_udp`");
+		}
+		else if(CMD=="set_codignore.dns") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				en=exec("rdb_get dialondemand.ports_en");
+				if(en == "1") {
+					system("rdb_set dialondemand.ports_en 0");
+				}
+				system("rdb_set dialondemand.ignore_dns "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.dns=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.dns") {
+			system("echo `rdb_get dialondemand.ignore_dns`");
+		}
+		else if(CMD=="set_codignore.ntp") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				en=exec("rdb_get dialondemand.ports_en");
+				if(en == "1") {
+					system("rdb_set dialondemand.ports_en 0");
+				}
+				system("rdb_set dialondemand.ignore_ntp "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.ntp=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.ntp") {
+			system("echo `rdb_get dialondemand.ignore_ntp`");
+		}
+		else if(CMD=="set_codignore.ncsi") {
+			if(ARGV[2]=="0" || ARGV[2]=="1") {
+				system("rdb_set dialondemand.ignore_win7 "ARGV[2]);
+				print ARGV[2];
+			}
+			else {
+				print "Parameter ERROR! usage: set codignore.ncsi=0-1";
+			}
+		}
+		else if(CMD=="get_codignore.ncsi") {
+			system("echo `rdb_get dialondemand.ignore_win7`");
+		}
+	}
+	exit 0;
+}

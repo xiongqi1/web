@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<script>
+    function resetStats() {
+        console.log("Reset stats clicked");
+        ajaxDeleteRequest("/rf_reset_stats/stats_landing");
+    }
+
+    function read_values_local_storage() {
+        for (var i = 0 ; i < 3 ; i++) {
+            g_cid[i] = localStorage.getItem("cid" + (i+1));
+            g_pass[i] = localStorage.getItem("pass" + (i+1));
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        read_values_local_storage();
+        console.log("Reading locally stored variables " + g_cid[0] + ' ' + g_cid[1] + ' ' + g_cid[2] +
+        ' ' + g_pass[0] + ' ' + g_pass[1] + ' ' + g_pass[2]);
+        g_is_html5_supported = is_html5_supported();
+        // disable "show FWI cell mode" and "show all cells" mode. It may have been set in advanced page
+        // The negative side effect of this arrangement is that next time on entry into advanced page the
+        // tick boxes are cleared even if they were set before. So some extra code is added to the 
+        // advanced page to save and restore tick boxes states.
+        ajaxPostRequest("/control/toggleShowMode?showFWICells=false", "");
+        ajaxPostRequest("/control/toggleShowMode?showAllCells=false", "");
+    });
+</script>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+#ifdef V_ORIENTATION_y
+    <div class="box" id="app-network-orientation">
+        <div class="box-header">
+            <h2>Antenna Orientation</h2>
+        </div>
+        <div class="box-content">
+            <div id="orientationResult"></div>
+        </div>
+    </div>
+#endif
+    <div class="box" id="app-network-scan">
+        <div class="box-header">
+            <h2>Network Scan</h2>
+        </div>
+        <div class="box-content">
+            <p>
+                Install antenna pointing to the highest ranked cell site
+                that meets its minimum RSRP threshold. Adjust both the azimuth and elevation for highest
+                signal strength possible.
+            </p>
+            <div id="scanResult"></div>
+        </div>
+    </div>
+    <div class="box" id="app-network-stats">
+        <div class="box-header">
+            <h2>Cell RF Statistics</h2>
+        </div>
+        <div class="box-content">
+            <div id="statsResult"></div>
+            <div id="statsReset">
+                <button class='tinyfont' id='ResetStatsButtonId' onclick="resetStats()">Reset Stats</button>
+            </div>
+        </div>
+    </div>
+    <!-- <div id="systemStatusContent"></div> -->
+    <div class="box" id="app-network-buttons">
+        <div class="box-content">
+            <!-- <p>Click 'Next' to run through test OR 'Back' to go back to data entry page</p> removed at AT&T's request-->
+            <div class="submit-row">
+                <form action="/data_entry.html" method="GET">
+                    <button class='med'>Back</button>
+                </form>
+                <form action="/adv_scan.html" method="GET">
+                    <button class='med'>OA Status</button>
+                </form>
+                <form action="/ttest.html" method="GET">
+                    <button class='tinyfont' id='SpeedTestButtonId'>Speed Test</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

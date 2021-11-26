@@ -1,0 +1,316 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Basic Status</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>
+input {
+	background:transparent;
+	border-style:none;
+	color:#000;
+}
+</style>
+<script language="JavaScript">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+document.cookie='language='+<%lang=get_single('webinterface.language');%>"@@lang";
+<%}%>
+Butterlate.setTextDomain("index");
+
+function initTranslation() {
+	//$("#pleaseWait").html(_("GUI pleaseWait"));
+	$("#csq").html(_("signalStrength"));
+	$("#3gconnection").html(_("status connection"));
+	$("#CSprovide").html(_("provider"));
+	$("#simstatusid").html(_("simStatus"));
+	$("#simstatusid2").html(_("simStatus"));
+	$("#insertSim").html(_("GUI insertSim"));
+	$("#GUI_sToAdv").html(_("GUI sToAdv"));
+	$("#SIMnotInserted").val(_("sim not inserted"));
+	$("#batteryLevel").html(_("batteryLevel"));
+	//document.getElementById("sToAdv").innerHTML = _("GUI sToAdv");
+}
+var imageidx = 0;
+var prvbatidx = 1;
+var http_request = 0;
+var counter = 30;
+var pincounter = 0;
+var prvSimStatus = "0";
+var ajaxerror = 0;
+
+function UrlDecode(str) {
+var unicode = 0;
+var ret = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1 , i + 3) );
+		if(val > 127 || val < 32) {
+			unicode = 1;
+			break;
+		}
+	}
+	for (var i = 0; i < str.length; i++) {
+	var chr = str.charAt(i);
+		if (chr == "+") {
+			ret += " ";
+		}
+		else {
+			if (chr == "%") {
+				var asc = str.substring(i + 1 , i + 3);
+				if (unicode) {
+					temp = parseInt("0x" + str.substring(i + 4 , i + 6) + asc );
+					rt = "&#"+temp.toString()+";";
+					ret += rt;
+					i += 5;
+				}
+				else {
+					rt = "&#x"+asc+";";
+					ret += rt;
+					i += 2;
+				}
+			}
+			else {
+				ret += chr;
+			}
+		}
+	}
+	return ret;
+}
+
+function ajaxUpdate(response) {
+var csq;
+	ajaxerror = 0;
+	if(response.length<10) return;
+	eval(response);
+	document.form.battery.value = parseInt(capacity)+"  %";		
+	if( charge == "c" )
+		imageidx = 0;
+	else if(capacity >= 80 )
+		imageidx = 5;
+	else if(capacity >= 60 )
+		imageidx = 4;
+	else if(capacity >= 40 )
+		imageidx = 3;
+	else if(capacity >= 20 )
+		imageidx = 2;
+	else
+		imageidx = 1;
+	if( imageidx != prvbatidx ) {
+		prvbatidx = imageidx;
+		$("#GUI-battery").html("<img src='images/GUI-bat"+imageidx+".GIF'/>");
+	}
+	if( meplockStatus=="locked" ) {
+		simStatus = "MEP Locked";
+		document.form.simStatus.value = _("mepLocked");
+	}
+	else {
+		document.form.simStatus.value = simStatus; 
+	}
+	if(msisdn=="N/A" || msisdn=="") {
+		document.getElementById("CSmsisdn").style.display='none';
+	}
+	else {
+		document.getElementById("CSmsisdn").style.display='';
+		$("#msisdn").html(msisdn);
+	}	
+	if(simStatus == "SIM OK") {
+		document.form.simStatus.value = _("simOK");
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+		document.getElementById('simID').style.color = '#107010'; //GREEN
+		csq = csq.substring(0, csq.indexOf("dBm") );		
+		csqstr = _("not available");
+		if(csq == 0)
+			imageidx = 0;	
+		else if(csq >= -86 ) {
+			csqstr = _("high");
+			if(csq >= -77)
+				imageidx = 6;
+			else
+				imageidx = 5;
+		}
+		else if(csq >= -101 ) {
+			csqstr = _("medium");
+			if(csq >= -92 )
+				imageidx = 4;
+			else
+				imageidx = 3;
+		}
+		else if(csq >= -110 ) {
+			csqstr = _("low");
+			if(csq >= -108)
+				imageidx = 2;
+			else
+				imageidx = 1;
+		}	
+		else
+			imageidx = 0;
+		document.form.csq.value = csq+" dBm         "+csqstr;	
+		$("#GUI-CSQ").html("<img src='/images/GUI-csq"+imageidx + ".GIF'/>");	
+		if( typeof(hint) == "undefined" || hint=="N/A" || hint=="" )	
+			$("#provider").html(UrlDecode(provider));
+		else
+			$("#provider").html(UrlDecode(hint));
+		if(st.length==0) {
+			document.form.wwanStatus.value = _("disabled");
+			document.getElementById('wwanID').style.color = '#ff0000'; //RED
+		}
+		else {
+			for( i=0; i<st.length && i<6; i++ ) {
+				if( st[i].pppStatus!="up" && st[i].enable == 1 ) {
+					document.form.wwanStatus.value = _("connecting");
+					document.getElementById('wwanID').style.color = 'Orange';
+					break;
+				}
+				else if( st[i].pppStatus=="up" ) {
+					document.form.wwanStatus.value = _("connected");
+					document.getElementById('wwanID').style.color = '#107010'; //GREEN
+					break;
+				}
+				else {
+					document.form.wwanStatus.value = st[i].pppStatus;
+				}
+			}
+		}
+	}
+	else if(simStatus != "SIM not inserted") {
+		document.getElementById('simID').style.color = '#ff0000'; //RED
+		$("#GUI-CSQ").html("");
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+		if( prvSimStatus != simStatus ) {
+			if( ++ pincounter >= 2 ) {
+				prvSimStatus = simStatus;
+				switch(simStatus) {
+				case "SIM general failure":
+					alert( _("admin warningMsg2") );//SIM general failure
+					break;
+				case "SIM locked":
+					alert( _("admin warningMsg3") );//You need to enter the PIN code to unlock the SIM before use
+					break;		
+				case "SIM CHV1 blocked":
+					alert( _("admin warningMsg4") );//You need to enter the PUK code to unlock the SIM before use
+					break;
+				/*case "MEP locked":
+					alert( _("mepLocked") );//MEP locked
+					break;*/
+				case "Network reject - Account":
+					alert( _("admin warningMsg6") );//Network reject - Account
+					break;
+				case "Network reject":
+					alert( _("admin warningMsg7") );//Network reject
+					break;
+				case "MEP Locked":
+					if(confirm(_("mep warningMsg1")+" "+_("mep warningMsg2")))
+					{
+						http_request.responseText.clear;
+						http_request.close;	 
+						http_request=0;
+						window.location=('mepUnlocking.html');
+						return;
+					}
+					break;
+				default:
+					pincounter = 0;	
+				break;
+				}
+			}
+		}
+		document.form.wwanStatus.value = "";
+		document.form.csq.value = "";
+		$("#GUI-CSQ").html("<img src='/images/GUI-csq0.GIF'/>");
+		document.getElementById("provider").innerHTML="";
+	}
+	else {
+		$("#GUI-CSQ").html("");
+		document.getElementById("sim_status_div0").style.display='none';
+		document.getElementById("sim_status_div1").style.display='';
+	}
+}
+
+$(document).ready(function() {
+	init_moveGUI();
+	var startPoll = function() {	
+		if(++counter>30) {//3 sec
+			counter=0;
+			if( ++ajaxerror<=5)
+				$.get('/cgi-bin/ajax.cgi',ajaxUpdate );
+			else
+				location.reload();
+		}
+		else
+			moveGUI();
+	}	
+	setInterval(startPoll, 100);	
+});
+</script>
+</head>
+<body>
+
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+</div>
+
+<form name="form">
+<div id="basicGUI" style="left:558px; top:120px">
+<div style="position:absolute; font-size:12px; left:34px; top:544px"><a class="a1" href="JavaScript:$('#GUI-battery').html('');toAdvV('/login.html');" id="GUI_sToAdv">Switch to Advanced View</a></div>
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	<img style="position:absolute; top:0px; left:0px" src="/images/button1.gif" />
+    <div class="Rotate-90" id="tab-status"><a style="text-decoration:none; color:#d00010; left:4px;" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+    <img style="position:absolute; top:100px; left:0px" src="/images/button2.gif" />
+    <div class="Rotate-90" id="tab-login"><a style="text-decoration:none" href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+<%}else{%> 
+	<img style="position:absolute; top:0px; left:0px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none; color:#d00010; left:4px;" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>	
+	<img style="position:absolute; top:100px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wlan"><a style="text-decoration:none;" href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:200px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-3gwwan"><a style="text-decoration:none;" href="/GUI-3gwwan.html">APN/SIM</a></div> 
+	<img style="position:absolute; top:300px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-acc"><a style="text-decoration:none" href="/GUI-acc.html">Account</a></div>	
+	<img style="position:absolute; top:400px; left:0px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-app"><a style="text-decoration:none" href="/GUI-app.html">Applications</a></div>
+<%}%>
+    <div id="GUI-battery"><img src="images/GUI-bat0.GIF"/></div>
+    <img style="position:absolute; top:170px; left:44px" src="/images/strip.png" />
+    <img style="position:absolute; top:350px; left:44px" src="/images/strip.png" />
+
+    <div id="GUI-CSQ"><font class="div_text"  style="top:50px; width:80px" id="pleaseWait"></font></div>
+	<div class="div_text" style="top:19px" id="batteryLevel">Battery Level</div>
+    <div class="div_input" style="top:17px" >
+      <input type="text" name="battery" value="" readonly/>
+    </div>
+    <div id="sim_status_div0" >
+        <div class="div_text" style="top:195px" id="csq">3G Signal Strength</div>
+        <div class="div_input" style="top:193px" >
+          <input type="text" size="30" class="finchAjax" name="csq" value="-88 dbm" readonly/>
+        </div>         
+        <div class="div_text" style="top:383px" id="3gconnection">3G Connection Status</div>
+        <div class="div_input" style="top:380px" >
+          <input type="text" id="wwanID" size="30" class="finchAjax" name="wwanStatus" value="" readonly/>
+        </div>
+        <div class="div_text" style="top:415px" id="CSprovide">Provide</div>
+        <div class="div_input" style="top:415px; color:#000" id="provider" ></div>
+        <div class="div_text" style="top:448px" id="simstatusid">SIM Status</div>
+        <div class="div_input" style="top:445px" >
+            <input type="text" id="simID" name="simStatus" value="" readonly/>
+        </div>
+        <div class="div_text" style="top:480px" id="CSmsisdn">Customer Number (MSISDN):
+        <font color="#000" id="msisdn"></font></div>   
+    </div>
+    <div id="sim_status_div1" style="display:none" >
+        <div class="div_text" style="top:215px" id="simstatusid2">SIM Status</div>
+        <div class="div_input" style="top:213px" ><input type="text" id="SIMnotInserted" value="SIM not inserted" style="color:#FF0000" readonly/></div>
+        <div class="div_text" style="top:260px; width:345px; left:52px" id="insertSim"><div>
+    </div>
+</div>
+<script language="JavaScript">initTranslation();</script>
+</form>  
+</body>
+</html>

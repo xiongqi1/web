@@ -1,0 +1,10 @@
+void getword(char* word, int maxlen, char* line, char stop);
+void getwordamp(char* word, int maxlen, char* line);
+void plustospace(char* str);
+void unescape(char* s);
+char* quotable(char* outquote, int maxlen, char* inquote);
+void getvariable(char* var, int maxlen, char* line, char stop);
+char* urlEscape(char* dest, unsigned maxlen, char* str);
+int create_path(char* name, int mode);
+char* intrim(char* str);
+void getwordquotes(char* word, int maxlen, char* line, char stop);

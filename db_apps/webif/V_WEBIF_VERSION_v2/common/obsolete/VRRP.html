@@ -1,0 +1,685 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>VRRP</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript">
+#include "net_util.js"
+
+function submitF() {
+	var f = document.form;
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+
+	f.vrrpaddr.value = f.vrrp_addr1.value + "." + f.vrrp_addr2.value + "." + f.vrrp_addr3.value + "." + f.vrrp_addr4.value;
+
+#ifdef V_VRRP_WAN_WATCHDOG_y
+	if(f.vrrpenable.value == 1 && $("#vrrp_wd_radio-1").is(":checked") == true
+		&& $("#cons_mon_enable-1").is(":checked") == true && $("#rand_mon_enable-1").is(":checked") == true) {
+		validate_alert( "", _("all monitors disabled"));
+		return;
+	}
+#endif
+	$("button").attr("disabled",true);
+	f.submit();
+}
+
+$(document).ready(function() {
+	var f = document.form;
+
+	/* Ensure that the radio button is initialised to the value stored in RDB */
+	if (f.vrrpenable.value=='1') {
+		$('#radio-1').attr("checked","checked");
+	} else {
+		$('#radio-2').attr("checked","checked");
+	}
+
+	/* Parse the IP address for display */
+	var ip_array = new Array();
+	var vrrp_ip = f.vrrpaddr.value;
+	ip_array = vrrp_ip.split(".");
+	if(ip_array.length != 4 ){ip_array[0]='0';ip_array[1]='0';ip_array[2]='0';ip_array[3]='0';}
+	f.vrrp_addr1.value=ip_array[0];
+	f.vrrp_addr2.value=ip_array[1];
+	f.vrrp_addr3.value=ip_array[2];
+	f.vrrp_addr4.value=ip_array[3];
+
+	/* If the feature is disabled, hide the configuration */
+	if ($('#radio-2').attr("checked") != "undefined" && $('#radio-2').attr("checked") == "checked") {
+		$('#box_2144_pin').hide();
+	}
+
+#ifdef V_VRRP_WAN_WATCHDOG_y
+	load_value_to_element("input:radio.access[name=vrrp_wd_radio]", f.wdEnable.value);
+	load_value_to_element("input:radio.access[name=verbose_logging]", f.wdVerboseEn.value);
+	load_value_to_element("input:radio.access[name=cons_mon_enable]", f.wdConsMonEn.value);
+	load_value_to_element("input:radio.access[name=rand_mon_enable]", f.wdRandMonEn.value);
+
+	$("input:radio.access[name=vrrp_wd_radio]").change(function() {
+		$("#vrrp_wd_conf").css("display", $("#vrrp_wd_radio-1").is(":checked")?"":"none");
+	});
+
+	$("input:radio.access[name=cons_mon_enable]").change(function() {
+		$("#cons_mon_enable-toggle-div").css("display", $("#cons_mon_enable-0").is(":checked")?"":"none");
+	});
+
+	$("input:radio.access[name=rand_mon_enable]").change(function() {
+		$("#rand_mon_enable-toggle-div").css("display", $("#rand_mon_enable-0").is(":checked")?"":"none");
+	});
+	$("input:radio.access[name=vrrp_wd_radio]").trigger("change");
+	$("input:radio.access[name=cons_mon_enable]").trigger("change");
+	$("input:radio.access[name=rand_mon_enable]").trigger("change");
+
+	var ping_info=[
+		{pinging:false,server:""},
+		{pinging:false,server:""},
+	];
+
+	// set element activation
+	$("#pingdst,#pingdst2").keyup(function(e) {
+
+#if 0 // temporarily removed, because the behavior is not fully defined, yet.
+		var len1;
+		var len2;
+
+		len1=$("#pingdst").val().length>0;
+		len2=$("#pingdst2").val().length>0;
+
+		if(!len1) {
+			$("#pingdst2").val("");
+			$("#pingdst2").attr("disabled",true);
+		}
+		if(($("#pingdst2").is(":disabled") && len1) || (!$("#pingdst2").is(":disabled") && !len1)) {
+			$("#pingdst2").attr("disabled",!len1 && !len2);
+		}
+
+		$("#pingtimer").attr("disabled",!len1 && !len2);
+		$("#pingacctmr").attr("disabled",!len1 && !len2);
+		$("#pingfailcnt").attr("disabled",!len1 && !len2);
+		$("#pingsucccnt").attr("disabled",!len1 && !len2);
+		$("#randerrtotalcnt").attr("disabled",!len1 && !len2);
+		$("#randerrfailcnt").attr("disabled",!len1 && !len2);
+		$("#randerrsucccnt").attr("disabled",!len1 && !len2);
+#endif
+
+		var el;
+		var el_array=["pingdst","pingdst2"];
+		var idx;
+		var server;
+		var el_id;
+
+		// get current el info
+		el=$(this);
+		el_id=el.attr("id");
+		idx=$.inArray(el_id,el_array);
+
+		// get peripheral elements
+		var el_wait=$("#"+el_id+"_wait");
+		var el_stat=$("#"+el_id+"_stat");
+
+		server=el.val();
+
+		// bypass if no server is available
+		if(server.length==0) {
+			// hide pinging icon
+			el_wait.hide();
+			el_stat.hide();
+			return;
+		}
+
+		// bypass if we have no change in the server
+		if(ping_info[idx].server==server)
+			return;
+
+		// when the server changed from blank to something while pinging
+		el_wait.toggle(ping_info[idx].pinging);
+
+		// bypass if currently pinging or already pinged
+		if(ping_info[idx].pinging)
+			return;
+
+		// update ping info
+		ping_info[idx].pinging=true;
+		ping_info[idx].server=server;
+
+		// show pinging icon
+		el_wait.toggle(ping_info[idx].pinging);
+		el_stat.toggle(!ping_info[idx].pinging);
+
+		$.getJSON (
+			"./cgi-bin/ltph.cgi",
+			{reqtype:"ping",reqparam:server},
+			function(res){
+				el_stat.html( (res.cgiresult==0)?_("succ"):_("fail"));
+
+				// udpate ping info
+				ping_info[idx].pinging=false;
+
+				// hide pinging icon
+				el_wait.toggle(ping_info[idx].pinging);
+				el_stat.toggle(!ping_info[idx].pinging);
+
+				// trigger keyup if we have a new server
+				if(ping_info[idx].server!=el.val()) {
+					el.trigger("keyup");
+				}
+			}
+		);
+		return;
+	});
+
+	// trigger events
+	$("#pingdst,#pingdst2").trigger("keyup");
+#endif
+
+});
+</script>
+<% if ( request['REQUEST_METHOD'] == "POST" ) {
+
+	// validate input
+	tryValidateOnOffRadio(form['vrrpenable']);
+	var deviceId = string_to_number(form['deviceid']);
+	if (deviceId < 1 || deviceId > 255) {
+		onBadRequest();
+	}
+	var priority = string_to_number(form['priority']);
+	if (priority < 1 || priority > 255) {
+		onBadRequest();
+	}
+	validateIpAddress(form['vrrpaddr'], "", "");
+
+	tempval = form['vrrpenable'];
+	retval = set_single('service.vrrp.enable='+tempval, '-p');
+	tempval = form['deviceid'];
+	retval = set_single('service.vrrp.deviceid='+tempval, '-p');
+	tempval = form['priority'];
+	retval = set_single('service.vrrp.priority='+tempval, '-p');
+	tempval = form['vrrpaddr'];
+	retval = set_single('service.vrrp.address='+tempval, '-p');
+
+#ifdef V_VRRP_WAN_WATCHDOG_y
+	tempval = form['vrrp_wd_radio'];
+	retval = set_single('service.vrrp.wanwatchdog.enable='+tempval, '-p');
+	tempval = form['verbose_logging'];
+	retval = set_single('service.vrrp.wanwatchdog.verbose_logging='+tempval, '-p');
+	tempval = form['pingdst'];
+	retval = set_single('service.vrrp.wanwatchdog.destaddress='+tempval, '-p');
+	tempval = form['pingdst2'];
+	retval = set_single('service.vrrp.wanwatchdog.destaddress2='+tempval, '-p');
+	tempval = form['pingtimer'];
+	retval = set_single('service.vrrp.wanwatchdog.periodicpingtimer='+tempval, '-p');
+	tempval = form['pingacctmr'];
+	retval = set_single('service.vrrp.wanwatchdog.pingacceleratedtimer='+tempval, '-p');
+	tempval = form['cons_mon_enable'];
+	retval = set_single('service.vrrp.wanwatchdog.cons_mon_enable='+tempval, '-p');
+	tempval = form['pingfailcnt'];
+	retval = set_single('service.vrrp.wanwatchdog.failcount='+tempval, '-p');
+	tempval = form['pingsucccnt'];
+	retval = set_single('service.vrrp.wanwatchdog.succcount='+tempval, '-p');
+	tempval = form['rand_mon_enable'];
+	retval = set_single('service.vrrp.wanwatchdog.rand_mon_enable='+tempval, '-p');
+	tempval = form['randerrtotalcnt'];
+	retval = set_single('service.vrrp.wanwatchdog.randerrtotalcount='+tempval, '-p');
+	tempval = form['randerrfailcnt'];
+	retval = set_single('service.vrrp.wanwatchdog.randerrfailcount='+tempval, '-p');
+	tempval = form['randerrsucccnt'];
+	retval = set_single('service.vrrp.wanwatchdog.randerrsucccount='+tempval, '-p');
+#endif
+
+	redirect('/VRRP.html?success');
+}
+else { /*GET*/
+	temp = get_single('service.vrrp.enable');
+	form['vrrpenable'] = temp;
+	temp = get_single('service.vrrp.deviceid');
+	form['deviceid'] = temp;
+	temp = get_single('service.vrrp.priority');
+	form['priority'] = temp;
+	temp = get_single('service.vrrp.address');
+	form['vrrpaddr'] = temp;
+
+#ifdef V_VRRP_WAN_WATCHDOG_y
+	temp = get_single('service.vrrp.wanwatchdog.enable');
+	form['vrrp_wd_radio'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.verbose_logging');
+	form['verbose_logging'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.destaddress');
+	form['pingdst'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.destaddress2');
+	form['pingdst2'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.periodicpingtimer');
+	form['pingtimer'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.pingacceleratedtimer');
+	form['pingacctmr'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.cons_mon_enable');
+	form['cons_mon_enable'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.failcount');
+	form['pingfailcnt'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.succcount');
+	form['pingsucccnt'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.rand_mon_enable');
+	form['rand_mon_enable'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.randerrtotalcount');
+	form['randerrtotalcnt'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.randerrfailcount');
+	form['randerrfailcnt'] = temp;
+	temp = get_single('service.vrrp.wanwatchdog.randerrsucccount');
+	form['randerrsucccnt'] = temp;
+#endif
+}
+%>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+		<div class="grid-9 omega">
+			<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+				<div class="note-lrg">
+					<div class="wrap alert clearfix">
+						<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+						<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+					</div>
+				</div>
+			</div>
+
+			<form name="form" id="form" class="validate hide_for_pppoe_en" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+			<%appendCsrfToken();%>
+			<div class="right-column white-box">
+				<div class="pad hide_for_pppoe_en">
+					<h2><script language=Javascript>document.write(_("vrrp config"))</script></h2>
+					<input type="hidden" name="vrrpenable" value="@@form['vrrpenable']">
+					<input type="hidden" name="vrrpaddr" value="@@form['vrrpaddr']">
+					<input type="hidden" name="wdEnable" value="@@form['vrrp_wd_radio']">
+					<input type="hidden" name="wdVerboseEn" value="@@form['verbose_logging']">
+					<input type="hidden" name="wdConsMonEn" value="@@form['cons_mon_enable']">
+					<input type="hidden" name="wdRandMonEn" value="@@form['rand_mon_enable']">
+					<div class="form-row no-bg-form">
+						<label for="field-1"><script language=Javascript>document.write(_("VRRP"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div id="vrrp_enable" class="radio-switch" data-toggle-element="box_2144_pin" data-toggle-disabled="btn_2144_change">
+									<input type="radio" id="radio-1" name="vrrp_radio" class="access" onClick="javascript:document.form.vrrpenable.value=1">
+									<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="radio-2" name="vrrp_radio" class="access" onClick="javascript:document.form.vrrpenable.value=0">
+									<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_2144_pin">
+						<div class="form-row">
+							<label for="deviceid"><script language=Javascript>document.write(_("virtual id"))</script></label>
+							<div class="field">
+								<input type="text" name="deviceid" class="validate[required,funcCall[validate_deviceid] required deviceid sml" id="deviceid" value="@@form['deviceid']" maxlength=3 onKeyUp="NumfieldEntry(this);">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(1-255)</span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="priority"><script language=Javascript>document.write(_("router priority"))</script></label>
+							<div class="field">
+								<input type="text" name="priority" class="validate[required,funcCall[validate_priority] required priority sml" id="priority" value="@@form['priority']" maxlength=3 onKeyUp="NumfieldEntry(this);">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(1-255)</span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="virtual_ip_addr"><script language=Javascript>document.write(_("virtualipaddr"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocks("vrrp_addr");</script>
+						</div>
+#ifdef V_VRRP_WAN_WATCHDOG_y
+						<div class="hr"></div>
+						<div class="form-row">
+							<label for="field-2"><script language=Javascript>document.write(_("vrrp wan watchdog"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div id="vrrp_wd_enable" class="radio-switch" >
+										<input type="radio" id="vrrp_wd_radio-1" name="vrrp_wd_radio" class="access" value="1">
+										<label for="vrrp_wd_radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="vrrp_wd_radio-2" name="vrrp_wd_radio" class="access" value="0">
+										<label for="vrrp_wd_radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+
+							<div class="grey-box" id="vrrp_wd_conf">
+								<div class="form-row no-bg-form">
+									<label><script language=Javascript>document.write(_("verbose logging"))</script></label>
+									<div class="field">
+										<div class="location-settings">
+											<div class="radio-switch">
+												<input type="radio" class="access" value="1" name='verbose_logging' id='verbose_logging-0'>
+												<label for="verbose_logging-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+												<input type="radio" class="access" value="0" name='verbose_logging' id='verbose_logging-1'>
+												<label for="verbose_logging-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<div id="div_settings_ping" >
+									<div class="form-row">
+										<label for="pingdst"><script language=Javascript>document.write(_("monitor destinationAddress"))</script></label>
+										<div class="field" style="inline">
+											<input type="text" class="validate[required] required large" name="pingdst" id="pingdst" value="@@form['pingdst']">
+										</div>
+										<div style="inline">
+											&nbsp;
+											<i style="display:none" id="pingdst_wait" class="progress-sml"></i>
+											<label id="pingdst_stat" style="width:40px"></label>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="pingdst2"><script language=Javascript>document.write(_("monitor secondAddress"))</script></label>
+										<div class="field">
+										<input type="text" class="large" name="pingdst2" id="pingdst2" value="@@form['pingdst2']">
+										</div>
+										<div style="inline">
+											&nbsp;
+											<i style="display:none" id="pingdst2_wait" class="progress-sml"></i>
+											<label id="pingdst2_stat" style="width:40px"></label>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="pingtimer"><script language=Javascript>document.write(_("monitor pingTimer"))</script></label>
+										<div class="field">
+											<input type="text" name="pingtimer" id="pingtimer" value="@@form['pingtimer']" class="validate[required,custom[integer],min[3],max[65535]] required field3and65535 large" maxLength="5" value="@@form['wanwd_periodicpingtimer']" onKeyUp="NumfieldEntry(this);">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover period"))</script></span>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="pingacctmr"><script language=Javascript>document.write(_("retry timer"))</script></label>
+										<div class="field">
+											<input type="text" name="pingacctmr" id="pingacctmr" value="@@form['pingacctmr']" class="validate[required,custom[integer],min[2],max[65535]] required field2and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover period2"))</script></span>
+										</div>
+									</div>
+									<div class="hr"></div>
+#ifndef V_WEBIF_SPEC_vdf
+									<div>
+										<h2><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></h2>
+									</div>
+#else
+									<div class="p-des-full-width" style="padding:0 0 0 20px;">
+										<h4 style="color:#000;"><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></h4>
+									</div>
+#endif
+									<div class="form-row">
+										<label><script language=Javascript>document.write(_("failover consecutive error monitor"))</script></label>
+											<div class="field">
+												<div class="location-settings">
+													<div class="radio-switch">
+														<input type="radio" class="access" value="1" name='cons_mon_enable' id='cons_mon_enable-0'>
+														<label for="cons_mon_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+														<input type="radio" class="access" value="0" name='cons_mon_enable' id='cons_mon_enable-1'>
+														<label for="cons_mon_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+													</div>
+												</div>
+											</div>
+									</div>
+
+									<div id="cons_mon_enable-toggle-div">
+									<div class="form-row">
+										<label for="pingfailcnt"><script language=Javascript>document.write(_("failover monitor failCount"))</script></label>
+										<div class="field">
+											<input type="text" name="pingfailcnt" id="pingfailcnt" value="@@form['pingfailcnt']" class="validate[required,funcCall[validate_3and65535]] required field3and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="pingsucccnt"><script language=Javascript>document.write(_("failover monitor succCount"))</script></label>
+										<div class="field">
+											<input type="text" name="pingsucccnt" id="pingsucccnt" value="@@form['pingsucccnt']" class="validate[required,funcCall[validate_3and65535]] required field3and65535 large" maxLength="5" onKeyUp="NumfieldEntry(this);">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+										</div>
+									</div>
+									</div>
+									<div class="hr"></div>
+#ifndef V_WEBIF_SPEC_vdf
+									<div>
+										<h2><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></h2>
+									</div>
+#else
+									<div class="p-des-full-width" style="padding:0 0 0 20px;">
+										<h4 style="color:#000;"><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></h4>
+									</div>
+#endif
+									<div class="form-row">
+										<label><script language=Javascript>document.write(_("failover periodic ratio monitor"))</script></label>
+											<div class="field">
+												<div class="location-settings">
+													<div class="radio-switch">
+														<input type="radio" class="access" value="1" name='rand_mon_enable' id='rand_mon_enable-0'>
+														<label for="rand_mon_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+														<input type="radio" class="access" value="0" name='rand_mon_enable' id='rand_mon_enable-1'>
+														<label for="rand_mon_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+													</div>
+												</div>
+											</div>
+									</div>
+									<div id="rand_mon_enable-toggle-div">
+									<div class="form-row">
+										<label for="randerrtotalcnt"><script language=Javascript>document.write(_("failover monitor randerr totalCount"))</script></label>
+										<div class="field">
+											<input type="text" name="randerrtotalcnt" id="randerrtotalcnt" value="@@form['randerrtotalcnt']" class="validate[required,funcCall[validate_randerrTotalCnt]] large required field3and65535 fieldgreaterthanfailcnt fieldgreaterthansucccnt">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="randerrfailcnt"><script language=Javascript>document.write(_("failover monitor failCount"))</script></label>
+										<div class="field">
+											<input type="text" name="randerrfailcnt" id="randerrfailcnt" value="@@form['randerrfailcnt']" class="validate[required,funcCall[validate_randerrCnt]] large required field3and65535 fieldlessthantotal">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+										</div>
+									</div>
+									<div class="form-row">
+										<label for="randerrsucccnt"><script language=Javascript>document.write(_("failover monitor succCount"))</script></label>
+										<div class="field">
+											<input type="text" name="randerrsucccnt" id="randerrsucccnt" value="@@form['randerrsucccnt']" class="validate[required,funcCall[validate_randerrCnt]] large required field3and65535 fieldlessthantotal">
+										</div>
+										<div>
+											<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("failover count2"))</script></span>
+										</div>
+									</div>
+									</div>
+								</div>
+							</div>
+						</div>
+#endif
+					</div>
+					<div class="submit-row">
+						<button name="saveButton" type="button" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "VRRP", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('vrrpSubmitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["deviceid"]=_("virtualIdRange");
+	$.validator.addMethod("deviceid",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 255 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.deviceid);
+
+	VALIDATOR.config.errors["priority"]=_("routerPriorityRange");
+	$.validator.addMethod("priority",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 255 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.priority);
+
+		$.validator.addMethod("field2and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 2 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field2and65535"));
+
+	$.validator.addMethod("field3and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 3 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field3and65535"));
+
+	$.validator.addMethod("fieldZ3and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c!=0 && ( c < 3 || c > 65535 ) || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldZ3and65535"));
+
+	$.validator.addMethod("fieldlessthantotal",function(c,a) {
+		var t=parseInt($("#randerrtotalcnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( t != "NaN" && t != 0 && c > t ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldlessthantotal"));
+
+	$.validator.addMethod("fieldgreaterthanfailcnt",function(c,a) {
+		var f=parseInt($("#randerrfailcnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( f != "NaN" && c < f && c != 0 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldgreaterthanfailcnt"));
+
+	$.validator.addMethod("fieldgreaterthansucccnt",function(c,a) {
+		var s=parseInt($("#randerrsucccnt").val());
+		if(c!==$(a).attr("data-watermark")) {
+			if( s != "NaN" && c < s && c != 0 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("fieldgreaterthansucccnt"));
+#else
+/********* for NTC ValidationEngine **********/
+function validate_deviceid(field, rules, i, options) {
+	if( field.val() < 1 || field.val() > 255 ) {
+		return _("virtualIdRange");
+	}
+}
+function validate_priority(field, rules, i, options) {
+	if( field.val() < 1 || field.val() > 255 ) {
+		return _("routerPriorityRange");
+	}
+}
+function validate_3and65535(field, rules, i, options) {
+	if( field.val() < 3 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("field3and65535");
+	}
+}
+function validate_randerrTotalCnt(field, rules, i, options) {
+	var f=parseInt($("#randerrfailcnt").val());
+	var s=parseInt($("#randerrsucccnt").val());
+
+	if( field.val() < 3 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("field3and65535");
+	}
+	else if( f != "NaN" && field.val() < f && field.val() != 0 ) {
+		return _("fieldgreaterthanfailcnt");
+	}
+	else if( s != "NaN" && field.val() < s && field.val() != 0 ) {
+		return _("fieldgreaterthansucccnt");
+	}
+}
+function validate_randerrCnt(field, rules, i, options) {
+	var t=parseInt($("#randerrtotalcnt").val());
+
+	if((field.val() < 3 || field.val() > 65535) || !isAllNum(field.val()) ) {
+		return _("field3and65535");
+	}
+	else if( t != "NaN" && t != 0 && field.val() > t ) {
+		return _("fieldlessthantotal");
+	}
+}
+#endif
+</script>
+</body>
+</html>

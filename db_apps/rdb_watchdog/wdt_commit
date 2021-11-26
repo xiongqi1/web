@@ -1,0 +1,314 @@
+#!/usr/bin/env lua
+
+--[[
+    wdt_commit - Commitment Timer Utility
+
+    This utility acts as a wrapper around the RDB watchdog
+    variable 'sys.watchdog.timeToReboot'. It allows multiple
+    processes to register timers simultaneously, and makes
+    sure that the shortest current timer is always installed
+    in 'sys.watchdog.timeToReboot'.
+
+    Timers are registered against a unique name so that the
+    owning process can cancel it once its task is complete.
+
+    If an optional max reboot count value is specified,
+    it is installed in 'sys.watchdog.max_reboot_count'
+    when the timer is the shortest timer.
+
+    Usage:
+        wdt_commit add <timer name> <timer length> [<optional max reboot count>]
+        wdt_commit readd <timer name> <timer length> [<optional max reboot count>]
+        wdt_commit del <timer name>
+        wdt_commit list
+        wdt_commit help
+
+    Active timers are stored in 'sys.watchdog.queuedTimers' as
+    a Lua snippet using the following format:
+
+        {
+            [1] = {
+                name = "Timer 1",
+                remaining = 60
+            },
+            [2] = {
+                name = "Timer 2",
+                remaining = 120
+            }
+            ...
+        }
+]]
+
+require('luardb')
+require('luasyslog')
+
+local action, name, delay, max_reboot_count = ...
+
+function main()
+    if action == "add" then
+        add(name, delay, max_reboot_count)
+    elseif action == "readd" then
+        readd(name, delay, max_reboot_count)
+    elseif action == "del"  then
+        del(name)
+    elseif action == "list" then
+        list()
+    elseif action == "--help" then
+        help()
+    elseif action == nil or action == "" then
+        error("No action specified.", 0)
+    else
+        error("Unrecognised action '" .. action .. "'.", 0)
+    end
+end
+
+--[[
+    Display usage information.
+]]
+function help()
+    print([[wdt_commit - Commitment Timer Utility
+
+This utility acts as a wrapper around the RDB watchdog
+variable 'sys.watchdog.timeToReboot'. It allows multiple
+processes to register timers simultaneously, and makes
+sure that the shortest current timer is always installed
+in 'sys.watchdog.timeToReboot'.
+
+Timers are registered against a unique name so that the
+owning process can cancel it once its task is complete.
+If an optional max reboot count value is specified,
+it is installed in 'sys.watchdog.max_reboot_count'
+when the timer is the shortest timer.
+
+Usage:
+    wdt_commit add <timer name> <timer length> [<optional max reboot count>]
+    wdt_commit readd <timer name> <timer length> [<optional max reboot count>]
+    wdt_commit del <timer name>
+    wdt_commit list
+    wdt_commit help]])
+end
+
+--[[
+    Create a new timer and add it to the queue.
+]]
+function add(name, delay, max_reboot_count)
+    name = checkName(name)
+    delay = checkDelay(delay)
+    max_reboot_count = checkMaxRebootCount(max_reboot_count)
+    local timeToReboot, queuedTimers = update(load())
+
+    for _, timer in pairs(queuedTimers) do
+        if timer.name == name then error("Timer named '" .. name .. "' already exists.", 0) end
+    end
+
+    if timeToReboot < 0 or delay < timeToReboot then
+        timeToReboot = delay
+    end
+
+    local newTimer = {["name"] = name, ["remaining"] = delay, ["max_reboot_count"] = max_reboot_count}
+    local inserted = false
+
+    for index, timer in pairs(queuedTimers) do
+        if delay < timer.remaining then
+            table.insert(queuedTimers, index, newTimer)
+            inserted = true
+            break
+        end
+    end
+
+    if not inserted then
+        table.insert(queuedTimers, newTimer)
+    end
+
+    luasyslog.log('LOG_NOTICE', "Adding timer '" .. name .. "', time to reboot is now " .. timeToReboot .. " second(s).")
+
+    save(timeToReboot, queuedTimers)
+end
+
+--[[
+    Update the timeout and or max_reboot_count of a timer (which may already
+    exist in the queue).
+]]
+function readd(name, delay, max_reboot_count)
+	del(name)
+	add(name, delay, max_reboot_count)
+end
+
+--[[
+    Release an existing timer.
+]]
+function del(name)
+    name = checkName(name)
+
+    local found = false
+    local timeToReboot, queuedTimers = update(load())
+
+    for index, timer in pairs(queuedTimers) do
+        if timer.name == name then
+            table.remove(queuedTimers, index)
+            found = true
+            break
+        end
+    end
+
+    -- Nothing else to do. del command should be safe and silent even if non-existent timer name is given
+    if not found then
+        return
+    end
+
+    if #queuedTimers > 0 then
+        timeToReboot = queuedTimers[1].remaining
+        luasyslog.log('LOG_NOTICE', "Deleting timer '" .. name .. "', time to reboot is now " .. timeToReboot .. " second(s).")
+    else
+        timeToReboot = -1
+        luasyslog.log('LOG_NOTICE', "Deleting timer '" .. name .. "', no remaining commitment timers.")
+    end
+
+    save(timeToReboot, queuedTimers)
+end
+
+--[[
+    List all currently active timers.
+]]
+function list()
+    local timeToReboot, queuedTimers = update(load())
+
+    for index, timer in pairs(queuedTimers) do
+        print("#" .. index .. ": " .. timer.name .. " = " .. timer.remaining .. " second(s)")
+    end
+end
+
+--[[
+    Load configuration paramaters from RDB.
+]]
+function load()
+    return tonumber(luardb.get("sys.watchdog.timeToReboot")), expand(luardb.get("sys.watchdog.queuedTimers"))
+end
+
+--[[
+    Save configuration paramaters to RDB.
+]]
+function save(timeToReboot, queuedTimers)
+    luardb.set("sys.watchdog.timeToReboot", timeToReboot)
+    luardb.set("sys.watchdog.queuedTimers", collapse(queuedTimers))
+
+    if #queuedTimers > 0 then
+        local cause = queuedTimers[1].name
+        --[[
+        sys.watchdog.queuedTimers is not persistent.
+        sys.watchdog.reboot_cause records the cause for the last reboot.
+        sys.watchdog.max_reboot_count is set to the maximum number of consecutive
+        reboots with the same cause.
+        ]]
+        luardb.set("sys.watchdog.reboot_cause", cause)
+
+        if queuedTimers[1].max_reboot_count == nil then
+            luardb.unset("sys.watchdog.max_reboot_count")
+        else
+            luardb.set("sys.watchdog.max_reboot_count", queuedTimers[1].max_reboot_count)
+        end
+    else
+        luardb.unset("sys.watchdog.reboot_cause")
+        luardb.unset("sys.watchdog.max_reboot_count")
+    end
+end
+
+--[[
+    Update configuration values based on time since last access.
+]]
+function update(timeToReboot, queuedTimers)
+    if #queuedTimers > 0 then
+        local deltaTime = queuedTimers[1].remaining - timeToReboot
+        for _, timer in pairs(queuedTimers) do
+            timer.remaining = timer.remaining - deltaTime
+        end
+    end
+    return timeToReboot, queuedTimers
+end
+
+--[[
+    Recursively collapse a table structure into a string of Lua source.
+]]
+function collapse(var)
+    if     type(var) == "nil"     then return "nil"
+    elseif type(var) == "string"  then return "\"" .. var .. "\""
+    elseif type(var) == "number"  then return tostring(var)
+    elseif type(var) == "boolean" then return tostring(var)
+    elseif type(var) == "table" then
+        local str = "{"
+        for i, x in pairs(var) do
+            str = str .. "[" .. collapse(i) .. "]=" .. collapse(x) .. ","
+        end
+        return str .. "}"
+    end
+    return nil
+end
+
+--[[
+    Expand a stored table structure from a string of Lua source.
+]]
+function expand(str)
+    if type(str) == "string" then
+        local func = loadstring("return " .. str)
+        return func()
+    end
+    return {}
+end
+
+--[[
+    Check timer name is valid.
+]]
+function checkName(name)
+    if name == nil then
+        error("No timer name specified.", 0)
+    end
+    if type(name) ~= "string" or #name < 1 then
+        error("Invalid timer name.", 0)
+    end
+    return name
+end
+
+--[[
+    Check timer length is valid.
+]]
+function checkDelay(delay)
+    if delay == nil then
+        error("No timer length specified.", 0)
+    end
+    delay = tonumber(delay)
+    if delay == nil or delay < 1 then
+        error("Invalid timer length.", 0)
+    end
+    return delay
+end
+
+--[[
+    Check max_reboot_count is nil or valid.
+]]
+function checkMaxRebootCount(max_reboot_count)
+    if max_reboot_count ~= nil then
+        max_reboot_count = tonumber(max_reboot_count)
+        if max_reboot_count < 1 then
+            error("Invalid max_reboot_count.", 0)
+        end
+    end
+    return max_reboot_count
+end
+
+luasyslog.open('wdt_commit')
+luardb.lock()
+
+local status, message = pcall(main)
+
+luardb.unlock()
+
+if status ~= true then
+    luasyslog.log('LOG_ERR', "Error: " .. message)
+    io.stderr:write("Error: " .. message .. "\n")
+    io.stderr:write("Type '".. arg[0] .. " --help' for more information.\n")
+    os.exit(1)
+end
+
+luasyslog.close()
+os.exit(0)
+

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Network Scan</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script>
+        ajaxPostRequest("/installation_state", "state=scan_connect");
+
+        function resetStats() {
+            console.log("Reset stats clicked");
+            ajaxDeleteRequest("/rf_reset_stats/stats_landing");
+        }
+
+        function read_values_local_storage() {
+            for (var i = 0 ; i < 3 ; i++) {
+                g_cid[i] = localStorage.getItem("cid" + (i+1));
+                g_pass[i] = localStorage.getItem("pass" + (i+1));
+            }
+        }
+
+        // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_RF_STATISTICS|BITMASK_RF_CURR_READING|BITMASK_ORIENTATION);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupPeriodicKeepAlive();
+
+            // read current band selection to skip CBRS related steps
+            ajaxGetRequest("/operating_config", true, function(data) {
+                //console.log(data);
+                if (data.band_select == "48") {
+                    document.getElementById("next_btn").addEventListener('click', function(){ location.replace("/cbrs_install_parameters.html");});
+                } else {
+                    document.getElementById("next_btn").addEventListener('click', function(){ location.replace("/ttest.html");});
+                }
+            });
+
+            read_values_local_storage();
+            console.log("Reading locally stored variables " + g_cid[0] + ' ' + g_cid[1] + ' ' + g_cid[2] +
+            ' ' + g_pass[0] + ' ' + g_pass[1] + ' ' + g_pass[2]);
+            g_is_html5_supported = is_html5_supported();
+            // disable "show FWI cell mode" and "show all cells" mode. It may have been set in advanced page
+            // The negative side effect of this arrangement is that next time on entry into advanced page the
+            // tick boxes are cleared even if they were set before. So some extra code is added to the 
+            // advanced page to save and restore tick boxes states.
+            ajaxPostRequest("/control/toggleShowMode?showFWICells=false", "");
+            ajaxPostRequest("/control/toggleShowMode?showAllCells=false", "");
+
+            rfScanProcessor.checkPlayingSound();
+        });
+    </script>
+
+</head>
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box">
+        <div class="box-header">
+            <h2>Antenna Orientation</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Bearing:</div>
+                    <div class="data_field_text"><span id="bearing_data"></span></div>
+                </div>
+                <div class="data_field_set_block">
+                    <div class="data_field_label">Downtilt:</div>
+                    <div class="data_field_text"><span id="down_tilt_data"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="box" id="app-network-scan">
+        <div class="box-header">
+            <h2>Network Scan</h2>
+        </div>
+        <div class="box-content">
+            <p>
+                Install antenna pointing to the highest ranked cell site
+                that meets its minimum RSRP threshold. Adjust both the azimuth and elevation for highest
+                signal strength possible.
+            </p>
+            <div id="allowing_audio_indicator" class="data_field_set_line" style="display:none">
+                <button class="tinyfont no_float button_auto_width" onclick="rfScanProcessor.allowPlaySound()">Push this button to allow playing audio indicator</button>
+            </div>
+            <audio id="audio_indicator">
+                <source src="res/signal_ready.mp3"></source>
+            </audio>
+            <div class="box-content" id="wait_scannable_state_ind" style="display:none">
+                <div class="data_field_set_line">
+                    <div class="data_field_set_row fixed_field_height">
+                        <div class="data_field_text fixed_field_height valign_middle"><img src="/loading.gif"></div>
+                        <div class="data_field_text fixed_field_height" style="color:#ee7d11;">Waiting for scannable state...</div>
+                    </div>
+                </div>
+            </div>
+            <div id="scanResult"></div>
+        </div>
+    </div>
+<!--
+    <div class="box" id="app-network-stats">
+        <div class="box-header">
+            <h2>Cell RF Statistics</h2>
+        </div>
+        <div class="box-content">
+            <div id="statsResult"></div>
+            <div id="statsReset">
+                <button class='tinyfont' id='ResetStatsButtonId' onclick="resetStats()">Reset Stats</button>
+            </div>
+        </div>
+    </div>
+-->
+    <!-- <div id="systemStatusContent"></div> -->
+    <div class="box" id="app-network-buttons">
+        <div class="box-content">
+            <div class="data_field_set_button_line">
+                    <button class='tinyfont no_float' onclick="window.location='/data_entry.html'">Back</button>
+                    <button class='tinyfont no_float' id="next_btn" name="next_btn">Next</button>
+                    <button class='tinyfont no_float button_auto_width' onclick="window.location='/move_to_new_location.html'">Move To New Location</button>
+                    <button class='tinyfont button_auto_width no_float' style="width:auto;" onclick="window.location='/advanced_operations.html'">Advanced Operations</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script src="js/rf_scan_result_processor.js"></script>
+<script src="js/orientation_data_handler.js"></script>
+<script>
+var rfScanProcessor = new RfScanProcessor();
+var orientationDataHandler = new OrientationDataHandler();
+</script>
+</html>

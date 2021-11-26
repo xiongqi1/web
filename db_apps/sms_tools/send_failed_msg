@@ -1,0 +1,118 @@
+#!/bin/sh
+# This script send failed tx sms messages in txfailed folder called when
+# router enters to coverage area.
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+	echo ""
+	echo "This is shell script is for internal system use only."
+	echo "It is used by sms_send_failed_msg.template for sending previously failed SMS messages."
+	echo "Please do not call this script manually."
+	echo ""
+	exit 0
+fi
+
+
+# find platform
+. /etc/platform.txt
+if [ "$platform" = "Platypus" ] || [ "$platform" = "Platypus2" ]; then
+. /var/sms/sms_common.cfg
+elif [ "$platform" = "Avian" ]; then
+. /system/cdcs/usr/etc/sms/sms_common.cfg
+else
+. /usr/etc/sms/sms_common.cfg
+fi
+
+. $SMS_LIB_PATH/sms_utils
+
+# read nvram/rdb variables and create new cfg files
+read_vars_n_create_cfg_files
+
+. $config_file
+. $diag_config_file
+. $ssmtp_config
+
+sms_log "try to send failed tx messages in txfailed folder"
+
+send_one_sms()
+{
+	# set rdb variable and send sms
+	sms_rdb_var_clear
+
+	rdb_set wwan.0.sms.cmd.param.to "$DEST" 2>/dev/null
+	rdb_set wwan.0.sms.cmd.param.message "$SUB_TXT" 2>/dev/null
+	# check whether the msg has special characters that can be sent with GSM7 bits encoding
+	# and keep this setting for all separate messages.
+	rdb_set wwan.0.sms.has_special_chars
+	/usr/bin/check_sp "${SUB_TXT}" 2>/dev/null
+
+	if [ "$DIAG" = "DIAG" ]; then
+		rdb_set wwan.0.sms.cmd.command senddiag 2>/dev/null
+	else
+		rdb_set wwan.0.sms.cmd.command send 2>/dev/null
+	fi
+	sms_log "send sms file $FILE to $DEST, text: $SUB_TXT"
+
+	# wait for sending sms message
+	MSG_LEN=${#TEXT}
+	TIME_FACTOR=$(($MSG_LEN/1000))
+	let "TIMEOUT=120+$TIME_FACTOR*10"
+	sms_log "msg len = $MSG_LEN, set msg send timeout to $TIMEOUT seconds"
+	while true; do
+		SEND_RESULT=`rdb_get wwan.0.sms.cmd.send.status`
+		test "$SEND_RESULT" != "" && sms_log "sms result = $SEND_RESULT"
+		if [ "${SEND_RESULT}" = "[done] send" ]; then
+			if [ "$USE_SIM_STORAGE" = "YES" ]; then
+				test "$DIAG" = "DIAG" && mv "$FILE" $DIAG_OUTBOX/ 2>/dev/null
+				test "$DIAG" = "DIAG" || rm "$FILE" 2>/dev/null
+			else
+				mv "$FILE" $LOCAL_OUTBOX/ 2>/dev/null
+			fi
+			rm "$RAWFILE"  2>/dev/null
+			sms_log "sms tx OK, remaining timeout = $TIMEOUT"
+			return 0
+		else
+			let "TIMEOUT-=1"
+			#echo "timeout = $TIMEOUT"
+			ERRSTR=`echo "${SEND_RESULT}" | awk '{print $1}'`
+			if [ $TIMEOUT -eq 0 ] || [ "${ERRSTR}" = "[error]" ]; then
+				# move to failed msg folder to send later when failed with network error
+				if [ "${SEND_RESULT}" = "[error] txfailed with retry count over" ];then
+					mv "$FILE" $LOCAL_TXFAILED/ 2>/dev/null
+					mv "$RAWFILE" $LOCAL_TXFAILED/ 2>/dev/null
+				else
+					rm "$FILE"  2>/dev/null
+					rm "$RAWFILE"  2>/dev/null
+				fi
+				sms_log "sms tx failed, remaining timeout = $TIMEOUT"
+				return 255
+			fi
+			sleep 1
+		fi
+	done
+}
+
+send_with_retry()
+{
+	DEST=`awk '{if (NR==1) print $0}' $FILE | sed 's/^To:\ //'`
+	SUB_TXT=`awk '{if (NR>2) print $0}' $FILE | sed -e 's/^GSM7://' -e 's/^8BIT://' -e 's/^UCS2://'`
+	send_one_sms
+	test "$?" = "0" && return
+	if [ "$USE_SIM_STORAGE" = "YES" ]; then
+		test "$SEND_RESULT" = "[error] storage fail" && return
+	fi
+}
+
+failed_files=`ls $LOCAL_TXFAILED | grep -v ".raw"`
+test -z "$failed_files" && sms_log "There is no failed tx message" && exit 0
+
+mv "$LOCAL_TXFAILED"/* "$OUT_SPOOL_PATH"/
+cd $OUT_SPOOL_PATH
+for FILE in $failed_files; do
+	RAWFILE="$FILE.raw"
+	send_with_retry
+done
+
+exit 0

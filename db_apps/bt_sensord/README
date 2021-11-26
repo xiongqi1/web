@@ -1,0 +1,95 @@
+This is the README for the Bluetooth Sensor daemon (bt_sensord).
+
+Summary
+-------
+
+bt_sensord is intended for demo purposes and not for production use.
+
+bt_sensord is started up as a daemon during bootup. It periodically
+finds all paired devices, reads data from any sensor devices it recognises
+and stores the data into RDB.
+
+Prerequisite
+------------
+
+bt_sensord only reads from paired devices. The procedure for pairing a device:
+
+1. Find the device address. From the command line this can be done with
+hcitool:
+
+        root:~# hcitool scan
+        Scanning ...
+                8C:DE:52:36:4A:44       TAIDOC TD2551
+
+2. Run the bt_pair.sh script. The first parameter is the address found above
+and the second parameter is the device type. Run with -h to see the device type
+values:
+
+        root:~# bt_pair.sh 8C:DE:52:36:4A:44 1
+
+RDB variables
+-------------
+
+* Each device is described by a device tree. These are created during device
+pairing (bt_pair.sh).
+
+bluetooth.device.<device_index>.addr
+    - Device bluetooth MAC address
+
+bluetooth.device.<device_index>.name:
+    - Device name as obtained via bluetooth inquiry
+
+bluetooth.device.<device_index>.type
+    - Device type. Valid values are:
+        0 = Unknown
+        1 = TD2251 Weight Scale
+        2 = Nonin 3230 Pulse Oximeter
+
+* Each device can have a data tree for data read from the device.:
+
+bluetooth.device.<device_index>.data.start_idx
+    - 0 based index describing the data slot where reads should start
+
+bluetooth.device.<device_index>.data.max_count
+    - The maximum data items that will be stored
+
+bluetooth.device.<device_index>.data.count
+    - The count of the number of data items currently stored for this device.
+      That is, the data is in a circular buffer with data in slots
+         (start_idx) to ((start_idx + count - 1) % max_count)
+
+bluetooth.device.<device_index>.data.<data_index>.timestamp
+bluetooth.device.<device_index>.data.<data_index>.value
+    - <data_index> valid range is 0 to (max_count - 1)
+    - The timestamp is a string in format: dd-mm-yy hh:mm
+    - The value is the string representation of a float value.
+
+RDB Sample
+-----------
+
+bluetooth.device.0.addr p       8C:DE:52:36:4A:44
+bluetooth.device.0.name p       TAIDOC TD2551
+bluetooth.device.0.type p       1
+bluetooth.device.0.data.max_count       p       100
+bluetooth.device.0.data.start_idx       p       0
+bluetooth.device.0.data.count   p       10
+bluetooth.device.0.data.0.timestamp     p       11-11-14 10:36
+bluetooth.device.0.data.0.value p       24.9
+bluetooth.device.0.data.1.timestamp     p       11-11-14 10:46
+bluetooth.device.0.data.1.value p       60.2
+bluetooth.device.0.data.2.timestamp     p       11-11-14 10:46
+bluetooth.device.0.data.2.value p       60.2
+bluetooth.device.0.data.3.timestamp     p       11-11-14 10:47
+bluetooth.device.0.data.3.value p       60.2
+bluetooth.device.0.data.4.timestamp     p       11-11-14 10:36
+bluetooth.device.0.data.4.value p       24.9
+bluetooth.device.0.data.5.timestamp     p       11-11-14 14:32
+bluetooth.device.0.data.5.value p       84.8
+bluetooth.device.0.data.6.timestamp     p       11-11-14 14:32
+bluetooth.device.0.data.6.value p       60.1
+bluetooth.device.0.data.7.timestamp     p       11-11-14 14:33
+bluetooth.device.0.data.7.value p       12.4
+bluetooth.device.0.data.8.timestamp     p       11-11-14 15:07
+bluetooth.device.0.data.8.value p       60.0
+bluetooth.device.0.data.9.timestamp     p       11-11-14 15:08
+bluetooth.device.0.data.9.value p       60.0

@@ -1,0 +1,602 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<head>
+<title>MAC/IP/Port Filtering</title>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/util.js"></script>
+<%   
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['addRule'];
+	if(tempval=='1') {
+		retval = set_single( 'service.firewall.IPPortFilterRules='+form['newRule'], '-p');  
+	}
+	tempval = form['portFilterEnabled'];
+	retval = set_single( 'service.firewall.IPPortFilterEnable='+tempval, '-p'); 
+	tempval = form['defaultFirewallPolicy'];
+	retval = set_single( 'service.firewall.DefaultFirewallPolicy='+tempval, '-p');
+%> var FilterRules =  <%val='\"'+get_single('service.firewall.IPPortFilterRules')+'\"';%>@@val; <%
+} 
+else { /*GET*/
+	form['addRule']='0';
+}
+%>
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+var FilterRules =  <%val='\"'+get_single('service.firewall.IPPortFilterRules')+'\"';%>@@val;
+var rules_num = (FilterRules.length<10)? 0:FilterRules.split(";").length;
+var MAX_RULES = 20;
+var secs
+var timerID = null
+var timerRunning = false
+var timeout = 3
+var delay = 1000
+
+if( rules_num == 0 )
+	FilterRules = "";
+function InitializeTimer(){
+	// Set the length of the timer, in seconds
+	secs = timeout
+	StopTheClock()
+	StartTheTimer()
+}
+
+function StopTheClock(){
+	if(timerRunning)
+		clearTimeout(timerID)
+	timerRunning = false
+}
+
+function StartTheTimer(){
+	if (secs==0){
+		StopTheClock()
+		timerHandler();
+		secs = timeout
+		StartTheTimer()
+    }else{
+		self.status = secs
+		secs = secs - 1
+		timerRunning = true
+		timerID = self.setTimeout("StartTheTimer()", delay)
+	}
+}
+
+function updatePacketCount(str){
+	var pc = new Array();
+	pc = str.split(" ");
+	for(i=0; i < pc.length; i++){
+		e = document.getElementById("pktCnt" + i);
+		if(e) e.innerHTML = pc[i];
+	}
+}
+
+function timerHandler(){
+	$.get("/cgi-bin/getRulesPacketCount.cgi", updatePacketCount);
+}
+
+function checkRange(str, num, min, max)
+{
+    d = atoi(str,num);
+    if(d > max || d < min)
+        return false;
+    return true;
+}
+
+function checkIpAddr(field)
+{
+	if(field.value == "")
+		return false;
+
+	if (isAllNumAndSlash(field.value) == 0){
+		return false;
+	}
+
+	var ip_pair = new Array();
+	ip_pair = field.value.split("/");
+
+	if(ip_pair.length > 2){
+		return false;
+	}
+
+	if(ip_pair.length == 2){
+		// sub mask
+		if(!ip_pair[1].length)
+			return false;
+		if(!isNumOnly(ip_pair[1])){
+			return false;
+		}
+		tmp = parseInt(ip_pair[1], 10);
+		if(tmp < 0 || tmp > 32){
+			return false;
+		}
+	}
+
+    if( (!checkRange(ip_pair[0],1,0,255)) ||
+		(!checkRange(ip_pair[0],2,0,255)) ||
+		(!checkRange(ip_pair[0],3,0,255)) ||
+		(!checkRange(ip_pair[0],4,0,254)) ){
+		return false;
+    }
+	return true;
+}
+
+function atoi(str, num){
+	i=1;
+	if(num != 1 ){
+		while (i != num && str.length != 0){
+			if(str.charAt(0) == '.'){
+				i++;
+			}
+			str = str.substring(1);
+		}
+	  	if(i != num )
+			return -1;
+	}
+	
+	for(i=0; i<str.length; i++){
+		if(str.charAt(i) == '.'){
+			str = str.substring(0, i);
+			break;
+		}
+	}
+	if(str.length == 0)
+		return -1;
+	return parseInt(str, 10);
+}
+
+function isAllNum(str){
+	for (var i=0; i<str.length; i++){
+	    if((str.charAt(i) >= '0' && str.charAt(i) <= '9') || (str.charAt(i) == '.'))
+			continue;
+		return 0;
+	}
+	return 1;
+}
+
+function isAllNumAndSlash(str){
+	for (var i=0; i<str.length; i++){
+	    if( (str.charAt(i) >= '0' && str.charAt(i) <= '9') || (str.charAt(i) == '.') || (str.charAt(i) == '/'))
+			continue;
+		return 0;
+	}
+	return 1;
+}
+
+
+
+function isNumOnly(str){
+	for (var i=0; i<str.length; i++){
+	    if((str.charAt(i) >= '0' && str.charAt(i) <= '9') )
+			continue;
+		return 0;
+	}
+	return 1;
+}
+
+function ipportFormCheck(){
+var f = document.ipportFilter;
+	if( f.sip_address.value == "" && 
+		f.dip_address.value == "" &&
+		f.sFromPort.value == "" &&
+		f.dFromPort.value == "" &&
+		f.mac_address.value == ""){
+		alert("Please input any IP or/and port value.");
+		return;
+	}
+
+	if( f.mac_address.value != "" && isValidMacAddress(f.mac_address.value) == false) {
+		alert("Invalid mac address.");
+		f.mac_address.focus();
+		return;
+	} 
+
+	if(f.sFromPort.value != ""){
+		d1 = atoi(f.sFromPort.value, 1);
+		if(isAllNum( f.sFromPort.value ) == 0){
+			alert("Invalid port number: source port.");
+			f.sFromPort.focus();
+			return;
+		}
+		if(d1 > 65535 || d1 < 1){
+			alert("Invalid port number: source port.");
+			f.sFromPort.focus();
+			return;
+		}
+		
+		if(f.sToPort.value != ""){
+			if(isAllNum( f.sToPort.value ) == 0){
+				alert("Invalid port number: source port.");
+				return;
+			}		
+			d2 = atoi(f.sToPort.value, 1);
+			if(d2 > 65535 || d2 < 1){
+				alert("Invalid source port number.");
+				return;
+			}
+			if(d1 > d2){
+			alert("Invalid source port range setting.");
+			return;
+			}
+		}
+	}
+
+	if(f.dFromPort.value != ""){
+		d1 = atoi(f.dFromPort.value, 1);
+		if(isAllNum( f.dFromPort.value ) == 0){
+			alert("Invalid port number: dest port.");
+			return;
+		}
+		if(d1 > 65535 || d1 < 1){
+			alert("Invalid port number: dest port.");
+			return;
+		}
+		
+		if(f.dToPort.value != ""){
+			if(isAllNum( f.dToPort.value ) == 0){
+				alert("Invalid port number: dest port.");
+				return;
+			}		
+			d2 = atoi(f.dToPort.value, 1);
+			if(d2 > 65535 || d2 < 1){
+				alert("Invalid dest port number.");
+				return;
+			}
+			if(d1 > d2){
+			alert("Invalid dest port range setting.");
+			return;
+			}
+		}
+	}
+	// check ip address format
+	if(f.sip_address.value != ""){
+		if(! checkIpAddr(f.sip_address) ){
+			alert("Source IP address format error.");
+			return;
+		}
+    }
+	if(f.dip_address.value != ""){
+		if(! checkIpAddr(f.dip_address) ){
+			alert("Dest IP address format error.");
+			return;
+		}
+    }
+	if(++rules_num >= (MAX_RULES-1) ){
+		alert("The rule number is exceeded "+ MAX_RULES +".");
+		return;
+	}
+
+	f.newRule.value = FilterRules==""?"":FilterRules+";";
+	f.newRule.value += (f.sip_address.value==""?"any/0":f.sip_address.value)+",,"+f.sFromPort.value+","+f.sToPort.value+","+(f.dip_address.value==""?"any/0":f.dip_address.value)+",,"+f.dFromPort.value+","+f.dToPort.value+","+f.protocol.value+","+f.action.value+","+f.comment.value+","+f.mac_address.value;
+	f.addRule.value = "1";
+	f.submit();
+}
+
+
+function display_on(){
+  if(window.XMLHttpRequest){ // Mozilla, Firefox, Safari,...
+    return "table-row";
+  } else if(window.ActiveXObject){ // IE
+    return "block";
+  }
+}
+
+function disableTextField (field){
+  if(document.all || document.getElementById)
+    field.disabled = true;
+  else {
+    field.oldOnFocus = field.onfocus;
+    field.onfocus = skip;
+  }
+}
+
+function enableTextField (field){
+  if(document.all || document.getElementById)
+    field.disabled = false;
+  else {
+    field.onfocus = field.oldOnFocus;
+  }
+}
+
+function defaultPolicyChanged(){
+	if( document.ipportFilter.defaultFirewallPolicy.options.selectedIndex == 0){
+		document.ipportFilter.action.options.selectedIndex = 0;
+	}else
+		document.ipportFilter.action.options.selectedIndex = 1;
+}
+function initState(){
+	if(IPPortFilterEnable == '1')
+		document.ipportFilter.portFilterEnabled.options.selectedIndex = 1;
+	if(DefaultFirewallPolicy== '1')
+		document.ipportFilter.defaultFirewallPolicy.options.selectedIndex = 1;
+	updateState()
+
+}
+function updateState(){
+    if(! rules_num ){
+ 		disableTextField(document.ipportFilterDelete.deleteSelFilterPort);
+ 		disableTextField(document.ipportFilterDelete.reset);
+	}else{
+        enableTextField(document.ipportFilterDelete.deleteSelFilterPort);
+        enableTextField(document.ipportFilterDelete.reset);
+	}
+
+	if( document.ipportFilter.defaultFirewallPolicy.options.selectedIndex == 0){
+		document.ipportFilter.action.options.selectedIndex = 0;
+	}else
+		document.ipportFilter.action.options.selectedIndex = 1;
+	protocolChange();
+	if( document.ipportFilter.portFilterEnabled.options.selectedIndex == 1)
+		InitializeTimer();	// update packet count
+}
+
+function actionChanged(){
+	if( document.ipportFilter.defaultFirewallPolicy.options.selectedIndex != document.ipportFilter.action.options.selectedIndex)
+		alert("The action of this rule would be the same with default policy.");
+}
+
+function protocolChange(){
+	if( document.ipportFilter.protocol.options.selectedIndex == 1 ||
+		document.ipportFilter.protocol.options.selectedIndex == 2){
+		document.ipportFilter.dFromPort.disabled = false;
+		document.ipportFilter.dToPort.disabled = false;
+		document.ipportFilter.sFromPort.disabled = false;
+		document.ipportFilter.sToPort.disabled = false;
+	}else{
+		document.ipportFilter.dFromPort.disabled = true;
+		document.ipportFilter.dToPort.disabled = true;
+		document.ipportFilter.sFromPort.disabled = true;
+		document.ipportFilter.sToPort.disabled = true;
+
+		document.ipportFilter.dFromPort.value = 
+		document.ipportFilter.dToPort.value = 
+		document.ipportFilter.sFromPort.value = 
+		document.ipportFilter.sToPort.value = "";
+	}
+}
+
+var RulesRay = new Array();
+function deleteClick(){
+var f = document.ipportFilter;
+	f.newRule.value = "";
+    for ( i=0; i<rules_num; i++ ){
+		if( document.getElementById('delRule'+i).checked==true ){
+			f.addRule.value = "1"
+		}
+		else{
+			if( f.newRule.value!="" )
+				f.newRule.value += ";";
+			f.newRule.value += RulesRay[i];
+		}
+	}
+	if (f.addRule.value == "1"){
+		f.submit();
+	}
+}
+
+function showIPPortFilterRules(){
+var items = new Array();
+var httpstr = "";
+var temp;
+	RulesRay = FilterRules.split(";");
+
+	for ( i=0; i<rules_num; i++ ){
+		items = RulesRay[i].split(",");
+		if( items.length!=12 ) {alert( "FilterRules format error "+items); return;}
+		httpstr += "<tr><td style=\"font-size:10px\">&nbsp;<input type=checkbox id=delRule"+i+"></td>";
+		temp=items[11]==""?"":items[11];
+		httpstr += "<td style=\"font-size:10px\">"+temp+" </td>";
+		temp=items[4]=="any/0"?"":items[4];
+		httpstr += "<td style=\"font-size:10px\">"+temp+" </td>";
+		temp=items[0]=="any/0"?"":items[0];
+		httpstr += "<td style=\"font-size:10px\">"+temp+" </td>";
+		httpstr += "<td style=\"font-size:10px\">";
+		switch(items[8]){
+            case '1'://PROTO_TCP
+				httpstr += "&nbsp;TCP</td>";
+				break;
+            case '2'://PROTO_UDP
+				httpstr += "&nbsp;UDP</td>";
+				break;
+            case '4'://PROTO_ICMP
+				httpstr += "ICMP</td>";
+				break;
+            case '5'://PROTO_NONE
+				httpstr += "&nbsp;ALL</td>";
+				break;
+		}
+		// output dest Port Range
+		httpstr += "<td style=\"font-size:10px\">";
+		if(items[7]!="0" && items[7]!="")
+			httpstr += items[6]+"-"+items[7]+"</td>";
+		else{
+			if(items[7]=="0"){
+				httpstr += "</td>";
+			}else{
+				httpstr += items[7]+"</td>";
+			}
+		}
+		// output Source Port Range
+		httpstr += "<td style=\"font-size:10px\">";
+		if(items[3]!="0" && items[3]!="")
+			httpstr += items[2]+"-"+items[3]+"</td>";
+		else{
+			if(items[3]=="0"){
+				httpstr += "</td>";
+			}else{
+				httpstr += items[3]+"</td>";
+			}
+		}
+		// output action
+		switch(items[9]){
+			case '0':
+				httpstr += "<td style=\"font-size:10px\" id=portFilterActionDrop"+i+">Drop</td>";
+			break;
+			case '1':
+				httpstr += "<td style=\"font-size:10px\" id=portFilterActionAccept"+i+">Accept</td>";
+			break;
+		}
+		// output Comment
+		httpstr += "<td style=\"font-size:10px\">";
+		if( items[10].length > 1 )
+			httpstr += items[10]+"</td>";
+		else
+			httpstr += "&nbsp;</td>";
+		// output the id of "packet count"
+		httpstr += "<td style=\"font-size:10px\" id=pktCnt"+i+"></td>";
+		httpstr += "</tr>";
+	}
+	if(document.ipportFilter.defaultFirewallPolicy.options.selectedIndex == '0')
+		httpstr += "<tr><td colspan=9 id=portCurrentFilterDefaultAccept><div align=center>Others would be accepted.</div></td><td style=\"font-size:10px\" id=pktCnt"+i+"></td></tr>";
+	else
+		httpstr += "<tr><td colspan=9 id=portCurrentFilterDefaultDrop><div align=center>Others would be dropped.</div></td><td style=\"font-size:10px\" id=pktCnt"+i+"></td></tr>";
+	document.getElementById("RulesList").innerHTML = '<table width=98% border=0 cellpadding=2 cellspacing=1 >\
+	<tr><th class=title colspan=10>Current IP/Port filtering rules in system: </th></tr>\
+	<tr>\
+		<td style="font-size:10px">Del.</td>\
+		<td style="font-size:10px">Mac Address</td>\
+		<td style="font-size:10px">Dest IP Address</td>\
+		<td style="font-size:10px">Source IP Address</td>\
+		<td style="font-size:10px">Protocol</td>\
+		<td style="font-size:10px">Dest Port Range</td>\
+		<td style="font-size:10px">Source Port Range</td>\
+		<td style="font-size:10px">Action</td>\
+		<td style="font-size:10px">Comment</td>\
+		<td style="font-size:10px">PktCnt</td>\
+	</tr>'+httpstr+'</table>';	
+}
+</script>
+
+<div class="content" >
+<h3>Firewall > MAC/IP/Port Filtering</h3>
+<div class="line" style="padding-left:20px; margin: 8px 7% 16px 0;"></div>
+<!-- ====================   BASIC  form  ==================== -->
+<form name="ipportFilter" method="POST" action="@@request['SCRIPT_NAME']">
+<input type='hidden' name='addRule' value="@@form['addRule']">
+<input type='hidden' name='newRule' maxlength="2048" value="@@form['newRule']">
+<table width="98%">
+    <tr><th>Basic Settings</th></tr>
+</table>
+<table width="98%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td width="60%">MAC/IP/Port Filtering</td>
+    <td>
+	<select onChange="updateState()" name="portFilterEnabled" size="1">
+	<option value=0 >Disable</option>
+    <option value=1 >Enable</option>
+    </select>
+    </td>
+</tr>
+<tr>
+	<td>Default Policy -- The packet that don't match with any rules would be:</td>
+	<td>
+		<select onChange="defaultPolicyChanged()" name="defaultFirewallPolicy">
+		<option value=0 >Accepted.</option>
+		<option value=1 >Dropped.</option>
+		</select>
+    </td>
+</tr>
+</table>
+<div align="center" style="margin-right:5% ">
+<p></p>
+	<input type="submit" value="Save">&nbsp;&nbsp;
+	<input type="reset" value="Reset" id="portBasicReset" name="reset">
+<p></p>
+</div>
+<!-- ====================   MAC/IP/Port form   ==================== -->
+<table width="98%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<th class="title" colspan="4" id="portFilterSet">IP/Port Filter Settings</th>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterMac">Mac address</td>
+	<td colspan="2"><input type="text" size="18" name="mac_address"></td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterDIPAddr">
+		Dest IP Address	</td>
+	<td colspan="2">
+		<input type="text" size="16" name="dip_address">
+	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterSIPAddr">
+		Source IP Address	</td>
+	<td colspan="2">
+  		<input type="text" size="16" name="sip_address">
+	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterProtocol">Protocol</td>
+	<td colspan="2">
+		<select onChange="protocolChange()" name="protocol" id="procotol">
+		<option value="5">None</option>
+		<option value="1">TCP</option>
+		<option value="2">UDP</option>
+		<option value="4">ICMP</option>
+		</select>&nbsp;&nbsp;	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterDPortRange">
+		Dest. Port Range	</td>
+	<td colspan="2">
+  		<input type="text" size="5" name="dFromPort" id="dFromPort">-
+		<input type="text" size="5" name="dToPort" id="dToPort">	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterSPortRange">
+		Src Port Range	</td>
+	<td colspan="2">
+  		<input type="text" size="5" name="sFromPort" id="sFromPort">-
+		<input type="text" size="5" name="sToPort" id="sToPort">	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterAction">
+		Action	</td>
+	<td colspan="2">
+		<select onChange="actionChanged()" name="action">
+   		<option value="0" id="portFilterActionDrop">Drop</option>
+		<option value="1" id="portFilterActionAccept">Accept</option>
+   		</select>	</td>
+</tr>
+<tr>
+	<td class="head" colspan="2" id="portFilterComment">Comment</td>
+	<td colspan="2"><input type="text" name="comment" size="16" maxlength="32"></td></tr>
+</table>
+<table width="98%" cellpadding="2" cellspacing="1">
+<tr><td>
+<script>document.write("(The maximum rule count is "+ MAX_RULES +".)");</script>
+</td></tr>
+</table>
+<div align="center" style="margin-right:5%">
+<p></p>
+	<input type="button" value="Save" id="portFilterApply" name="addFilterPort" onClick="ipportFormCheck()"> &nbsp;&nbsp;
+	<input type="reset" value="Reset" id="portFilterReset" name="reset">
+<p></p>
+</div>    
+</form>
+<!-- =========================  delete rules  ========================= -->
+<form action=/goform/ipportFilterDelete method=POST name="ipportFilterDelete">
+<div id="RulesList"></div>
+<div align="center" style="margin-right:5%">
+<p></p>
+<input type="button" value="Delete Selected" id="portCurrentFilterDel" name="deleteSelFilterPort" onClick="deleteClick()">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="portCurrentFilterReset" name="reset">
+<p></p>
+</div>
+<script type="text/javascript">
+var IPPortFilterEnable =  <%val='\"'+get_single('service.firewall.IPPortFilterEnable')+'\"';%>@@val;
+var DefaultFirewallPolicy =  <%val='\"'+get_single('service.firewall.DefaultFirewallPolicy')+'\"';%>@@val;
+showIPPortFilterRules();
+initState();
+</script>
+</form>
+</div></div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

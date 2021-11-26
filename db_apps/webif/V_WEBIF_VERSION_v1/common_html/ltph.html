@@ -1,0 +1,411 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>System Monitor</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['pingdst'];
+	retval = set_single( 'service.systemmonitor.destaddress='+tempval );
+	tempval = form['pingdst2'];
+	retval = set_single( 'service.systemmonitor.destaddress2='+tempval );
+	tempval = form['pingtimer'];
+	retval = set_single( 'service.systemmonitor.periodicpingtimer='+tempval );
+	tempval = form['pingacctmr'];
+	retval = set_single( 'service.systemmonitor.pingacceleratedtimer='+tempval );
+	tempval = form['pingfailcnt'];
+	retval = set_single( 'service.systemmonitor.failcount='+tempval );
+	tempval = form['resetAnyway'];
+	retval = set_single( 'service.systemmonitor.forcereset='+tempval );
+}
+else { /*GET*/
+	temp = get_single( 'service.systemmonitor.destaddress' );
+	form['pingdst'] = temp;
+	temp = get_single( 'service.systemmonitor.destaddress2' );
+	form['pingdst2'] = temp;
+	temp = get_single( 'service.systemmonitor.periodicpingtimer' );
+	form['pingtimer'] = temp;
+	temp = get_single( 'service.systemmonitor.pingacceleratedtimer' );
+	form['pingacctmr'] = temp;
+	temp = get_single( 'service.systemmonitor.failcount' );
+	form['pingfailcnt'] = temp;
+	temp = get_single( 'service.systemmonitor.forcereset' );
+	if(temp=="")
+		temp="0";
+	form['resetAnyway'] = temp;
+}
+%>
+<body>
+<div id="contentWrapper" >
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("ltph");
+
+function submitF() {       
+	var f=document.form;
+	try {
+		if ( (f.pingtimer.value < 0) ||  (f.pingtimer.value!=0 && f.pingtimer.value < 300) || (f.pingtimer.value > 65535) ) {
+			alert(_("monitor warningMsg1"));
+			f.pingtimer.select();
+			return;
+		}
+		if ( (f.pingacctmr.value < 0) || (f.pingacctmr.value!=0 && f.pingacctmr.value<60) || (f.pingacctmr.value > 65535) ) {
+			alert(_("log Error")+": "+_("monitor warningMsg2"));
+			f.pingacctmr.select();
+			return;
+		}
+		if ( (f.pingfailcnt.value < 0) || (f.pingfailcnt.value!=0 && f.pingfailcnt.value<1) || (f.pingfailcnt.value > 65535) ) {
+			alert(_("monitor warningMeg10"));
+			f.pingfailcnt.select();
+			return;
+		}
+		if ( (f.resetAnyway.value < 0) || (f.resetAnyway.value!=0 && f.resetAnyway.value<5) || (f.resetAnyway.value > 65535)) {
+			alert(_("monitor warningMsg4"));
+			f.resetAnyway.select();
+			return;
+		} 
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+} 
+
+function switchItem( action ) {
+	if( action ) {
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(0); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("close introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='';
+	}
+	else {
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(1); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("display introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='none';
+	}  
+}
+
+#if 1
+
+// jquery body
+$(function(){
+	
+	var ping_info=[
+		{pinging:false,server:""},
+  		{pinging:false,server:""},
+    	];
+	
+	// set element activation
+	$("#pingdst,#pingdst2").keyup(function(e){
+		
+		var len1;
+		var len2;
+		
+		len1=$("#pingdst").val().length>0;
+		len2=$("#pingdst2").val().length>0;
+		
+		$("#pingdst2").attr("disabled",!len1 && !len2);
+		
+		$("#pingtimer").attr("disabled",!len1 && !len2);
+		$("#pingacctmr").attr("disabled",!len1 && !len2);
+		$("#pingfailcnt").attr("disabled",!len1 && !len2);
+	});
+	
+	
+	// perform automatic ping
+	$("#pingdst,#pingdst2").keyup(function(e){
+		
+		var el;
+		var el_array=["pingdst","pingdst2"];
+		var idx;
+		var server;
+		var el_id;
+		
+		// get current el info
+		el=$(this);
+		el_id=el.attr("id");
+		idx=$.inArray(el_id,el_array);
+		
+		// get peripheral elements
+		var el_wait=$("#"+el_id+"_wait");
+		var el_stat=$("#"+el_id+"_stat");
+		
+		server=el.val();
+				
+		// bypass if no server is available
+		if(server.length==0) {
+			// hide pinging icon
+			el_wait.hide();
+			el_stat.hide();
+			return;
+		}
+
+		// bypass if we have no change in the server
+		if(ping_info[idx].server==server)
+			return;
+		
+		// when the server changed from blank to something while pinging
+		el_wait.toggle(ping_info[idx].pinging);
+		
+		// bypass if currently pinging or already pinged
+		if(ping_info[idx].pinging)
+			return;
+		
+		// update ping info
+		ping_info[idx].pinging=true;
+		ping_info[idx].server=server;
+		
+		// show pinging icon
+		el_wait.toggle(ping_info[idx].pinging);
+		el_stat.toggle(!ping_info[idx].pinging);
+		
+		$.getJSON(
+			"./cgi-bin/ltph.cgi",
+			{reqtype:"ping",reqparam:server},
+			function(res){
+				el_stat.html( (res.cgiresult==0)?_("succ"):_("fail"));
+				
+				// udpate ping info
+				ping_info[idx].pinging=false;
+				
+				// hide pinging icon
+				el_wait.toggle(ping_info[idx].pinging);
+				el_stat.toggle(!ping_info[idx].pinging);
+				
+				// trigger keyup if we have a new server
+				if(ping_info[idx].server!=el.val())
+					el.trigger("keyup");
+			}
+		);
+		
+		return;
+	});
+	
+	
+	// trigger events
+	$("#pingdst,#pingdst2").trigger("keyup");
+
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+#else
+$(function(){
+
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+#endif
+
+</script>
+
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("treeapp sysMonitor"));</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<!--<h3>Services > System Monitor</h3>-->
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("treeapp sysMonitor"));</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+	<tr><th id="introduction0"><script language="JavaScript">document.write(_("periodic ping settings"));</script>
+	<a href=javascript:switchItem(1); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("display introduction"));</script></a>
+	</th></tr>
+</table>
+
+<table id="introduction1" style="display:none">
+<tr><td>
+<% var _lang=get_single('webinterface.language'); if(_lang=='ar') {%>
+<script language="JavaScript">document.write(_("ping instruction01").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction02").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction03").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction04").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction05").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction06").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction07").replace("MyZone","الموجه"));</script><br/>
+<br/>
+<script language="JavaScript">document.write(_("ping instruction08").replace("MyZone","الموجه"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction09").replace("MyZone","الموجه"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction10").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction11").replace("MyZone","الموجه"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction12").replace("MyZone","الموجه"));</script><br/>
+<%}else{%>
+<script language="JavaScript">document.write(_("ping instruction01").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction02").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction03").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction04").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction05").replace("The MyZone","Your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction06").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction07").replace("the MyZone","your router"));</script><br/>
+<br/>
+<script language="JavaScript">document.write(_("ping instruction08").replace("the MyZone","your router"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction09").replace("the MyZone","your router"));</script><br/>
+<br/> 
+<script language="JavaScript">document.write(_("ping instruction10").replace("The MyZone","Your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction11").replace("the MyZone","your router"));</script><br/>
+<script language="JavaScript">document.write(_("ping instruction12").replace("the MyZone","your router"));</script><br/>
+<%}%>
+</td></tr>
+</table>
+
+<table width="75%">
+<tr> 
+<td width="38%"><script language="JavaScript">document.write(_("monitor destinationAddress"));</script></td>
+<td><input type=text id="pingdst" name='pingdst' size=32 maxlength=64 value="@@form['pingdst']">&nbsp;<img src="images/waiting.gif" width="18" height="18" id="pingdst_wait" style="display:none"/><label id="pingdst_stat"></label></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("monitor secondAddress"));</script></td>
+		<td><input type=text id="pingdst2" name='pingdst2' size=32 maxlength=64 value="@@form['pingdst2']">&nbsp;<img src="images/waiting.gif" width="18" height="18" id="pingdst2_wait" style="display:none"/><label id="pingdst2_stat"></label></td>
+</tr>
+
+<tr>
+<td><script language="JavaScript">document.write(_("monitor pingTimer"));</script></td>
+<td> <input type=text id="pingtimer" name='pingtimer' size=8 maxLength=5 value="@@form['pingtimer']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period300"));</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("monitor acceleratedTimer"));</script></td>
+<td><input type=text id="pingacctmr" name='pingacctmr' size=8 maxLength=5 value="@@form['pingacctmr']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period60"));</script></td>
+</tr>
+
+<tr>
+<td><script language="JavaScript">document.write(_("monitor failCount"));</script></td>
+<td> <input type=text id="pingfailcnt" name='pingfailcnt' size=8 maxLength=5 value="@@form['pingfailcnt']" onkeyup=NumfieldEntry(this); ID="Text1"> &nbsp;<script language="JavaScript">document.write(_("count"));</script></td>
+</tr>
+</table>
+
+<table>
+	<tr><th><script language="JavaScript">document.write(_("monitor periodicReset"));</script></th></tr>
+</table>
+
+<table width="75%">
+<tr> 
+<td width="38%"><script language="JavaScript">document.write(_("force reset"));</script></td>
+<td><input type=text name='resetAnyway' size=8 maxLength=5 value="@@form['resetAnyway']" onkeyup=NumfieldEntry(this);> &nbsp;<script language="JavaScript">document.write(_("period5min"));</script></td>
+</tr>
+
+#if 1 
+	<tr>
+		<td width="38%" id="reboot_rnd_min_title"></td>
+		<td>
+			<select id="reboot_rnd_min" name="reboot_rnd_min">
+		</td>
+	</tr>
+#endif
+</table>
+
+#if 1
+<%
+	if (request["REQUEST_METHOD"] == "POST") {
+		if(form["reboot_rnd_min"]!=undefined) {
+			set_single_direct("-p","service.systemmonitor.forcereset.rndmin",form["reboot_rnd_min"]);
+		}
+	}
+%>
+
+<script language="JavaScript">
+
+$(function(){
+	$.each(
+		{
+			"#reboot_rnd_min_title":_("random period"),
+		},
+
+		function(el,str){
+			if($(el).is("input:button"))
+				$(el).val(str);
+			else
+				$(el).html(str);
+		}
+	);
+
+	$.each(
+		["#reboot_rnd_min"],
+		function(idx,el) {
+			$.each(
+				{
+					"1":"1 "+_("minute"),
+					"2":"2 "+_("minutes"),
+					"3":"3 "+_("minutes"),
+					"5":"5 "+_("minutes"),
+					"5":"5 "+_("minutes"),
+					"10":"10 "+_("minutes"),
+					"15":"15 "+_("minutes"),
+					"20":"20 "+_("minutes"),
+					"25":"25"+_("minutes"),
+					"30":"30 "+_("minutes"),
+					"35":"35 "+_("minutes"),
+					"45":"45 "+_("minutes"),
+					"60":"1 "+_("hour"),
+				},
+    				function(val,txt) {
+					$(el).append("<option value=\""+val+"\""+">"+txt+"</option>");
+				}
+    			);
+		}
+	);
+
+	$("input[name=resetAnyway]").keyup(function() {
+
+		var periodic_ping;
+		var val=$(this).val();
+
+		periodic_ping=(parseInt(val)||0);
+
+		$("#reboot_rnd_min option").each(function() {
+			$(this).attr("disabled",parseInt($(this).val())>=periodic_ping);
+		});
+
+		var last=$("#reboot_rnd_min option:enabled:last");
+		
+		$("#reboot_rnd_min").attr("disabled",last.length==0);
+		if( $("#reboot_rnd_min option:selected").is(":disabled") && (last.length>0) )
+			$("#reboot_rnd_min").val(last.val());
+	});
+
+	$("#reboot_rnd_min").val("<% get_single_direct('service.systemmonitor.forcereset.rndmin'); %>");
+	$("input[name=resetAnyway]").trigger("keyup");
+});
+
+</script>
+#endif
+
+<div align="center"><br/><input type="Button" value="Save" id="bottomButton" onClick="javascript:submitF()" style="width:120px;"></div>
+</form>
+</div> <!-- <div class="hide_for_pppoe_en"> -->
+</div> <!-- <div id="contentWrapper" > -->
+<div id="footer"></div>
+<script type="text/javascript">
+document.form.pingdst.focus();
+CopyRight();
+document.getElementById("bottomButton").value=_("CSsave");
+</script>
+</body>
+</html>

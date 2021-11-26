@@ -1,0 +1,527 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>NetComm Wireless Router</title>
+<%_sv=get_single('sw.version'); _lang=get_single('webinterface.language');%>
+<link href="GUI-ntcStyle.css?@@_sv" rel="stylesheet" type="text/css"/>
+<%if(_lang=='ar') {%>
+<link href="GUI-ntcStyle-ar.css?@@_sv" rel="stylesheet" type="text/css"/>
+<%}%>
+<script type="text/javascript" src="/lang/b28n.js?@@_sv"></script>
+<script language="javascript" src="util.js?@@_sv"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>
+body {
+	direction:ltr;
+}
+input {
+	/*font-family: Traditional Arabic, Arial, Helvetica;*/
+	background:transparent;
+	border-style:none;
+	color:#FFFFFF;
+}
+</style>
+<script language="JavaScript">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+document.cookie='language='+<%lang=get_single('webinterface.language');%>"@@lang";
+<%}%>
+#ifdef V_WIZARD
+<%
+var wizard_status = get_single("wizard_status");
+if(wizard_status<5) {
+	redirect("/wizard.html");
+	exit(403);
+}
+%>
+#endif
+Butterlate.setTextDomain("index");
+
+function initTranslation() {
+	$("#csq").html(_("signalStrength"));
+	$("#3gconnection").html(_("Connection Status"));
+	$("#CSprovide").html(_("provider"));
+	$("#simstatusid").html(_("sim Status"));
+	$("#insertSim").html(_("GUI insertSim"));
+	$("#sToAdv").html(_("GUI sToAdv"));
+}
+
+var imageidx = 0;
+var prvbatidx = 1;
+var counter = 30;
+var prvSimStatus = "0";
+var ajaxerror = 0;
+var apn_stage=0;
+var apn_progress=0;
+var apn_status=0;
+var apn_retrycount=0;
+var auto_apn = false;
+var apn_done = false;
+var sim_stat_disp_count = 0;
+
+function UrlDecode(str) {
+var unicode = 0;
+var ret = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1 , i + 3) );
+		if(val > 127 || val < 32) {
+			unicode = 1;
+			break;
+		}
+	}
+	for (var i = 0; i < str.length; i++) {
+	var chr = str.charAt(i);
+		if (chr == "+") {
+			ret += " ";
+		}
+		else {
+			if (chr == "%") {
+				var asc = str.substring(i + 1 , i + 3);
+				if (unicode) {
+					temp = parseInt("0x" + str.substring(i + 4 , i + 6) + asc );
+					rt = "&#"+temp.toString()+";";
+					ret += rt;
+					i += 5;
+				}
+				else {
+					rt = "&#x"+asc+";";
+					ret += rt;
+					i += 2;
+				}
+			}
+			else {
+				ret += chr;
+			}
+		}
+	}
+	return ret;
+}
+
+function setVisibleElement(element,visible) {
+	if(visible) {
+		document.getElementById(element).style.display="";
+	}
+	else {
+		document.getElementById(element).style.display="none";
+	}
+}
+
+function get_autoapn_status(stage) {
+	return stage;
+}
+
+function update_autoapn_visibility(percent,sim_status) {
+	// get sim status
+	if( (sim_status=="") || (sim_status=="N/A") ) {
+		sim_ok=false;
+	}
+	else {
+		sim_ok=true;
+	}
+	apn_done=percent==100;
+
+	// enable progress var
+	setVisibleElement("autoapn_frame",sim_ok && auto_apn);
+	setVisibleElement("autoapn_frame_status",sim_ok && (auto_apn && !apn_done));
+	setVisibleElement("manualapn_frame",sim_ok && (!auto_apn || apn_done));
+}
+
+function update_autoapn_status(simStatus,percent,status,retry) {
+	if(auto_apn) {
+		status_array=status.split(",");
+		document.getElementById("apn_progress_percent").style.width=percent+"%";
+		document.getElementById("apn_numberic_percent").innerHTML=percent + "%";
+		if(status_array.length>1) {
+			status_str=_("autoapn stage error");
+		}
+		else
+		{
+			status_str="";
+			if(percent<=20) {
+				status_str=_("autoapn stage basic network");
+			}
+			else if (percent<100) {
+				if(retry!=0) {
+					status_str=_("autoapn stage basic retry")+" - "+retry;
+				}
+				else {
+					status_str=_("autoapn stage basic detect");
+				}
+			}
+			else if (percent==100) {
+				status_str=_("autoapn stage basic success");
+			}
+			document.getElementById("autoapn_status").value=status_str;
+		}
+	}
+	update_autoapn_visibility(percent,simStatus);
+}
+
+function ajaxFunction(responseText) {
+var csq;
+var simStatusID=document.getElementById('simID');
+	ajaxerror = 0;
+	if(responseText.length==0) return;
+	eval( responseText );
+
+	/* auto apn */
+	apn_status=get_autoapn_status(apn_stage);
+	update_autoapn_status(simStatus,apn_progress,apn_status,apn_retrycount);
+
+	if( simStatus.indexOf("SIM locked")!=-1 || simStatus.indexOf("SIM PIN")!=-1) {
+		simStatus="SIM locked";
+	}
+	else if( simStatus.indexOf("PH-NET PIN")!=-1 || simStatus.indexOf("SIM PH-NET")!=-1) {
+		simStatus="MEP locked";
+	}
+
+	switch(simStatus) {
+		case "SIM locked":
+			simStatusID.value = _("SIMlocked");
+		break;
+		case "SIM PUK":
+			simStatusID.value = _("status pukLocked");
+		break;
+		case "SIM OK":
+			simStatusID.value = _("simOK");
+		break;
+		case "SIM not inserted":
+			simStatusID.value = _("sim not inserted");
+		break;
+		default:
+			simStatusID.value = simStatus;
+		break;
+	}
+	document.getElementById('simID').style.color = '#ff0000'; //RED
+	var patt=/%[0-1][0-9a-f]%/gi;
+	if( typeof(hint)!="undefined" && hint!="N/A" && hint!="" ) {
+		hint = hint.replace(patt, "%20%") // Some SIM cards have character less than %20. This ruins decoding rules.
+		provider = UrlDecode(hint);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>ROAMING</font>";
+		}
+	}
+	else if(provider=="Limited Service") {
+		provider=_("limited service");
+	}
+	else if (provider=="N/A") {
+		provider=_("na");
+	}
+	else if (provider.charAt(0) == "%") {
+		provider = UrlDecode(provider);
+		if(typeof(roamingStatus)!="undefined" && hasSubStr(roamingStatus,/^active$/i)) {
+			provider = provider+"&nbsp;&nbsp;-&nbsp;&nbsp;<font style='color:red'>ROAMING</font>";
+		}
+	}
+	if(simStatus == "SIM OK") {
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+		document.getElementById('simID').style.color = '#22bb66'; //GREEN
+		csq = csq.substring(0, csq.indexOf("dBm") );
+		csqstr = _("not available");
+#if defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3)
+	// LTE is using RSRP that has a different range of dBm
+	// Quanta (4gt101w) is the only module that provides now
+	if(coverage.indexOf("LTE")>=0) {
+		if(csq == 0) {
+			imageidx = 0;
+		}
+		else if(csq > -70 ) {
+			csqstr = _("high");
+			imageidx = 5;
+		}
+		else if(csq > -90 ) {
+			csqstr = _("medium");
+			if(csq > -80 ) {
+				imageidx = 4;
+			}
+			else {
+				imageidx = 3;
+			}
+		}
+		else if(csq > -100 ) {
+			csqstr = _("low");
+			if(csq > -90) {
+				imageidx = 2;
+			}
+			else {
+				imageidx = 1;
+			}
+		}
+		else {
+			imageidx = 0;
+		}
+	}
+	else {
+#endif
+		// Changed by Testra recommendation : Test Track #3796
+		if(csq == 0) {
+			imageidx = 0;
+		}
+		else if(csq >= -77 ) {
+			csqstr = _("high");
+			imageidx = 5;
+		}
+		else if(csq >= -91 ) {
+			csqstr = _("medium");
+			if(csq >= -85 ) {
+				imageidx = 4;
+			}
+			else {
+				imageidx = 3;
+			}
+		}
+		else if(csq >= -109 ) {
+			csqstr = _("low");
+			if(csq >= -101)
+				imageidx = 2;
+			else
+				imageidx = 1;
+		}
+		else {
+			imageidx = 0;
+		}
+#if defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3) || defined(V_PRODUCT_ntc_4gt101w_3)
+	}
+#endif
+		document.form.csq.value = csq+" dBm         "+csqstr;
+		document.getElementById("GUI-CSQ").innerHTML = "<img src='/images/GUI-csq"+imageidx + ".GIF'/>";
+#if defined V_SKIN_ro
+		provider = provider.replace("Rogers Wireless", "Rogers");
+#endif
+		document.getElementById("provider").innerHTML=provider;
+#if defined V_SKIN_ro
+		freq=freq.replace("UMTS", "HSPA");
+		freq=freq.replace("WCDMA", "HSPA");
+		document.getElementById("msisdn").innerHTML = msisdn;
+#else
+		freq=freq.replace("WCDMA 800", "WCDMA 850");
+		freq=freq.replace("IMT2000", "WCDMA 2100");
+#endif
+		document.getElementById("coverage").innerHTML=freq.indexOf("No band")==-1?freq:_("band not available");
+		if(st.length==0) {
+			$("#wwanStatus").html(_("disabled"));
+			document.getElementById('wwanStatus').style.color = '#ff0000'; //RED
+		}
+		else {
+			var found=false;
+			for( i=0; i<st.length && i<6; i++ ) {
+				if( st[i].enable == 1 ) {
+					autoapn=<%_m=get_single('webinterface.autoapn'); %>"@@_m";
+					if( st[i].apn == "" || st[i].apn == "N/A" || (autoapn == "1" && current_apn != "" && current_apn != "N/A") ) {
+						document.getElementById("apn_id").innerHTML = current_apn;
+					}
+					else {
+						document.getElementById("apn_id").innerHTML = st[i].apn;
+					}
+					if( st[i].pppStatus=="waiting" ) {
+						$("#wwanStatus").html(_("waiting"));
+						document.getElementById('wwanStatus').style.color = '#22bb66'; //GREEN
+					}
+					else if( st[i].pppStatus!="up" ) {
+						$("#wwanStatus").html(coverage=="Limited Service"?_("limited service"):_("connecting"));
+						document.getElementById('wwanStatus').style.color = 'Orange';
+					}
+					else {
+						$("#wwanStatus").html(_("connected"));
+						document.getElementById('wwanStatus').style.color = '#22bb66'; //GREEN
+					}
+					found=true;
+					break;
+				}
+				else {
+					$("#wwanStatus").html(st[i].pppStatus);
+				}
+			}
+			if(!found) {
+				$("#wwanStatus").html("Down");
+			}
+		}
+	}
+	else if(simStatus != "SIM not inserted" && simStatus != "SIM removed") {
+		document.getElementById('simID').style.color = '#ff0000'; //RED
+		document.getElementById("GUI-CSQ").innerHTML = "";
+		document.getElementById("sim_status_div0").style.display='';
+		document.getElementById("sim_status_div1").style.display='none';
+
+		// get matching count
+		if(prvSimStatus != simStatus) {
+			sim_stat_disp_count++;
+		}
+		else {
+			sim_stat_disp_count=0;
+		}
+		fUpdateStat=(sim_stat_disp_count>5) || (simStatus == "N/A") || (prvSimStatus=="");
+		if(fUpdateStat) {
+			sim_stat_disp_count=0;
+		}
+		// update sim status
+		if(fUpdateStat) {
+			switch(simStatus)
+			{
+			case "SIM not inserted":
+				alert( _("admin warningMsg8") );
+				break;//Please insert an active SIM card in order to connect to the internet. Please wait around 60 seconds for the router to restart after inserting your SIM card.
+			case "SIM general failure":
+				alert( _("admin warningMsg2") );//SIM general failure
+				break;
+			case "SIM locked":
+				alert( _("admin warningMsg3") );//You need to enter the PIN code to unlock the SIM before use
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+				window.location="/GUI-3gwwan.html";
+<%}%>
+				break;
+			case "SIM PUK":
+			case "SIM CHV1 blocked":
+				alert( _("admin warningMsg4 3g22wv") );//You need to enter the PUK code to unlock the SIM before use
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+				window.location=('pinsettings.html');
+<%}%>
+				break;
+			case "Network reject - Account":
+				alert( _("admin warningMsg6") );//Network reject - Account
+				break;
+			case "Network reject":
+				alert( _("admin warningMsg7") );//Network reject
+				break;
+			case "MEP Locked":
+#if defined V_SKIN_ro
+				if(confirm(_("mep warningMsg1_ro")+" "+_("mep warningMsg2"))) {
+#else
+				if(confirm(_("mep warningMsg1")+" "+_("mep warningMsg2"))) {
+#endif
+<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+					window.location=('mepUnlocking.html');
+<%}%>
+				}
+				break;
+			default:
+				sim_stat_disp_count = 0;
+				break;
+			}
+			prvSimStatus = simStatus;
+		}
+		$("#wwanStatus").html(provider);
+		document.form.csq.value = "";
+		document.getElementById("GUI-CSQ").innerHTML = "<img src='/images/GUI-csq0.GIF'/>";
+		document.getElementById("provider").innerHTML="";
+	}
+	else {
+		document.getElementById("GUI-CSQ").innerHTML = "";
+		document.getElementById("sim_status_div0").style.display='none';
+		document.getElementById("sim_status_div1").style.display='';
+		document.getElementById("wwanStatus2").innerHTML=provider;
+	}
+}
+
+$(document).ready(function() {
+	checkIE10();
+	$.get('/cgi-bin/ajax.cgi',ajaxFunction);
+	var startPoll = function() {
+		if( ++ajaxerror>5) {
+			location.reload();
+		}
+		else {
+			$.get("/cgi-bin/ajax.cgi",ajaxFunction);
+		}
+	}
+	setInterval(startPoll, 3000);
+	initTranslation();
+	if("@@request['QUERY_STRING']"=="setdate") {
+		$.get('/cgi-bin/setdate.cgi?'+HostDate());
+	}
+});
+</script>
+</head>
+<body>
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+</div>
+
+<form name="form">
+<div id="basicGUI">
+<div id="langTab"><a class="a1" href="JavaScript:switchLanguage_ar();"><script language="JavaScript">showLanguage_ar();</script></a></div>
+<div style="position:absolute; font-size:12px; left:34px; top:534px"><a class="a1" href="JavaScript:toAdvV('/login.html')" id="sToAdv">Switch to Advanced View</a></div>
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	<img src="images/GUI-Login-Basic.gif" border="0" usemap="#1"/>
+	<div class="Rotate-90" id="tab-status2"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<div class="Rotate-90" id="tab-login"><a style="text-decoration:none" href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+<%}else{%>
+	<img src="images/GUI-Basic.gif" border="0" usemap="#1"/>
+	<div class="Rotate-90" id="tab-status2"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<div class="Rotate-90" id="tab-wlan"><a style="text-decoration:none" href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<div class="Rotate-90" id="tab-3gwwan"><a style="text-decoration:none" href="/GUI-3gwwan.html"><script language="JavaScript">document.write(_("CSinternet"));</script></a></div>
+<%}%>
+#if (defined V_SKIN_eti)
+	<p style="color:#ffffff; position:absolute; font-size:24px; font-weight:bold; top:28px; left:75px">Etisalat 4G100W-E Router</p>
+	<img style="position:absolute; top:120px; left:60px" src='/images/strip.png'/>
+#elif (defined V_PRODUCT_swi_nhd1w)
+	<p style="color:#ffffff; position:absolute; font-size:24px; font-weight:bold; top:28px; left:75px"></p>
+	<img style="position:absolute; top:120px; left:60px" src='/images/strip.png'/>
+#elif (defined V_PRODUCT_ntc_3g41wt)
+	<p style="color:#ffffff; position:absolute; font-size:24px; font-weight:bold; top:28px; left:120px">USB WiFi Gateway</p>
+	<img style="position:absolute; top:120px; left:60px" src='/images/strip.png'/>
+#elif (defined V_PRODUCT_ro_4g100w)
+	<p style="color:#D00001; position:absolute; font-size:32px; font-weight:bold; top:25px; left:115px">Rocket&#0153; Hub</p>
+	<img style="position:absolute; top:120px; left:0px" src='/images/strip.png'/>
+#else
+	<p style="color:#ffffff; position:absolute; font-size:24px; font-weight:bold; top:28px; left:70px">NetComm Wireless Router</p>
+	<img style="position:absolute; top:120px; left:60px" src='/images/strip.png'/>
+#endif
+	<div id="GUI-CSQ"><img src='/images/GUI-csq0.GIF'/></div>
+	<div id="sim_status_div0" >
+#if (defined V_PRODUCT_ro_4g100w)
+		<div class="div_text" style="top:140px">MSISDN</div>
+		<div class="div_text" style="top:140px;left:191px;" id="msisdn"></div>
+		<div class="div_text" style="top:165px"><script language="JavaScript">document.write(_("status CScoverage"));</script></div>
+		<div class="div_text" style="top:165px;left:191px;" id="coverage"></div>
+#else
+		<div class="div_text" style="top:156px"><script language="JavaScript">document.write(_("status CScoverage"));</script></div>
+		<div class="div_text" style="top:156px;left:191px;" id="coverage"></div>
+#endif
+		<div class="div_text" style="top:190px"><script language="JavaScript">document.write(_("signal Strength"));</script></div>
+		<div class="div_input" style="top:188px;left:190px" >
+			<input type="text" size="30" class="finchAjax" name="csq" value="-88 dbm" readonly/>
+		</div>
+	<div id="autoapn_frame" style="display:none">
+		<div id="autoapn_progress_text" class="div_text" style="top:367px"></div>
+		<div>
+			<div class="bar_bg" style="top:368px;left:192px">
+				<div id="apn_progress_percent" class="bar_fg" align="center" style="top:400px"></div>
+			</div>
+			<div id="apn_numberic_percent" class="div_text" style="top:367px;left:305px">100%</div>
+		</div>
+		<div id="autoapn_frame_status">
+			<div id="autoapn_status_text" class="div_text" style="top:390px"></div>
+			<div class="div_input" style="top:388px;left:190px" >
+			<input id="autoapn_status" type="text" size="30" class="finchAjax" style="color:#00ff00;" value="Read SIM Info" readonly/>
+			</div>
+		</div>
+	</div>
+        <div id="manualapn_frame">
+		<div class="div_text" style="top:390px" id="3gconnection">Connection Status</div>
+		<div class="div_input" style="top:390px;left:190px" id="wwanStatus"></div>
+	</div>
+		<div class="div_text" style="top:442px" id="CSprovide">Provider</div>
+		<div class="div_text" style="left:191px; top:442px;" id="provider" ></div>
+		<div class="div_text" style="top:465px">APN</div>
+		<div class="div_text" style="left:191px; top:465px;" id="apn_id" ></div>
+		<div class="div_text" style="top:489px" id="simstatusid">SIM Status</div>
+		<div class="div_input" style="top:486px;left:190px;" >
+			<input type="text" style="font-size: 12px; font-weight:bold;" id="simID" name="simStatus" value="" readonly/>
+		</div>
+	</div>
+	<div id="sim_status_div1" style="display:none" >
+		<div class="div_text" style="top:215px" >SIM Status</div>
+		<div class="div_input" style="top:213px;left:190px" ><input type="text" value="SIM not inserted" style="color:#FF0000" readonly/></div>
+		<div class="div_text" style="top:280px; width:375px" id="insertSim"></div>
+		<div class="div_text" style="top:420px" ><script language=Javascript>document.write(_("Connection Status"))</script></div>
+		<div class="div_text" style="top:420px;left:190px" id="wwanStatus2"></div>
+	</div>
+</div>
+</form>
+</body>
+</html>

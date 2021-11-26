@@ -1,0 +1,127 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Package Manager</title>
+<script language="JavaScript" src="/cgi-bin/pkManager.cgi"></script>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+var netif_name=get_single('wwan.0.netif');
+if (netif_name=="")
+	netif_name="ppp";
+
+if (request['REQUEST_METHOD'] == "POST" ) {
+	i=form['delindex'];
+	set_single( 'service.firewall.dnat.'+i+'=' ); //delete last
+	tempval = form['rdbCmd'];
+	set_list( tempval, '-p' );
+
+/*  if( form['submit']=="Save" ) {
+		if( form['editindex'] > 0 ) {
+			set_single( 'service.firewall.dnat.'+form['editindex']+'=\"-p '+form['ProtocolText']+' -s '+form['ipmapsrcip']+' --dport '+form['ipmapsrcport']+':'+form['ipmapsrcport2']+' -i ' + netif_name + ' -j DNAT --to-destination '+form['ipmapdstip']+':'+form['ipmapdstport']+'-'+form['ipmapdstport2']+' \"');
+			set_single( 'service.firewall.dnat.trigger=1' );
+		}
+	}
+	else {
+		set_single( 'service.firewall.dnat.'+form['delindex']+'=delete' ); //delete
+		set_single( 'service.firewall.dnat.trigger=1' );
+	}*/
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("pkManager");
+</script>
+
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']">
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("LoadSave")+" > "+_("pkg manager"));</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>	
+<input type="hidden" name="editindex" value="@@form['editindex']">
+
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("package list view"));</script></th></tr>
+</table>	
+<table width="85%" border="0" cellspacing="0" ID="Table2">
+<tr>
+	<td width="20%"><b><script language="JavaScript">document.write(_("packageName"));</script></b></div></td>
+	<td width="15%"><b><script language="JavaScript">document.write(_("version"));</script></b></div></td>
+	<td width="20%"><b><script language="JavaScript">document.write(_("architecture"));</script></b></div></td>
+	<td width="15%"><b><script language="JavaScript">document.write(_("installedTime"));</script></b></div></td>
+	<td width="15%">&nbsp;</td>
+	<td width="15%">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function uninstall( idx ) {
+	var msg="";
+	if( st[idx].detail.indexOf("/etc/appweb/appweb.conf")>0 ) {
+		msg = _("Msg111");//Stop! This package contains the web server configuration file,uninstall this package will disable the web server!
+	}
+	msg += _("Msg112")+": "+st[idx].Package+" ?";//Do you really want to uninstall this package
+	if (confirm(msg) ) {
+		var xmlHttp;
+		try {  
+			xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");   
+		}
+		catch (e) {  // Internet Explorer
+			try {    
+				xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");   
+			}
+			catch (e) {    
+				try {      
+					// Firefox, Opera 8.0+, Safari  
+					xmlHttp=new XMLHttpRequest();  
+				}
+				catch (e) {      
+					//alert("Your browser does not support AJAX!");      
+					return false;      
+				}    
+			}  
+		}
+		xmlHttp.open("GET","/cgi-bin/file_action.cgi?U&"+st[idx].Package,true);
+		xmlHttp.send('a'); 
+		xmlHttp.onreadystatechange=function() {
+			if(xmlHttp.readyState==4) {
+				alert( xmlHttp.responseText );
+				location.reload();
+			}
+		}
+	}
+}
+
+function makeList() {   
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='8' align='center'>"+_("package list empty")+"</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		installedTime = new Date(st[i].Installed_Time*1000);
+		document.write("<tr>"); 
+		document.write("<td>"+st[i].Package+"</td>");
+	    document.write("<td>"+st[i].Version+"</td>");
+		document.write("<td>"+st[i].Status+"</td>");
+		document.write("<td>"+installedTime.toLocaleString()+"</td>");
+		document.write("<td><a href=javascript:alert(\""+st[i].detail+"\"); title=\""+st[i].description+"&#10"+st[i].title+"\">"+_("package details")+"</a></td>");
+		document.write("<td><a href=javascript:uninstall(\""+i+"\"); title=\"Uninstall "+st[i].Package+"\">"+_("uninstall")+"</td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

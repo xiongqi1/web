@@ -1,0 +1,17 @@
+digraph "Audio"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node3 [label="FSK/Caller ID generation",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___f_s_k___c_o_n_t_r_o_l.html"];
+  Node1 [label="ProSLIC API",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___pro_s_l_i_c___a_p_i.html"];
+  Node4 [label="Audio control/configuration",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___a_u_d_i_o___c_o_n_t_r_o_l.html"];
+  Node2 [label="Tone generation",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___t_o_n_e___g_e_n.html"];
+  Node0 [label="Audio",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node5 [label="DTMF Decode",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_t_m_f___d_e_c_o_d_e.html"];
+  Node1->Node0 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+}

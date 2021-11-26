@@ -1,0 +1,187 @@
+#!/bin/sh
+# This script send a text sms at the command line by creating
+# a sms file in the outgoing queue.
+# If the message length is longer than 160 characters ( maximum number
+# of single sms message ) then seperate to multiple message files.
+
+# $1 is the destination phone number
+# $2 is the message text
+# $3 is diagnostic msg flag
+# if you leave $2 or both empty, the script will ask you
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    echo ""
+	echo "sendsms is a shell script for sending SMS messages. It is intended"
+	echo "for internal use by system CGI/shell scripts, but may be used"
+	echo "from the CLI for testing purposes."
+	echo ""
+	echo "Usage   : sendsms destination message"
+	echo "Example : sendsms \"1234567\" \"This is test message\""
+	echo ""
+	exit 0
+fi
+
+# find platform
+. /etc/platform.txt
+if [ "$platform" = "Platypus" ] || [ "$platform" = "Platypus2" ]; then
+. /var/sms/sms_common.cfg
+elif [ "$platform" = "Avian" ]; then
+. /system/cdcs/usr/etc/sms/sms_common.cfg
+else
+. /usr/etc/sms/sms_common.cfg
+fi
+
+. $SMS_LIB_PATH/sms_utils
+
+# read nvram/rdb variables and create new cfg files
+read_vars_n_create_cfg_files
+
+# When calling this script to send ack message after factory resetting, all config files
+# were already removed so need to use backup config files.
+if [ ! -e "$config_file" -a ! -e "$diag_config_file" -a  ! -e "$ssmtp_config"  ]; then
+	sms_log "use backup config due to original config files were removed by factory reset"
+	config_file="/tmp/sms/conf/sms.cfg"
+	diag_config_file="/tmp/sms/conf/sms_diag.cfg"
+	ssmtp_config="/tmp/sms/conf/ssmtp.conf"
+fi
+
+. $config_file
+. $diag_config_file
+. $ssmtp_config
+
+DEST="$1"
+TEXT="$2"
+DIAG="$3"
+
+sms_log "========================================================================="
+#echo " send sms to $DEST, $TEXT"
+sms_log "send $DIAG sms to $DEST, $TEXT"
+
+if [ -z "$DEST" ]; then
+	printf "Destination: "
+	read DEST
+fi
+
+if [ -z "$TEXT" ]; then
+	printf "Text: "
+	read TEXT
+fi
+
+# check whether the msg has special characters that can be sent with GSM7 bits encoding
+# and keep this setting for all seperate messages.
+rdb_set wwan.0.sms.has_special_chars
+/usr/bin/check_sp "${TEXT}" 2>/dev/null
+found_schar=`rdb_get wwan.0.sms.has_special_chars`
+sms_log "found_schar = $found_schar"
+
+#rdb_set wwan.0.sms.cmd.send.status "[done] send"
+#exit 0
+
+#--- sub routines ------------------------------------------------------------------------
+create_tx_msg_file()
+{
+	# sms msg file name does not have any meaning for the model using SIM/ME storage
+	# because it always rebuild inbox/outbox contents from SIM/ME memory when read inbox/outbox
+	# but for other models we need to give some index to sort out.
+	if [ "$USE_SIM_STORAGE" = "YES" ]; then
+		FILE=`mktemp $OUT_SPOOL_PATH/send_XXXXXX` 2>/dev/null
+	else
+		# check existing files in local outbox and txfailed folder as well
+		get_new_file_index "$LOCAL_OUTBOX" "$LOCAL_TXFAILED"
+		FILE=$OUT_SPOOL_PATH/txmsg_${NEW_FILE_IDX}
+		# delete old file with same file index in local outbox
+		rm $LOCAL_OUTBOX/txmsg_${NEW_FILE_IDX} 2>/dev/null
+		touch $FILE 2>/dev/null
+	fi
+	
+	# create raw data file for external program
+	rm $OUT_SPOOL_PATH/*.raw 2>/dev/null
+	RAWFILE="$FILE.raw"
+	touch $RAWFILE 2>/dev/null
+	
+	echo "To: $DEST" > $FILE
+	echo "" >> $FILE
+
+	CODING="GSM7:"
+	if [ "$CODING_SCHEME" = "UCS2" ] ||  [ "$found_schar" = "1" ]; then
+		CODING="UCS2:"
+	fi
+	echo -n $CODING"${TEXT}" >> $FILE
+	echo -n "${TEXT}" > $RAWFILE
+}
+
+send_one_sms()
+{
+	# set rdb variable and send sms
+	sms_rdb_var_clear
+
+	rdb_set wwan.0.sms.cmd.param.to "$DEST" 2>/dev/null
+	
+	# Do not use rdb variable as a message body container
+	# because if the message is extremely large RDB manager
+	# becomes panic and eventually it will cause kernel crash.
+	# rdb_set wwan.0.sms.cmd.param.message "${TEXT}" 2>/dev/null
+	rdb_set wwan.0.sms.cmd.param.filename "$FILE" 2>/dev/null
+
+	if [ "$DIAG" = "DIAG" ]; then
+		rdb_set wwan.0.sms.cmd.command senddiag 2>/dev/null
+	else
+		rdb_set wwan.0.sms.cmd.command send 2>/dev/null
+	fi
+	if [ "$USE_SIM_STORAGE" = "YES" ]; then
+		sms_log "send sms to $DEST"
+	else
+		sms_log "send sms file $FILE to $DEST"
+	fi
+	
+	# wait for sending sms message
+	MSG_LEN=${#TEXT}
+	TIME_FACTOR=$(($MSG_LEN/1000))
+	let "TIMEOUT=120+$TIME_FACTOR*10"
+	sms_log "msg len = $MSG_LEN, set msg send timeout to $TIMEOUT seconds"
+	while true; do
+		SEND_RESULT=`rdb_get wwan.0.sms.cmd.send.status`
+		test "$SEND_RESULT" != "" && sms_log "sms result = $SEND_RESULT"
+		if [ "${SEND_RESULT}" = "[done] send" ]; then
+			if [ "$USE_SIM_STORAGE" = "YES" ]; then
+				test "$DIAG" = "DIAG" && mv "$FILE" $DIAG_OUTBOX/ 2>/dev/null
+				test "$DIAG" = "DIAG" || rm "$FILE" 2>/dev/null
+			else
+				mv "$FILE" $LOCAL_OUTBOX/ 2>/dev/null
+			fi
+			rm "$RAWFILE"  2>/dev/null
+			sms_log "sms tx OK, remaining timeout = $TIMEOUT"
+			return 0
+		else
+			let "TIMEOUT-=1"
+			#echo "timeout = $TIMEOUT"
+			ERRSTR=`echo "${SEND_RESULT}" | awk '{print $1}'`
+			if [ $TIMEOUT -eq 0 ] || [ "${ERRSTR}" = "[error]" ]; then
+				# move to failed msg folder to send later when failed with network error
+				if [ "${SEND_RESULT}" = "[error] txfailed with retry count over" ];then
+					mv "$FILE" $LOCAL_TXFAILED/ 2>/dev/null
+					mv "$RAWFILE" $LOCAL_TXFAILED/ 2>/dev/null
+				else
+					rm "$FILE"  2>/dev/null
+					rm "$RAWFILE"  2>/dev/null
+				fi
+				sms_log "sms tx failed, remaining timeout = $TIMEOUT"
+				return 255
+			fi
+			sleep 1
+		fi
+	done
+}
+
+# when sms is sent via simple_at_manager and the message body contains
+# some special characters that should be sent with UCS2 encoding,
+# maximum message body length should be limited to 70 chars for
+# Sierra modem. Or AT command will fail.
+#-----------------------------------------------------------------------------
+create_tx_msg_file
+send_one_sms
+sms_log "========================================================================="
+exit 0

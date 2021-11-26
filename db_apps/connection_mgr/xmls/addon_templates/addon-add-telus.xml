@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+<Include>
+	<Country country="Canada" mcc="302">
+		<Carrier carrier="Telus" mnc="220">
+			<APN apn="isp.telus.com">
+			</APN>
+		</Carrier>
+		
+		<Carrier carrier="Telus VPN" mnc="220">
+			<APN apn="vpn.telus.com">
+			</APN>
+		</Carrier>
+	</Country>
+</Include>	
+</Rt>

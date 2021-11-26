@@ -1,0 +1,205 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA-NIT sensors API",
+        "description": "OWA-NIT RESTful API to access sensor data",
+        "version": "1.0.0"
+    },
+    "basePath": "/api/v2/NIT",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/GPS": {
+            "get": {
+                "summary": "OWA-NIT GPS data",
+                "description": "The GPS endpoint provides data from the OWA's GPS sensors\n",
+                "tags": [
+                    "Device"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/GPS"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/Battery": {
+            "put": {
+                "summary": "NIT's battery charge and status",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "Level",
+                        "description": "NIT battery charge level (0-100)",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Voltage",
+                        "description": "NIT battery voltage",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Status",
+                        "description": "NIT battery status (charge/discharge)",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/Compass": {
+            "put": {
+                "summary": "NIT compass data",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "Status",
+                        "description": "NIT compass calibration",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "BearingRaw",
+                        "description": "NIT compass bearing (raw)",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "BearingCorrected",
+                        "description": "NIT compass bearing (corrected for true north)",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/Downtilt": {
+            "put": {
+                "summary": "Downtilt data from NIT's accelerometers",
+                "tags": [
+                    "Device"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "Angle",
+                        "description": "NIT downtilt",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "GPS": {
+            "properties": {
+                "Altitude": {
+                    "type": "string",
+                    "description": "OWA GPS alitude"
+                },
+                "Latitude": {
+                    "type": "string",
+                    "description": "OWA GPS latitude"
+                },
+                "Longitude": {
+                    "type": "string",
+                    "description": "OWA GPS longitude"
+                },
+                "Height": {
+                    "type": "string",
+                    "description": "OWA GPS height"
+                },
+                "VerticalUncertainty": {
+                    "type": "string",
+                    "description": "OWA GPS vertical uncertainty"
+                },
+                "HorizontalUncertainty": {
+                    "type": "string",
+                    "description": "OWA GPS horizontal uncertainty"
+                },
+                "Source": {
+                    "type": "string",
+                    "description": "OWA GPS source (assisted/standalone/historical)"
+                },
+                "Status": {
+                    "type": "string",
+                    "description": "OWA GPS data valid"
+                },
+		"Date": {
+		    "type": "string",
+		    "description": "OWA GPS date"
+		}
+            }
+        },
+        "Error": {
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

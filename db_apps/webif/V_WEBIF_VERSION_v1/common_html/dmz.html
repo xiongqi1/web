@@ -1,0 +1,225 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<title>DMZ Settings</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+</head>
+<body onLoad="updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("dmz");
+
+function checkDmzIPAddr(field) {
+	if(field.value == "") {
+		alert(_("warningMsg01"));
+		field.value = field.defaultValue;
+		field.focus();
+		return false;
+	}
+
+	if (isAllNumAndSlash(field.value) == 0){
+		alert(_("nat warningMsg05"));
+		field.focus();
+		return false;
+	}
+
+	var ip_pair = new Array();
+	ip_pair = field.value.split("/");
+
+	if(ip_pair.length > 2){
+		alert(_("nat warningMsg05"));
+		field.focus();
+		return false;
+	}
+
+	if(ip_pair.length == 2) {
+		// sub mask
+		if(!ip_pair[1].length) {
+			alert(_("nat warningMsg05"));
+			field.focus();
+			return false;
+		}
+		if(!isNumOnly(ip_pair[1])) {
+			alert(_("nat warningMsg05"));
+			field.focus();
+			return false;
+		}
+		tmp = parseInt(ip_pair[1], 10);
+		if(tmp < 0 || tmp > 32) {
+			alert(_("nat warningMsg05"));
+			field.focus();
+			return false;
+		}
+	}
+
+	if( (!checkRange(ip_pair[0],1,0,255)) ||
+		(!checkRange(ip_pair[0],2,0,255)) ||
+		(!checkRange(ip_pair[0],3,0,255)) ||
+		(!checkRange(ip_pair[0],4,0,255)) ) {
+		alert(_("nat warningMsg05"));
+		field.focus();
+		return false;
+	}
+
+	var mymask="<%val=get_single('link.profile.0.netmask');%>@@val";
+	var dmzAr = new Array();
+	var maskAr = new Array();
+	dmzAr = ip_pair[0].split('.');
+	maskAr = mymask.split('.');
+
+	var firstAr = new Array();
+	var negAr = new Array();
+	var lastAr = new Array();
+	for (i = 0; i < 4; i++) {
+		firstAr[i] = dmzAr[i] & maskAr[i];
+		negAr[i] = 255 - maskAr[i];
+		lastAr[i] = firstAr[i] | negAr[i];
+	}
+
+	if ((dmzAr[0] == firstAr[0] && dmzAr[1] == firstAr[1] && dmzAr[2] == firstAr[2] && dmzAr[3] == firstAr[3]) ||
+		(lastAr[0] == 255 && lastAr[1] == 255 && lastAr[2] == 255 && lastAr[3] == 255) ||
+		(dmzAr[0] == lastAr[0] && dmzAr[1] == lastAr[1] && dmzAr[2] == lastAr[2] && dmzAr[3] == lastAr[3])) {
+		alert(_("dmz warningMsg01"));
+		field.focus();
+		return false;
+	}
+	return true;
+}
+
+function formCheck() {
+	if((document.DMZ.dmzEnable.value=='1')&&(!checkDmzIPAddr(document.DMZ.DMZIPAddress) ))
+		return;
+	document.DMZ.submit();
+}
+
+function display_on() {
+	if(window.XMLHttpRequest){ // Mozilla, Firefox, Safari,...
+		return "table-row";
+	} else if(window.ActiveXObject){ // IE
+		return "block";
+	}
+}
+
+function disableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = true;
+	else {
+		field.oldOnFocus = field.onfocus;
+		field.onfocus = skip;
+	}
+}
+
+function enableTextField (field) {
+	if(document.all || document.getElementById)
+		field.disabled = false;
+	else {
+		field.onfocus = field.oldOnFocus;
+	}
+}
+
+function updateState() {
+	if(document.DMZ.DMZEnabled[0].checked==true){
+		enableTextField(document.DMZ.DMZIPAddress);
+	}else{
+		disableTextField(document.DMZ.DMZIPAddress);
+	}
+}
+
+$(document).ready(function() {
+var IPForward="<%val=get_single('service.bridge.3GIPForward');%>@@val";
+	if(IPForward == "1") {
+		alert(_("transparent bridge warnMsg5"));
+		window.location="/LAN.html?ipsetup";
+	}
+
+	$.get("/cgi-bin/rdb.cgi?service.pppoe.server.0.enable", function(v) {
+		eval(v);
+		if(service_pppoe_server_0_enable=="1") {
+			$(".hide_for_pppoe_en").css("display", "none");
+			$(".pppoeEnablesMsg").css("display", "");
+		}
+	});
+});
+
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['dmzEnable'];
+	retval=set_single( 'service.firewall.dmz.enable='+tempval );
+	if(tempval=='1') {
+		tempval = form['DMZIPAddress'];
+		retval = set_single( 'service.firewall.dmz.address='+tempval );
+	}
+}
+else {/*GET*/
+	form['dmzEnable'] = get_single( 'service.firewall.dmz.enable');
+}
+myip = get_single( 'service.firewall.dmz.address' );
+form['DMZIPAddress'] = myip;
+%>
+
+<div class="content" >
+<div class="pppoeEnablesMsg" style="display:none">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > "+"DMZ")</script></h3>
+<div class="line" style="margin: 40px 15% 16px 0;"></div>
+<table style="width:95%" align="center" cellspacing="0" >
+	<tr>
+		<td height="58px" width="15%"><img align="right" src="/images/error.gif"/></td>
+		<td height="58px" ><h4 style="margin-bottom:0px; color:#CC0000; font-size:2em"><script language="JavaScript">document.write(_("pppoeEnabled"));</script></h4></td>
+	</tr>
+	<tr>
+		<td/>
+		<td><p style="font-size:14px" ><script language="JavaScript">document.write(_("functionNotAvailable"));</script></p></td>
+	</tr>
+</table>
+</div>
+
+<div class="hide_for_pppoe_en">
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > "+"DMZ")</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 20% 16px 0;"></div>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("dmz setting"))</script></th></tr>
+</table>
+<!--% checkIfUnderBridgeModeASP(); %-->
+<form name="DMZ" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="dmzEnable" value="@@form['dmzEnable']"/>
+<table width="80%">
+<tr>
+	<td class="head" id="dmzSet"><script language="JavaScript">document.write(_("dmz setting"))</script></td>
+	<td>
+	<input type=radio name='DMZEnabled' onClick="javascript:document.DMZ.dmzEnable.value='1'; updateState()">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+	<input type=radio name='DMZEnabled' onClick="javascript:document.DMZ.dmzEnable.value='0'; updateState()">&nbsp;<script language="JavaScript">document.write(_("disable"))</script>
+	</td>
+</tr>
+<script type="text/javascript">   
+if( parseInt(document.DMZ.dmzEnable.value)==1  )
+	document.DMZ.DMZEnabled[0].checked=true;
+else
+	document.DMZ.DMZEnabled[1].checked=true;
+</script>  
+<tr>
+	<td class="head" id="dmzIPAddr"><script language="JavaScript">document.write(_("dmz ipaddr"))</script></td>
+	<td><input type="text" size="24" name="DMZIPAddress" value="@@form['DMZIPAddress']" ></td>
+</tr>
+</table>
+
+<div align="center">
+<br/>
+	<input type="button" value="Save" id="dmzApply" name="addDMZ" onClick="return formCheck()" style="width:120px;">
+</div>
+</form>
+</div>
+</div>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("dmzApply").value = _("CSsave");
+</script>
+</body>
+</html>

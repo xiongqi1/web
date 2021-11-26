@@ -1,0 +1,50 @@
+#!/bin/sh
+
+#
+# sms_rdb_set "rdb name" "rdb value" <boolean false string> <boolean true string> "possible rdb value 1" "possible rdb value 2" ..
+#
+#
+
+rdb_name="$1"
+rdb_set_val="$2"
+rdb_boolean_false="$3"
+rdb_boolean_true="$4"
+
+# print usage
+if [ $# -lt 2 ]; then
+	cat << EOF >&2
+
+	sms rdb set tool
+
+	usage>
+		sms_rdb_set <rdb name> <rdb value> <boolean false string> <boolean true string> <possible rdb value 1> [possible rdb value 2]..
+
+EOF
+	exit 1
+fi
+
+print_args() {
+	for value in "$@"; do
+		echo "$value"
+	done
+}
+
+# check possible values
+shift 4
+if [ $# -gt 0 ]; then
+	print_args "$@" | grep -q "^$rdb_set_val\$" || exit 1
+fi
+
+# convert boolean
+if [ -n "$rdb_boolean_true" -a -n "$rdb_boolean_false" ]; then
+	if [ "$rdb_set_val" = "1" ]; then
+		rdb_set_val="$rdb_boolean_true"
+	else
+		rdb_set_val="$rdb_boolean_false"
+	fi
+fi
+
+# set
+rdb_set "$rdb_name" "$rdb_set_val" || exit 1
+
+exit 0

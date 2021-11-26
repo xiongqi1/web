@@ -1,0 +1,78 @@
+#!/bin/sh
+
+show_help()
+{
+    echo -e "Usage:\n    $0 [alarm type ID]"
+}
+
+if [ "$#" -gt "1" -o "$1" = "help" ]; then
+    show_help
+    exit 0
+fi
+
+EVENT_TYPE=$1
+EVENT_TYPE_NAME=$(rdb get "tr069.FaultMgmt.SupportedAlarm.${EVENT_TYPE}.EventType")
+[ -z "$EVENT_TYPE_NAME" ] && EVENT_TYPE_NAME="Event"
+
+is_event_type()
+{
+    local event_id=$1
+    local event_type_id=$2
+    if [ $(rdb get tr069.FaultMgmt.Event.$idx._event_type_id) = "$event_type_id" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+dump_event()
+{
+    local event_id=$1
+    local base_key="tr069.FaultMgmt.Event.$event_id"
+    local event_type_id=$(rdb get $base_key._event_type_id)
+    local event_type_name=$(rdb get "tr069.FaultMgmt.SupportedAlarm.${event_type_id}.EventType")
+
+    # Skip invalid event
+    [ -z "$event_type_name" ] && return
+
+    echo "=== <$event_type_id> $(rdb get $base_key.NotificationType): $event_type_name ==="
+    echo "EventTime: $(date -d @$(rdb get $base_key.EventTime))"
+    echo "Identifier: $(rdb get $base_key.AlarmIdentifier)"
+    echo "EventID: $event_id"
+    echo "Text: $(rdb get $base_key.AdditionalText)"
+    local add_info=$(rdb get $base_key.AdditionalInformation)
+    [ -n "$add_info" ] && echo "Info: $add_info"
+
+    echo ""
+}
+
+
+INDEX_LIST=$(rdb get tr069.FaultMgmt.Event._index | cut -f3 | tr ',' '\n' | sort -n)
+
+START_INDEX=$(rdb get tr069.FaultMgmt._IndexEvent)
+EVENT_COUNT=$(echo "$INDEX_LIST" | wc -l)
+LATEST_LINE=$(echo "$INDEX_LIST" | grep -no -e "^${START_INDEX}\$" | cut -d':' -f1)
+
+DUMP_START_LINE=$((LATEST_LINE + 1))
+[ "$DUMP_START_LINE" -gt "$EVENT_COUNT" ] && DUMP_START_LINE=1
+
+# Create a sorted index list with the order from the oldest to the latest
+NEW_INDEX_LIST=""
+line=1
+for idx in $INDEX_LIST; do
+    [ $line -ge $DUMP_START_LINE ] && NEW_INDEX_LIST="$NEW_INDEX_LIST $idx"
+    line=$((line+1))
+done
+line=1
+for idx in $INDEX_LIST; do
+    [ $line -lt $DUMP_START_LINE ] && NEW_INDEX_LIST="$NEW_INDEX_LIST $idx"
+    line=$((line+1))
+    [ $line -ge $DUMP_START_LINE ] && break
+done
+
+# Dump events in the index list
+for idx in $NEW_INDEX_LIST; do
+    if is_event_type $idx $EVENT_TYPE || [ "$EVENT_TYPE_NAME" = "Event" ]; then
+        dump_event $idx
+    fi
+done

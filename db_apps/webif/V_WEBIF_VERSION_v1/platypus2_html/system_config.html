@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<title>System Configuration</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+</head>
+<%
+var diag_if=get_single( 'wwan.0.diag_if');
+#if (defined V_PRODUCT_swi_nhd1w)
+	diag_exist=1;
+#elif (defined V_SHOW_DIAGNOSTIC_PORT_y)
+	if(diag_if=='')
+		diag_exist=0;
+	else
+		diag_exist=1;
+#else
+	diag_exist=0;
+#endif
+
+if (request['REQUEST_METHOD'] == "POST") {
+	enable = form['keepaliveEnable'];
+	if(enable=='1') {
+		tempval = form['keepaliveTime'];
+		retval = set_single( 'system.config.tcp_keepalive_time='+tempval, '-p' );
+		tempval = form['intvl'];
+		retval = set_single( 'system.config.tcp_keepalive_intvl='+tempval, '-p' );
+		tempval = form['probes'];
+		retval = set_single( 'system.config.tcp_keepalive_probes='+tempval, '-p' );
+	}
+	retval=set_single( 'system.config.tcp_keepalive_enable='+enable, '-p' );
+	tempval = form['syslogServer'];
+	set_single( 'service.syslog.option.remote='+tempval, '-p' );
+	tempval = form['syslogSavetoFile'];
+	set_single( 'service.syslog.option.logtofile='+tempval, '-p' );
+
+	if(diag_exist) {
+		tempval = form['qxdmEnableVal'];
+		set_single( 'service.qxdm.enable='+tempval, '-p' );
+		tempval = form['qxdmTCPPortVal'];
+		set_single( 'service.qxdm.tcp_port='+tempval, '-p' );
+	}
+}
+form['keepaliveEnable'] = get_single( 'system.config.tcp_keepalive_enable');
+form['keepaliveTime'] = get_single( 'system.config.tcp_keepalive_time');
+form['intvl'] = get_single( 'system.config.tcp_keepalive_intvl');
+form['probes'] = get_single( 'system.config.tcp_keepalive_probes');
+tempval=get_single( 'service.syslog.option.remote' );
+if(tempval=="N/A")
+	tempval="";
+form['syslogServer'] = tempval;
+tempval=get_single( 'service.syslog.option.logtofile' );
+form['syslogSavetoFile'] = tempval;
+
+if(diag_exist) {
+	tempval=get_single( 'service.qxdm.enable' );
+	form['qxdmEnableVal']=tempval;
+	tempval=get_single( 'service.qxdm.tcp_port' );
+	form['qxdmTCPPortVal']=tempval;
+}
+%>
+<body onLoad="updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("system_config");
+var profiles_connection_op=0;
+
+function updateState() {
+var f=document.form;
+<%if(diag_exist) {%>
+	f.qxdmTCPPort.disabled=f.qxdmEnableVal.value==0;
+	f.qxdmEnable[0].checked=f.qxdmEnableVal.value!=0;
+	f.qxdmEnable[1].checked=f.qxdmEnableVal.value==0;
+<%}%>
+	f.syslogSavetoFileEnable[0].checked=f.syslogSavetoFile.value!=0;
+	f.syslogSavetoFileEnable[1].checked=f.syslogSavetoFile.value==0;
+}
+
+function choption(val) {
+var f=document.form;
+var d=(val==0)?true:false;
+	if(val==0 && profiles_connection_op==3) {
+		f.enable_keepalive[0].checked=true;
+		alert("PAD Server TCP New Connection Option is set to 'Rejected during existing session'. You can't have Keepalive disabled.");
+		return;
+	}
+	f.keepaliveEnable.value=val;
+	f.keepaliveTime.disabled=d;
+	f.intvl.disabled=d;
+	f.probes.disabled=d;
+}
+
+function formCheck() {
+var f=document.form;
+	while(f.syslogServer.value.substring(0,1)==" ") {
+		f.syslogServer.value=f.syslogServer.value.substring(1,f.syslogServer.value.length);
+	}
+<%if(diag_exist){%>
+	f.qxdmTCPPortVal.value=f.qxdmTCPPort.value;
+<%}%>
+	f.submit();
+}
+</script>
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("system config"));</script></h3>
+<form class="content" name="form" method="POST" action="@@request['SCRIPT_NAME']">
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("remote syslog server"));</script></th></tr>
+</table>
+<table width="80%">
+<input type="hidden" name="syslogSavetoFile" value="@@form['syslogSavetoFile']"/>
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("ip hostname"));</script></td>
+	<td><input type=input size="30" name="syslogServer"  value="@@form['syslogServer']"></td>
+</tr>
+</table>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("diag")+" "+_("log"));</script></th></tr>
+</table>
+<table width="80%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("syslog to file"));</script></td>
+	<td>
+		<input type=radio onClick="javascript:document.form.syslogSavetoFile.value='1';updateState()" name='syslogSavetoFileEnable'/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<input type=radio onClick="javascript:document.form.syslogSavetoFile.value='0';updateState()" name='syslogSavetoFileEnable'/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+	</td>
+</tr>
+</table>
+
+<%if(diag_exist) {%>
+<table width="80%">
+	<tr><th><script language="JavaScript">document.write(_("dian port config"));</script></th></tr>
+</table>
+
+<input type="hidden" name="qxdmTCPPortVal" value="@@form['qxdmTCPPortVal']"/>
+<input type="hidden" name="qxdmEnableVal" value="@@form['qxdmEnableVal']"/>
+<table width="80%">
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("dian config"));</script></td>
+		<td>
+			<input type=radio onClick="javascript:document.form.qxdmEnableVal.value='1';updateState()" name='qxdmEnable'/>&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio onClick="javascript:document.form.qxdmEnableVal.value='0';updateState()" name='qxdmEnable'/>&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</td>
+	</tr>
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write(_("dian tcp port"));</script></td>
+		<td>
+			<input type=input size="30" name="qxdmTCPPort"  value="@@form['qxdmTCPPortVal']"/>
+		</td>
+	</tr>
+</table>
+<%}%>
+
+<div align="center">
+<br/><input type="button" value="Save" id="Apply" name="Apply" onClick="formCheck();" style="width:120px;">
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight(); $("#Apply").val(_("CSsave"));</script>
+</body>
+</html>

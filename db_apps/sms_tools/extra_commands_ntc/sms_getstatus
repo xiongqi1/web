@@ -1,0 +1,22 @@
+#!/bin/sh
+
+## To get same firmware version number with status page
+case $(rdb_get wwan.0.firmware_version) in
+	SWI9X*) ## a bit of parse for a more friendly version number - due to complexity of Sierra firmware version (svn revision 51011 on status.html)
+		echo 'Module FW Version=' && rdb_get wwan.0.firmware_version | sed -n 's/.*_\(.*\)$/\1/p' |sed  -n 's/ r*\(.*\)$//p'
+		;;
+	*)
+		echo 'Module FW Version=' && rdb_get wwan.0.firmware_version
+		;;
+esac
+
+echo ' LAN IP Address=' && rdb_get link.profile.0.address
+echo ' Network State=' && rdb_get wwan.0.system_network_status.pdp0_stat | sed 's/up/Connected/g'
+echo ' Network Operator=' && rdb_get wwan.0.system_network_status.network.unencoded
+if [ "`rdb_get wwan.0.system_network_status.system_mode`" = "LTE" ]; then
+	echo ' RSRP=' && rdb_get wwan.0.radio.information.signal_strength
+elif [ "`rdb_get wwan.0.system_network_status.system_mode`" = "UMTS" ]; then
+	echo ' RSCP=' && rdb_get wwan.0.radio.information.signal_strength
+else
+	echo ' RSSI=' && rdb_get wwan.0.radio.information.signal_strength
+fi

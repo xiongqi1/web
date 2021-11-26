@@ -1,0 +1,6 @@
+set yrange [3400:4400]
+set y2range [-10:110]
+set y2tics border
+set ylabel "mV"
+set y2label "charge[%]"
+plot 'test_out' using 1 title 'Voltage mV' with lines, 'test_out' using 2 title 'Filtered mV' with lines, 'test_out' using 3 title 'Charge %' axes x1y2 with lines

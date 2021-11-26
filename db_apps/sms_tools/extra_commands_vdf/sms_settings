@@ -1,0 +1,147 @@
+#!/bin/sh
+
+#
+# This script sets or gets one of the folloinwg SMS configurations
+#
+# download.timeout	: timeout (minutes) for wget
+# install.timeout	: timeout (minutes) for install_file - installing procedure
+#
+
+log() {
+	logger -t "sms_settings" -- "$@"
+}
+
+#---------------------------------------------------------------------------
+# For help text
+#---------------------------------------------------------------------------
+if [ "$1" = "--help" -o "$1" = "-h" -o "$1" = "" ]; then
+        echo ""
+        echo "This shell script is for internal system use only."
+        echo "It is used as part of the SMS diagnostic functionality."
+        echo "Please do not run this script manually."
+        echo ""
+        exit 0
+fi
+
+action="$1"
+conf="$2"
+val="$3"
+
+print_parameters() {
+	cat << EOF
+download.timeout:smstools.conf.download.timeout:10:$((24*60)):10:min.
+install.timeout:smstools.conf.install.timeout:3:$((5*60)):3:min.
+EOF
+}
+
+print_ranges() {
+	local conf="$1"
+	print_parameters | sed -n "s/^$conf:\\(.*\\):\\(.*\\):\\(.*\\):\\(.*\\):\\(.*\\)$/rdb='\\1';min='\\2';max='\\3';def='\\4';unit='\\5';/p"
+}
+
+# get parameters
+eval $(print_ranges "$conf")
+
+# log parameters
+log << EOF
+rdb='$rdb'
+min='$min'
+max='$max'
+EOF
+
+bail() {
+	log "[sms result] $*"
+	echo "$*"
+	exit 1
+}
+
+report() {
+	log "[sms result] $*"
+	echo "$*"
+	exit 0
+}
+
+
+# make sure that rdb exists
+if [ "$rdb" = "" ]; then
+	report "parameter:$conf not found"
+fi
+
+build_strings() {
+	minmax=""
+
+	# get unit suffix
+	suffix=""
+	test -n "$unit" && suffix=" $unit"
+
+	# add parameter min. setting
+	if [ -n "$min" ]; then
+		test -n "$minmax" && minmax="$minmax,"
+		minmax="${minmax}min=$min$suffix"
+	fi
+
+	# add parameter max. setting
+	if [ -n "$max" ]; then
+		test -n "$minmax" && minmax="$minmax,"
+		minmax="${minmax}max=$max$suffix"
+	fi
+
+	# add parameter max. setting
+	if [ -n "$def" ]; then
+		test -n "$minmax" && minmax="$minmax,"
+		minmax="${minmax}def=$def$suffix"
+	fi
+
+	# use brackets for min or max of parameter 
+	test "$minmax" && minmax=" ($minmax)"
+}
+
+build_strings
+
+# start parse
+case "$action" in
+
+	"get")
+		# read value
+		val=$(rdb_get "$rdb")
+
+		if [ -z $val ]; then
+			report "value not configured$minmax"
+		fi
+		report "$val"
+		;;
+
+	"set")
+
+		# check min. boundary
+		if [ -n "$min" ]; then
+			if [ "$val" -ge "$min" ]; then
+				:
+			else
+				bail "Parameter ERROR! usage: set $conf=value$minmax"
+			fi
+		fi
+
+		# check max. boundary
+		if [ -n "$max" ]; then
+			if [ "$val" -le "$max" ]; then
+				:
+			else
+				bail "Parameter ERROR! usage: set $conf=value$minmax"
+			fi
+		fi
+
+		# store oldval for logging
+		oldval=$(rdb_get "$rdb")
+
+		rdb_set -p -- "$rdb" "$val"
+		log "parameter:$conf (rdb:$db) set from '$oldval' to '$val'"
+
+		report "$val"
+		;;
+
+	*)
+		report "internal error unknown action (parameter:$conf)"
+		;;
+
+esac

@@ -1,0 +1,441 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#ifdef V_WEBIF_SPEC_ntc_v2
+<title>Watchdogs</title>
+#else
+<title>System Monitor</title>
+#endif
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['pingdst'];
+	retval = set_single( 'service.systemmonitor.destaddress='+tempval );
+	tempval = form['pingdst2'];
+	retval = set_single( 'service.systemmonitor.destaddress2='+tempval );
+	tempval = form['pingtimer'];
+	retval = set_single( 'service.systemmonitor.periodicpingtimer='+tempval );
+	tempval = form['pingacctmr'];
+	retval = set_single( 'service.systemmonitor.pingacceleratedtimer='+tempval );
+	tempval = form['pingfailcnt'];
+	retval = set_single( 'service.systemmonitor.failcount='+tempval );
+	tempval = form['resetAnyway'];
+	retval = set_single( 'service.systemmonitor.forcereset='+tempval );
+	redirect('/ltph.html?success');
+}
+else { /*GET*/
+	temp = get_single( 'service.systemmonitor.destaddress' );
+	form['pingdst'] = temp;
+	temp = get_single( 'service.systemmonitor.destaddress2' );
+	form['pingdst2'] = temp;
+	temp = get_single( 'service.systemmonitor.periodicpingtimer' );
+	if(temp=="") temp=0;
+	form['pingtimer'] = temp;
+	temp = get_single( 'service.systemmonitor.pingacceleratedtimer' );
+	if(temp=="") temp=0;
+	form['pingacctmr'] = temp;
+	if(temp=="") temp=0;
+	temp = get_single( 'service.systemmonitor.failcount' );
+	if(temp=="") temp=0;
+	form['pingfailcnt'] = temp;
+	temp = get_single( 'service.systemmonitor.forcereset' );
+	if(temp=="")
+		temp="0";
+	form['resetAnyway'] = temp;
+}
+%>
+
+<script language="JavaScript">
+
+function switchItem( action ) {
+	if( action ) {
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(0); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("close introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='';
+	}
+	else {
+		document.getElementById("introduction0").innerHTML=_("periodic ping settings")+'<a href=javascript:switchItem(1); style="margin-left:60px">&nbsp;&nbsp;&nbsp;&nbsp;'+_("display introduction")+'</a>';
+		document.getElementById( "introduction1" ).style['display']='none';
+	}
+}
+
+// jquery body
+$(function() {
+	var ping_info=[
+		{pinging:false,server:""},
+		{pinging:false,server:""},
+	];
+
+	// set element activation
+	$("#pingdst,#pingdst2").keyup(function(e) {
+		var len1;
+		var len2;
+
+		len1=$("#pingdst").val().length>0;
+		len2=$("#pingdst2").val().length>0;
+
+		if(!len1) {
+			$("#pingdst2").val("");
+			$("#pingdst2").attr("disabled",true);
+		}
+		if(($("#pingdst2").is(":disabled") && len1) || (!$("#pingdst2").is(":disabled") && !len1)) {
+			$("#pingdst2").attr("disabled",!len1 && !len2);
+		}
+
+		$("#pingtimer").attr("disabled",!len1 && !len2);
+		$("#pingacctmr").attr("disabled",!len1 && !len2);
+		$("#pingfailcnt").attr("disabled",!len1 && !len2);
+
+		var el;
+		var el_array=["pingdst","pingdst2"];
+		var idx;
+		var server;
+		var el_id;
+
+		// get current el info
+		el=$(this);
+		el_id=el.attr("id");
+		idx=$.inArray(el_id,el_array);
+
+		// get peripheral elements
+		var el_wait=$("#"+el_id+"_wait");
+		var el_stat=$("#"+el_id+"_stat");
+
+		server=el.val();
+
+		// bypass if no server is available
+		if(server.length==0) {
+			// hide pinging icon
+			el_wait.hide();
+			el_stat.hide();
+			return;
+		}
+
+		// bypass if we have no change in the server
+		if(ping_info[idx].server==server)
+			return;
+
+		// when the server changed from blank to something while pinging
+		el_wait.toggle(ping_info[idx].pinging);
+
+		// bypass if currently pinging or already pinged
+		if(ping_info[idx].pinging)
+			return;
+
+		// update ping info
+		ping_info[idx].pinging=true;
+		ping_info[idx].server=server;
+
+		// show pinging icon
+		el_wait.toggle(ping_info[idx].pinging);
+		el_stat.toggle(!ping_info[idx].pinging);
+
+		$.getJSON (
+			"./cgi-bin/ltph.cgi",
+			{reqtype:"ping",reqparam:server},
+			function(res){
+				el_stat.html( (res.cgiresult==0)?_("succ"):_("fail"));
+
+				// udpate ping info
+				ping_info[idx].pinging=false;
+
+				// hide pinging icon
+				el_wait.toggle(ping_info[idx].pinging);
+				el_stat.toggle(!ping_info[idx].pinging);
+
+				// trigger keyup if we have a new server
+				if(ping_info[idx].server!=el.val()) {
+					el.trigger("keyup");
+				}
+			}
+		);
+		return;
+	});
+
+	// trigger events
+	$("#pingdst,#pingdst2").trigger("keyup");
+
+	$.each(
+		["#reboot_rnd_min"],
+		function(idx,el) {
+			$.each(
+				{
+					"1":"1 "+_("minute"),
+					"2":"2 "+_("minutes"),
+					"3":"3 "+_("minutes"),
+					"5":"5 "+_("minutes"),
+					"5":"5 "+_("minutes"),
+					"10":"10 "+_("minutes"),
+					"15":"15 "+_("minutes"),
+					"20":"20 "+_("minutes"),
+					"25":"25"+_("minutes"),
+					"30":"30 "+_("minutes"),
+					"35":"35 "+_("minutes"),
+					"45":"45 "+_("minutes"),
+					"60":"1 "+_("hour"),
+				},
+					function(val,txt) {
+					$(el).append("<option value=\""+val+"\""+">"+txt+"</option>");
+				}
+				);
+		}
+	);
+
+	$("input[name=resetAnyway]").keyup(function() {
+
+		var periodic_ping;
+		var val=$(this).val();
+
+		periodic_ping=(parseInt(val)||0);
+
+		$("#reboot_rnd_min option").each(function() {
+			$(this).attr("disabled",parseInt($(this).val())>=periodic_ping);
+		});
+
+		var last=$("#reboot_rnd_min option:enabled:last");
+
+		$("#reboot_rnd_min").attr("disabled",last.length==0);
+		if( $("#reboot_rnd_min option:selected").is(":disabled") && (last.length>0) )
+			$("#reboot_rnd_min").val(last.val());
+	});
+
+	<%
+		var rdnmin;
+
+		if(rdb_exists("service.systemmonitor.forcereset.rndmin"))
+			rdnmin=get_single("service.systemmonitor.forcereset.rndmin");
+		else
+			rdnmin="";
+	%>
+	$("#reboot_rnd_min").val("@@rdnmin");
+	$("input[name=resetAnyway]").trigger("keyup");
+
+});
+
+</script>
+
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+	if(form["reboot_rnd_min"]!=undefined) {
+		set_single_direct("-p","service.systemmonitor.forcereset.rndmin",form["reboot_rnd_min"]);
+	}
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" nonvalidate="novalidate">
+		<%appendCsrfToken();%>
+		<div class="right-column hide_for_pppoe_en white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("watchdogsSettings"))</script></h2>
+				<div class="p-des-full-width">
+					<p><script language=Javascript>document.write(_("ping watchdog desc 01"))</script></p>
+					<p><script language=Javascript>document.write(_("ping watchdog desc 02"))</script></p>
+					<p><script language=Javascript>document.write(_("ping watchdog desc 03"))</script></p>
+					<p><script language=Javascript>document.write(_("ping watchdog desc 04"))</script></p>
+					<table class="no-border" style="margin-bottom:10px">
+						<tr><td>A.</td><td><script language=Javascript>document.write(_("ping watchdog desc 05"))</script></td></tr>
+						<tr><td>B.</td><td><script language=Javascript>document.write(_("ping watchdog desc 06"))</script></td></tr>
+						<tr><td>C.</td><td><script language=Javascript>document.write(_("ping watchdog desc 07"))</script></td></tr>
+						<tr><td>D.</td><td><script language=Javascript>document.write(_("ping watchdog desc 08"))</script></td></tr>
+						<tr><td>E.</td><td><script language=Javascript>document.write(_("ping watchdog desc 09"))</script></td></tr>
+					</table>
+					<p><script language=Javascript>document.write(_("ping watchdog desc 10"))</script></p>
+					<p><script language=Javascript>document.write(_("ping watchdog desc 11"))</script></p>
+				</div>
+
+				<div class="form-row">
+					<label for="pingdst"><script language=Javascript>document.write(_("monitor destinationAddress"))</script></label>
+					<div class="field" style="inline">
+						<input type="text" class="large" name="pingdst" id="pingdst" onkeyup="urlFilter(this);" value="@@form['pingdst']">
+					</div>
+					<div style="inline">
+						&nbsp;
+						<i style="display:none" id="pingdst_wait" class="progress-sml"></i>
+						<label id="pingdst_stat" style="width:40px"></label>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="pingdst2"><script language=Javascript>document.write(_("monitor secondAddress"))</script></label>
+					<div class="field">
+					<input type="text" class="large" name="pingdst2" id="pingdst2" onkeyup="urlFilter(this);" value="@@form['pingdst2']">
+					</div>
+					<div style="inline">
+						&nbsp;
+						<i style="display:none" id="pingdst2_wait" class="progress-sml"></i>
+						<label id="pingdst2_stat" style="width:40px"></label>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="pingtimer"><script language=Javascript>document.write(_("monitor pingTimer"))</script></label>
+					<div class="field">
+						<input type="text" name="pingtimer" id="pingtimer" class="validate[required,funcCall[validate_pingtimer]] required pingtimer large" maxlength=5 value="@@form['pingtimer']" onkeyup="NumfieldEntry(this)">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("period300"))</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="pingacctmr"><script language=Javascript>document.write(_("retry timer"))</script></label>
+					<div class="field">
+						<input type="text" name="pingacctmr" id="pingacctmr" class="validate[required,funcCall[validate_pingacctmr]] required pingacctmr large" maxlength=5 value="@@form['pingacctmr']" onkeyup="NumfieldEntry(this)">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("period60"))</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="pingfailcnt"><script language=Javascript>document.write(_("monitor failCount"))</script></label>
+					<div class="field">
+						<input type="text" name="pingfailcnt" id="pingfailcnt" class="validate[required,funcCall[validate_pingfailcnt]] required pingfailcnt large" maxlength=5 value="@@form['pingfailcnt']" onkeyup="NumfieldEntry(this)">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("count"))</script></span>
+					</div>
+				</div>
+
+				<h2><script language=Javascript>document.write(_("monitor periodicReset"))</script></h2>
+				<div class="form-row">
+					<label for="resetanyway"><script language=Javascript>document.write(_("force reset"))</script></label>
+					<div class="field">
+						<input type="text" name="resetAnyway" class="validate[required,funcCall[validate_resetAnyway]] required resetAnyway large" maxLength=5 value="@@form['resetAnyway']" onkeyup="NumfieldEntry(this)">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("period5min"))</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="reboot_rnd_min"><script language=Javascript>document.write(_("random period"))</script></label>
+					<div class="field">
+						<select id="reboot_rnd_min" name="reboot_rnd_min"></select>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="submit" id="bottomButton"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("System", "Sys_Monitor", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["pingtimer"]=_("monitor warningMsg1");
+	$.validator.addMethod("pingtimer",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c!=0 && c < 300) || (c > 65535) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.pingtimer);
+
+	VALIDATOR.config.errors["pingacctmr"]=_("log Error")+": "+_("monitor warningMsg2");
+	$.validator.addMethod("pingacctmr",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c!=0 && c < 60) || (c > 65535) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.pingacctmr);
+
+	VALIDATOR.config.errors["pingfailcnt"]=_("monitor warningMeg10");
+	$.validator.addMethod("pingfailcnt",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c!=0 && c < 1) || (c > 65535) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.pingfailcnt);
+
+	VALIDATOR.config.errors["resetAnyway"]=_("monitor warningMsg4");
+	$.validator.addMethod("resetAnyway",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( (c < 0) ||  (c!=0 && c < 5) || (c > 65535) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.resetAnyway);
+#else
+/********* NTC ValidationEngine **********/
+function validate_pingtimer(field) {
+	if( (field.val() < 0) ||  (field.val()!=0 && field.val() < 300) || (field.val() > 65535) ) {
+		return _("monitor warningMsg1");
+	}
+}
+function validate_pingacctmr(field) {
+	if( (field.val() < 0) ||  (field.val()!=0 && field.val() < 60) || (field.val() > 65535) ) {
+		return _("monitor warningMsg2");
+	}
+}
+function validate_pingfailcnt(field) {
+	if( (field.val() < 0) ||  (field.val()!=0 && field.val() < 1) || (field.val() > 65535) ) {
+		return _("monitor warningMeg10");
+	}
+}
+function validate_resetAnyway(field) {
+	if( (field.val() < 0) ||  (field.val()!=0 && field.val() < 5) || (field.val() > 65535) ) {
+		return _("monitor warningMsg4");
+	}
+}
+jQuery("#form").validationEngine("attach", {
+	onValidationComplete: function(form, status) {
+		if( status == false ) {
+			validate_alert("",_("errorsSummary"));
+			return false;
+		}
+		else {
+			//clear_alert();
+			return true;
+		}
+	}
+});
+#endif
+
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('ltphSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

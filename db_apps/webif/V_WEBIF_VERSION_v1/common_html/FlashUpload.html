@@ -1,0 +1,258 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.asp'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Update Module Firmware</title>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<script language="javascript" type="text/javascript" src="cedric.js"></script>
+<script language="JavaScript" src="/jquery-1.6.min.js"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<style type="text/css">
+	.bar1 {background-color:#F0EFEB; position:relative; text-align:left; height:12px; width:838px; border:1px solid #505050;}
+	.bar2 {background-color:blue; position:relative; text-align:left; height:12px; width:0%;}
+</style>
+</head>
+
+<body onLoad="iniCedric();">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("upload_firmware");
+function printf(fmt) {
+	var reg = /%s/;
+	var result = new String(fmt);
+	for (var i = 1; i < arguments.length; i++) {
+		result = result.replace(reg, new String(arguments[i]));
+	}
+	document.write(result);
+}
+var p_width=838;
+var ceder = 0;
+function iniCedric() {
+	if (!ceder) {
+		ceder = new Cedric( p_width );
+		ceder.zeroProgressBar();
+	}
+}
+var _totalPeriod = 4 * 60;
+var _pastSeconds = 0;
+var _tickSeconds = 2;
+function uploadFiles() {
+var downloadTick=0;
+var intval="";
+var firmwaretype = getCheckedValue(document.formflash.webfileupd_env_flashtype);
+
+	if (firmwaretype == "boot")
+		_totalPeriod = 4*60;
+	else
+		_totalPeriod = 8*60;
+
+	ceder.startProgressStatus = ceder.startNetProgressStatus;
+	ceder.showProgressDiv(1,1);
+	ceder.setProgressInfo('current', '0');
+	ceder.setProgressInfo('phase', "Initializing");
+	ceder.setProgressInfo('messages', "Starting");
+	var startPoll = function() {
+		_pastSeconds = _pastSeconds + _tickSeconds;
+		downloadTick =  Math.round(_pastSeconds * 100 / _totalPeriod );
+		if(downloadTick>=100) {
+			ceder.setProgressInfo('phase', "Failure");
+			ceder.setProgressInfo('percent', downloadTick+'%');
+			ceder.setProgressInfo('messages', "ERROR! Upload Timeout.");
+			window.clearInterval(intval);
+			return;
+		}
+		ceder.setProgressWidth( Math.round(p_width*downloadTick/100) );
+		ceder.setProgressInfo('percent', downloadTick+'%');
+		$.get("cgi-bin/webfileupd.cgi?webfileupd_env_action=getprogress", function(v) {
+			ceder.setProgressInfo('phase', "In progress");
+			var respObj = eval('('+v+')');
+			if (respObj.messages){
+				ceder.setProgressInfo('messages', respObj.messages.join("<br/>"));
+				if((respObj.total_bytes <= respObj.last_bytes_read) &&
+					(respObj.messages.indexOf("Please continue to update the application firmware.") != -1
+			       		|| respObj.messages.indexOf("Application firmware update succeeded. Module update finished.") != -1))
+				{
+					window.clearInterval(intval);
+					//ceder && ceder.runRabbit("cgi-bin/webfileupd.cgi?webfileupd_env_action=getprogress");
+					ceder.setProgressInfo('phase', "Finished");
+					ceder.setProgressWidth( Math.round(p_width) );
+					ceder.setProgressInfo('percent', '100%');
+					return;
+				}
+			}
+			if(typeof(respObj.total_bytes) != "undefined" && typeof(respObj.last_bytes_read) != "undefined") {
+				$("#total_kbytes").html( Math.round(respObj.total_bytes / 1024) );
+				$("#current").html( Math.round(respObj.last_bytes_read / 1024) );
+			}
+//			if(intval!="" && parseInt(respObj.last_bytes_read)>downloadTick) {
+//				window.clearInterval(intval);
+//				ceder && ceder.runRabbit("cgi-bin/webfileupd.cgi?webfileupd_env_action=getprogress");
+//			}
+		});
+	}
+
+	if(intval=="")
+		intval=window.setInterval(startPoll, _tickSeconds * 1000);
+}
+
+function uploadStop() {
+	ceder && ceder.stopUpload();
+}
+
+function getCheckedValue(radioObj) {
+	if(!radioObj)
+		return "";
+	var radioLength = radioObj.length;
+	if(radioLength == undefined)
+		if(radioObj.checked)
+			return radioObj.value;
+		else
+			return "";
+	for(var i = 0; i < radioLength; i++) {
+		if(radioObj[i].checked) {
+			return radioObj[i].value;
+		}
+	}
+	return "";
+}
+
+function submitF() {
+var wfmess="Error: Wrong Upgrade File! (file must end in .cwe)";
+var f = document.formflash;
+var rc = getCheckedValue(f.webfileupd_env_flashtype);
+	if (rc == "") {
+		alert("Choose a File Type; Application or Boot Loader.");
+		return;
+	}
+	if(f.webfileupd_env_uploadfile.value.length == 0){ alert("Please enter a file."); return;}
+
+	var f1=f.webfileupd_env_uploadfile.value;
+	var end=f1.indexOf(".cwe");
+	if(end == -1){
+		end=f1.indexOf(".CWE");
+		if(end == -1){alert(wfmess);return;}
+	}
+	uploadStop();
+	if (confirm("Do you wish to continue with the fimrware upload process? ")) {
+	//	document.getElementById("bottomButton").disabled=true;
+	//	document.formflash.webfileupd_env_uploadfile.disabled=true;
+		alert("At the end of the upgrade, the device may not respond\nto commands for as long as one minute.\nThis is normal behavior.  Do not power off the device when\nthe upgrade procedure is in progress.");
+		_pastSeconds = 0;
+		$.get("cgi-bin/webfileupd.cgi?webfileupd_env_action=cleanmessage",function(v) {f.submit(); uploadFiles();});
+	}
+}
+var errors = "";
+
+function processErrors() {
+	if( errors != "" )
+		printf("<tr><td valign=\"top\" align=\"left\"><b>Errors:</b></td><td align=\"left\"><span id=\"errors\"></span></td></tr>");
+}
+</script>
+
+<!--<div align="center" style="padding:40px 0 30px 0; font-size:32px;">Flash Module Firmware</div>-->
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("upload module firmware"))</script></h3>
+<p></p>
+<table class="body">
+	<tr><th><script language="JavaScript">document.write(_("upload module firmware"))</script></th></tr>
+</table>
+
+<form name="formflash" target='target_upload' method=post action="/cgi-bin/webfileupd.cgi" encType="multipart/form-data">
+<input type=hidden name="webfileupd_env_action" value="getprocess">
+<input type=hidden name="webfileupd_env_script" value="webfileupd_pm.sh">
+<input type=hidden name="webfileupd_env_filelength" value=0>
+
+<table border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td colspan="2" style="height:60px;">
+		<div align="left">
+			<div>This page allows you to update firmware to the embedded cellular module. Click Browse to locate the firmware file to be used for the upgrade.</div>
+			<p/>
+			<div style="color:#FF0000">Please note that it takes up to 8 minutes for the firmware to be upgraded. Do NOT turn off your Router during the firmware upgrade process.</div>
+		</div>
+	</td>
+</tr>
+<tr>
+	<td width="25%">Firmware Type</td>
+	<td><input type="radio" name="webfileupd_env_flashtype" value="app">&nbsp;Application&nbsp;&nbsp;&nbsp;&nbsp;
+	&nbsp;&nbsp;&nbsp;&nbsp;<input type="radio" name="webfileupd_env_flashtype" value="boot">&nbsp;Boot Loader</td>
+</tr>
+<tr>
+	<td>Update Firmware</td>
+	<td><input type=file size="35" name="webfileupd_env_uploadfile"></td>
+</tr>
+
+</table>
+
+<table cellpadding="2" cellspacing="1">
+<tr align="center"><td>
+<input type="Button" value="Apply" id="bottomButton" onClick="javascript:submitF()" style="width:120px;">
+</td></tr>
+</table>
+<hr/>
+
+<!--<div align="center" style="margin-right:15% ">
+	<br/><br/>
+	<input type="Button" value="Save" id="bottomButton" onClick="javascript:submitF()" style="width:120px;">
+	<div id="upload_div"><iframe style="display:none" id='target_upload' name="target_upload" frameborder=0></iframe></div>
+</div>-->
+<iframe style="display:none" id='target_upload' name="target_upload" frameborder=0></iframe>
+</form>
+
+<div class="info" id="progress_info"  style="display:none">
+<table width="85%" border="0" cellspacing="0" cellpadding="10">
+	<tr>
+		<td width="180px" align="left" style="height:40px"><b>Phase:</b></td>
+		<td align="left"><span id="phase"></span></td>
+	</tr>
+	<tr>
+		<td valign="top" align="left"><b>Messages:</b></td>
+		<td align="left"><span id="messages"></span></td>
+	</tr>
+	<script language=Javascript>
+	processErrors();
+	</script>
+</table>
+</div>
+
+<div id="progress_bar" style="display:none">
+<table class="data" cellpadding='3' cellspacing='1'>
+<tr>
+	<td width="180px" align="left"><b>Update Progress:</b></td>
+	<td align="center"><span id="percent">0%</span></td>
+</tr>
+</table>
+<div class="bar1" id="upload_status_wrap" align="center">
+	<div align="center" class="bar2" id="upload_status"></div>
+</div>
+<table class="data" cellpadding='3' cellspacing='1'>
+<tr>
+	<td width="180px" align="left"><b>Current Position:</b></td>
+	<td align="center"><span id="current">0</span> / <span id="total_kbytes"></span> KBytes</td>
+</tr>
+</table>
+<div style="display:none">
+<table>
+<tr>
+	<td align="left" ><b>Elapsed time:</b> </td>
+	<td align="center"><span id="time">0</span></td>
+</tr>
+<tr>
+	<td align="left"><b>Est Time Left:</b></td>
+	<td align="center"><span id="remain">0</span></td>
+</tr>
+<tr>
+	<td align="left"><b>Est Speed:</b></td>
+	<td align="center"><span id="speed">0</span> KB/s.</td>
+</tr>
+</table>
+</div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>MyZone Login</title>
+<link href="MyZoneStyle.css" rel="stylesheet" type="text/css"/>
+<link href="MyZoneStyle-ar.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>body { direction:ltr; }</style>
+<script language="JavaScript">
+updateStylesheet();
+Butterlate.setTextDomain("NTC-GUI");
+function initTranslation() {
+	document.getElementById("username").innerHTML = _("GUI username");
+	document.getElementById("passwd").innerHTML = _("password");
+	document.getElementById("passWarning").innerHTML = _("admin passWarning");
+	document.getElementById("CSsubmit").value = "  "+_("submit")+"  ";
+	document.getElementById("CSclear").value = "  "+_("clear")+"  ";
+	document.getElementById("sToAdv").innerHTML = _("GUI sToAdv");
+}
+function reload_timer() {
+	moveGUI();
+	setTimeout("reload_timer()", 100);
+}
+$(document).ready(function() {
+	$.get('/cgi-bin/setdate.cgi?'+getHostDate());
+	init_moveGUI();
+	reload_timer();
+	document.form.username.focus();
+});
+</script>
+</head>
+<body>
+<div id="banner"><img src="images/MyZone-banner.jpg" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="http://www.etisalat.ae/" alt="www.etisalat.ae" target="_blank"/>
+</map>
+</div>
+
+<form name="form"  class="content" method="POST" action="@@requst['SCRIPT_NAME']">
+<div id="myzoneGUI" style="left:558px; top:120px">
+	<div id="langTab"><a class="a1" href="JavaScript:switchLanguage_ar();"><script language="JavaScript">showLanguage_ar();</script></a></div>
+	<div style="position:absolute; font-size:12px; left:34px; top:534px" ><a class="a1" href="/login.html" id="sToAdv">Switch to Advanced View</a></div>
+	<img src="images/GUI-Login.gif" border="0" usemap="#1"/>
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<div class="Rotate-90" style="left:5px" id="tab-login"><a style="text-decoration:none" href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+	<div style="position:absolute; font-size:40px; font-weight:5; top:38px; color:#ffffff; left:80px">Etisalat</div>
+	<div style="position:absolute; font-size:46px; font-weight:600; top:33px; color:#ffffff; left:220px">MyZone</div>
+
+    <div class="div_text" style="top:195px" id="username">User Name</div>
+    <div class="div_input" style="top:189px" >
+	<input type="text" name="username" maxlength="20" size="20" value="@@form['username']">
+    </div>
+    <div class="div_text" style="top:250px" id="passwd">Password</div>
+    <div class="div_input" style="top:245px" >
+	<input type="password" name="password" maxlength="20" size="20" value="@@form['password']">
+    </div>
+    <div class=div_small_text style="top:310px"><script language="JavaScript">document.write(_("login msg"));</script></div>  
+    <div id="ID1" class="div_button" style="top:435px">
+	<input type="submit" id="CSsubmit" value="Submit">
+	<input type="button" id="CSclear" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''">
+    </div>
+    <div id="ID0" style="position:absolute; font-size:12px; top:416px; left:75px; display:none"> 
+    <h4 style="margin-bottom:0px; color:#CC0000; width:300px" id="passWarning">User name or password is incorrect. Please try again!</h4>
+    </div>
+</div>
+<script language="JavaScript">
+initTranslation();
+user_agent = <%val=headers['USER_AGENT'];%>"@@val";
+if(user_agent.indexOf("IE")!=-1)
+	document.form.password.size="22";
+</script>
+</form>  
+</body>
+<%    
+    if (request['REQUEST_METHOD'] == "POST")
+	{      
+        //check username and password
+        user = form['username'];
+        pass = get_single( 'admin.user.'+user );
+		mypassword = form['password'];
+        if( ( pass != 'N/A' ) && ( mypassword == pass) ) //password ok
+        {
+    		session["sessionid"] = request['SESSION_ID'];
+            session["user"] = user;
+            if( user == 'root')
+            	session["userlevel"] = '0';
+            else
+            	session["userlevel"] = '1';
+            redirect('/index.html');
+        }
+        else 
+        {%>
+        	<script language='JavaScript'>
+			document.getElementById( "ID0" ).style['display']='';
+			document.getElementById( "ID1" ).style['display']='none';
+			setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);
+			</script>
+        <%}
+	}
+    else
+    {
+        if(request['QUERY_STRING']=='logoff')
+        	session["sessionid"] = '';
+        else if( request['SESSION_ID']==session["sessionid"] )
+        	redirect('/index.html');
+    }
+%>
+</html>

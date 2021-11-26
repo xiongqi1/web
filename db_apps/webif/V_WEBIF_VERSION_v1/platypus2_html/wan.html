@@ -1,0 +1,413 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>WAN</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="/cgi-bin/timezoneList.cgi"></script>
+<script language="JavaScript">
+function checkWanPortStatus() {
+	var wan_mode=<%v=get_single('link.profile.0.wan_mode');%>"@@v";
+	if ( wan_mode !="wan") {
+		alert(_("lanwan warningMsg2"));
+		window.location.href="login.html";
+		return false;
+	}
+}
+function checkTransparentMode() {
+	var IPForward="<%val=get_single('service.bridge.3GIPForward');%>@@val";
+	if(IPForward == "1") {
+		document.getElementById("WANConfigurationDiv").style['display']='none';
+		//alert(_("transparent bridge warnMsg4"));
+	}
+}
+</script>
+</head>
+
+<body onload="checkTransparentMode();">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("wan");
+
+#ifdef PLATFORM_Platypus2
+#include "failovertrans.inc"
+#endif
+
+checkWanPortStatus();
+
+function initTranslation() {
+	$("#wIntroduction").html(_("wan introduction")+" ("+_("wan address mode static")+", DHCP, PPPoE), "+_("Msg2"));
+	$("#wStaticMode").html(_("wan static mode"));
+	$("#wStaticIp").html(_("ip address"));
+	$("#wStaticNetmask").html(_("subnet mask"));
+	$("#wStaticGateway").html(_("default gateway"));
+	$("#wStaticPriDns").html(_("inet pri dns"));
+	$("#wStaticSecDns").html(_("inet sec dns"));
+	
+	$("#wDhcpMode").html(_("wan dhcp mode"));
+	
+	$("#wPppoeMode").html(_("wan pppoe mode"));
+	$("#wPppoeUser").html(_("user name"));
+	$("#wPppoePassword").html(_("password"));
+	$("#wPppoePass2").html(_("verify password"));
+	$("#CSsave").val(_("CSsave"));
+}
+
+function connectionTypeSwitch() {
+	document.getElementById( "d_static" ).style['display']='none';
+	document.getElementById( "d_pppoe" ).style['display']='none';
+	document.getElementById( "d_dhcp" ).style['display']='none';
+
+	if (document.form.connectionType.options.selectedIndex == 0)
+		document.getElementById( "d_static" ).style['display']='';
+	else if (document.form.connectionType.options.selectedIndex == 2)
+		document.getElementById( "d_pppoe" ).style['display']='';
+	else
+		document.getElementById( "d_dhcp" ).style['display']='';
+	document.form.wan_conntype.value=document.form.connectionType.value;
+}
+
+function submitF1() {
+var f=document.form;
+
+	if (f.connectionType.options.selectedIndex == 0) { //STATIC
+		if (!checkIpAddr(f.staticIp, false))
+			return;
+		else if (!checkIpAddr(f.staticNetmask, true))
+			return;
+		if (!checkIpAddr(f.staticGateway, false))
+			return;
+		if (!checkIpAddr(f.staticPriDns, false, _("dns filed error")))
+			return;
+		if (f.staticSecDns.value != "") {
+			if (!checkIpAddr(f.staticSecDns, false, _("2nd dns filed error")))
+				return;
+		}
+	}
+	else if (f.connectionType.options.selectedIndex == 2) { //PPPOE
+		if (f.pppoeUser.value == "") {
+			alert(_("pleaseEnterUsername"));
+			return;
+		}
+		else if (f.pppoePass.value == "") {
+			alert(_("pleaseEnterPassword"));
+			return;
+		}
+		if (f.pppoePass.value != f.pppoePass2.value) {
+			alert(_("warningMsg15"));//"Password mismatched!"/
+			return;
+		}
+	}
+	#if (defined V_3GFAILOVERNOTIFICATION)
+	if( checkFailOverItems()==false )
+		return;
+	#endif
+	f.submit();
+}
+
+$(document).ready(function() {
+	with ( document.forms[0] ) {
+		if(wan_conntype.value=="N/A")
+			wan_conntype.value="dhcp";
+		connectionType.value=wan_conntype.value;
+		if(staticIp.value=="N/A")
+			staticIp.value="";
+		if(staticNetmask.value=="N/A")
+			staticNetmask.value="";
+		if(staticGateway.value=="N/A")
+			staticGateway.value="";
+		if(staticPriDns.value=="N/A")
+			staticPriDns.value="";
+		if(staticSecDns.value=="N/A")
+			staticSecDns.value="";
+		if(pppoeUser.value=="N/A")
+			pppoeUser.value="";
+		if(pppoePass.value=="N/A") {
+			pppoePass.value="";
+			pppoePass2.value="";
+		}
+	}
+	initTranslation();
+	connectionTypeSwitch();
+});
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(form['form_name']=="form") {
+		set_single('link.profile.0.wan_ipaddr='+form['staticIp'], '-p');
+		set_single('link.profile.0.wan_mask='+form['staticNetmask'],'-p');
+		set_single('link.profile.0.wan_gw='+form['staticGateway'], '-p');
+		set_single('link.profile.0.wan_dns1='+form['staticPriDns'], '-p');
+		set_single('link.profile.0.wan_dns2='+form['staticSecDns'],'-p');
+		set_single('link.profile.0.wan_pppoe_user='+form['pppoeUser'],'-p');
+		set_single('link.profile.0.wan_pppoe_passwd='+form['pppoePass'],'-p');
+		set_single('link.profile.0.wan_conntype='+form['wan_conntype'], '-p');
+
+		#if (defined V_3GFAILOVERNOTIFICATION)
+			#include "failover-head.inc"
+		#endif
+	}
+
+	#if (defined V_3GFAILOVERNOTIFICATION)
+		#include "failovernoti-head.inc"
+	#endif
+}
+
+form['wan_conntype']=get_single('link.profile.0.wan_conntype');
+form['staticIp']=get_single('link.profile.0.wan_ipaddr');
+form['staticNetmask']=get_single('link.profile.0.wan_mask');
+form['staticGateway']=get_single('link.profile.0.wan_gw');
+form['staticPriDns']=get_single('link.profile.0.wan_dns1');
+form['staticSecDns']=get_single('link.profile.0.wan_dns2');
+form['pppoeUser']=get_single('link.profile.0.wan_pppoe_user');
+pass=get_single('link.profile.0.wan_pppoe_passwd');
+form['pppoePass']=pass;
+form['pppoePass2']=pass;
+
+wanNatEnable=get_single("wanNatEnable");
+if((wanNatEnable==1) || (wanNatEnable=="")) {
+	wNatEnable0="selected";
+	wNatEnable1="";
+}
+else {
+	wNatEnable0="";
+	wNatEnable1="selected";
+}
+
+%>
+
+<form name="form" id="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?form_name=form">
+<h3><script language="JavaScript">document.write( _("treeapp internet settings")+" > "+_("wan"))</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="wan_conntype" value="@@form['wan_conntype']">
+
+<div id="WANConfigurationDiv">
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("wanConfiguration"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr>
+	<td width="30%"><b><script language="JavaScript">document.write(_("wan connection type"))</script></b>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+	<td><select name="connectionType" size="1" onChange="connectionTypeSwitch();">
+		<option value="static"><script language="JavaScript">document.write(_("wan connection type static"))</script></option>
+		<option value="dhcp"><script language="JavaScript">document.write(_("wan connection type dhcp"))</script></option>
+		<option value="pppoe"><script language="JavaScript">document.write(_("wan connection type pppoe"))</script></option>
+		<!--option value="PPTP" id="wConnTypePptp"></option-->
+		</select>
+	</td>
+</tr>
+</table>
+
+<!-- ================= STATIC Mode ================= -->
+<div id="d_static" >
+<table width="85%">
+<tr>
+	<td class="title" colspan="2" id="wStaticMode"></td>
+</tr>
+<tr>
+	<td width="30%" class="head" id="wStaticIp"></td>
+	<td><input name="staticIp" maxlength=15 value="@@form['staticIp']"></td>
+</tr>
+<tr>
+	<td class="head" id="wStaticNetmask"></td>
+	<td><input name="staticNetmask" maxlength=15 value="@@form['staticNetmask']"></td>
+</tr>
+<tr>
+	<td class="head" id="wStaticGateway"></td>
+	<td><input name="staticGateway" maxlength=15 value="@@form['staticGateway']"></td>
+</tr>
+<tr>
+	<td class="head" id="wStaticPriDns"></td>
+	<td><input name="staticPriDns" maxlength=15 value="@@form['staticPriDns']"></td>
+</tr>
+<tr>
+	<td class="head" id="wStaticSecDns"></td>
+	<td><input name="staticSecDns" maxlength=15 value="@@form['staticSecDns']"></td>
+</tr>
+<!--tr>
+  <td class="head" id="wMTU">MTU</td>
+  <td><input name="staticMTU" maxlength=15 value="@@form['staticMTU']"></td>
+</tr-->
+</table>
+</div>
+<!-- ================= DHCP Mode ================= -->
+<div id="d_dhcp">
+<table border="0" cellpadding="2" cellspacing="1" >
+<tr>
+	<td class="title" colspan="2" id="wDhcpMode"></td>
+</tr>
+</table>
+</div>
+
+<script language="JavaScript" type="text/javascript">
+for (i=0; i<document.forms.length; i++) {
+	document.forms[i].setAttribute("AutoComplete","off");
+}
+</script>
+
+<!-- ================= PPPOE Mode ================= -->
+<div id="d_pppoe">
+<table  border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td class="title" colspan="2" id="wPppoeMode"></td>
+</tr>
+<tr>
+	<td width="30%" class="head" id="wPppoeUser"></td>
+	<td><input name="pppoeUser" maxlength=32 size=32 value="@@form['pppoeUser']"></td>
+</tr>
+<tr>
+	<td class="head" id="wPppoePassword"></td>
+	<td><input type="password" name="pppoePass" maxlength=32 size=32 value="@@form['pppoePass']"></td>
+</tr>
+<tr>
+	<td class="head" id="wPppoePass2"></td>
+	<td><input type="password" name="pppoePass2" maxlength=32 size=32 value="@@form['pppoePass2']"></td>
+</tr>
+<!--tr>
+  <td class="head" rowspan="2" id="wPppoeOPMode"></td>
+	<td>
+	<select name="pppoeOPMode" size="1" onChange="pppoeOPModeSwitch()">
+		<option value="KeepAlive" id="wPppoeKeepAlive"></option>
+		<option value="OnDemand" id="wPppoeOnDemand"></option>
+		<option value="Manual" id="wPppoeManual"></option>
+	</select>
+	</td>
+</tr>
+<tr>
+  <td>
+		<script language="JavaScript">document.write(_("wan operation mode keepalive"))</script>&nbsp;
+		<input type="text" id="pppoeRedialPeriod" name="pppoeRedialPeriod" maxlength="5" size="3" value="60">
+		<script language="JavaScript">document.write(_("seconds"))</script>
+		<br/><br/>
+		<script language="JavaScript">document.write(_("wan operation mode ondemand"))</script> &nbsp;&nbsp; <p id="iDleTime"></p>&nbsp;&nbsp;&nbsp;
+		<input type="text" id="pppoeIdleTime" name="pppoeIdleTime" maxlength="3" size="2" value="5">
+		<script language="JavaScript">document.write(_("wan operation mode minutes"))</script></td>
+</tr-->
+</table>
+</div>
+</div>
+<!-- ================= PPTP Mode ================= -->
+<!--div id="d_pptp" >
+<table width="540" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td class="title" colspan="2" id="wPptpMode"></td>
+</tr>
+<tr>
+	<td width="30%" class="head" id="wPptpServer"></td>
+	<td><input name="pptpServer" maxlength="15" size=15 value="@@form['pptpServer']"></td>
+</tr>
+<tr>
+	<td class="head" id="wPptpUser"></td>
+	<td><input name="pptpUser" maxlength="20" size=20 value="@@form['pptpUser']"></td>
+</tr>
+<tr>
+	<td class="head" id="wPptpPassword"></td>
+	<td><input type="password" name="pptpPass" maxlength="32" size=32 value="@@form['password']"></td>
+</tr>
+<tr>
+	<td class="head" id="wPptpAddrMode"></td>
+	<td>
+	<select name="pptpMode" size="1" onChange="pptpModeSwitch()">
+		<option value="0" id="wPptpAddrModeS"></option>
+		<option value="1" id="wPptpAddrModeD"></option>
+	</select>
+	</td>
+</tr>
+<tr id="pptpIp">
+	<td class="head" id="wPptpIp"></td>
+	<td><input name="pptpIp" maxlength=15 size=15 value="@@form['pptpIp']"></td>
+</tr>
+<tr id="pptpNetmask">
+	<td class="head" id="wPptpNetmask"></td>
+	<td><input name="pptpNetmask" maxlength=15 size=15 value="@@form['pptpNetmask']">
+	</td>
+</tr>
+<tr id="pptpGateway">
+	<td class="head" id="wPptpGateway"></td>
+	<td><input name="pptpGateway" maxlength=15 size=15 value="@@form['pptpGateway']">
+	</td>
+</tr>
+<tr>
+	<td class="head" rowspan="3" id="wPptpOPMode"></td>
+	<td>
+	<select name="pptpOPMode" size="1" onChange="pptpOPModeSwitch()">
+		<option value="KeepAlive" id="wPptpKeepAlive"></option>
+		<option value="OnDemand" id="wPptpOnDemand"></option>
+		<option value="Manual" id="wPptpManual"></option>
+	</select>
+	</td>
+</tr>
+<tr>
+<td>
+	<script language="JavaScript">document.write(_("wan operation mode keepalive"))</script>&nbsp;
+	<input type="text" name="pptpRedialPeriod" maxlength="5" size="3" value="60">
+	<script language="JavaScript">document.write(_("seconds"))</script><br/><br/>
+	<script language="JavaScript">document.write(_("wan operation mode ondemand"))</script>: &nbsp;&nbsp;
+	<script language="JavaScript">document.write(_("wan operation mode idle time"))</script>&nbsp;&nbsp;&nbsp;
+	<input type="text" name="pptpIdleTime" maxlength="3" size="2" value="5">
+	<script language="JavaScript">document.write(_("wan operation mode minutes"))</script>
+	</td>
+</tr>
+</table>
+</div-->
+<!-- =========== MAC Clone =========== -->
+<!--table width="85%">
+<tr>
+	<td class="title" colspan="2" id="wMacClone"></td>
+</tr>
+<tr>
+	<td width="30%" class="head" id="wMacCloneEnabled"></td>
+	<td>
+	<select name="macCloneEnbl" size="1" onChange="macCloneSwitch()">
+		<option value="0" id="wMacCloneD1"></option>
+		<option value="1" id="wMacCloneE1"></option>
+	</select>
+	</td>
+</tr>
+<tr id="macCloneMacRow">
+	<td class="head" id="wMacCloneAddr"></td>
+	<td>
+		<input name="macCloneMac" id="macCloneMac" maxlength=17 value="@@form['macCloneMac']">
+		<input type="button" id="macCloneMacFill" onClick="macCloneMacFillSubmit();" >
+	</td>
+</tr>
+</table-->
+
+<!-- enable NAT -->
+<!--table width="85%">
+<tr>
+	<td width="30%" class="title" id="wNatEnable"></td>
+	<td><select name="natEnable" size="1">
+		<option value="0" id="wNatEnable1" @wNatEnable1 ></option>
+		<option value="1" id="wNatEnable0" @wNatEnable0 ></option>
+	</select>
+</tr>
+</table-->
+#if (defined V_3GFAILOVERNOTIFICATION)
+#include "failover-body.inc"
+#endif
+
+<div align="center"><input type="button" name="submitForm" onClick='submitF1();' id="CSsave" value="Save" style="width:120px;"></div>
+</form>
+
+<br></br>
+#if (defined V_3GFAILOVERNOTIFICATION)
+#include "failovernoti-body.inc"
+#endif
+
+</div>
+
+
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

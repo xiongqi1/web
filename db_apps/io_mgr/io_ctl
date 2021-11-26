@@ -1,0 +1,327 @@
+#!/bin/sh
+
+log() {
+	logger -t "io_ctl" "$*"
+}
+
+log_echo() {
+	log "$*"
+	echo "$*"
+}
+
+bail() {
+	log "$*"
+
+	echo "$*" >&2
+	exit 1
+}
+
+print_usage() {
+	cat << EOF
+
+io_ctl controls Aux IO via RDB interface of io_mgr
+
+usage>
+	io_ctl <command> [options...] 
+
+
+command syntax>
+
+* Global IO information commands
+	stat				: check to see if daemon is running and reacting
+	list				: list all IOs
+	set_pull_up_voltage <3.3|8.2>	: set pull up voltage
+	get_pull_up_voltage		: get pull up voltage
+	check <IO name>			: check if the IO exists (return code only)
+
+* Per-channel commands
+
+	# Analogue IO commands
+	read_analogue <IO name>		: read analogue input
+	write_analogue <IO name> <value>	: write analogue output
+
+	# Digital IO commands
+	read_digital <IO name>		: read digital Input
+	write_digital <IO name> <value>	: write digital output
+
+	get_cap <IO name>		: get physical capability of IO
+	get_mode <IO name>		: get IO mode
+	set_mode <IO name>		: set IO mode
+
+	set_pull_up <IO name> <0|1>	: set pull up status
+	get_pull_up <IO name>		: get current status of pull up
+	check_pull_up <IO name>		: check to see if pull up control exists
+
+	set_din_threshold <IO name> <value>	: set virtual digital input threshold
+	get_din_threshold <IO name>		: get virtual digital input threshold
+
+	set_hardware_gain <IO name> <value>	: set hardware gain
+	get_hardware_gain <IO name>		: get hardware gain
+
+* High frequency interface commands
+
+	hfi_enable_output	: enable high frequency output interface (port is 30000)
+	hfi_disable_output	: disable high frequency output interface
+	hfi_netcat_output	: netcat on the high frequency output interface
+
+	hfi_enable_input		: enable high frequency output interface (port is 30001)
+	hfi_disable_input		: disable high frequency output interface
+	hfi_netcat_input <input file>	: netcat <input file> to the high frequency input interface
+	
+
+* Misc.
+	help			: print this help screen
+
+EOF
+}
+
+io_is_existing() {
+	rdb_get "sys.sensors.io.$1.cap" 2> /dev/null > /dev/null
+}
+
+io_check_rdb() {
+	rdb_get "sys.sensors.io.$1.$2" 2> /dev/null > /dev/null
+	rc=$?
+
+	if [ $rc -ne 0 ]; then
+		echo "not found"
+	else
+		echo "ok"
+	fi
+
+	return $rc
+}
+
+io_write_rdb() {
+	rdb_set "sys.sensors.io.$1.$2" "$3"
+}
+
+io_read_rdb() {
+	rdb_get "sys.sensors.io.$1.$2"
+}
+
+global_write_rdb() {
+	rdb_set "sys.sensors.iocfg.$1" "$2"
+}
+
+global_read_rdb() {
+	rdb_get "sys.sensors.iocfg.$1"
+}
+
+
+get_rdb_by_cmd() {
+	sed -n "s/${1}\\+[[:space:]]\\+\\(.*\\)/\\1/p" << EOF
+read_analogue		adc
+write_analogue		dac
+read_digital		d_in
+write_digital		d_out
+get_pull_up		pull_up_ctl
+set_pull_up		pull_up_ctl
+check_pull_up		pull_up_ctl
+get_cap			cap
+get_mode		mode
+set_mode		mode
+set_din_threshold	d_in_threshold
+get_din_threshold	d_in_threshold
+set_hardware_gain	hardware_gain
+get_hardware_gain	hardware_gain
+
+set_pull_up_voltage	pull_up_voltage
+get_pull_up_voltage	pull_up_voltage
+EOF
+}
+
+get_gaction_by_cmd() {
+	# get global command
+	sed -n "s/${1}\\+[[:space:]]\\+\\(.*\\)/\\1/p" << EOF
+set_pull_up_voltage	global_write_rdb
+get_pull_up_voltage	global_read_rdb
+EOF
+}
+
+get_action_by_cmd() {
+	# get per-channel command
+	action=$(echo "$1" | sed -n 's/\([^_]\+\)_.\+/\1/p')
+
+	sed -n  "s/${action}[[:space:]]\\+\\(.*\\)/\\1/p" << EOF
+get	io_read_rdb
+read	io_read_rdb
+write	io_write_rdb
+set	io_write_rdb
+check	io_check_rdb
+EOF
+}
+
+# get command
+cmd=$1
+
+if [ $# -gt 0 ]; then
+	shift 1
+fi
+
+# get rdb and action
+rdb=$(get_rdb_by_cmd "$cmd")
+action=$(get_gaction_by_cmd "$cmd")
+if [ -z "$action" ]; then
+	action=$(get_action_by_cmd "$cmd")
+fi
+
+# run as a direct command
+if [ -n "$rdb" -a -n "$action" ]; then
+
+	io_name=""
+
+	# check validaton of action
+	case $action in
+		'global_write_rdb')
+			if [  $# != 1 ]; then
+				bail "invalid number of parameter(s) taken for global write"
+			fi
+			;;
+
+		'global_read_rdb')
+			if [  $# != 0 ]; then
+				bail "invalid number of parameter(s) taken for global read"
+			fi
+			;;
+
+		'io_write_rdb'|'io_read_rdb'|'io_check_rdb')
+			# get io name
+			io_name="$1"
+			shift 1
+
+			# check io name validation check
+			if [ -z "$io_name" ]; then
+				bail "IO name not specified"
+			fi
+
+			# check if io name exists
+			if ! io_is_existing "$io_name"; then
+				bail "IO name ($io_name) not found"
+			fi
+
+			if [ "$action" = "io_write_rdb" -a  $# != 1 ]; then
+				bail "invalid number of parameter(s) taken for per-channel write"
+			fi
+
+			if [ "$action" = "io_read_rdb" -a $# != 0 ]; then
+				bail "missing of invalid number of parameter(s) taken for per-channel read"
+			fi
+
+			if [ "$action" = "io_check_rdb" -a $# != 0 ]; then
+				bail "missing of invalid number of parameter(s) taken for per-channel read"
+			fi
+
+			;;
+
+		*)
+			bail "unknown action detected (action='$action')"
+			;;
+	esac
+
+	if [ -n "$io_name" ]; then
+		#log "run channel rdb command - $action '$io_name' '$rdb' $@"
+		$action "$io_name" "$rdb" "$@"
+	else
+		#log "run global rdb command - $action '$rdb' $@"
+		$action "$rdb" "$@"
+	fi
+
+	exit $?
+fi
+
+
+# run as a indivisual command
+
+case $cmd in
+	'hfi_disable_output')
+		rdb_set "sys.sensors.iocfg.hfi.out_port" "0"
+		;;
+
+	'hfi_enable_output')
+		rdb_set "sys.sensors.iocfg.hfi.out_port" "30000"
+		;;
+
+	'hfi_netcat_output')
+		nc localhost "30000"
+		;;
+
+	'hfi_disable_input')
+		rdb_set "sys.sensors.iocfg.hfi.in_port" "0"
+		;;
+
+	'hfi_enable_input')
+		rdb_set "sys.sensors.iocfg.hfi.in_port" "30001"
+		;;
+
+	'hfi_netcat_input')
+		if [ -z "$1" ]; then
+			bail "file not specified"
+		fi
+
+		if [ ! -e "$1" ]; then
+			bail "file not found  - '$1'"
+		fi
+
+		if [ ! -r "$1" ]; then
+			bail "file not readable - '$1'"
+		fi
+
+		nc localhost "30001" < "$1"
+		;;
+
+	'list')
+		rdb_get -l "sys.sensors.io." | sed -n 's/sys.sensors.io.\([^\.]\+\).cap/\1/p'
+		true
+		;;
+
+	'check')
+		if [ $# -lt 1 ]; then
+			bail "IO name not specified"
+		fi
+
+		if io_is_existing "$@"; then
+			echo "ok"
+			true
+		else
+			echo "not found"
+			false
+		fi
+		;;
+		
+	'stat')
+		rdb_set "sys.sensors.iocfg.mgr.watchdog" "0"
+		i=0
+
+		# wait until rdb is clear
+		rdb=$(rdb_get "sys.sensors.iocfg.mgr.watchdog")
+		while [ $i -lt 5 -a "$rdb" = "0" ]; do
+			sleep 1
+			rdb=$(rdb_get "sys.sensors.iocfg.mgr.watchdog")
+
+			i=$((i+1))
+		done
+
+		# check rdb
+		rdb=$(rdb_get "sys.sensors.iocfg.mgr.watchdog")
+		if [ "$rdb" != "1" ]; then
+			echo "stopped"
+			exit 1
+		fi
+
+		echo "running"
+		true
+		;;
+
+	''|'help')
+		print_usage
+		true
+		;;
+
+	*)
+		bail "command not recognised (cmd='$cmd')"
+		;;
+
+esac
+
+exit $?

@@ -1,0 +1,8 @@
+{
+    "web server setting":"WEB SERVER SETTING",
+    "gen server certi":"GENERATE WEB SERVER CERTIFICATE",
+    "ca delete confirm":"It will delete previously generated certificate. Are you sure you want to continue?",
+    "ca fail":"Failed to generate the CA key. Please ensure you enter correct certificate information",
+    "certi generated":"Certificate successfully generated",
+    "empty field":"Please fill the empty fields"
+}

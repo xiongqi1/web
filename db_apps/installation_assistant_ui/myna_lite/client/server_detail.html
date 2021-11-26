@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+    <script>
+        function getServerDetail() {
+
+            ajaxGetRequest("/user_entry_ftp", true, function(data) {
+                //console.log(data);
+                formObject = document.forms['server_select_form'];
+                formObject.elements["dload_server"].value = data.dload.server
+                formObject.elements["dload_user"].value = data.dload.user
+                formObject.elements["dload_pass"].value = data.dload.pass
+                formObject.elements["dload_remote_file"].value = data.dload.remote_file
+                formObject.elements["dload_local_file"].value = data.dload.local_file
+                formObject.elements["uload_server"].value = data.uload.server
+                formObject.elements["uload_user"].value = data.uload.user
+                formObject.elements["uload_pass"].value = data.uload.pass
+                formObject.elements["uload_remote_file"].value = data.uload.remote_file
+                formObject.elements["uload_local_file"].value = data.uload.local_file
+            });
+        }
+
+        document.removeEventListener('DOMContentLoaded', ws_listener, false);
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("document is ready");
+            getServerDetail();
+        });
+    </script>
+</head>
+
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>Test Server Details</script></h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="server_select_form" id="server_select_form" class="content" method="POST" action="/user_entry_ftp">
+
+                <h3>Server for FTP Downloads</h3>
+                <div id="ftp_download_server_id" class="form-row">
+                    <fieldset>
+                        <label for="dload_server">Server IP address/domain name</label>
+                        <div class="field">
+                            <input type="text" name="dload_server" id="dload_server" value="">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="dload_user">User</label>
+                        <div class="field">
+                            <input type="text" name="dload_user" id="dload_user" value="">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="dload_pass">Password</label>
+                        <div class="field">
+                            <input type="password" name="dload_pass" id="dload_pass" value="">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="dload_remote_file">Remote file/path name</label>
+                        <div class="field">
+                            <input type="text" name="dload_remote_file" id="dload_remote_file" value="">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;Full path to remote file to download&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="dload_local_file">Local file name</label>
+                        <div class="field">
+                            <input type="text" name="dload_local_file" id="dload_local_file" value="">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;The file will be stored locally under this name&nbsp;</span>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <h3>Server for FTP Uploads</h3>
+                <div id="ftp_upload_server_id" class="form-row">
+                    <fieldset>
+                        <label for="uload_server">Server IP address/domain name</label>
+                        <div class="field">
+                            <input type="text" name="uload_server" id="uload_server" value="" disabled>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="uload_user">User</label>
+                        <div class="field">
+                            <input type="text" name="uload_user" id="uload_user" value="" disabled>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="uload_pass">Password</label>
+                        <div class="field">
+                            <input type="password" name="uload_pass" id="uload_pass" value="" disabled>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="uload_local_file">Local file name</label>
+                        <div class="field">
+                            <input type="text" name="uload_local_file" id="uload_local_file" value="" disabled>
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;Local file to upload&nbsp;</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <label for="uload_remote_file">Remote file name</label>
+                        <div class="field">
+                            <input type="text" name="uload_remote_file" id="uload_remote_file" value="">
+                        </div>
+                        <div>
+                            <span class="normal-text">&nbsp;&nbsp;Remote file path and name&nbsp;</span>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="submit-row">
+                    <button class="med" type="button" onclick="window.location='/ttest.html'">Back</button>
+                    <button class="med" type="submit">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

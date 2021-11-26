@@ -1,0 +1,350 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>system | Advanced Status</title>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+</head>
+<body>
+<script language="JavaScript" src="/cgi-bin/vpn.cgi"></script>
+<!-- <script language="JavaScript" src="stdlibjs.htm"></script> -->
+<div id="contentWrapper">
+<% include menu.html %>
+<script language='javascript'>
+Butterlate.setTextDomain("AdvancedStatus");
+var ajaxerror = 0;
+function set_title( moduleModel ) {
+	if( document.getElementById("productTitle").innerHTML.indexOf("NetComm Cellular Router") >= 0 ) {
+		if( moduleModel.indexOf("MC87") >= 0 )
+			window.location.reload();
+	}
+}
+
+function showElementById(elementName,showStatus) {
+	targetElement=document.getElementById(elementName);
+
+	if(targetElement==null)
+		return;
+
+	if(showStatus)
+			targetElement.style['display']='';
+	else
+		targetElement.style['display']='none';
+}
+
+function showElementsByModuleType(moduleType) {
+	// module - default(sierra and etc)
+	visibleInfo=[
+		{element:"trProvider", show:true},		// 0
+		{element:"trRSCP", show:true},			// 1
+		{element:"trCCID", show:true},			// 2
+		{element:"trPSC", show:true},			// 3
+		{element:"trRAC", show:true},			// 4
+		{element:"trIMSI", show:true},			// 5
+		{element:"trCellID", show:true},		// 6
+		{element:"trChannels", show:true},		// 7
+		{element:"trModuleBootVersion", show:true},	// 8
+		{element:"trPRIID", show:true},			// 9
+		{element:"trSigQual", show:true}		// 10
+	];
+	// module - fusion
+	if (moduleType=="fusion") {
+		visibleInfo[0].show=false;
+		visibleInfo[1].show=false;
+		visibleInfo[2].show=false;
+		visibleInfo[3].show=false;
+		visibleInfo[4].show=false;
+		visibleInfo[5].show=false;
+		visibleInfo[6].show=false;
+		visibleInfo[7].show=false;
+		visibleInfo[8].show=false;
+		visibleInfo[9].show=false;
+		visibleInfo[10].show=true;
+	}
+	// module - ericsson
+	if (moduleType=="ericsson") {
+		visibleInfo[0].show=true;
+		visibleInfo[1].show=false;
+		visibleInfo[2].show=true;
+		visibleInfo[3].show=false;
+		visibleInfo[4].show=false;
+		visibleInfo[5].show=true;
+		visibleInfo[6].show=true;
+		visibleInfo[7].show=true;
+		visibleInfo[8].show=false;
+		visibleInfo[9].show=false;
+		visibleInfo[10].show=false;
+	}
+
+	// module - Cinterion
+	if (moduleType=="Cinterion") {
+		visibleInfo[0].show=true;
+		visibleInfo[1].show=true;
+		visibleInfo[2].show=true;
+		visibleInfo[3].show=true;
+		visibleInfo[4].show=false;
+		visibleInfo[5].show=true;
+		visibleInfo[6].show=true;
+		visibleInfo[7].show=true;
+		visibleInfo[8].show=false;
+		visibleInfo[9].show=false;
+		visibleInfo[10].show=false;
+	}
+
+	for(i=0;i<visibleInfo.length;i++)
+		showElementById(visibleInfo[i].element,visibleInfo[i].show);
+}
+
+/* Decodes a Unicode string into ASCII ready for printing on status page */
+function UrlDecode(str) {
+        var output = "";
+        for (var i = 0; i < str.length; i+=3) {
+                var val = parseInt("0x" + str.substring(i + 1, i + 3));
+                output += String.fromCharCode(val);
+        }
+        return output;
+}
+
+function  ajaxUpdate(response) {
+	ajaxerror = 0;
+	eval(response);
+	if( typeof(module_type)!="undefined" && module_type!=null)
+		showElementsByModuleType(module_type);
+
+	set_title( moduleModel );
+	$("#umtsss").html(csq);
+
+	$("#uptime").html(toUpTime(uptime));
+
+	if (typeof(hint) == "undefined" || hint == "N/A" || hint == "") {
+		if (provider.charAt(0) == "%")
+			provider=UrlDecode(provider);
+		provider=provider.replace("3Telstra", "Telstra");
+		$("#provider").html(provider.replace("Telstra Mobile", "Telstra"));
+	} else {
+		$("#provider").html(UrlDecode(hint));
+	}
+//	$("#connType").html(connType);
+	$("#coverage").html(coverage);
+	$("#pppStatus").html('Down');
+	if(simStatus=="SIM OK") {
+		for( i=0; i<st.length && i<6; i++ ) {
+			if(st[i].type.indexOf("wwan") != -1) {
+				if( st[i].pppStatus!="up" && st[i].enable == 1 )
+					$("#pppStatus").html(_("connecting"));
+				else if (st[i].pppStatus != '')
+				{
+					if(st[i].pppStatus == "up")
+						$("#pppStatus").html(_("status up"));
+					else if(st[i].pppStatus == "down")
+						$("#pppStatus").html(_("status down"));
+					else
+						$("#pppStatus").html(st[i].pppStatus);
+				}
+				break;
+			}
+		}
+	}
+	$("#imei").html(imei);
+	$("#freq").html(freq);
+
+	if( rscp0!="N/A" || rscp1!="N/A" )
+		$("#rscps").html(_("carrier")+" 0:&nbsp;&nbsp;&nbsp;&nbsp;" + rscp0 + "<br/>"+_("carrier")+" 1:&nbsp;&nbsp;&nbsp;&nbsp;" + rscp1);
+	else
+		$("#rscps").html("-"+RSCPs0+(RSCPs0=="N/A"?"":" dB") );
+
+	if( ecio0!="N/A" || ecio1!="N/A" )
+		$("#ecios").html(_("carrier")+" 0:&nbsp;&nbsp;&nbsp;&nbsp;" + ecio0 + "<br/>"+_("carrier")+" 1:&nbsp;&nbsp;&nbsp;&nbsp;" + ecio1);
+	else
+		$("#ecios").html("-"+ECIOs0+(ECIOs0=="N/A"?"":" dB"));
+
+	if( RXlevel0!="N/A" || RXlevel1!="N/A" ) { //for MC8801 module
+		document.getElementById("RX_level").style['display']='';
+		$("#rx_level_data").html(_("carrier")+" 0:&nbsp;&nbsp;&nbsp;&nbsp;" + RXlevel0+(RXlevel0=="N/A"?"":" dBm") + "<br/>"+_("carrier")+" 1:&nbsp;&nbsp;&nbsp;&nbsp;" + RXlevel1+(RXlevel1=="N/A"?"":" dBm"));
+	}
+	else {
+		document.getElementById("RX_level").style['display']='none';
+	}
+
+	if(hsucat!="N/A") {
+		document.getElementById("hsu_cat").style['display']='';
+		$("#hsucat").html(hsucat);
+	}
+	if(hsdcat!="N/A") {
+		document.getElementById("hsd_cat").style['display']='';
+		$("#hsdcat").html(hsdcat);
+	}
+
+	$("#simICCID").html(simICCID);
+	$("#PSC").html(PSCs0);
+	$("#LAC").html(LAC);
+	$("#RAC").html(RAC);
+	$("#CellId").html(CellId);
+	$("#ChannelNumber").html(ChannelNumber);
+	$("#MCC").html(MCC);
+	$("#MNC").html(MNC);
+	$("#IMSI").html(IMSI);
+	$("#bootVersion").html(moduleBootVersion);
+	var val="";
+	if( PRIID_REV != "" )
+		val = _("Revision")+": "+PRIID_REV + "&nbsp;&nbsp;&nbsp;&nbsp;";
+	if( PRIID_PN != "" )
+		val += _("PRI Part Number")+": "+PRIID_PN;
+	$("#PRIID_REV").html(val);
+	$("#Msisdn").html(msisdn);
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 6000);
+});
+
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+
+<form action="/cgi-bin/ajax.cgi" name="form1">
+<h3><script language="JavaScript">document.write(_("status")+" > "+_("advStatus advancedStatus"));</script></h3>
+<br/>
+<table width="85%">
+    <tr><th><script language=Javascript>document.write(_("moduleInformation"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr>
+    <td><script language=Javascript>document.write(_("advStatus phoneModule"));</script></td>
+    <td style="color:#000000">
+    <script language=Javascript>document.write(_("module"));</script>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<script language=Javascript>document.write(moduleModel);</script>
+    <br/>
+    <script language=Javascript>document.write(_("firmware"));</script>:&nbsp;&nbsp;<script language=Javascript>document.write(moduleFirmwareVersion);</script>
+    </td>
+</tr>
+<tr id='trModuleBootVersion'>
+	<td width="22%"><script language=Javascript>document.write(_("advStatus moduleBootVersion"));</script></td>
+    <td style="color:#000000" id="bootVersion"></td>
+</tr>
+<tr id='trPRIID'>
+	<td width="22%"><script language=Javascript>document.write(_("advStatus modulePRIID"));</script></td>
+    <td id="PRIID_REV" class="innerText"></td>
+</tr>
+<tr>
+    <td width="22%"><script language=Javascript>document.write(_("status System Up Time"));</script></td>
+    <td id="uptime" class="innerText"></td>
+</tr>
+</table>
+
+<table width="85%">
+    <tr><th><script language=Javascript>document.write(_("Connection Status"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr id="trProvider">
+	<td width="22%"><script language=Javascript>document.write(_("provider"));</script></td>
+    <td id="provider" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("country code"));</script></td>
+    <td id="MCC" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("advStatus Network Code"));</script></td>
+    <td id="MNC" class="innerText"></td>
+</tr>
+<!--tr>
+    <td>Service Type</td>
+    <td id="connType" class="innerText"></td>
+</tr-->
+<tr>
+    <td><script language=Javascript>document.write(_("status CScoverage"));</script></td>
+    <td id="coverage" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("Connection Status"));</script></td>
+    <td id="pppStatus" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("status CSimei"));</script></td>
+    <td id="imei" class="innerText"></td>
+</tr>
+<td><script language=Javascript>document.write(_("status CSfrequency"));</script></td>
+	<td id="freq" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("signalStrength"));</script></td>
+    <td id="umtsss" class="innerText"></td>
+</tr>
+<tr id='trSigQual'>
+    <td><script language=Javascript>document.write(_("signalQualityEcIo"));</script></td>
+    <td id="ecios" class="innerText"></td>
+</tr>
+<tr id='trRSCP'>
+    <td><script language=Javascript>document.write(_("Received Signal Code Power"));</script></td>
+    <td id="rscps" class="innerText"></td>
+</tr>
+<tr id="RX_level" style="display:none">
+    <td><script language=Javascript>document.write(_("RXlevel"));</script></td>
+    <td id="rx_level_data" class="innerText"></td>
+</tr>
+<tr id="hsu_cat" style="display:none">
+    <td><script language=Javascript>document.write(_("Hsupa Category"));</script></td>
+    <td id="hsucat" class="innerText"></td>
+</tr>
+<tr id="hsd_cat" style="display:none">
+    <td><script language=Javascript>document.write(_("Hsdpa Category"));</script></td>
+    <td id="hsdcat" class="innerText"></td>
+</tr>
+<tr id='trCCID'>
+    <td><script language=Javascript>document.write(_("advStatus iccid"));</script></td>
+    <td id="simICCID" class="innerText"></td>
+</tr>
+<tr id='trPSC'>
+    <td><script language=Javascript>document.write(_("Primary Scrambling Code"));</script></td>
+    <td id="PSC" class="innerText"></td>
+</tr>
+<tr>
+    <td><script language=Javascript>document.write(_("advStatus Location Area Code"));</script></td>
+    <td id="LAC" class="innerText"></td>
+</tr>
+<tr id='trRAC'>
+    <td><script language=Javascript>document.write(_("advStatus Routing Area Code"));</script></td>
+    <td id="RAC" class="innerText"></td>
+</tr>
+<tr id='trIMSI'>
+    <td><script language=Javascript>document.write(_("advStatus imsi"));</script></td>
+    <td id="IMSI" class="innerText"></td>
+</tr>
+<tr id='trCellID'>
+    <td><script language=Javascript>document.write(_("advStatus cellID"));</script></td>
+    <td id="CellId" class="innerText"></td>
+</tr>
+<tr id='trChannels'>
+    <td><script language=Javascript>document.write(_("advStatus Channel Number"));</script></td>
+    <td id="ChannelNumber" class="innerText"></td>
+</tr>
+<tr id='trMsisdn'>
+    <td>MSISDN</td>
+    <td id="Msisdn" class="innerText"></td>
+</tr>
+
+<%pots_disabled=get_single('potsbridge_disabled');pots_status=get_single('pots.status');%>
+<script language='JavaScript' type="text/javascript">
+    if( "@@pots_disabled"=="1" || "@@pots_status"!="pots_ready") {
+		document.getElementById( "trMsisdn" ).style['display']='none';
+	} else {
+		document.getElementById( "trMsisdn" ).style['display']='';
+	}
+</script>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

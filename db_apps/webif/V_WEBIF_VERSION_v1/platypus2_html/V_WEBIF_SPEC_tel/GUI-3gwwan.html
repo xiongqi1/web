@@ -1,0 +1,550 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<% if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/GUI-login.html'); exit(403); } else _apndropdown=get_single('webinterface.3gwwan_apndropdown');%>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Basic Internet</title>
+<script src="stuHover.js" type="text/javascript"></script>
+<script language="JavaScript" src="util.js"></script>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<% var _lang=get_single('webinterface.language'); if(_lang=='ar') {%>
+<link href="GUI-ntcStyle-ar.css" rel="stylesheet" type="text/css"/>
+<%}%>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>body { direction:ltr; }</style>
+<script language="JavaScript">
+var http_request = false;
+Butterlate.setTextDomain("GUI-3gwwan");
+function initTranslation() {
+	$("#GUItext4").html(_("GUItext4"));
+	$("#CustomAPN").html(_("GUI CustomAPN")+"<br>"+_("GUI ifRequired"));
+	$("#PINsettings").html(_("pinSettings"));
+	$("#GUItext6").html(_("GUItext6"));
+	$("#simstatusid").html(_("sim Status"));
+	$("#CSpin").html(_("CSpin"));
+	$("#confirmPIN").html(_("confirmPin"));
+	$("#rememberPIN").html(_("rememberPin"));
+	$("#CSyes").html(_("CSyes"));
+	$("#CSno").html(_("CSno"));
+	$("#GUItext3").html(_("GUItext3"));
+	$("#CSsave").val("    "+_("CSsave")+"    ");
+	$("#savePass").val("    "+_("CSsave")+"    ");
+	$("#sToAdv").html(_("GUI sToAdv"));
+}
+function setAPNHandler(responseText) {
+	if (responseText.length<20 ) return;
+	eval( responseText  );
+	setTimeout(stuHover, 1000);
+	for(i=1; i<st.length; i++)
+		document.formS.countryList[i-1] = new Option(st[i], st[i] );
+	document.getElementById('countryList').options.selectedIndex=selectedIdx;
+	document.getElementById("chooseAPN").innerHTML = _("click to choose apn");
+	ckeckAutoAPN();
+}
+var stpf_readonly;
+var stpf_APNName;
+
+function setPPPHandler(responseText) {
+	if (responseText.length<20 ) return;
+	eval( responseText  );
+	for (var i=0; i<stpf.length; i++) {
+		if( parseInt(stpf[i].enable) == 1) {
+			document.formS.editIndex.value = i;
+			stpf_readonly=stpf[i].readonly;
+			stpf_APNName=stpf[i].APNName;
+			break;
+		}
+	}
+	i = document.formS.editIndex.value;
+	document.formS.profilename.value = stpf[i].name;
+	document.formS.APNName.value = stpf[i].APNName;
+	document.formS.pppuser.value=stpf[i].user;
+	document.formS.ppppass.value=stpf[i].pass;
+
+	checkAPNdev();
+	document.formS.gascEnable.value = stpf[i].enable;
+	if( parseInt(document.formS.gascEnable.value)==1 )
+		document.formS.pppAutoCon[0].checked=true;
+	else
+		document.formS.pppAutoCon[1].checked=true;
+	if( stpf[i].readonly == '1' ) {
+		document.getElementById( "PFreadonly_0" ).style['display']='none';
+		document.getElementById( "PFreadonly_1" ).style['display']='';
+	//	document.formS.APNName.disabled = true;
+<%if(_apndropdown=="1"){%>
+		document.formS.countryList.disabled = true;
+<%}%>
+		document.getElementById( "nav2" ).style['display']='none';
+	}
+	else {
+		document.getElementById( "PFreadonly_0" ).style['display']='';
+		document.getElementById( "PFreadonly_1" ).style['display']='none';
+
+	//	document.formS.APNName.disabled = false;
+<%if(_apndropdown=="1"){%>
+		document.formS.countryList.disabled = false;
+<%}%>
+		document.getElementById( "nav2" ).style['display']="";
+	}
+/*	if( stpf[i].readonly=='1' &&  stpf[i].APNName=="" ) {
+		document.getElementById( "GUItext5" ).style['top']='130px';
+		$("#GUItext5").html(_("autoapn help"));
+	}
+	else*/ {
+		//document.getElementById( "GUItext5" ).style['top']='160px';
+		$("#GUItext5").html(_("GUItext5"));
+	}
+	ckeckAutoAPN();
+	document.formS.pin.focus();
+}
+
+function cgCountry( myval ) {
+	document.formS.country.value=myval;
+	$.get("/cgi-bin/wwanGetAPN.cgi?"+myval, setAPNHandler);
+}
+
+function submitProf() {
+	<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	alert(_("accessDenied"));//Access denied! Please Login first.;
+	window.location.href="/GUI-login.html"
+	<%}else{%>
+	var i = document.formS.editIndex.value;// = document.formS.pppprofilenum.value;
+	if( stpf_readonly == '1' ) {
+		if(document.formS.APNName.value!=stpf_APNName) {
+			alert( _("profileReadOnly") );//This Profile is READ ONLY!
+			document.formS.editIndex.value = '-1';
+			return;
+		}
+		document.formS.APNName.disabled = false;
+<%if(_apndropdown=="1"){%>
+		document.formS.countryList.disabled = false;
+<%}%>
+		document.getElementById( "nav2" ).style['display']="";
+	}
+	if (document.formS.profilename.value == "") {
+		alert(_("noProfileNameEntered"));//Error: no Profile Name entered.
+		document.formS.profilename.select();
+		document.formS.editIndex.value = '-1';
+	}
+	submitSIMsecurity();
+	<%}%>
+}
+
+function checkAPNdev() {
+	document.getElementById( "APNname_Div" ).style['display']='';
+}
+
+var initPIN;
+function submitSIMsecurity() {
+	if( (document.formS.SIMStatus.value!="SIM locked") && ( document.formS.SIMStatus.value.indexOf("PUK")==-1 ) ) { // SIM not locked
+		if ((document.formS.rememberPIN[0].checked==true ) && (document.formS.rememberPINtext.value ==  "Enabled") && (initPIN == document.formS.pin.value))
+			return;
+		if (document.formS.rememberPIN[1].checked==true ){
+			if(document.formS.rememberSIMPINstatus=="1") {
+				if(!confirm(_("SIMwarningMsg4 3g22wv")) ) return;//PIN will be lost. Do you wish to continue?
+			}
+		}
+		else if (!confirm(_("SIMwarningMsg5")) ) //"The PIN will be saved without verification. Do you wish to continue?"
+			return;
+	}
+	else {
+		if (document.formS.pin.value != document.formS.confirmPIN.value) {
+			alert(_("wwan warningMsg12"));//PINs do not match!
+			return;
+		}
+		if (document.formS.pin.value == "") {
+			alert(_("wwan warningMsg14"));//you must enter the PIN code to enable or disable PIN verification
+			return;
+		}
+		if (document.formS.pin.value.length < 4 || document.formS.pin.value.length > 8  ) {
+			alert(_("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+			return;
+		}
+	}
+	document.formS.saveButton.disabled = true;
+	document.formS.submit();
+}
+
+function checkSIMStatus() {
+	//document.formS.action.value = document.formS.PINaction.value;
+	document.formS.retris.value="";
+<%mepStatus=get_single('meplock.status');%>
+	if( "@@mepStatus"=="locked" || document.formS.SIMStatus.value.indexOf("PH-NET PIN")!=-1 || document.formS.SIMStatus.value.indexOf("SIM PH-NET")!=-1) {
+		document.formS.SIMStatus.value="MEP Locked";
+		document.formS.SIMStatusText.value="MEP locked";
+		document.getElementById('simID').style.color = '#ff0000'; //RED
+<%skin=get_single('system.product.skin'); if(skin=='ro'){%>
+		if(confirm(_("mep warningMsg1_ro")+" "+_("mep warningMsg2"))) {
+<%}else{%>
+		if(confirm(_("mep warningMsg2"))) {
+<%}%>
+			window.location=('pinsettings.html');
+		}
+		else {
+			document.getElementById("pin_fileds").style['display'] = 'none';
+			document.getElementById("CSsave").disabled = true;
+		}
+	}
+	if( (document.formS.SIMStatus.value=="SIM PIN")||(document.formS.SIMStatus.value.indexOf("SIM locked")!= -1)||(document.formS.SIMStatus.value.indexOf("incorrect SIM")!= -1)||(document.formS.SIMStatus.value.indexOf("SIM PIN Required")!= -1) ) {
+		document.formS.SIMStatus.value = "SIM locked";
+		document.formS.SIMStatusText.value = _("SIMlocked");
+		if( parseInt(document.formS.numRetriesRem.value) > 0 )
+			document.formS.retris.value="( "+parseInt(document.formS.numRetriesRem.value)+" "+_("retriesRemaining")+" )";
+		else
+			document.formS.retris.value="";
+		//document.formS.rememberPINtext.value =  _("GUI disabled");//"Disabled";
+	}
+	document.getElementById('simID').style.color = '#ff0000'; //RED
+	if ( (document.formS.SIMStatus.value == "SIM locked") && (document.formS.numRetriesRem.value >= 3) ) {
+		document.formS.pin.disabled = false;
+		document.formS.confirmPIN.disabled = false;
+		document.formS.pin.value = "";
+		document.formS.confirmPIN.value = "";
+	}
+	else if ( (document.formS.SIMStatus.value == "SIM locked") && (document.formS.numRetriesRem.value < 3) ) {
+		document.formS.pin.disabled = false;
+		document.formS.confirmPIN.disabled = false;
+		document.formS.pin.value = "";
+		document.formS.confirmPIN.value = "";
+		<%if( request["SESSION_ID"]==session["sessionid"] ) {%>
+		if (document.formS.numRetriesRem.value > 1) {
+			alert(_("SIMwarningMsg1")+" "+document.formS.numRetriesRem.value+" "+_("wan attempts"));
+//alert("You need to enter the PIN code again since the last code was incorrect. You have " + document.formS.numRetriesRem.value + " remaining attempts.");
+			return;
+		}
+		else if (document.formS.numRetriesRem.value == 1) {
+			alert(_("SIMwarningMsg1")+" "+document.formS.numRetriesRem.value+" "+_("wan attempt"));
+//alert("You need to enter the PIN code again since the last code was incorrect. You have " + document.formS.numRetriesRem.value + " remaining attempt.");
+			return;
+		}
+		<%}%>
+
+	}
+	else if ( document.formS.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		//document.formS.rememberPINtext.value =  _("GUI disabled");
+		document.formS.pin.disabled = false;
+		document.formS.confirmPIN.disabled = false;
+		document.formS.pin.value = "";
+		document.formS.confirmPIN.value = "";
+		if(confirm(_("SIMwarningMsg2 3g22wv"))) {
+			//You need enter the CORRECT PUK code and new PIN in 'WWAN (3G) > SIM Security' page.
+			window.location=('pinsettings.html');
+		}
+		else {
+			document.getElementById("pin_fileds").style['display'] = 'none';
+			document.getElementById("CSsave").disabled = true;
+		}
+		return;
+	}
+	else if(document.formS.SIMStatus.value=="SIM not inserted") {
+		document.formS.SIMStatusText.value = _("sim not inserted");
+	}
+	else if( document.formS.SIMStatus.value.indexOf("OK")!=-1) {
+		document.getElementById('simID').style.color = '#00ff00'; //GREEN
+		document.formS.SIMStatusText.value = _("simOK");
+	}
+	if(document.formS.rememberPIN[1].checked==true) {
+		document.formS.pin.value = "";
+		document.formS.confirmPIN.value = "";
+	}
+	if (document.formS.lastOpFailed.value == '1') {
+		alert(_("SIMwarningMsg3"));
+//alert("This operation has failed possibly because you have entered the wrong code, please enter the CORRECT PIN.");
+		document.formS.pin.value = "";
+		document.formS.confirmPIN.value = "";
+	}
+}
+
+function enablePINFields2() {
+// This is not a bug. "rememberSIMPIN" should be always enabled due to Defect #4990.
+// If you have any question, please talk to Joe Zhou.
+//	document.formS.rememberPIN[1].checked = true;
+//	document.formS.rememberPIN.value=0;
+	if (document.formS.SIMStatus.value.indexOf("Required")!=-1 || document.formS.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		alert(_("wan warningMsg11"));
+//alert("You need to unlock the SIM by inputing PIN before disable.");
+	}
+	else {
+		enablePINFields();
+	}
+}
+
+function enablePINFields() {
+	document.formS.pin.disabled = false;
+	document.formS.confirmPIN.disabled = false;
+}
+
+function enablePINFieldsforRemPIN() {
+	document.formS.pin.disabled = false;
+	document.formS.confirmPIN.disabled = false;
+}
+
+function ckeckAutoAPN() {
+	if(document.getElementById("autoapnCK").checked==true) {
+		document.formS.autoapn.value="1";
+		document.getElementById("hide_for_autoapn").style['display']="none";
+		var isAnyProfileEnabled=false;
+		for( i=0; i<stpf.length; i++ ) {
+			if(stpf[i].enable == 1) {
+				isAnyProfileEnabled=true;
+				break;
+			}
+		}
+		if(!isAnyProfileEnabled) {
+			document.formS.pppAutoCon[0].checked=true;
+			document.formS.gascEnable.value='1';
+		}
+	}
+	else {
+		document.formS.autoapn.value="0";
+		document.getElementById("hide_for_autoapn").style["display"]="";
+	}
+}
+function setPass(val) {
+	if( val ) {
+		$('#apn_pass').animate( { width: "show", paddingLeft: "show", paddingRight: "show", marginLeft: "show", marginRight: "show" }, 1000);
+	}
+	else {
+		$('#apn_pass').animate( { width: "hide", paddingLeft: "hide", paddingRight: "hide", marginLeft: "hide", marginRight: "hide" }, 1000);
+	}
+}
+
+function setAPN( myapn, myuser, mypass, myauth ) {
+	document.getElementById('wwanAPN').value=myapn;
+	document.formS.pppuser.value=myuser;
+	document.formS.ppppass.value=mypass;
+	checkAPNdev();
+}
+
+function submitPass() {
+var i = parseInt(document.formS.editIndex.value)+1;
+	cmd="/cgi-bin/rdb.cgi?link.profile."+i+".user="+document.formS.pppuser.value+"&link.profile."+i+".pass="+document.formS.ppppass.value;
+	$.get(cmd);
+	setPass(0);
+}
+
+$(document).ready(function() {
+	checkIE10();
+	$.get('/cgi-bin/ajax.cgi?getProfiles', setPPPHandler);
+<%country=get_single('webinterface.apn_country');%>
+	cgCountry('@@country');
+// This is not a bug. "rememberSIMPIN" should be always enabled due to Defect #4990.
+// If you have any question, please talk to Joe Zhou.
+	document.formS.rememberSIMPIN.value=1
+
+	if(document.formS.rememberSIMPIN.value=="1")
+		document.formS.rememberPIN[0].checked=true;
+	else
+		document.formS.rememberPIN[1].checked=true;
+	initPIN = document.formS.pin.value;
+	initTranslation();
+	if(document.formS.autoapn.value=="1")
+		document.getElementById("autoapnCK").checked=true;
+	else
+		document.getElementById("autoapnCK").checked=false;
+	checkSIMStatus();
+});
+
+</script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	i = form['editIndex']+1;
+	if( i > 0 ) {
+		tempval = form['APNName'];
+		retval=set_single( 'link.profile.'+i+'.apn='+tempval, '-p' );
+		tempval = form['pppuser'];
+		retval=set_single( 'link.profile.'+i+'.user='+tempval, '-p' );
+		tempval = form['ppppass'];
+		retval=set_single( 'link.profile.'+i+'.pass='+tempval, '-p' );
+		retval=set_single( 'link.profile.'+i+'.enable=0', '-p' );
+		autoapn=form['autoapn'];
+		set_single( 'webinterface.autoapn='+autoapn, '-p');
+		if(autoapn=='1')
+			tempval='1';
+		else
+			tempval = form['gascEnable'];
+		if( tempval=='1' ) {
+			esp_sleep(2000);
+			retval=set_single( 'link.profile.'+i+'.enable=1', '-p' );
+		}
+	}
+	tempval = form['country'];
+	set_single( 'webinterface.apn_country='+tempval, '-p');
+
+/*----------------------------------------*/
+	simpin = get_single('wwan.0.sim.pin');
+	mypin = form['pin'];
+	set_single('wwan.0.sim.cmd.param.pin='+mypin);
+	mystatus = form['SIMStatus'];
+	if( mystatus=='SIM locked' ) {
+		set_single('wwan.0.sim.cmd.command=verifypin');
+		//check last operation
+		esp_sleep(5000);
+		tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+		form['lastOpFailed'] = tempval;
+	}
+	//check remember pin
+	tempval = form['rememberSIMPIN'];
+	set_single('wwan.0.sim.autopin='+tempval);
+	if( tempval == '1' ) {
+		set_single('wwan.0.sim.pin='+mypin);
+	}
+	else {
+		set_single('wwan.0.sim.pin=');
+		form['pin'] = "";
+		form['confirmPIN'] = "";
+	}
+	esp_sleep(3000);
+	redirect('/GUI-3gwwan.html');
+}
+else { //GET
+	tempval = get_single( 'link.profile.profilenum' );
+	if( (tempval == "N/A") || (tempval == "") || (tempval == "0") ) tempval = 1;
+	form['editIndex'] = tempval-1;
+	tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+	form['lastOpFailed'] = tempval;
+	tempval = get_single('wwan.0.sim.autopin');
+	form['rememberSIMPIN'] = tempval;
+	form['rememberSIMPINstatus'] = tempval;
+	if( tempval == '1' ) {
+		if( request["SESSION_ID"]!=session["sessionid"] ) {
+			form['pin'] = "****";
+			form['confirmPIN'] = "****";
+		}
+		else {
+			tempval = get_single('wwan.0.sim.pin');
+			form['pin'] = tempval;
+			form['confirmPIN'] = tempval;
+		}
+	}
+	else {
+		form['pin'] = "";
+		form['confirmPIN'] = "";
+	}
+	form['autoapn'] = get_single( 'webinterface.autoapn' );
+}
+tempval = get_single('wwan.0.sim.status.retries_remaining');
+form['numRetriesRem'] = tempval;
+tempval = get_single('wwan.0.sim.status.status');
+form['SIMStatus'] = tempval;
+form['SIMStatusText'] = tempval;
+%>
+<body>
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm" target="_blank"/>
+</map>
+</div>
+
+<form name="formS" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<input type="hidden" name="gascEnable" value="@@form['gascEnable']">
+<input type="hidden" name="profilenum" value="@@form['profilenum']">
+<input type="hidden" name="editIndex" value="@@form['editIndex']">
+<input type="hidden" name="autoapn" value="@@form['autoapn']">
+<input type="hidden" name="country" value="@@form['country']">
+<div id="basicGUI">
+	<div id="langTab"><a class="a1" href="JavaScript:switchLanguage_ar();"><script language="JavaScript">showLanguage_ar();</script></a></div>
+	<img src="images/GUI-3G.gif" border="0" usemap="#1"/>
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<div class="Rotate-90" id="tab-wlan"><a style="text-decoration:none" href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<div class="Rotate-90" id="tab-3gwwan2"><a style="text-decoration:none" href="/GUI-3gwwan.html"><script language="JavaScript">document.write(_("CSinternet"));</script></a></div>
+	<div style="position:absolute; font-size:12px; left:34px; top:534px; width:200px"><a class="a1" href="JavaScript:toAdvV('/login.html')" id="sToAdv">Switch to Advanced View</a></div>
+<%if(skin=='ro'){%>
+	<table style="display:none">
+<%}else{%>
+	<table class="t1">
+<%}%>
+		<tr><td><script language="JavaScript">document.write(_("apnMsg1"));</script></td>
+		<td><input type="checkbox" name="autoapnCK" id="autoapnCK" onclick="ckeckAutoAPN();"></td></tr>
+	</table>
+
+	<div class="div_text" style="top:60px; width:420px"><a class="a1" href="JavaScript:JavaScript:setPass(1);"><script language="JavaScript">document.write(_("apnMsg3"));</script></a></div>
+
+	<div id="hide_for_autoapn">
+		<div class="div_text" style="top:39px"><script language="JavaScript">document.write(_("mobile broadband"));</script></div>
+		<div class="div_input" style="top:35px;">
+			<input type=radio name='pppAutoCon' value=1 onClick="document.formS.gascEnable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+			<input type=radio name='pppAutoCon' value=0 onClick="document.formS.gascEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"));</script>
+		</div>
+
+		<div id="PFreadonly_0">
+			<div class="div_text" style="top:88px" id="CustomAPN">Custom APN <font style="font-size:11px">(if required)</font></div>
+			<div class="div_input" style="top:88px" >
+				<div id="APNname_Div"><input type=text name='APNName' id="wwanAPN" size=20 maxlength=128 value="@@form['APNName']" onkeyup="checkAPNdev();"></div>
+			</div>
+		<%if(_apndropdown=="1"){%>
+			<div class="div_input" style="top:116px" >
+		<%}else{%>
+			<div style="display:none" >
+		<%}%>
+				<select name="countryList" id="countryList" size=1  onChange="cgCountry(this.value)">
+				</select>
+			</div>
+		</div>
+
+		<div id="PFreadonly_1" style="display:none">
+			<div class="div_text" style="top:84px"><script language="JavaScript">document.write(_("profile name")+"<br/>( "+_("readOnly")+" )");</script></div>
+			<div class="div_input" style="top:79px" ><input type="text" name="profilename" id="profileName" size=20 maxlength=128 value="@@form['profilename']" readonly></div>
+		</div>
+
+		<div class=div_small_text style="top:170px" id="GUItext5">
+		Your Access Point Name (APN) is the 3G mobile network name that is used to identify your 3G mobile broadband service provider.
+		</div>
+		<div style="position:absolute;left:191px;top:144px;"><ul id="nav2" style="display:none;"></ul></div>
+	</div>
+
+	<div id="apn_pass" style="display:none;">
+		<img src="/images/PopupBox1.gif"/>
+		<div style="position:absolute;top:5px;left:225px;"><a class="a2" href="JavaScript:JavaScript:setPass(0);">&#215;</a></div>
+		<table class="t2">
+			<tr><td></td></tr>
+			<tr><td><script language="JavaScript">document.write(_("GUI username"));</script></td></tr>
+			<tr><td><input type=text name='pppuser' maxlength=127 style="width:200px" value="@@form['pppuser']"></td></tr>
+			<tr><td><script language="JavaScript">document.write(_("password"));</script></td></tr>
+			<tr><td><input type=password name='ppppass' maxlength=127 style="width:200px" value="@@form['ppppass']"></td></tr>
+			<tr><td align="center" style="padding-top:8px;"><input type=button id='savePass' onClick="submitPass();" value="&nbsp;Save&nbsp;"></td></tr>
+		</table>
+	</div>
+	<input type="hidden" name="lastOpFailed" value="@@form['lastOpFailed']"/>
+	<input type="hidden" name="rememberSIMPIN" value="@@form['rememberSIMPIN']"/>
+	<input type="hidden" name="rememberSIMPINstatus" value="@@form['rememberSIMPIN']"/>
+	<input type="hidden" name="numRetriesRem" value="@@form['numRetriesRem']"/>
+	<input type="hidden" name="SIMStatus" value="@@form['SIMStatus']"/>
+
+	<div class="div_text" style="top:233px" id="PINsettings">PIN Settings</div>
+	<div class=div_small_text style="top:256px" id="GUItext6">(This is only required if your SIM card needs a PIN code to be activated.)</div>
+	<div class="div_text" style="top:282px" id="simstatusid">SIM Status</div>
+	<div class="div_input" style="top:279px">
+		<input type="text" name="SIMStatusText" id="simID" size="30" style="border-style:none; background:transparent; color:#FFFFFF" readonly/>
+		<input type="text" name="retris" size="24" style="border-style:none; background:transparent; color:#FFFFFF; font-size:10px"  value="" readonly/>
+	</div>
+	<div id="pin_fileds">
+		<div class="div_text" style="top:322px" id="CSpin">PIN</div>
+		<div class="div_input" style="top:314px" ><input type=password name="pin" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " maxlength=8 value="@@form['pin']"></div>
+		<div class="div_text" style="top:358px" id="confirmPIN">Confirm PIN</div>
+		<div class="div_input" style="top:352px" ><input type=password name="confirmPIN" onkeyup="this.value=this.value.replace(/[^\d]/g,'') " maxlength=8 value="@@form['confirmPIN']"></div>
+		<div class="div_text" style="top:392px" id="rememberPIN">Remember PIN</div>
+		<font color="#FFFFFF">
+			<div class="div_input" style="top:388px">
+			<input type=radio name='rememberPIN' onclick="document.formS.rememberSIMPIN.value='1'">&nbsp;<font id="CSyes">Yes</font>&nbsp;&nbsp;<input type=radio name='rememberPIN' onclick="document.formS.rememberSIMPIN.value='0'">&nbsp;<font id="CSno">No</font>
+			</div>
+			<input type="hidden" name="rememberPINtext"/>
+		</font>
+	</div>
+
+	<div class=div_small_text style="top:441px" id="GUItext3">
+	If you have made changes to any of the above settings you will need to click Save below to apply them
+	</div>
+
+	<div class="div_button1" style="top:475px" >
+		<input type="button" name="saveButton" id="CSsave" value="&nbsp;Save&nbsp;" onClick="submitProf();"/>
+	</div>
+</div>
+</div>
+</form>
+</body>
+</html>

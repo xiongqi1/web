@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Finish Installation</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/registration_status_handler.js"></script>
+    <script src="js/all.js"></script>
+    <script>
+        ajaxPostRequest("/installation_state", "state=normal_operation");
+
+        var registrationStatusHandler = new RegistrationStatusHandler();
+        function getRegistrationStatusAndValidate(data) {
+            registrationStatusHandler.handleData(data);
+        }
+
+        // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_REGISTRATION_STATUS);
+    </script>
+</head>
+
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="main-content-box">
+        <div class="box-header">
+            <h2>Finish Installation</h2>
+        </div>
+        <div class="box-content" id="main_content" style="display:block">
+            <div class="data_field_set_line fixed_field_height valign_middle">
+                <b>It is now safe to remove the Antenna Alignment tool.</b>
+            </div>
+            <div class="data_field_set_line top_delimiter"><b>Status</b></div>
+            <div class="data_field_set_line">
+                <div class="data_field_set_block">
+                    <div class="general_error_message" id="general_error_message" style="display:none"></div>
+                    <div class="general_error_guideline" id="general_error_guideline" style="display:none"></div>
+                    <div class="data_field_set_row">
+                        <div class="data_field_label wide_label" style="vertical-align:top;">CBRS Registration Status</div>
+                        <div class="data_field_text">
+                            <div><div class="data_field_text" id="sas_reg_state"></div></div>
+                            <div><div class="data_field_text" id="sas_err_code" style="display:none"></div></div>
+                            <div><div class="data_field_text" id="sas_err_msg" style="display:none"></div></div>
+                        </div>
+                    </div>
+                    <div class="data_field_set_row">
+                        <div class="data_field_label wide_label">Serving cell</div>
+                        <div class="data_field_text"><span id="scell_id" name="scell_id"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data_field_set_button_line top_delimiter">
+                <button class="med button_auto_width no_float" type="button" onclick="window.location='/ttest.html'">Back</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

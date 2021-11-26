@@ -1,0 +1,607 @@
+#!/bin/sh -f
+#
+# Connect script for Sierra Wireless Packetized modules
+#
+# This script is called by wwand_deamon as follows:-
+#
+# SUSBNET <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+#
+# <action> is only used for internal purpose
+#
+
+PROFILE=$1
+INSTANCE=$2
+WWANID=`echo $2 | awk '{print $1 -$1%10}'`
+BIN=$0
+ACTION=$3
+
+CONNECTION_MGR_PROFILE=$PROFILE
+CONNECTION_MGR_INSTANCE=$WWANID
+CONNECTION_MGR_ACTION=$ACTION
+CONNECTION_MGR_DEV=$(rdb_get "link.profile.$CONNECTION_MGR_PROFILE.dev")
+export CONNECTION_MGR_PROFILE CONNECTION_MGR_INSTANCE CONNECTION_MGR_ACTION CONNECTION_MGR_DEV
+
+
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+SERVICE_TYPE=`rdb_get "wwan.${INSTANCE}.system_network_status.service_type"`
+NETWORK_PROVIDER=`rdb_get "wwan.${INSTANCE}.system_network_status.network.unencoded"`
+SIGNAL_STRENGTH=`rdb_get "wwan.${INSTANCE}.radio.information.signal_strength"`
+
+RSCP=$(rdb_get "wwan.$WWANID.system_network_status.RSCPs0")
+ECIO=$(rdb_get "wwan.$WWANID.system_network_status.ECIOs0")
+ECN0=$(rdb_get "wwan.$WWANID.system_network_status.ECN0s0")
+
+MODULE_NAME=`rdb_get "wwan.${INSTANCE}.model"`
+FIRMWARE_VERSION=`rdb_get "wwan.${INSTANCE}.firmware_version"`
+DETECT_NAME=`rdb_get "wwan.${INSTANCE}.module_name"`
+ROUTER_VERSION=`head -n 1 /etc/version.txt`
+
+test -z "$ACTION" && ACTION=start
+
+# load v variables
+if [ -e "/etc/variant.sh" ]; then
+	. /etc/variant.sh
+fi
+
+# Workaround for getting the 3G phone module up on 3g30ap. This should be changed
+# to a more robust solution for the long term.
+BOARD=`rdb_get "system.board"`
+
+if [ "$V_SUB_NETIF" = 'none' -o "$V_SUB_NETIF" = '' ]; then
+NETIF_CFG=`rdb_get wwan.$WWANID.netif`
+NETIF_UDEV=`rdb_get wwan.$WWANID.netif_udev`
+else
+NETIF_CFG=`rdb_get wwan.${INSTANCE}.netif`
+NETIF_UDEV=`rdb_get wwan.${INSTANCE}.netif_udev`
+fi
+
+# do not try Telstra bigpond and extranet in autapn mode
+PLMN_MCC=`rdb_get wwan.$WWANID.imsi.plmn_mcc`
+PLMN_MNC=`rdb_get wwan.$WWANID.imsi.plmn_mnc`
+
+# use udev interface name if it exists - udev interface name is more reliable
+if [ -n "$NETIF_UDEV" ]; then
+    NETIF="$NETIF_UDEV"
+    log "using udev interface name NETIF=$NETIF"
+# use interface name in config (/etc/cdcs_init_wwan_pm.conf) - assume the device is the first one
+elif [ -n "$NETIF_CFG" ]; then
+    NETIF="${NETIF_CFG}0"
+    log "using config interface name NETIF=$NETIF"
+else
+    NETIF="wwan0"
+    log "no interface name available - use default name NETIF=$NETIF"
+fi
+
+getUsbNetIp() {
+	LINE=`ifconfig $NETIF | grep "inet addr"`
+	LINE=${LINE##*addr:}
+	echo ${LINE%% Bcast*}
+}
+
+hidePassword() {
+    echo "$@" | sed -n 's/^\(.\).*/\******/p'
+}
+
+startUsbNet() {
+    test_mode=$(rdb_get "test_mode")
+    if [ "$test_mode" = "1" ]; then
+        log "warning! test mode applied and skipping apn setting"
+    else
+        # get connection information
+        APN=`rdb_get link.profile.${PROFILE}.apn`
+        USER=`rdb_get link.profile.${PROFILE}.user`
+        PASS=`rdb_get link.profile.${PROFILE}.pass`
+        AUTH=`rdb_get link.profile.${PROFILE}.auth_type`
+        PDP_TYPE=`rdb_get link.profile.${PROFILE}.pdp_type`
+        PREFIPEnable=`rdb_get link.profile.${PROFILE}.preferred_ip.enable`
+        PREFIPAddr=`rdb_get link.profile.${PROFILE}.preferred_ip.addr`
+
+		# profile number in phone module
+		hw_profile_no=$(rdb_get "link.profile.${PROFILE}.module_profile_idx")
+		test -z "$hw_profile_no" && hw_profile_no="0"
+
+		if [ ! "$V_SUB_NETIF" = 'none' -a ! "$V_SUB_NETIF" = '' ]; then
+			hw_profile_no=$(echo $INSTANCE | awk '{print $1%10}')
+
+		fi
+
+		# cdma mip/sip preference - sip, mip/sip, mip
+        MIP_MODE=$(rdb_get "link.profile.${PROFILE}.mip_mode")
+
+	# set cdma mip/sip preference
+	if [ -n "$MIP_MODE" ]; then
+		cur_mip_mode=$(rdb_get "wwan.${INSTANCE}.cdmamip.mode")
+
+		if [ "$cur_mip_mode" = "$MIP_MODE" ]; then
+			log "already sip/mip preference configurated - cur='$cur_mip_mode',new='$MIP_MODE'"
+		else
+			log "setting sip/mip preference configuration  - cur='$cur_mip_mode',new='$MIP_MODE'"
+
+			# send mip mode switch command
+			rdb_set "wwan.${INSTANCE}.cdmamip.cmd.setdata" "$MIP_MODE"
+			rdb_set "wwan.${INSTANCE}.cdmamip.cmd.command" "set"
+
+			# wait for 10 seconds
+			i=0
+			max_wait_sec=10
+			while [ $i -lt $max_wait_sec ]; do
+
+				i=$(( $i+1 ))
+				log "waiting for sip/mip configuration #$i/$max_wait_sec"
+
+				cur_mip_mode=$(rdb_get "wwan.${INSTANCE}.cdmamip.mode")
+				if [ "$cur_mip_mode" = "$MIP_MODE" ]; then
+					break
+				fi
+
+				sleep 1
+			done
+
+			# check result
+			cur_mip_mode=$(rdb_get "wwan.${INSTANCE}.cdmamip.mode")
+			if [ "$cur_mip_mode" = "$MIP_MODE" ]; then
+				log "mip mode successfully changed to '$MIP_MODE'"
+			else
+				log "failed in switching mip mode from '$cur_mip_mode' to '$MIP_MODE'"
+			fi
+		fi
+	fi
+
+	# if cdma
+	if [ "$V_CELL_NW" = "cdma" ]; then
+		log "CDMA mode detected"
+	else
+		# clear apn if auto apn selected
+		perprofile_auto_apn_enable=0
+		global_auto_apn=$(rdb_get "webinterface.autoapn")
+		profile_auto_apn=`/usr/bin/rdb_get link.profile.$PROFILE.autoapn`
+
+		# source unpw
+		UNPW="${BIN}-UNPW"
+		log "sourcing (fname='$UNPW')"
+		source "$UNPW"
+
+		if [ "$SIM_AUTOAPN" = "0" ]; then
+			log "non-auto-apn SIM card detected"
+
+			# disable
+			perprofile_auto_apn_enable=0
+			global_auto_apn=0
+		else
+			# decide if we do global auto-APN procedure or per-profile auto-APN
+			if [ -n "$profile_auto_apn" ]; then
+				log "Per-profile auto-APN detected - link.profile.$PROFILE.autoapn"
+
+				if [ "$profile_auto_apn" = "1" ]; then
+					log "auto-apn is enabled in 'link.profile.$PROFILE.autoapn' rdb"
+					APN=""
+				fi
+
+				perprofile_auto_apn_enable=1
+			else
+				log "Global auto-APN detected - link.profile.$PROFILE.autoapn"
+
+				# clear apn if auto apn selected
+				if [ "$global_auto_apn" = "1" ]; then
+					log "auto-apn is enabled in 'webinterface.autoapn' rdb"
+					APN=""
+				fi
+
+				perprofile_auto_apn_enable=0
+			fi
+		fi
+
+		# do not perform auto-apn if auto-apn is intentionally disabled
+		if [ "$global_auto_apn" = "0" ]; then
+			log "auto-apn is disabled"
+		elif [ -z "$APN" ]; then
+		while true; do
+			# read wwan.$WWANID.apn.simICCID before wwan_check_apn running which
+			# clears this variable
+			LAST_ICCID=`rdb_get wwan.$WWANID.system_network_status.simICCID`
+			LAST_APN=`rdb_get wwan.$WWANID.apn.${LAST_ICCID}`
+			if [ "$perprofile_auto_apn_enable" = "1" ]; then
+				eval `wwan_check_apn $PROFILE`
+			else
+				eval `wwan_check_apn`
+			fi
+
+			log "auto APN: '$APN' USER: '$USER' PASS: '$FAKE_PASS' AUTH: '$AUTH'"
+
+			# do not try Telstra bigpond and extranet in auto apn mode
+			# if current ICCID is matching with previous historic ones and
+			# previous connection was extranet or bigpond, allow connection.
+			if [ "$PLMN_MCC" = "505" -a "$PLMN_MNC" = "01" ]; then
+			if [ "$APN" = "telstra.extranet" -o "$APN" = "telstra.bigpond" ];then
+				#log "current ICCID = $LAST_ICCID, LAST_APN = $LAST_APN, APN = $APN"
+				if [ "$LAST_APN" = "" -o "$LAST_APN" != "$APN" ]; then
+				log "auto APN: '$APN' is ignored in autoapn mode"
+				continue
+				fi
+			fi
+			fi
+			break
+		done
+
+			# accept the blank apn only if V_VODAFONE_SPEC is y
+			if [ -z "$APN" ]; then
+				log "use the blank apn - ignore autoapn"
+			fi
+		fi
+	fi
+
+	rdb_set wwan.${INSTANCE}.apn.current "$APN"
+        rdb_set wwan.${INSTANCE}.username.current "$USER"
+        rdb_set wwan.${INSTANCE}.pass.current "$PASS"
+        rdb_set wwan.${INSTANCE}.auth.current "$AUTH"
+        rdb_set wwan.${INSTANCE}.profile.current "$PROFILE"
+	rdb_set wwan.${INSTANCE}.connection.status connecting
+
+	# Update profile's current APN link.profile.X.apn.current
+	rdb_set link.profile.$PROFILE.apn.current "$APN"
+
+	if [ "$V_CELL_NW" = "cdma" ]; then
+		log "signal=$SIGNAL_STRENGTH / service=$SERVICE_TYPE"
+		log "signal rscp=$RSCP / ecio=$ECIO / ecn0=$ECN0"
+		log "rv=$ROUTER_VERSION / comp=$DETECT_NAME"
+		log "dongle=$MODULE_NAME / ver=$FIRMWARE_VERSION"
+	else
+		log "APN name=$APN / provider=$NETWORK_PROVIDER / signal=$SIGNAL_STRENGTH / service=$SERVICE_TYPE"
+		log "signal rscp=$RSCP / ecio=$ECIO / ecn0=$ECN0"
+		log "rv=$ROUTER_VERSION / comp=$DETECT_NAME"
+		log "dongle=$MODULE_NAME / ver=$FIRMWARE_VERSION"
+	fi
+
+	FAKE_PASS=$(hidePassword "$PASS")
+
+        OPTUSER=""
+        OPTPASS=""
+        OPTPASS_FAKE=""
+        OPTPREFIP=""
+        test -n "$USER" && OPTUSER="user $USER"
+        test -n "$PASS" && OPTPASS="password $PASS"
+        test -n "$PASS" && OPTPASS_FAKE="password $FAKE_PASS"
+
+	# Preferred IP is Not applied to AutoAPN
+	if [ "$PREFIPEnable" = "1" -a -n "$PREFIPAddr" ]
+	then
+		OPTPREFIP="prefIP $PREFIPAddr"
+	else
+		OPTPREFIP="prefIP 0.0.0.0"
+	fi
+
+	if [ "$perprofile_auto_apn_enable" = "1" -a "$profile_auto_apn" = "1" ] || [ "$perprofile_auto_apn_enable" = "0" -a "$global_auto_apn" = "1" ];
+	then
+		OPTPREFIP="prefIP 0.0.0.0"
+	fi
+
+        case "$AUTH" in
+            pap|PAP)	OPTAUTH="pap";;
+            none|NONE)	OPTAUTH="none";;
+            *)		OPTAUTH="chap";;
+        esac
+
+	# set wwan settings(?) from previous svn
+	if [ "$V_SUB_NETIF" = 'none' -o "$V_SUB_NETIF" = '' ]; then
+		OPT_WWAN=""
+	else
+		OPT_WWAN="wwan $hw_profile_no"
+	fi
+
+	# set apn option
+	OPT_APN="apn $APN"
+
+	# clear unused settings for cdma - cdma does not support the following settings
+	if [ "$V_CELL_NW" = "cdma" ]; then
+		OPTPREFIP=""
+		PDP_TYPE=""
+		OPT_APN=""
+	fi
+
+	# carrier special settings - VZW
+	module_pri_carrier=$(rdb_get "wwan.$WWANID.priid_carrier")
+	case "$module_pri_carrier" in
+		'VZW')
+			if [ -z "$PDP_TYPE" -a "$V_MODULE" = "MC7304" -o "$V_MODULE" = "MC7354" ]; then
+				log "verizon PRI specific option applied (pdp_type=PDP-IPV4V6)"
+				PDP_TYPE="PDP-IPV4V6"
+			fi
+			;;
+
+		*)
+			log "no carrier specific option found (pri='$module_pri_carrier'"
+			;;
+	esac
+
+	if [ \( "$module_pri_carrier" = "VZW" -a "$profile_auto_apn" = "0" \) -o "$module_pri_carrier" != "VZW" ]; then
+		# write profile - apn option must be at the end to support blank apn
+		log "writing wwan profile - cns_profile write id "$hw_profile_no" $OPT_WWAN $OPTUSER $OPTPASS_FAKE $OPTAUTH $OPTPREFIP $PDP_TYPE $OPT_PRI $OPT_APN"
+		if ! cns_profile write id "$hw_profile_no" wwan "$INSTANCE"  $OPT_WWAN $OPTUSER $OPTPASS $OPTAUTH $OPTPREFIP $PDP_TYPE $OPT_PRI $OPT_APN; then
+			log "failed to update profile"
+			SETTING_PROFILE_FAILED="1"
+		else
+			log "profile successfully updated"
+			SETTING_PROFILE_FAILED=""
+		fi
+
+	fi
+	# Sierra LTE dongle does not react right after writing. MC7430 needs longer
+	sleep 6
+    fi
+
+    # [pdp result code] set "profile.cmd.param.result_rdb" - to get error code from Port Managers
+    if [ "$V_SUB_NETIF" = 'none' -o "$V_SUB_NETIF" = '' ]; then
+        rdb_set "wwan.$WWANID.profile.cmd.param.result_rdb" "link.profile.${PROFILE}.pdp_result"
+    else
+        rdb_set "wwan.${INSTANCE}.profile.cmd.param.result_rdb" "link.profile.${PROFILE}.pdp_result"
+    fi
+
+    # activate profile if the setting profile is successful
+    if [ -z "$SETTING_PROFILE_FAILED" ]; then
+	# get the module online
+	log "activating profile id '$hw_profile_no' wwan '$INSTANCE'"
+	cns_profile id "$hw_profile_no" wwan "$INSTANCE" activate
+
+	rc=$?
+    else
+	# failure in setting profile: update pdp_result and return
+        if [ "$V_SUB_NETIF" = 'none' -o "$V_SUB_NETIF" = '' ]; then
+	    rdb_set "wwan.$WWANID.profile.cmd.param.result_rdb" ""
+        else
+	    rdb_set "wwan.${INSTANCE}.profile.cmd.param.result_rdb" ""
+        fi
+
+	rdb_set "link.profile.${PROFILE}.pdp_result" "Setting profile failed, retrying..."
+	return 1
+    fi
+
+    # [pdp result code] reset "wwan.$WWANID.profile.cmd.param.result_rdb" - not to get error code from unknown sources
+    if [ "$V_SUB_NETIF" = 'none' -o "$V_SUB_NETIF" = '' ]; then
+        rdb_set "wwan.$WWANID.profile.cmd.param.result_rdb" ""
+    else
+        rdb_set "wwan.${INSTANCE}.profile.cmd.param.result_rdb" ""
+    fi
+
+    if [ $rc -ne 0 ]; then
+	result_rdb=$(rdb_get "link.profile.${PROFILE}.pdp_result")
+
+        log "module communication failed - activation failure (Manager result code - '$result_rdb')"
+	if [ -z "$result_rdb" ]; then
+		rdb_set "link.profile.${PROFILE}.pdp_result" "Context activation failed for an unknown reason, retrying..."
+	fi
+
+        return 1
+    fi
+
+    # get the interface up
+    log "making net interface ($NETIF) up"
+    if [ $(rdb get wwan.$WWANID.mgmt_if) = "quectel-qmi-proxy" ]; then
+        # quectel proxy mode needs parent interface to up first
+        ifconfig $(echo $NETIF|cut -f1 -d'.') up
+    fi
+    if ! ifconfig $NETIF up; then
+        log "ifconfig failed - having the interface up"
+
+        # [pdp result code] - error code
+        rdb_set "link.profile.${PROFILE}.pdp_result" "failed to activate network interface"
+        return 1
+    fi
+
+	# VZ20Q has 4 RBs and 1st RB is dedicated for control plane and a IP address
+	# in same subnet with VZ20Q is allocated (192.168.15.xxx).
+	# Second bearer is connected to real outer network via third RB which is
+	# set to 'bypass' mode in /etc/config/network file of VZ20Q so we have to
+	# wait this second bearer is up to look up IP address.
+	if [ "$V_MODULE" = "VZ20Q" ] || [ "$V_MODULE" = "harlequin" ]; then
+		log "---------------------------------------------------------"
+		let "TIMEOUT=20"
+		while true; do
+			PDP0ST=`rdb_get wwan.$WWANID.system_network_status.pdp0_stat`
+			log "timeout = $TIMEOUT, pdp0_st = $PDP0ST"
+			test "$PDP0ST" = "up" && break
+			sleep 1
+			let "TIMEOUT-=1"
+			test $TIMEOUT -eq 0 && break
+		done
+		log "final timeout = $TIMEOUT, pdp0_st = $PDP0ST"
+		if [ $TIMEOUT -eq 0 ]; then
+			log "PDP is not up within 20 seconds, give up"
+			rdb_set "link.profile.${PROFILE}.pdp_result" "failed to up"
+			return 1
+		fi
+	fi
+
+	# On the NRB-240 when PDN 3 comes up DCCD will store the
+	# corresponding interface name to use from here on.
+	if [ "$V_USE_DCCD" = "y" ]; then
+		NETIF_OVERRIDE=$(rdb_get wwan.$WWANID.netif_override)
+		if [ -n "$NETIF_OVERRIDE" ]; then
+			log "DCCD told us to use $NETIF_OVERRIDE instead of $NETIF."
+			NETIF="$NETIF_OVERRIDE"
+		fi
+	fi
+
+	# find the script - udhcpc script is located in variable places. It depends on the platform
+	if [ -x "/bin/udhcpc.sh" ]; then
+		udhcpc_script_opt="-s /bin/udhcpc.sh"
+	elif [ -x "/sbin/udhcpc.sh" ]; then
+		udhcpc_script_opt="-s /sbin/udhcpc.sh"
+	else
+		udhcpc_script_opt=""
+	fi
+
+	# workaround for Sierra modules that return the previous IP address right after the connection newly gets up
+	log "waiting for the IP address..."
+	sleep 5
+
+	# MC7304 and MC7354 are checking broadcast flag in IP header of DHCP request
+	if [ "$V_MODULE" = "MC7304" -o "$V_MODULE" = "MC7354" ]; then
+		broadcast_opt="-B"
+	else
+		broadcast_opt=""
+	fi
+
+	case "$PDP_TYPE" in
+		ipv6)
+			;;
+
+		*)	# get ip address from the driver - fake dhcp server
+			if ! udhcpc -f -q -n -i $NETIF $udhcpc_script_opt $broadcast_opt; then
+				log "failed to get ip address in udhcpc"
+
+				# [pdp result code] - error code
+				rdb_set "link.profile.${PROFILE}.pdp_result" "failed to obtain an IP address"
+
+				# deactivte the previos configuration
+				cns_profile id "$hw_profile_no" wwan "$hw_profile_no" deactivate
+
+				# ericsson F5521gw expects the interface down - workaround for dhcp failure
+				ifconfig $NETIF down
+				return 1
+			fi
+			;;
+	esac
+
+	# config the interface with IPv6 information given by LTE network
+	# TODO: replace with DHCPv6 client
+	case "$PDP_TYPE" in
+		ipv6|ipv4v6)
+			IPV6ADDR=$(rdb_get wwan.${WWANID}.link.profile.${PROFILE}.ipv6_ipaddr);
+			if [ ! -z "$IPV6ADDR" ] ; then
+				/bin/ip -6 addr add ${IPV6ADDR}/64 dev $NETIF
+				route -A inet6 add default $NETIF
+			fi
+
+			# enumerate all IPv6 addresses for webui to display
+			addr=$(/bin/ip -6 addr show dev $NETIF | awk '/inet/{print $2}'|cut -d"/" -f1|xargs echo)
+			rdb_set "link.profile.${PROFILE}.ipv6_ipaddr" "$addr"
+
+			# if ipv6 only update dns with ipv6 ones given by LTE network
+			if [ "$PDP_TYPE" == "ipv6" ] ; then
+				ipv6dns1=$(rdb_get wwan.${WWANID}.link.profile.${PROFILE}.ipv6_dns1);
+				ipv6dns2=$(rdb_get wwan.${WWANID}.link.profile.${PROFILE}.ipv6_dns2);
+				[ -n "$ipv6dns1" ] && echo "nameserver $ipv6dns1" > /etc/resolv.conf
+				[ -n "$ipv6dns2" ] && echo "nameserver $ipv6dns2" >> /etc/resolv.conf
+				rdb_set "link.profile.${PROFILE}.dns1" "$ipv6dns1"
+				rdb_set "link.profile.${PROFILE}.dns2" "$ipv6dns2"
+			fi
+			;;
+		*)
+			rdb_del "link.profile.${PROFILE}.ipv6_ipaddr"
+			;;
+	esac
+
+    # clear pdp result code
+    rdb_set "link.profile.${PROFILE}.pdp_result" ""
+    rdb_set "link.profile.${PROFILE}.ESM_reconnect_delay" "0"
+    rdb_set "link.profile.${PROFILE}.reconnect_count" "0"
+    rdb_set "link.profile.${PROFILE}.reconnect_retries" "0"
+
+    log "usbnet connection up"
+
+    # build environment variables for ip-up script
+    PPP_IFACE="$NETIF"
+    PPP_TTY=""
+    PPP_SPEED=""
+    PPP_LOCAL=`getUsbNetIp up`
+    PPP_IPPARAM="$PROFILE"
+
+    PPP_REMOTE=$(rdb_get "link.profile.${PROFILE}.gw")
+    export DNS1=$(rdb_get "link.profile.${PROFILE}.dns1")
+    export DNS2=$(rdb_get "link.profile.${PROFILE}.dns2")
+
+    rdb_set "wwan.${INSTANCE}.ifname"	"ppp${INSTANCE}"
+
+    echo "$$" > "/var/lock/ppp-${PROFILE}.pid"
+    /etc/ppp/ip-up "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+    #log "ip-up script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+    log "done"
+}
+
+stopUsbNet() {
+    if ifconfig $NETIF > /dev/null; then
+
+		rdb_set link.profile.${PROFILE}.status 'disconnecting'
+
+		# profile number in phone module
+		hw_profile_no=$(rdb_get "link.profile.${PROFILE}.module_profile_idx")
+		test -z "$hw_profile_no" && hw_profile_no="0"
+
+		if [ ! "$V_SUB_NETIF" = 'none' -a ! "$V_SUB_NETIF" = '' ]; then
+			hw_profile_no=$INSTANCE
+		fi
+
+		if [ ! "$V_MODULE" = "harlequin" ]; then # dccd will handle PDN teardown for harlequin
+			# get the module down
+			log "deactivating profile id '$hw_profile_no' wwan '$INSTANCE'"
+			if ! cns_profile id "$hw_profile_no" wwan "$INSTANCE" deactivate; then
+				log "module communication failed - deactivation failure"
+			fi
+		fi
+		# get the interface down
+		if ! ifconfig $NETIF down; then
+			log "ifconfig failed - having the interface down"
+		fi
+
+		rdb_del "link.profile.${PROFILE}.ipv6_ipaddr"
+
+        log "usbnet connection down"
+    fi
+
+    rm -f "/var/lock/ppp-${PROFILE}.pid"
+
+    # dccd stores net iface to netif_override
+    if [ "$V_USE_DCCD" = "y" ]; then
+        NETIF_OVERRIDE=$(rdb_get wwan.$WWANID.netif_override)
+        if [ -n "$NETIF_OVERRIDE" ]; then
+            log "DCCD told us to use $NETIF_OVERRIDE instead of $NETIF."
+            NETIF="$NETIF_OVERRIDE"
+        fi
+    fi
+
+    # build environment variables for ip-up script
+    PPP_IFACE="$NETIF"
+    PPP_TTY=""
+    PPP_SPEED=""
+    PPP_LOCAL=`getUsbNetIp down`
+    PPP_REMOTE="0.0.0.0"
+    PPP_IPPARAM="$PROFILE"
+
+    /etc/ppp/ip-down "$PPP_IFACE" "$PPP_TTY" "$PPP_SPEED" "$PPP_LOCAL" "$PPP_REMOTE" "$PPP_IPPARAM"
+
+    log "ip-down script called - ipaddr=$PPP_LOCAL,dev=$PPP_IFACE,profile=$PPP_IPPARAM"
+}
+
+RUNONTERM="runonterm"
+
+if [ "$WWANID" = '10' ]; then
+	RUNONTERM="runonterm10"
+fi
+
+case $ACTION in
+    'manual_start')
+	startUsbNet
+	;;
+
+    'start')
+        # start usb net
+        if startUsbNet; then
+            # stopusbNet on term signal
+            exec $RUNONTERM "$BIN $PROFILE $INSTANCE stop"
+        fi
+        ;;
+
+    'stop')
+        stopUsbNet;
+        ;;
+esac
+

@@ -1,0 +1,1132 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Administration</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+<script type="text/javascript" src="/js/zxcvbn.js"></script>
+#endif
+
+<script language="JavaScript">
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+#if (0)
+/*-----------------------------------------------------------------------*/
+// combine multiple line warning messages
+/*-----------------------------------------------------------------------*/
+
+/* password warning message for submit
+
+   Passwords configured on the router must meet the following criteria:
+     • Be a minimum of 8 characters and no more than 128 characters in length.
+     • Contain at least one upper case and one number.
+     • Contain at least one special character, such as: `~!@#$%^&*()-_=+[{]}\|;:'",<.>/?.
+ */
+#endif
+var pwdWarn1=[];
+	pwdWarn1[0] = _("passwordWarning6");
+	pwdWarn1[1] = bulletHead+_("passwordWarning2");
+	pwdWarn1[2] = bulletHead+_("passwordWarning3");
+	pwdWarn1[3] = bulletHead+_("passwordWarning4")+convert_to_html_entity('`~!@#$%^&*()-_=+[{]}\|;:\'\",\<.>/?.');
+
+#if (0)
+/* password warning message for weak default password
+
+   The default password is currently set. To protect the device, please create a password that meets the following criteria:
+     • Be a minimum of 8 characters and no more than 128 characters in length.
+     • Contain at least one upper case and one number.
+     • Contain at least one special character, such as: `~!@#$%^&*()-_=+[{]}\|;:'",<.>/?.
+     • It is also advised that the Telnet/SSH password be changed to a strong non-default password.
+ */
+#endif
+var pwdWarn2=[];
+	pwdWarn2[0] = _("passwordWarning1");
+	pwdWarn2[1] = bulletHead+_("passwordWarning2");
+	pwdWarn2[2] = bulletHead+_("passwordWarning3");
+	pwdWarn2[3] = bulletHead+_("passwordWarning4")+convert_to_html_entity('`~!@#$%^&*()-_=+[{]}\|;:\'\",\<.>/?.');
+	pwdWarn2[4] = bulletHead+_("passwordWarning5");
+
+#if (0)
+/*-----------------------------------------------------------------------*/
+#endif
+
+#endif
+
+
+function setLanguageOptions() {
+	<%var _lang=get_single('webinterface.language'); var _lang_fr=get_single('webinterface.lang_fr'); var _lang_ar=get_single('webinterface.lang_ar');%>
+
+	var lang_fr="@@_lang_fr";
+	var lang_ar="@@_lang_ar";
+	var current_lang="@@_lang";
+	var lang_element = document.getElementById("langSelection");
+
+	if (lang_fr == "1" || lang_ar == "1") {
+		lang_element.options.length = 0;
+		lang_element.options[lang_element.length] = new Option(_("english"), 'en');//'English'
+		if (lang_fr == 1) {
+			if(current_lang=="fr")
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("man language french"), 'fr', false, false);
+		}
+		if (lang_ar == 1) {
+			if(current_lang=="ar")
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, true);
+			else
+				lang_element.options[lang_element.length] = new Option(_("arabicAR"), 'ar', false, false);
+		}
+		document.getElementById("langDisplay").style["display"]="";
+	}
+}
+
+function submitLang() {
+	var lang=document.getElementById("langSelection").value;
+	setLanguage(lang);
+}
+
+function ungreyOutPortField() {
+	if ( (document.form.incomingPort.value < 1) || (document.form.incomingPort.value > 65534) )
+		document.form.incomingPort.value = "8080";
+}
+////////////////////////////////////////
+
+function insecure_warning() {
+	var f = document.form;
+
+#ifndef V_CONFIG_REMOTE_HTTP_FROM_WEBUI_none
+	var enable_http=$("#webbrowser_ID-0").is(":checked");
+#else
+	var enable_http=false;
+#endif
+
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	var enable_https=$("#web_https-0").is(":checked");
+#else
+        var enable_https=false;
+#endif
+
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+	var enable_telnet=$("#telnet_ID-0").is(":checked");
+#else
+        var enable_telnet=false;
+#endif
+
+#ifndef V_CONFIG_REMOTE_SSH_FROM_WEBUI_none
+	var enable_ssh=$("#sshd_wan_enable_0").is(":checked");
+#else
+        var enable_ssh=false
+#endif
+
+	if(enable_http||enable_https||enable_telnet||enable_ssh) {
+		blockUI_confirm(_("password warning"), function(){f.submit();});
+	}
+	else {
+		f.submit();
+	}
+}
+
+function submitF() {
+	var f = document.form;
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	var dummyPW="**********";
+#endif
+
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	if (f.Pass.value != f.PassConf.value) {
+		validate_alert("", _("wwan warningMsg2"));//passwords do not match
+		return;
+	}
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+<%if(session["user"]=="root"){%>
+	// check password validity only when logged in as root & the password changed
+	if (f.Pass.value != dummyPW) {
+		if ((f.Pass.value.length < 8) || (f.Pass.value.length > 128)) {
+			validate_alert(_("securityAdvise"), _("webPasswordWarningMsg"));//password has the incorrect length
+			return;
+		}
+		if (passStrengthValidation(f.Pass.value) == false) {
+			validate_alert(_("securityAdvise"), pwdWarn1, true);	// Passwords configured on the router must meet the following criteria:...
+			return;
+		}
+	}
+<%}%>
+#else
+	if ((f.Pass.value.length < 1) || (f.Pass.value.length > 128)) {
+		validate_alert("", _("wwan warningMsg24"));//password has the incorrect length
+		return;
+	}
+#endif
+
+#ifdef V_WEB_LOGIN_LOCKING_y
+	if ((f.loginMaxAttempt.value < 3) || (f.loginMaxAttempt.value > 5)) {
+		validate_alert("", _("loginMaxAttemptRangeWarning"));//Login attempt limit must have a value between 3 and 5.
+		return;
+	}
+	if ((f.loginLockDuration.value < 1) || (f.loginLockDuration.value > 10)) {
+		validate_alert("", _("loginLockDurationRangeWarning"));//Login lock duration must have a value between 1 and 10.
+		return;
+	}
+#endif
+
+#ifdef V_WEB_SESSION_TIMEOUT_y
+	if ((f.sessionTimeout.value < 300) || (f.sessionTimeout.value > 3600)) {
+		validate_alert("", _("sessionTimeoutRangeWarning"));//Session timeout must have a value between 300 and 3600.
+		return;
+	}
+#endif
+
+<%if(session["user"]=="root"){%>
+	if(f.userName.value=="root") {
+#if defined(V_PRODUCT_ntc_220)
+		f.rootPass.value=(f.Pass.value==dummyPW)?"":f.Pass.value;
+#else
+        f.rootPass.value=f.Pass.value;
+#endif
+	}
+	else {
+#if defined(V_PRODUCT_ntc_220)
+		f.adminPass.value=(f.Pass.value==dummyPW)?"":f.Pass.value;
+#else
+        f.adminPass.value=f.Pass.value;
+#endif
+	}
+#ifndef V_CONFIG_TELNET_SSH_ACCOUNT_FROM_WEBUI_none
+	if (f.TelnetPass.value != f.TelnetPassConf.value) {
+		validate_alert("", _("wwan warningMsg2"));//passwords do not match
+		return;
+	}
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	// check password validity only when the password changed
+	if (f.TelnetPass.value != dummyPW) {
+		if ((f.TelnetPass.value.length < 8) || (f.TelnetPass.value.length > 126)) {
+			validate_alert("", _("telnetPasswordWarningMsg"));//password has the incorrect length
+			return;
+		}
+		if (passStrengthValidation(f.TelnetPass.value) == false) {
+			validate_alert("", pwdWarn1, true);	// Passwords configured on the router must meet the following criteria:...
+			return;
+		}
+	}
+#else
+	if ((f.TelnetPass.value.length < 1) || (f.TelnetPass.value.length > 126)) {
+		validate_alert("", _("wwan warningMsg25"));//password has the incorrect length
+		return;
+	}
+#endif
+	f.telnethiddenPass.value=f.TelnetPass.value;
+#endif
+<%}else{%>
+	f.adminPass.value=f.Pass.value;
+<%}%>
+
+#ifdef V_WEB_SESSION_TIMEOUT_y
+	var oldSessionTimeout="<%get_single_direct('admin.user.login.session_timeout');%>";
+	if (f.sessionTimeout.value != oldSessionTimeout) {
+		blockUI_confirm(_("sessionTimeoutChangedWarning"), function(){
+			insecure_warning();
+		});
+	} else {
+		insecure_warning();
+	}
+#else
+	insecure_warning();
+#endif
+}
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+function checkPassStrength(domain) {
+	var f, t;
+	if (domain == 'web') {
+		f = document.form.Pass;
+		t = document.getElementById("WebPassStrength");
+	} else {
+#ifndef V_CONFIG_TELNET_SSH_ACCOUNT_FROM_WEBUI_none
+		f = document.form.TelnetPass;
+		t = document.getElementById("TelnetPassStrength");
+#endif
+	}
+	updatePassStrength(f, t);
+}
+#endif
+
+function checkPass(val) {
+	document.form.userName.value=val;
+	if( val=="root" ) {
+		document.form.Pass.value=document.form.rootPass.value;
+		document.form.PassConf.value=document.form.rootPass.value;
+	}
+	else {
+		document.form.Pass.value=document.form.adminPass.value;
+		document.form.PassConf.value=document.form.adminPass.value;
+	}
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+	// update password strength when changing account name
+	checkPassStrength('web');
+#endif
+}
+
+</script>
+<%
+/* To change the value of dummyPW, check chpasswd.template first. */
+/* The template uses dummyPW for empty password                   */
+
+var dummyPW="**********";
+
+validIpWhitelistPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(/([1-9]|[1-2][0-9]|3[0-2]))?(,(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(/([1-9]|[1-2][0-9]|3[0-2]))?)*$";
+
+function validateHttpsIpWhitelist() {
+	var v = form['httpsIpWhitelist'];
+	if (v != "") {
+		if (string_regex_match(v, validIpWhitelistPattern) == false) {
+			onBadRequest();
+		}
+	}
+}
+function validateEnableLocalHttp() {
+	validateOnOffRadio(form["enableLocalHttp"]);
+}
+function validateEnableLocalHttps() {
+	validateOnOffRadio(form["enableLocalHttps"]);
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	// input validation
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	validateHttpsIpWhitelist();
+#endif
+#ifndef V_CONFIG_LOCAL_HTTP_FROM_WEBUI_none
+	validateEnableLocalHttp();
+#endif
+#ifndef V_CONFIG_LOCAL_HTTPS_FROM_WEBUI_none
+	validateEnableLocalHttps();
+#endif
+
+	if(form['Pass']==form['PassConf']) {
+#ifndef V_WAN_INTERFACE_none
+		currval = get_single( 'admin.remote.webenable' );
+		tempval = form['webenable'];
+		if (currval != tempval) {
+			set_single( 'admin.remote.webenable='+tempval);
+		}
+
+		setRdbOnDiff('admin.remote_https.ip_whitelist', form['httpsIpWhitelist'], true);
+
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+		currval = get_single( 'admin.remote_https.enable' );
+		tempval = form['remoteHTTPSenable'];
+		if (currval != tempval) {
+			set_single( 'admin.remote_https.enable='+tempval, '-p');
+		}
+#endif
+
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+		currval = get_single( 'admin.remote.telnetenable' );
+		tempval = form['telnetenable'];
+		if (currval != tempval) {
+			set_single( 'admin.remote.telnetenable='+tempval);
+		}
+#endif
+
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+		currval = get_single( 'admin.remote.pingenable' );
+		tempval = form['pingenable'];
+		if (currval != tempval) {
+			set_single( 'admin.remote.pingenable='+tempval);
+		}
+#endif
+#endif
+		currval = get_single( 'admin.remote.port' );
+		tempval = form['incomingPort'];
+		if (currval != tempval) {
+			set_single( 'admin.remote.port='+tempval);
+		}
+
+		currval = get_single( 'admin.remote_https.port' );
+		tempval = form['httpsPort'];
+		if (currval != tempval) {
+			set_single( 'admin.remote_https.port='+tempval, '-p');
+		}
+
+		tempval = form['adminPass'];
+#if !defined(V_PRODUCT_ntc_220)
+		if(tempval==dummyPW) {
+			tempval=session["adminPass"];
+		}
+#endif
+#ifdef V_EVENT_NOTIFICATION
+		if (tempval != session["adminPass"]) {
+			cmd="elogger 10 \"WEBUI login password changed for username 'admin'\" 2>/dev/null >/dev/null";
+			exec_cmd(cmd);
+		}
+#endif
+
+#if !defined (V_WEBIF_SPEC_vdf)
+#if defined(V_PRODUCT_ntc_220)
+        if(tempval != dummyPW) {
+            set_single( 'admin.user.admin.new'+'='+tempval );
+		}
+#else
+        set_single( 'admin.user.admin'+'='+tempval );
+#endif
+#else
+		set_single( 'admin.user.user'+'='+tempval );
+#endif
+		if(session["user"]=="root") {
+			tempval = form['rootPass'];
+#if !defined(V_PRODUCT_ntc_220)
+			if(tempval==dummyPW) {
+				tempval=session["rootPass"];
+			}
+#endif
+#ifdef V_EVENT_NOTIFICATION
+			if (tempval != session["rootPass"]) {
+				cmd="elogger 10 \"WEBUI login password changed for username 'root'\" 2>/dev/null >/dev/null";
+				exec_cmd(cmd);
+			}
+#endif
+#if defined(V_PRODUCT_ntc_220)
+            if(tempval != dummyPW) {
+                set_single('admin.user.root.new=' + tempval);
+            }
+#else
+            set_single( 'admin.user.root'+'='+tempval );
+#endif
+		}
+
+#ifndef V_CONFIG_TELNET_SSH_ACCOUNT_FROM_WEBUI_none
+		if(session["user"]=="root") {
+			tempval = form['telnethiddenPass'];
+			if(tempval!=dummyPW) {
+				if(tempval == "") {
+					set_single( 'telnet.passwd.new'+'='+dummyPW );
+				}
+				else {
+					set_single( 'telnet.passwd.new'+'='+tempval );
+				}
+#if !defined(V_PRODUCT_ntc_220)
+				set_single( 'telnet.passwd.trigger=1');
+#endif
+// for Telnet/SSH password, there is no way to check whether the password really changed or not
+// so presume that the password changed if the user entered any password
+#ifdef V_EVENT_NOTIFICATION
+				cmd="elogger 10 \"Telnet/SSH password changed\" 2>/dev/null >/dev/null";
+				exec_cmd(cmd);
+#endif
+			}
+		}
+#endif
+// for Telnet/SSH password, there is no way to check whether the password really changed or not
+#if defined(V_PRODUCT_ntc_220)
+        set_single( 'admin.passwd.trigger=1');
+#endif
+
+#ifndef V_WAN_INTERFACE_none
+#ifndef V_CONFIG_REMOTE_SSH_FROM_WEBUI_none
+		/* set ssh configuration */
+		set_single_direct("-p","admin.remote.sshd_enable",form["sshd_wan_enable"]);
+		set_single_direct("-p","admin.remote.sshd_port",form["sshdPort"]);
+#endif
+#endif
+#ifdef V_FIREWALL_IP_PORT_BASIC_RDB_INTERPRETATION_none
+		/* set local router access control. */
+#ifndef V_CONFIG_LOCAL_SSH_FROM_WEBUI_none
+		set_single_direct("-p","admin.local.ssh_enable",form["ssh_local_enable"]);
+#endif
+#ifndef V_CONFIG_LOCAL_TELNET_FROM_WEBUI_none
+		set_single_direct("-p","admin.local.telnetenable",form["telnet_local_enable"]);
+#endif
+#ifndef V_CONFIG_LOCAL_HTTP_FROM_WEBUI_none
+		setRdbOnDiff("admin.local.enable_http", form["enableLocalHttp"], true);
+#endif
+#ifndef V_CONFIG_LOCAL_HTTPS_FROM_WEBUI_none
+		setRdbOnDiff("admin.local.enable_https", form["enableLocalHttps"], true);
+#endif
+
+#endif
+#ifdef V_WEB_LOGIN_LOCKING_y
+		tempval = form["loginMaxAttempt"];
+		if (tempval >= 3 && tempval <= 5)
+			set_single_direct("-p","admin.user.login.maxattempt",form["loginMaxAttempt"]);
+		tempval = form["loginLockDuration"];
+		if (tempval >= 1 && tempval <= 10)
+			set_single_direct("-p","admin.user.login.lockduration",form["loginLockDuration"]);
+#endif
+#ifdef V_WEB_SESSION_TIMEOUT_y
+		// save session timeout & restart appweb only when the timeout value changed.
+		tempval = form["sessionTimeout"];
+		oldSessionTimeout = get_single( 'admin.user.login.session_timeout');
+		if (tempval >= 300 && tempval <= 3600 && tempval != oldSessionTimeout) {
+			// appweb will restart by this RDB variable change
+			set_single_direct("-p","admin.user.login.session_timeout",tempval);
+		}
+#endif
+	}
+	else {
+#ifndef V_WAN_INTERFACE_none
+		form['webenable']=get_single( 'admin.remote.webenable');
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+		form['remoteHTTPSenable'] = get_single( 'admin.remote_https.enable' );
+#endif
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+		form['telnetenable']=get_single( 'admin.remote.telnetenable');
+#endif
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+		form['pingenable']=get_single( 'admin.remote.pingenable');
+#endif
+#endif
+		form['incomingPort'] = get_single( 'admin.remote.port' );
+		form['httpsPort'] = get_single( 'admin.remote_https.port' );
+	}
+	redirect('/administration.html?success');
+}
+else { /*GET*/
+#ifndef V_WAN_INTERFACE_none
+	form['webenable']=get_single( 'admin.remote.webenable');
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	form['remoteHTTPSenable'] = get_single( 'admin.remote_https.enable' );
+#endif
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+	form['telnetenable']=get_single( 'admin.remote.telnetenable');
+#endif
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+	form['pingenable']=get_single( 'admin.remote.pingenable');
+#endif
+#endif
+	form['incomingPort'] = get_single( 'admin.remote.port' );
+	form['httpsPort'] = get_single( 'admin.remote_https.port' );
+	form['httpsIpWhitelist'] = get_single( 'admin.remote_https.ip_whitelist' );
+#if !defined (V_WEBIF_SPEC_vdf)
+	temp = get_single( 'admin.user.admin' );
+#else
+	temp = get_single( 'admin.user.user' );
+#endif
+	session['adminPass'] =temp;
+	temp = get_single( 'admin.user.root' );
+	session["rootPass"]=temp;
+	form['userName']=session["user"];
+#ifdef V_WEB_LOGIN_LOCKING_y
+	form['loginMaxAttempt']=get_single( 'admin.user.login.maxattempt');
+	form['loginLockDuration']=get_single( 'admin.user.login.lockduration');
+#endif
+#ifdef V_WEB_SESSION_TIMEOUT_y
+	temp = get_single( 'admin.user.login.session_timeout');
+	form['sessionTimeout'] = temp;
+#endif
+}
+#if !defined (V_WEBIF_SPEC_vdf)
+var temp = get_single( 'admin.user.admin' );
+#else
+var temp = get_single( 'admin.user.user' );
+#endif
+session['adminPass'] =temp;
+temp = get_single( 'admin.user.root' );
+session["rootPass"]=temp;
+form['adminPass']=dummyPW;
+form['rootPass']=dummyPW;
+form['Pass']=dummyPW;
+form['PassConf']=dummyPW;
+if(session["user"]=="root") {
+	form['telnethiddenPass']=dummyPW;
+	form['TelnetPass']=dummyPW;
+	form['TelnetPassConf']=dummyPW;
+}
+%>
+
+<script language="JavaScript">
+function initValue() {
+#ifndef V_WAN_INTERFACE_none
+	if( $("#webenable").val()=='1') {
+		$("#webbrowser_ID-0").attr("checked","checked");
+		$("#webbrowser_div").css("display", "");
+	}
+	else {
+		$("#webbrowser_ID-1").attr("checked","checked");
+		$("#webbrowser_div").css("display", "none");
+	}
+
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	if($("#remoteHTTPSenable").val()=="1") {
+		$("#web_https-0").attr("checked","checked");
+		$("#web_https_div").css("display", "");
+		$('#certiHint').css('display', '');
+	}
+	else {
+		$("#web_https-1").attr("checked","checked");
+		$("#web_https_div").css("display", "none");
+		$('#certiHint').css('display', 'none');
+	}
+#endif
+
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+	if( $("#telnetenable").val()=='1') {
+		$("#telnet_ID-0").attr("checked","checked");
+	}
+	else {
+		$("#telnet_ID-1").attr("checked","checked");
+	}
+#endif
+
+#ifndef V_CONFIG_REMOTE_SSH_FROM_WEBUI_none
+	/* set sshd configuration */
+	load_values_to_elements({
+		"input:radio.access[name=sshd_wan_enable]":"<%get_single_direct('admin.remote.sshd_enable');%>"=="1",
+		/* use 22 if value does not exist - for backward compatibility */
+		"#sshdPort":"<%get_single_direct('admin.remote.sshd_port');%>"||"22"
+	});
+#endif
+
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+	if( $("#pingenable").val()=='1') {
+		$("#ping_ID-0").attr("checked","checked");
+	}
+	else {
+		$("#ping_ID-1").attr("checked","checked");
+	}
+#endif
+#endif
+
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	if($("#httpsPort").val()=="" || $("#httpsPort").val()=="N/A") {
+		$("#httpsPort").val("443");
+	}
+#endif
+
+	/* If firewall.IPPort controlled firewall is enabled, the local admin settings have no effect, so do not show them */
+#ifdef V_FIREWALL_IP_PORT_BASIC_RDB_INTERPRETATION_none
+#ifndef V_CONFIG_LOCAL_TELNET_FROM_WEBUI_none
+	load_values_to_elements({
+		"input:radio.access[name=telnet_local_enable]":"<%get_single_direct('admin.local.telnetenable');%>"!="0",
+	});
+#endif
+
+#ifndef V_CONFIG_LOCAL_SSH_FROM_WEBUI_none
+	load_values_to_elements({
+		"input:radio.access[name=ssh_local_enable]":"<%get_single_direct('admin.local.ssh_enable');%>"!="0",
+	});
+#endif
+
+#ifndef V_CONFIG_LOCAL_HTTP_FROM_WEBUI_none
+	load_values_to_elements({
+		"input:radio.access[name=enableLocalHttp]":"<%get_single_direct('admin.local.enable_http');%>"!="0",
+	});
+#endif
+
+#ifndef V_CONFIG_LOCAL_HTTPS_FROM_WEBUI_none
+	load_values_to_elements({
+		"input:radio.access[name=enableLocalHttps]":"<%get_single_direct('admin.local.enable_https');%>"!="0",
+	});
+#endif
+#endif
+}
+
+function onWanHttpEnable() {
+#ifdef V_NON_SECURE_WARNING_y
+	blockUI_alert(_("warningInsecureHttp"));
+#endif
+	$('#webenable').val(1);$('#webbrowser_div').css('display', '');
+}
+function onWanTelnetEnable() {
+#ifdef V_NON_SECURE_WARNING_y
+	blockUI_alert(_("warningInsecureTelnet"));
+#endif
+	$('#telnetenable').val(1);
+}
+function onEnableLocalHttp() {
+#ifdef V_NON_SECURE_WARNING_y
+	blockUI_alert(_("warningInsecureHttp"));
+#endif
+}
+function onEnableLocalTelnet() {
+#ifdef V_NON_SECURE_WARNING_y
+	blockUI_alert(_("warningInsecureTelnet"));
+#endif
+}
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	$("#passwordInfo1").prop("title", _("passwordWarning10"));
+	$("#passwordInfo2").prop("title", _("passwordWarning10"));
+	$("#passwordInfo3").prop("title", _("passwordWarning10"));
+	$("#passwordInfo4").prop("title", _("passwordWarning10"));
+#endif
+
+$(document).ready( function() {
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+	$("input:radio[name=web_https]").click(function(){
+		var val=$("input:radio[name=web_https]:checked").val();
+		$("#web_https_div").css("display",val=="1"?"":"none");
+#ifndef V_WAN_INTERFACE_none
+		$("#remoteHTTPSenable").val(val);
+#endif
+	});
+#endif
+	initValue();
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+<%	if(request['QUERY_STRING']=="setpassword") {%>
+		validate_alert(_("securityAdvise"), pwdWarn2, true);	// The default password is currently set. To protect the device, ...
+<%	}%>
+#endif
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form class="validate" name="form" id="form" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']?server">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<input type="hidden" name='adminPass' size=32 maxlength=32  value="@@form['adminPass']">
+				<input type="hidden" name='rootPass' size=32 maxlength=32  value="@@form['rootPass']">
+				<input type="hidden" name='telnethiddenPass' size=32 maxlength=32  value="@@form['telnethiddenPass']">
+				<input type="hidden" name="userName" id="userName" value="@@form['userName']"/>
+#ifndef V_WAN_INTERFACE_none
+				<input type="hidden" name="webenable" id="webenable" value="@@form['webenable']"/>
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+				<input type="hidden" name="remoteHTTPSenable" id="remoteHTTPSenable" value="@@form['remoteHTTPSenable']"/>
+#endif
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+				<input type="hidden" name="telnetenable" id="telnetenable" value="@@form['telnetenable']"/>
+#endif
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+				<input type="hidden" name="pingenable" id="pingenable" value="@@form['pingenable']"/>
+#endif
+	#ifndef V_ROUTER_TERMINATED_PPPOE
+				<div class="hide_for_pppoe_en">
+	#endif
+#if !defined V_CONFIG_REMOTE_HTTP_FROM_WEBUI_none || !defined V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none || \
+    !defined V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none || !defined V_CONFIG_REMOTE_SSH_FROM_WEBUI_none
+					<h2><script language=Javascript>document.write(_("router access control"))</script></h2>
+					<div class="form-row">
+#ifndef V_CONFIG_REMOTE_HTTP_FROM_WEBUI_none
+						<div class="form-row no-bg-form">
+							<label for="webbrowser_ID"><script language=Javascript>document.write(_("enable HTTP"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="webbrowser_ID-0" name="webbrowser_ID" class="access" onclick="onWanHttpEnable();">
+										<label for="webbrowser_ID-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="webbrowser_ID-1" name="webbrowser_ID" class="access" onclick="$('#webenable').val(0);$('#webbrowser_div').css('display', 'none');">
+										<label for="webbrowser_ID-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row" id="webbrowser_div" style="display: none">
+							<label for="incomingPort"><script language=Javascript>document.write(_("http port"))</script></label>
+							<div class="field">
+								<input type="text" name="incomingPort" id="incomingPort" class="sml required port validate[required, funcCall[validate_port]]" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['incomingPort']">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("choosePortOne65534"))</script>)</span>
+							</div>
+						</div>
+#endif
+#ifndef V_CONFIG_REMOTE_HTTPS_FROM_WEBUI_none
+						<div class="form-row no-bg-form">
+							<label><script language=Javascript>document.write(_("enable HTTPS"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="web_https-0" name="web_https" class="access" value="1" onclick="javascript:$('#certiHint').css('display', '');">
+										<label for="web_https-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="web_https-1" name="web_https" class="access" value="0" onclick="javascript:$('#certiHint').css('display', 'none');">
+										<label for="web_https-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										<span id="certiHint" class="normal-text" style="display:none">&nbsp;<a href="/server_certificate.html" style="color:red"><script language=Javascript>document.write(_("serverCertiHint"))</script></a></span>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div id="web_https_div" style="display: none">
+							<div class="form-row">
+								<label for="httpsPort"><script language=Javascript>document.write(_("remote https port"))</script></label>
+								<div class="field">
+									<input type="text" name="httpsPort" id="httpsPort" class="sml required port validate[required, funcCall[validate_port]]" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['httpsPort']">
+								</div>
+								<div>
+									<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("choosePortOne65534"))</script>)</span>
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="httpsIpWhitelist"><script language=Javascript>document.write(_("remoteHttpsIpWhitelist"))</script></label>
+								<div class="field">
+									<input type="text" name="httpsIpWhitelist" id="httpsIpWhitelist" class="sml large validate[funcCall[validateIpWhitelist]] httpsIpWhitelist" value="@@form['httpsIpWhitelist']">
+								</div>
+								<div class="field-des sml">
+									<script language=Javascript>document.write(_("remoteHttpsIpWhitelistDesc"))</script>
+								</div>
+							</div>
+						</div>
+#endif
+#ifndef V_CONFIG_REMOTE_TELNET_FROM_WEBUI_none
+						<div class="form-row no-bg-form" id="telnet_trID">
+							<label for="field-2"><script language=Javascript>document.write(_("enable Telnet"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="telnet_ID-0" name="telnet_ID" class="access" onclick="onWanTelnetEnable();">
+										<label for="telnet_ID-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="telnet_ID-1" name="telnet_ID" class="access" onclick="$('#telnetenable').val(0)">
+										<label for="telnet_ID-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+#endif
+#ifndef V_CONFIG_REMOTE_SSH_FROM_WEBUI_none
+						<!-- ssh enable -->
+						<div class="form-row no-bg-form">
+							<label><script language=Javascript>document.write(_("enable sshd"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch" data-toggle-element="sshd_div">
+										<input type="radio" id="sshd_wan_enable_0" name="sshd_wan_enable" class="access" value="1">
+										<label for="sshd_wan_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="sshd_wan_enable_1" name="sshd_wan_enable" class="access" value="0">
+										<label for="sshd_wan_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<!-- ssh  port -->
+						<div class="form-row" id="sshd_div" style="display:none">
+							<label for="sshdPort"><script language=Javascript>document.write(_("remote sshd port"))</script></label>
+							<div class="field">
+								<input type="text" name="sshdPort" id="sshdPort" class="sml required port validate[required, funcCall[validate_port]]" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['sshdPort']">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("choosePortOne65534"))</script>)</span>
+							</div>
+						</div>
+#endif
+#ifndef V_CONFIG_REMOTE_PING_FROM_WEBUI_none
+						<div class="form-row no-bg-form" id="ping_trID">
+							<label for="field-3"><script language=Javascript>document.write(_("enable Ping"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch">
+										<input type="radio" id="ping_ID-0" name="ping_ID" class="access" value=1 onclick="$('#pingenable').val(1)">
+										<label for="ping_ID-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="ping_ID-1" name="ping_ID" class="access" value=0 onclick="$('#pingenable').val(0)">
+										<label for="ping_ID-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+#endif
+					</div>
+#endif
+	#ifndef V_ROUTER_TERMINATED_PPPOE
+				</div>
+	#endif
+#endif
+#ifdef V_FIREWALL_IP_PORT_BASIC_RDB_INTERPRETATION_none
+#if !defined V_CONFIG_LOCAL_HTTP_FROM_WEBUI_none || !defined V_CONFIG_LOCAL_HTTPS_FROM_WEBUI_none || \
+    !defined V_CONFIG_LOCAL_TELNET_FROM_WEBUI_none || !defined V_CONFIG_LOCAL_SSH_FROM_WEBUI_none
+				<h2><script language=Javascript>document.write(_("localAccessControl"))</script></h2>
+				<div class="form-row no-bg-form">
+#ifndef V_CONFIG_LOCAL_HTTP_FROM_WEBUI_none
+					<div class="form-row no-bg-form">
+						<label><script language=Javascript>document.write(_("enableLocalHttp"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="enableLocalHttp-0" name="enableLocalHttp" class="access" value="1" onclick="onEnableLocalHttp();">
+									<label for="enableLocalHttp-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="enableLocalHttp-1" name="enableLocalHttp" class="access" value="0">
+									<label for="enableLocalHttp-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+#endif
+#ifndef V_CONFIG_LOCAL_HTTPS_FROM_WEBUI_none
+					<div class="form-row no-bg-form">
+						<label><script language=Javascript>document.write(_("enableLocalHttps"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="enableLocalHttps-0" name="enableLocalHttps" class="access" value="1">
+									<label for="enableLocalHttps-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="enableLocalHttps-1" name="enableLocalHttps" class="access" value="0">
+									<label for="enableLocalHttps-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+#endif
+#ifndef V_CONFIG_LOCAL_TELNET_FROM_WEBUI_none
+					<div class="form-row no-bg-form" id="telnet_trID">
+						<label for="field-2"><script language=Javascript>document.write(_("enableLocalTelnet"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="telnet_local_enable-0" name="telnet_local_enable" class="access" value="1" onclick="onEnableLocalTelnet();">
+									<label for="telnet_local_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="telnet_local_enable-1" name="telnet_local_enable" class="access" value="0">
+									<label for="telnet_local_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+#endif
+#ifndef V_CONFIG_LOCAL_SSH_FROM_WEBUI_none
+					<div class="form-row no-bg-form">
+						<label><script language=Javascript>document.write(_("enableLocalSSH"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="ssh_local_enable_0" name="ssh_local_enable" class="access" value="1">
+									<label for="ssh_local_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="ssh_local_enable_1" name="ssh_local_enable" class="access" value="0">
+									<label for="ssh_local_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+#endif
+#endif
+#endif
+				<h2><script language=Javascript>document.write(_("webui account"))</script></h2>
+				<div class="form-row no-bg-form">
+					<div class="form-row">
+						<label for="field-2"><script language=Javascript>document.write(_("user name"))</script></label>
+						<div class="field">
+							<%if(session["user"]=="root"){%>
+							<select name="user_name" class="med" id="user_name" onchange="checkPass(this.value)">
+								<option value="root">root</option>
+#if !defined (V_WEBIF_SPEC_vdf)
+								<option value="admin">admin</option>
+#else
+								<option value="user">user</option>
+#endif
+							</select>
+							<%}else{%>
+#if !defined (V_WEBIF_SPEC_vdf)
+							<span class="normal-text">admin</span>
+#else
+							<span class="normal-text">user</span>
+#endif
+							<%}%>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="Pass"><script language=Javascript>document.write(_("password"))</script></label>
+						<div class="field">
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+							<input type="password" name="Pass" id="field-3" class="med" value="@@form['Pass']" onkeyup="checkPassStrength('web')">
+#else
+							<input type="password" name="Pass" id="field-3" class="med" value="@@form['Pass']">
+#endif
+						</div>
+						<div>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("webPasswordLimit"))</script>)</span>
+							<a href='javascript:showStrongPasswordInfo();' id="passwordInfo1" style='background-color:transparent;'>
+							<i id='net-info' style='margin:5px;padding:5px 30px 10px 0px;'></i></a>
+#else
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("UiPasswdLenLimit"))</script>)</span>
+#endif
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="PassConf"><script language=Javascript>document.write(_("confirmPassword"))</script></label>
+						<div class="field">
+							<input type="password" name="PassConf" id="field-4" class="med" value="@@form['PassConf']">
+						</div>
+						<div>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("webPasswordLimit"))</script>)</span>
+							<a href='javascript:showStrongPasswordInfo();' id="passwordInfo2" style='background-color:transparent;'>
+							<i id='net-info' style='margin:5px;padding:5px 30px 10px 0px;'></i></a>
+#else
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("UiPasswdLenLimit"))</script>)</span>
+#endif
+						</div>
+					</div>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+					<div class="form-row">
+						<label for="WebPassStrength"><script language=Javascript>document.write(_("passwordStrength"))</script></label>
+						<div class="field">
+							<span class="normal-text" id="WebPassStrength"></span>
+						</div>
+					</div>
+#endif
+
+#ifdef V_WEB_LOGIN_LOCKING_y
+					<div class="form-row">
+						<label for="loginMaxAttempt"><script language=Javascript>document.write(_("loginMaxAttempt"))</script></label>
+						<div class="field">
+							<input type="text" name="loginMaxAttempt" id="loginMaxAttempt" class="med" value="@@form['loginMaxAttempt']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("loginMaxAttemptRange"))</script>)</span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="loginLockDuration"><script language=Javascript>document.write(_("loginLockDuration"))</script></label>
+						<div class="field">
+							<input type="text" name="loginLockDuration" id="loginLockDuration" class="med" value="@@form['loginLockDuration']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("loginLockDurationRange"))</script>)</span>
+						</div>
+					</div>
+#endif
+
+#ifdef V_WEB_SESSION_TIMEOUT_y
+					<div class="form-row">
+						<label for="sessionTimeout"><script language=Javascript>document.write(_("sessTout"))</script></label>
+						<div class="field">
+							<input type="text" name="sessionTimeout" id="sessionTimeout" class="med" value="@@form['sessionTimeout']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("sessionTimeoutRange"))</script>)</span>
+						</div>
+					</div>
+#endif
+				</div>
+#ifndef V_CONFIG_TELNET_SSH_ACCOUNT_FROM_WEBUI_none
+				<div class="hr"></div>
+				<%if(session["user"]=="root"){%>
+#ifdef V_WEBIF_SPEC_vdf
+				<h2><script language=Javascript>document.write(_("telnet account"))</script></h2>
+#else
+				<h2><script language=Javascript>document.write(_("telnet_ssh account"))</script></h2>
+#endif
+				<div class="form-row no-bg-form">
+					<div class="form-row">
+						<label for="user_name"><script language=Javascript>document.write(_("user name"))</script></label>
+						<div class="field">
+							<span class="normal-text">root</span>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="Pass"><script language=Javascript>document.write(_("password"))</script></label>
+						<div class="field">
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+							<input type="password" name="TelnetPass" id="field-5" class="med" value="@@form['Pass']" onkeyup="checkPassStrength('telnet')">
+#else
+							<input type="password" name="TelnetPass" id="field-5" class="med" value="@@form['Pass']">
+#endif
+						</div>
+						<div>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("telnetPasswordLimit"))</script>)</span>
+							<a href='javascript:showStrongPasswordInfo();' id="passwordInfo3" style='background-color:transparent;'>
+							<i id='net-info' style='margin:5px;padding:5px 30px 10px 0px;'></i></a>
+#else
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("passwdLenLimit"))</script>)</span>
+#endif
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="PassConf"><script language=Javascript>document.write(_("confirmPassword"))</script></label>
+						<div class="field">
+							<input type="password" name="TelnetPassConf" id="field-6" class="med" value="@@form['PassConf']">
+						</div>
+						<div>
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("telnetPasswordLimit"))</script>)</span>
+							<a href='javascript:showStrongPasswordInfo();' id="passwordInfo4" style='background-color:transparent;'>
+							<i id='net-info' style='margin:5px;padding:5px 30px 10px 0px;'></i></a>
+#else
+							<span class="normal-text">&nbsp;(<script language=Javascript>document.write(_("passwdLenLimit"))</script>)</span>
+#endif
+						</div>
+					</div>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+					<div class="form-row">
+						<label for="TelnetPassStrength"><script language=Javascript>document.write(_("passwordStrength"))</script></label>
+						<div class="field">
+							<span class="normal-text" id="TelnetPassStrength"></span>
+						</div>
+					</div>
+#endif
+				</div>
+				<%}%>
+#endif
+				<div class="hr"></div>
+				<div class="submit-row">
+					<button type="button" onClick="submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script type="text/javascript">
+	set_menu("System", "ADMINISTRATION", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('administrationSubmitSuccess'));
+<%	}%>
+#ifndef V_WAN_INTERFACE_none
+function validIpWhitelist(value) {
+	if (value) {
+		var pattern = new RegExp("<% write(validIpWhitelistPattern); %>");
+		return pattern.test(value);
+	}
+	else {
+		return true;
+	}
+}
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["port"]=_("warningMsg07"); //Port number must have a value between 1 and 65535.
+	$.validator.addMethod("port",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65534 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.port);
+	$.validator.addMethod("httpsIpWhitelist",function(value, element) {
+		return validIpWhitelist(value);
+	},_("httpsIpWhitelistValidation"));
+#else
+/********* for NTC ValidationEngine **********/
+function validate_port(field, rules, i, options) {
+	if( field.val() < 1 || field.val() > 65534 ) {
+		return _("warningMsg07");
+	}
+}
+function validateIpWhitelist(field) {
+	if (!validIpWhitelist(field.val())) {
+		return _("httpsIpWhitelistValidation");
+	}
+}
+#endif
+#endif
+</script>
+</body>
+</html>

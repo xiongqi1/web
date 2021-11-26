@@ -1,0 +1,235 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<% include mbssid.inc %>
+<title>Wireless MAC Filtering</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['rdbCmd'];
+	set_list( tempval, '-p' );
+}
+else /*GET*/
+{}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="javascript">
+Butterlate.setTextDomain("wifimacblock");
+var MacRay = new Array(5);
+var accessPolicy= new Array();
+accessPolicy[0] = <%val='\"'+get_single('wlan.0.access_policy')+'\"';%>@@val;
+accessPolicy[1] = <%val='\"'+get_single('wlan.1.access_policy')+'\"';%>@@val;
+accessPolicy[2] = <%val='\"'+get_single('wlan.2.access_policy')+'\"';%>@@val;
+accessPolicy[3] = <%val='\"'+get_single('wlan.3.access_policy')+'\"';%>@@val;
+accessPolicy[4] = <%val='\"'+get_single('wlan.4.access_policy')+'\"';%>@@val;
+
+var macControlList =new Array();
+macControlList[0]= <%val='\"'+get_single('wlan.0.access_control_list')+'\"';%>@@val;
+macControlList[1]= <%val='\"'+get_single('wlan.1.access_control_list')+'\"';%>@@val;
+macControlList[2]= <%val='\"'+get_single('wlan.2.access_control_list')+'\"';%>@@val;
+macControlList[3]= <%val='\"'+get_single('wlan.3.access_control_list')+'\"';%>@@val;
+macControlList[4]= <%val='\"'+get_single('wlan.4.access_control_list')+'\"';%>@@val;
+
+function InitMacRay() {
+	for(var i=0; i<5; i++) {
+		MacRay[i]=new Array();
+	}
+	for(var i=0; i<5; i++) {
+		MacRay[i] = macControlList[i].split(";");
+	}
+}
+
+function formLoad() {
+	var SSIDIdx=0;
+	SSIDIdx=getSSIDIdx();
+	document.form1.macpolicy.value = accessPolicy[SSIDIdx];
+}
+
+function getSSIDIdx() {
+	var i=0;
+	var ssidIdx  = 0;
+	for (i=0; i< document.form1.mulSSID.options.length; i++) {
+		if (document.form1.mulSSID.options[i].selected  == true) {
+		 	ssidIdx = document.form1.mulSSID.options[i].value;
+		 	break;
+		}
+	}
+	return ssidIdx;
+}
+
+function submitF() {
+	var macaddr;
+	var ssidIdx=document.form1.mulSSID.value;
+
+	makeCmd(ssidIdx, document.form1.macpolicy.value);
+
+	if ( (document.form1.WifiMac1.value == "") || (document.form1.WifiMac2.value == "")
+		|| (document.form1.WifiMac3.value == "") || (document.form1.WifiMac4.value == "")  
+		|| (document.form1.WifiMac5.value == "") || (document.form1.WifiMac6.value == "") ) {
+		newmac = false;
+	}
+	else {
+		newmac = true;
+	}
+	if(newmac) {
+		newMacAddr = document.form1.WifiMac1.value + ":"+document.form1.WifiMac2.value + ":"+document.form1.WifiMac3.value + ":"+document.form1.WifiMac4.value+ ":"+document.form1.WifiMac5.value+ ":"+document.form1.WifiMac6.value;
+		if(MacRay[ssidIdx][0] == "")
+			document.form1.rdbCmd.value += newMacAddr;
+		else
+			document.form1.rdbCmd.value += ";" + newMacAddr;
+	}
+	document.form1.submit();
+}
+
+function makeCmd(ssidIdx, policy) {
+	k =0 ;
+	document.form1.rdbCmd.value = "wlan."+ssidIdx+".access_policy=" + policy + "&";
+	document.form1.rdbCmd.value += "wlan."+ssidIdx+".access_control_list=";
+	for (var i=0; i< MacRay[ssidIdx].length; i++) {
+		if( MacRay[ssidIdx][i] != "" ) {
+			if( k>0 ) document.form1.rdbCmd.value += ";";
+			document.form1.rdbCmd.value += MacRay[ssidIdx][i];
+			k++;
+		}
+	}
+}
+
+function delentry(ssidIdx, index) {
+	try {
+		MacRay[ssidIdx][index]="";
+		makeCmd(ssidIdx, accessPolicy[ssidIdx]);	
+		document.form1.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function makeList() {   
+	var notEmpty="0";
+	var MacCount =0;
+
+	for(var idx=0; idx<5; idx++) {
+		if(mbssidST[idx].enable == "1") {
+			if(MacRay[idx].length >=1 && MacRay[idx][0] != "") {
+				notEmpty="1";
+			}
+		}
+	}
+	if(notEmpty == "0" ) {
+		document.write( "<tr><td colspan='8' align='center'>"+_("mac filter table empty")+"</td></tr>" );
+		return;
+	}
+	for(var ssidIdx=0; ssidIdx < 5; ssidIdx++) {
+		if(mbssidST[ssidIdx].enable == "1") {
+			if(accessPolicy[ssidIdx] == "0")
+				policyMsg = _("disable");
+			else if(accessPolicy[ssidIdx] == "1")
+				policyMsg = _("allow");
+			else if(accessPolicy[ssidIdx] == "2")
+				policyMsg = _("reject");
+			else 
+				policyMsg = _("unknown");
+			for (var i = 0; i < MacRay[ssidIdx].length; i++) {
+				if((MacRay[ssidIdx].length >=1) && (MacRay[ssidIdx][0] != "")) {
+					MacCount ++;
+					document.write("<tr>"); 
+					document.write("<td><div align=\"center\">"+MacCount+"</div></td>");
+					document.write("<td><div align=\"center\">"+mbssidST[ssidIdx].ssid+"</div></td>");
+					document.write("<td><div align=\"center\">"+MacRay[ssidIdx][i]+"</div></td>");
+					document.write("<td><div align=\"center\">"+policyMsg+"</div></td>");
+					document.write("<td><a href=javascript:delentry("+(ssidIdx)+","+(i)+");>"+"Delete"+"</a></td>");
+					document.write("</tr>");
+				}
+			}
+		}
+	}
+}
+
+function setOption() {
+	for( i=0; i<mbssidST.length; i++) {
+		if(mbssidST[i].enable == "1")
+			document.form1.mulSSID.options[i] = new Option(mbssidST[i].ssid, i);
+	}
+}
+$(document).ready( function() {formLoad();} );
+</script>
+
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/> 
+<h3><script language="JavaScript">document.write(_("wirelessLAN")+" > "+ _("mac blocking"))</script></h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("secure access policy"));</script></th></tr>
+</table>
+<table width="90%">
+<tr> 
+<td bgcolor=#E8F8FF class=head width="38%"><script language="JavaScript">document.write(_("ssid select"));</script></td>
+<td> 
+	<select name="mulSSID" id="mulSSID" onChange="formLoad();">
+	</select> 
+</td>
+</tr>
+<script language="Javascript">
+setOption();
+</script>
+
+<tr> 
+<td bgcolor=#E8F8FF class=head width="38%"><script language="JavaScript">document.write(_("secure access policy capable"));</script></td>
+<td> 
+	<select name="macpolicy" id="macpolicy" size=1>
+		<option value=0 ><script language="JavaScript">document.write(_("disable"));</script></option> 
+		<option value=1 ><script language="JavaScript">document.write(_("allow"));</script></option>
+		<option value=2 ><script language="JavaScript">document.write(_("reject"));</script></option>
+	</select> 
+</td>
+</tr>
+</table>
+
+<table width="90%">
+<tr> 
+	<td width="38%"><script language="JavaScript">document.write(_("secure access policy new"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenMacBlocks("WifiMac");</script></td>
+</tr>
+<tr> 
+	<td colspan="2">
+	<div align="center"><input type="button" name="submitForm" value="Apply" onClick="submitF()" style="width:120px;"></div>
+	</td>
+</tr>
+</table>
+</form>
+
+<form name="formList" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="delindex" value="@@form['delindex']"/>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+<table width="85%">
+<tr>
+	<td width="10%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("mapping no"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("station ssid"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("macAddress"));</script></b></div></td>
+	<td width="20%"><div nowrap align="center"><b><script language="JavaScript">document.write(_("secure access policy capable"));</script></b></div></td>
+	<td width="15%">&nbsp;</td>
+</tr>
+<script language="Javascript">
+InitMacRay();
+makeList();
+</script>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

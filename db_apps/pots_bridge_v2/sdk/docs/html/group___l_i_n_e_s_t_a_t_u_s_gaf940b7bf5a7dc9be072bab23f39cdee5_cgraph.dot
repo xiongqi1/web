@@ -1,0 +1,9 @@
+digraph "ProSLIC_PolRev"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir="LR";
+  Node1 [label="ProSLIC_PolRev",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node1 -> Node2 [color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node2 [label="ProSLIC_SetPowersaveMode",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___p_r_o_s_l_i_c___d_c_f_e_e_d.html#ga9283b3779812fbdda45dcc67bcb387a0",tooltip="This function allows one to enable/disable power savings mode found on some of the chipsets..."];
+}

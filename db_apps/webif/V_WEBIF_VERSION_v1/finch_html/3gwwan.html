@@ -1,0 +1,493 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>3G WWAN</title>
+</head>
+<script language="JavaScript" src="/cgi-bin/ppp.cgi"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<% _apndropdown=get_single('webinterface.3gwwan_apndropdown');
+if(_apndropdown=="0"){%>
+<body onload="setIndex();">
+<%}else{ country=get_single('wwan.0.system_network_status.country');%>
+<body onload="cgCountry('@@country'); setIndex();">
+<%}%>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("internet");
+
+function setAPNHandler(response) {
+	if(typeof(document.formS.countryList) == "undefined")
+		return;
+	eval( response );
+	setTimeout(stuHover, 1000);
+	for(i=1; i<st.length; i++)
+		document.formS.countryList[i-1] = new Option(st[i], st[i] );
+	document.getElementById('countryList').options.selectedIndex=selectedIdx;
+	$("#chooseAPN").html(_("choose apn"));
+	document.getElementById("chooseAPN").style['color'] = '#107010'; //GREEN
+}
+
+function setAPN( myapn, myuser, mypass, myauth )
+{
+	document.getElementById('wwanAPN').value=myapn;
+	document.formS.pppuser.value=myuser;
+	document.formS.ppppass.value=mypass;
+	if(myauth=='pap' || myauth=='PAP')
+		document.formS.AuthType[1].checked=true;
+	else
+		document.formS.AuthType[0].checked=true;
+	checkAPNdev();
+}
+
+function cgCountry( myval ) {
+	document.formS.country.value=myval;
+	$.get("/cgi-bin/wwanGetAPN.cgi?"+myval, setAPNHandler);
+}
+
+function setOption() { 
+	for( i=0; i<stpf.length; i++) {
+		document.formS.pppprofilenum.options[i] = new Option(stpf[i].name, i, false, (i==document.formS.editIndex.value)?true:false);
+	}
+}
+function deleteProf() {
+	i = document.formS.editIndex.value = document.formS.pppprofilenum.value;
+	if( i == stpf.length ) { //ADD field
+		document.formS.editIndex.value = '-1';
+	}
+	else if( stpf[i-1].readonly == '1' ) {
+		alert( _("profileReadOnly") );//This Profile is READ ONLY!
+		setIndex();
+		document.formS.editIndex.value = '-1';
+	}
+}
+function submitProf() {	
+	i = document.formS.editIndex.value = document.formS.pppprofilenum.selectedIndex;
+	if( stpf[i].readonly == '1' ) {
+		if((document.formS.pppuser.value!=stpf[i].user)||(document.formS.APNName.value!=stpf[i].APNName)||(document.formS.ppppass.value!=stpf[i].pass)) {
+			alert( _("profileReadOnly") );//This Profile is READ ONLY!
+			setIndex();
+			document.formS.editIndex.value = '-1';
+			return;
+		}
+		document.formS.pppuser.disabled = false;
+		//document.formS.pppdialnum.disabled = false;
+		document.formS.APNName.disabled = false;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = false;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='';
+		document.formS.ppppass.disabled = false;
+	}
+	if ( (document.formS.metric.value < 0 ) || (document.formS.metric.value > 65535) ) {
+		alert("Msg48");//Error: Metric must have a value between 0 and 65535
+		document.formS.metric.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if ( (document.formS.reconnectDelay.value < 30 ) || (document.formS.reconnectDelay.value > 65535) ) {
+		alert("Msg49");//Error: Reconnect Delay must have a value between 30 and 65535
+		document.formS.reconnectDelay.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if ( (document.formS.reconnectRetries.value < 0 ) || (document.formS.reconnectRetries.value > 65535) ) {
+		alert("Msg50");//Error: Reconnect Retries must have a value between 0 and 65535
+		document.formS.reconnectRetries.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if (document.formS.profilename.value == "") {
+		alert("noProfileNameEntered");//Error: no Profile Name entered.
+		document.formS.profilename.select();
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	if (document.formS.metric.value == "") {
+		alert("noMetricEntered");//Error: no metric entered.
+		document.formS.editIndex.value = '-1';
+		return;
+	}
+	document.formS.submit();
+}
+
+function checkAPNdev() {
+	document.getElementById( "autoAPN" ).style['display']='none';
+}
+
+function setIndex() {   	
+	document.formS.editIndex.value = document.formS.pppprofilenum.value;
+	var i = document.getElementById("pppprofilenum").value;	
+	document.formS.profilenum.value = stpf[i].profilenum;
+	document.formS.profilename.value = stpf[i].name;
+	document.formS.pppuser.value = stpf[i].user;
+	//document.formS.pppdialnum.value = stpf[i].dialnum;
+	document.formS.APNName.value = stpf[i].APNName;
+	checkAPNdev();
+	document.formS.ppppass.value = stpf[i].pass;
+	document.formS.reconnectDelay.value = stpf[i].reconnect_delay;
+	document.formS.reconnectRetries.value = stpf[i].reconnect_retries;
+	document.formS.metric.value = stpf[i].metric;
+	
+	document.formS.gascEnable.value = stpf[i].enable;
+	if( parseInt(document.formS.gascEnable.value)==1 )
+		document.formS.pppAutoCon[0].checked=true;
+	else
+		document.formS.pppAutoCon[1].checked=true;
+
+	//document.formS.authtype.value = stpf[i].authtype;	
+	if( stpf[i].authtype=="chap" )
+		document.formS.AuthType[0].checked=true;
+	else
+		document.formS.AuthType[1].checked=true;
+
+	document.formS.snatEnable.value = stpf[i].snat;
+	if( parseInt(document.formS.snatEnable.value)==1 )
+		document.formS.NatEnable[0].checked=true;
+	else
+		document.formS.NatEnable[1].checked=true;
+
+ 	if ( (document.formS.reconnectDelay.value < 30 ) || (document.formS.reconnectDelay.value > 65535) )
+		document.formS.reconnectDelay.value = 30;
+	if ( (document.formS.reconnectRetries.value == "N/A") ||(document.formS.reconnectRetries.value < 0 ) || (document.formS.reconnectRetries.value > 65535) )
+		document.formS.reconnectRetries.value = 0;
+	if( stpf[i].readonly == '1' ) {
+		document.formS.pppuser.disabled = true;
+	//	document.formS.pppdialnum.disabled = true;
+		document.formS.APNName.disabled = true;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = true;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='none';
+		document.formS.ppppass.disabled = true;
+	}
+	else {
+		document.formS.pppuser.disabled = false;
+	//	document.formS.pppdialnum.disabled = false;
+		document.formS.APNName.disabled = false;
+		var e=document.formS.countryList;
+		if(typeof(e) != "undefined")
+			e.disabled = false;
+		e = document.getElementById( "nav2" );
+		if(e)
+			e.style['display']='';
+		document.formS.ppppass.disabled = false;
+	}
+	if(stpf[i].readonly!='1') {
+		document.getElementById( "addDiv" ).style['display']='';
+		if(stpf[i].name=="Add") document.formS.profilename.value = "";
+	}
+	else {
+		document.getElementById( "addDiv" ).style['display']='none';
+	}
+<%
+if( get_pid('modem_emulator')!=0 || get_single('system.product.title')=='CDCS CDR-897i Cellular Router') {
+%>	
+	document.formS.ppprhost.value = stpf[i].host;
+    document.formS.pppport.value = stpf[i].port;
+	if(stpf[i].padmode<1) 
+		stpf[i].padmode = 1;
+	document.formS.ppppadmode.options.selectedIndex = stpf[i].padmode-1;
+    if ( 1*stpf[i].pad_o &128)
+        document.formS.pppauto[0].checked = true;
+    else //if (stpf[i].auto == "Off")
+        document.formS.pppauto[1].checked = true;
+    if ( 1*stpf[i].pad_o &16)
+        document.formS.serprot[0].checked = true;
+    else // if (stpf[i].prot == "Off")
+        document.formS.serprot[1].checked = true;
+	setPad_o();
+	if(stpf[i].readonly!='1')
+		document.getElementById( "padDiv" ).style['display']='';
+	else
+		document.getElementById( "padDiv" ).style['display']='none';
+<%}%>
+	document.formS.APNName.focus();
+
+}
+</script>
+
+<%
+i = form['profilenum']; 
+if (request['REQUEST_METHOD'] == "POST") {
+	if( form['editIndex'] != '-1') {
+		if( form['submitForm'] == "Delete" ) {        
+			retval=set_single( 'link.profile.'+i+'.name=');  
+			retval=set_single( 'link.profile.'+i+'.enable=0'); 
+			retval=set_single( 'link.profile.'+i+'.dialstr=');    
+			retval=set_single( 'link.profile.'+i+'.apn=');  
+			retval=set_single( 'link.profile.'+i+'.user='); 
+			retval=set_single( 'link.profile.'+i+'.pass=');
+			retval=set_single( 'link.profile.'+i+'.snat='); 
+			retval=set_single( 'link.profile.'+i+'.reconnect_delay=');
+			retval=set_single( 'link.profile.'+i+'.reconnect_retries='); 
+			retval=set_single( 'link.profile.'+i+'.defaultroutemetric=');
+			retval=set_single( 'link.profile.'+i+'.auth_type='); 
+			retval=set_single( 'link.profile.'+i+'.verbose_logging=');
+		}
+		else {	//Save
+			tempval = form['editIndex'];
+			set_single( 'webinterface.profileIdx='+tempval, '-p' );
+			tempval = form['profilenum'];
+			set_single( 'link.profile.profilenum='+tempval, '-p' );
+			set_single( 'link.profile.'+i+'.dev=wwan.0', '-p' );
+			tempval = form['profilename'];
+			retval=set_single( 'link.profile.'+i+'.name='+tempval, '-p' );        
+			tempval = form['gascEnable'];            
+			if( tempval=='1' )
+				retval=set_single( 'link.profile.'+i+'.enable=1', '-p' ); 
+			else
+				retval=set_single( 'link.profile.'+i+'.enable=0', '-p' ); 
+			//  tempval = form['pppdialnum'];
+			//  retval=set_single( 'link.profile.'+i+'.dialstr='+tempval, '-p' );
+			tempval = form['APNName'];
+			retval=set_single( 'link.profile.'+i+'.apn='+tempval, '-p' );  
+			tempval = form['pppuser'];
+			retval=set_single( 'link.profile.'+i+'.user='+tempval, '-p' ); 
+			tempval = form['ppppass'];
+			retval=set_single( 'link.profile.'+i+'.pass='+tempval, '-p' );
+			tempval = form['snatEnable'];
+			retval=set_single( 'link.profile.'+i+'.snat='+tempval, '-p' );   
+			tempval = form['reconnectDelay'];
+			retval=set_single( 'link.profile.'+i+'.reconnect_delay='+tempval, '-p' );
+			tempval = form['reconnectRetries'];
+			retval=set_single( 'link.profile.'+i+'.reconnect_retries='+tempval, '-p' );
+			tempval = form['metric'];
+			retval=set_single( 'link.profile.'+i+'.defaultroutemetric='+tempval, '-p' );
+			tempval = form['AuthType'];
+			set_single( 'link.profile.'+i+'.auth_type='+tempval, '-p');
+			country = form['country'];
+			set_single( 'wwan.0.system_network_status.country='+country, '-p');
+			redirect('/3gwwan.html');
+		}
+	}
+	if( get_pid('modem_emulator')!=0 ) {
+		tempval = form['ppprhost'];
+		set_single( 'link.profile.'+i+'.pad_host='+tempval, '-p');
+		tempval = form['ppppadmode'];
+		set_single( 'link.profile.'+i+'.pad_mode='+tempval, '-p');
+		tempval = form['pppport'];
+		set_single( 'link.profile.'+i+'.pad_encode='+tempval, '-p');
+		tempval = form['pad_o'];
+		set_single( 'link.profile.'+i+'.pad_o='+tempval, '-p');
+        }   
+} 
+else { //GET
+	tempval = get_single( 'webinterface.profileIdx' );
+	if( (tempval == "N/A") || (tempval == "") ) tempval = 0;
+	form['editIndex'] = tempval;    
+	temp = get_single( 'service.pppoe.server.0.enable' );
+	form['pppoe'] = temp; 
+}  
+%>
+
+<form name="formS" method="POST" action="@@request['SCRIPT_NAME']" >
+<input type="hidden" name="gascEnable" value="@@form['gascEnable']">
+<input type="hidden" name="snatEnable" value="@@form['snatEnable']"/>
+<input type="hidden" name="pppoe" value="@@form['pppoe']"/>
+<input type="hidden" name="editIndex" value="@@form['editIndex']">
+<input type="hidden" name="profilenum" value="@@form['profilenum']">
+<input type="hidden" name="country" value="@@form['country']">
+
+<h3><script language="JavaScript">document.write(_("wwan3g")+" > "+_("connection"));</script></h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+    <tr><th>&nbsp;&nbsp;<script language="JavaScript">document.write(_("profileSettings3g"));</script></th></tr>
+</table>
+<table width="90%">
+<tr> 
+	<td width="22%"><script language="JavaScript">document.write(_("profile name"));</script></td>
+	<td><select name="pppprofilenum" id="pppprofilenum" onChange="setIndex()" >
+	<script type="text/javascript">setOption();</script>
+	</select></td>
+</tr>
+</table>
+
+<table width="90%" id="addDiv" style="display:none">
+<tr >
+	<td width="22%"><script language="JavaScript">document.write(_("profile name"));</script></td>
+	<td><input type="text" maxlength="32" name="profilename" value="@@form['profilename']"></td>
+</tr>
+</table>
+
+<table width="90%">
+<tr> 
+	<td width="22%"><script language="JavaScript">document.write(_("apnName"));</script></td>
+	<td><input type=text name='APNName' id="wwanAPN" size=24 maxlength=128 value="@@form['APNName']" onkeyup="checkAPNdev();"><div id="autoAPN"><script language="JavaScript">document.write(_("autoAPNenabled"))</script></div></td>    
+<%if(_apndropdown=="1"){%>
+	<td> 
+	<select name="countryList" id="countryList" size=1  onChange="cgCountry(this.value)"> 
+    </select>
+	</td>
+	<td><ul id="nav2"></ul></td>
+<%}%>
+</tr>
+</table>
+
+<table width="90%">
+<tr> 
+<td width="22%"><script language="JavaScript">document.write(_("user"));</script></td>
+<td><input type=text name='pppuser' size=32 maxlength=128 value="@@form['pppuser']"></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("password"));</script></td>
+<td><input type=password name='ppppass' size=32 maxlength=128 value="@@form['ppppass']"></td>
+</tr>
+
+<script type="text/javascript">   
+function checkPPPoEenable()
+{
+	if( parseInt(document.formS.pppoe.value) == 1 ) {
+		alert(_("Msg51"));//Please disable the PPPoE frist!
+		document.formS.pppAutoCon[1].checked=true;
+	}
+	else {
+		for( i=0; (i<stpf.length && i<6); i++ ) {
+			if( stpf[i].enable == 1 && document.formS.editIndex.value!=i) {
+				alert(_("Msg52")+" \""+stpf[i].name+"\"");//Please disable and save the profile:
+				document.formS.pppAutoCon[1].checked=true;
+				return;
+			}	
+		}
+		document.formS.gascEnable.value='1';
+	}
+}
+</script> 
+
+<tr> 
+<td width="22%"><script language="JavaScript">document.write(_("autoConnect"));</script></td>
+<td>
+<input type=radio name='pppAutoCon' value=1 onClick="javascript:document.formS.gascEnable.value='1';checkPPPoEenable();">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+<input type=radio name='pppAutoCon' value=0 onClick="javascript:document.formS.gascEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+<tr> 
+<td width="22%"><script language="JavaScript">document.write(_("authentication type"));</script></td>
+<td><input type=radio name='AuthType' value="chap" >&nbsp;<script language="JavaScript">document.write(_("swCHAP"))</script>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type=radio name='AuthType' value="pap" >&nbsp;<script language="JavaScript">document.write(_("swPAP"))</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("reconnectDelay"));</script></td>
+<td><input type=text name='reconnectDelay' size=8 maxLength=5 value="@@form['reconnectDelay']" onkeyup=NumfieldEntry(this);> &nbsp;( <script language="JavaScript">document.write(_("30-65535"))</script> )&nbsp;<script language="JavaScript">document.write(_("secs"))</script></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("reconnectRetries"));</script></td>
+<td><input type=text name='reconnectRetries' size=8 maxLength=5 value="@@form['reconnectRetries']" onkeyup=NumfieldEntry(this);> &nbsp;( <script language="JavaScript">document.write(_("0-65535"))</script>, 0=<script language="JavaScript">document.write(_("unlimited"))</script> )</td>
+</tr>
+
+<tr> 
+    <td><script language="JavaScript">document.write(_("routing del metric"));</script></td>
+    <td><input type=text name='metric' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['metric']"> &nbsp;( <script language="JavaScript">document.write(_("0-65535"))</script> )</td>
+</tr>
+			
+<tr> 
+	<td width="22%"><script language="JavaScript">document.write(_("NatMasq"));</script></td>
+	<td><input type=radio name='NatEnable' onClick="javascript:document.formS.snatEnable.value='1'">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;&nbsp;
+    	<input type=radio name='NatEnable' onClick="javascript:document.formS.snatEnable.value='0'">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+</table>
+
+<%
+if( get_pid('modem_emulator')!=0 || get_single('system.product.title')=='CDCS CDR-897i Cellular Router') {
+%>
+<div id="padDiv">
+<table width="90%">
+    <tr><th><script language="JavaScript">document.write(_("apdMode"));</script></th></tr>
+</table>
+
+<table width="90%">
+<input type="hidden" name="pad_o">
+<tr> 
+<td width="22%"><script language="JavaScript">document.write(_("remoteHost"));</script></td>
+<td><input type=text name="ppprhost" size=32 maxlength=128 ></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("port"));</script></td>
+<td><input type=text name="pppport" size=8 maxLength=5 onkeyup=NumfieldEntry(this);> &nbsp;( 1-65535 )</td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("localEncoding"));</script></td>
+<td><input type=radio name="serprot" value="16" onclick="setPad_o()">&nbsp;Enable&nbsp;&nbsp;<input type=radio name="serprot" value="0" onclick="setPad_o()">&nbsp;Disable</td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("padMode"));</script></td>
+<td><select name="ppppadmode" size=1><option value=1>tcp</option><option value=2>udp</option><option value=3>gmtp</option></select></td>
+</tr>
+
+<tr> 
+<td><script language="JavaScript">document.write(_("padAutoAnswer"));</script></td>
+<td><input type=radio name="pppauto" value="128" onclick="setPad_o()">&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;<input type=radio name="pppauto" value="0" onclick="setPad_o()">&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>	
+</tr>
+</table>
+</div>
+<script type="text/javascript">
+function setPad_o() {
+	document.formS.pad_o.value = 0;
+	if(document.formS.serprot[0].checked==true)
+		document.formS.pad_o.value = 16;
+	if(document.formS.pppauto[0].checked==true)
+		document.formS.pad_o.value |= 128;
+}
+</script>
+<%}%>
+
+<div align="right" style="margin-right:10% ">
+<p></p>
+<input type="button" name="submitForm" value="&nbsp;Save&nbsp;" onClick="this.disabled='true';submitProf();"/>
+<p></p>
+</div>
+
+<table>
+<tr>
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("profile name"))</script></div></td>
+<td width="10%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("enabled"))</script></div></td>
+<!--td width="4%" style='background:#808080; color:#ffffff'><div align="center">Type</div></td>
+<td width="20%" style='background:#808080; color:#ffffff'><div align="center">Num</div></td-->
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("apn"))</script></div></td>
+<td width="30%" style='background:#808080; color:#ffffff'><div align="center"><script language="JavaScript">document.write(_("user"))</script></div></td>
+</tr>
+<script language=Javascript>
+function makeList() {   
+	if (stpf.length == 0) {
+		document.write("<tr bgcolor=\"#DEE3EF\"> <td colspan=\"8\"><div align=\"center\">"+_("profileTableEmpty")+"</div></td></tr>");
+		return ;
+	}	
+	for (var i=0; i<stpf.length;i++) {
+		document.write("<tr bgcolor='#DEE3EF'>"); 
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+stpf[i].name+"</font></div></td>");
+		if(stpf[i].enable==1)
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+_('CSyes')+"</font></div></td>");
+		else
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'>"+_('CSno')+"</font></div></td>");
+		/*if( stpf[i].dialnum.indexOf("*99#")>=0 || stpf[i].dialnum.indexOf("*98#")>=0 )
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>Packet</div></td>");
+		else
+			document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>Circuit</div></td>");
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].dialnum+"</div></td>");*/
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].APNName+"</div></td>");
+		document.write("<td nowrap bordercolor='#0033cc' bgcolor='#DEE3EF'><div align='center'><font size='2' face='Arial, Helvetica, sans-serif'></font>"+stpf[i].user+"</div></td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.formS.submitForm.value="   "+_("CSsave")+"   ";
+</script>
+</body>
+</html>

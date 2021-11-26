@@ -1,0 +1,27 @@
+This tiny test harness is for verification of metering device communication protocol.
+
+The example data path can be as below;
+
+meter <------> router processor <-------> router modem <-------> remote server
+        RS232C                    UART                   3G/4G
+        /dev/ttyAPP1             /dev/ttyUSB3
+        
+ex1 ) server dials, sends any data and client echoes
+    server : metering_emul -p /dev/ttyUSB1 -s -n 0123456789 -e
+    client : metering_emul -p /dev/ttyUSB1
+
+ex2 ) server dials, sends a test metering packet and client sends a response packet
+    server : metering_emul -p /dev/ttyUSB1 -s -n 0123456789
+    client : metering_emul -p /dev/ttyUSB1 -d
+    
+ex3 ) server sends a test metering packet to metering device directly. modem_emulator should be killed before and
+    UART cable should be connected to PC.
+    server : metering_emul -p /dev/ttyUSB1 -s -d
+    
+To run metering_emul on router, define METERING_EMUL and recompile modem_emulator.
+
+meter <------> modcomm processor <-------> modcomm modem <-------> remote
+     PC   <--------->  data stream manager <----------------->     NWL12
+   server     UART                                TCP              client
+metering_emul -p /dev/ttyUSB2 -d							metering_pad_emul 123.209.208.85 20000
+(picocom /dev/ttyUSB2)

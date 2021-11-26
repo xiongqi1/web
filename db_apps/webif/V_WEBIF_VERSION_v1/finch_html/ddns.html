@@ -1,0 +1,253 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>DDNS</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+var secs
+var timerID = null
+var timerRunning = false
+var timeout = 5
+var delay = 1000
+
+function InitializeTimer(){
+    // Set the length of the timer, in seconds
+    secs = timeout
+    StopTheClock()
+    StartTheTimer()
+}
+
+function StopTheClock(){
+    if(timerRunning)
+        clearTimeout(timerID)
+    timerRunning = false
+}
+
+var http_request = false;
+function StartTheTimer(){
+    if (secs==0){
+        StopTheClock()
+		$.get("/cgi-bin/ddns.cgi", alertContents);
+        secs = timeout
+        StartTheTimer()
+    }else{
+        self.status = secs
+        secs = secs - 1
+        timerRunning = true
+        timerID = self.setTimeout("StartTheTimer()", delay)
+    }
+}
+
+function alertContents(responseText) {
+	eval(responseText);
+	eval( "document.form.ddnsStatus.value=service_ddns_status" );
+}
+
+function submitF() {
+
+	if (document.form.password.value != document.form.Vpassword.value) {
+		alert(_("wwan warningMsg2"));
+		return;
+	}
+	unGreyOutMappingFields();
+	document.form.submit();
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function unGreyOutMappingFields()
+{
+    try
+    {	
+		document.form.servermap.disabled = false;
+		document.form.hostname.disabled = false;
+		document.form.username.disabled = false;
+		document.form.password.disabled = false;
+		document.form.Vpassword.disabled = false;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+// If DDNS is disabled then we need to grey out these fields
+function greyOutMappingFields()
+{
+    try
+    {
+        document.form.servermap.disabled = true;
+		document.form.hostname.disabled = true;
+		document.form.username.disabled = true;
+		document.form.password.disabled = true;
+		document.form.Vpassword.disabled = true;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+function checkDDNSConf()
+{
+	try
+	{
+		if (document.form.ddnsEnable[1].checked == true)
+		{
+			greyOutMappingFields();
+		}
+		else if (document.form.ddnsEnable[0].checked == true)
+		{
+			unGreyOutMappingFields();
+		}
+	}
+	catch (e)
+	{
+		alert(e.message);
+	}
+}
+function setOption()
+{
+var serverlist = <%val=get_single('service.ddns.serverlist');%>"@@val";
+var ray = new Array();
+	ray = serverlist.split(",");
+	for( i=0; i < ray.length; i++ )
+	{
+		document.forms[0].servermap[i] = new Option(ray[i], ray[i]);
+	}
+}
+InitializeTimer();
+</script>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+        //tempval = form['ddnsindex'];
+        //retval = set_single( 'service.ddns.index='+tempval, '-p' ); 
+        tempval = form['servermap'];
+        form['ddnsserver'] = tempval;
+        retval = set_single( 'service.ddns.server='+tempval, '-p' ); 
+        tempval = form['ddnsenable'];
+        retval = set_single( 'service.ddns.enable='+tempval, '-p' ); 
+        if(tempval == '0')
+        	set_single( 'service.ddns.status=Disabled' );
+        else
+        	set_single( 'service.ddns.status=Enabled' );
+        tempval = form['hostname'];
+        retval = set_single( 'service.ddns.hostname='+tempval, '-p' ); 
+        tempval = form['username'];
+        retval = set_single( 'service.ddns.user='+tempval, '-p' ); 
+        tempval = form['password'];
+        retval = set_single( 'service.ddns.password='+tempval, '-p' );        
+	} 
+	else /*GET*/
+	{
+        temp = get_single( 'service.ddns.server' ); 
+        form['ddnsserver'] = temp;
+        temp = get_single( 'service.ddns.enable' ); 
+        form['ddnsenable'] = temp;
+        temp = get_single( 'service.ddns.hostname' ); 
+        form['hostname'] = temp;
+        temp = get_single( 'service.ddns.user' ); 
+        form['username'] = temp;
+        temp = get_single( 'service.ddns.password' ); 
+        form['password'] = temp;
+        form['Vpassword'] = temp; 
+	}
+%>
+
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<!--<h3>Services > DDNS</h3>-->
+<h3><script language="JavaScript">document.write(_("services")+" > DDNS");</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="ddnsenable" value="@@form['ddnsenable']"/>
+<input type="hidden" name="ddnsserver" value="@@form['ddnsserver']"/>	
+<table width="75%">
+    <tr><th><script language="JavaScript">document.write(_("ddnsConfiguration"));</script></th></tr>
+</table>
+
+<table width="75%">
+<tr > 
+	<td width="38%"><script language="JavaScript">document.write(_("ddnsConfiguration"));</script></font></td>
+	<td> <input type=radio name='ddnsEnable' onClick="javascript:document.form.ddnsenable.value='1';unGreyOutMappingFields()">&nbsp;<script language="JavaScript">document.write(_("enable"));</script> &nbsp;&nbsp;
+    <input type=radio name='ddnsEnable' onClick="javascript:document.form.ddnsenable.value='0';greyOutMappingFields()">&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr> 
+    <td><script language="JavaScript">document.write(_("statusinfo"));</script></td>
+    <td><input type="text" name="ddnsStatus" class='cdcsAjax' readonly size="60"/></td>
+</tr>
+</table>
+
+<table width="75%">
+    <tr><th><script language="JavaScript">document.write(_("man ddns setting"));</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("serveraddr"));</script></td>
+	<td><select name="servermap" size="1" ID="Select2">
+    <script language='javascript'>
+	setOption();
+	</script>
+	</select>	</td>
+</tr>
+
+<tr>
+	<td><script language="JavaScript">document.write(_("mesh hostname"));</script></font></td>
+	<td><input type="text" name="hostname" size="28" maxLength="64" value="@@form['hostname']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td><script language="JavaScript">document.write(_("user name"));</script></td>
+	<td><input type="text" name="username" size="28" maxLength="64" value="@@form['username']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td><script language="JavaScript">document.write(_("password"));</script></td>
+	<td> <input type="password" name="password" size="28" maxLength="64" value="@@form['password']"> &nbsp;</td>
+</tr>
+
+<tr>
+	<td><script language="JavaScript">document.write(_("verify password"));</script></font></td>
+	<td> <input type="password" name="Vpassword" size="28" maxLength="64" value="@@form['Vpassword']"> &nbsp;</td>
+</tr>
+</table>	
+<div align="right" style="margin-right:25% ">
+<p></p>
+<INPUT TYPE="Button" VALUE="Save" id="Button1" onClick="javascript:submitF()">&nbsp;&nbsp;
+<!--INPUT TYPE="Button" VALUE="Help" id="Button2" onClick="window.open('help.htm#snmp')"-->
+</div>
+<script language='javascript'>
+	if(document.form.ddnsenable.value=='1')
+	{  
+		unGreyOutMappingFields()
+		document.form.ddnsEnable[0].checked=true;
+	}
+	else
+	{
+		greyOutMappingFields()
+		document.form.ddnsEnable[1].checked=true;
+	}
+	with ( document.forms[0] ) {
+	setSelect(servermap, document.form.ddnsserver.value);
+	}
+</script>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("Button1").value="   "+_("CSsave")+"   ";
+</script>
+</body>	
+</html>

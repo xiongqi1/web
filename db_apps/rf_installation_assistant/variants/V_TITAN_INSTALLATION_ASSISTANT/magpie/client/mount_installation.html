@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Mount Installation</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/registration_status_handler.js"></script>
+    <script src="js/all.js"></script>
+    <script src="js/keep_alive.js"></script>
+    <script>
+        var registrationStatusHandler = new RegistrationStatusHandler();
+
+        var timeout_cnt = 0;
+        var sasDeregisterCond = false;
+        var updatedMount = false;
+
+        // check conditions for showing indicator of being safe to remove antenna
+        function checkSafeRemove() {
+            if (sasDeregisterCond && updatedMount) {
+                document.getElementById("safe remove msg").style["display"] = "";
+            }
+        }
+
+        function getRegistrationStatusAndValidate(data) {
+            registrationStatusHandler.handleData(data);
+            // Check if deregistered or timeout for 45 seconds
+            timeout_cnt += 1;
+            if (data.reg_state != 'Registered – Grant Authorized' || timeout_cnt >= 45) {
+                sasDeregisterCond = true;
+                checkSafeRemove();
+            }
+        }
+
+        function sasDeregister() {
+            ajaxGetRequest("/sas_deregister", true, function(data) {});
+        }
+
+        function updateMountType(mount_type) {
+            ajaxPostRequest("/mount_type", "mount_type="+mount_type, function() {
+                updatedMount = true;
+                checkSafeRemove();
+            });
+        }
+
+      // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_REGISTRATION_STATUS);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupPeriodicKeepAlive();
+
+            // read current band selection to skip CBRS related steps
+            ajaxGetRequest("/operating_config", true, function(data) {
+                //console.log(data);
+                // deregister first then wait until SAS client deregistered if in band 48
+                if (data.band_select == "48") {
+                    sasDeregister();
+                } else {
+                    sasDeregisterCond = true;
+                    checkSafeRemove();
+                }
+            });
+            //console.log("document is ready");
+        });
+    </script>
+
+</head>
+
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>Mount Installation</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="mount_form" class="content">
+
+               <div class="data_field_set_line">
+                  <div class="data_field_set_row fixed_field_height">
+                      <div class="data_field_label wide_label">Mount Type</div>
+                      <div class="data_field_text">
+                          <select class="no_float" name="mount_type" id="mount_type" onChange="updateMountType(this.value)">
+                              <option value="" disabled selected>Please choose mount type</option>
+                              <option value="rooftop">Roof Top</option>
+                              <option value="wallmount">Wall mount</option>
+                              <option value="polemount">Pole mount</option>
+                          </select>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="data_field_set_line top_delimiter"><b>Status</b></div>
+              <div class="data_field_set_line">
+                  <div class="data_field_set_block">
+                      <div class="general_error_message" id="general_error_message" style="display:none"></div>
+                      <div class="general_error_guideline" id="general_error_guideline" style="display:none"></div>
+                      <div class="data_field_set_row">
+                          <div class="data_field_label wide_label" style="vertical-align:top;" id="reg_status_title" ></div>
+                          <div class="data_field_text">
+                              <div><div class="data_field_text" id="sas_reg_state"></div></div>
+                              <div><div class="data_field_text" id="sas_err_code" style="display:none"></div></div>
+                              <div><div class="data_field_text" id="sas_err_msg" style="display:none"></div></div>
+                          </div>
+                      </div>
+                      <div class="data_field_set_row">
+                          <div class="data_field_label wide_label">Serving cell</div>
+                          <div class="data_field_text"><span id="scell_id" name="scell_id"></span></div>
+                      </div>
+                  </div>
+              </div>
+              <div class="data_field_set_line fixed_field_height valign_middle" id="safe remove msg" style="display:none">
+                    <b>It is now safe to remove the Antenna Alignment tool and mount OA.</b>
+              </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

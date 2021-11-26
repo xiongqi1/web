@@ -1,0 +1,121 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>System | Reboot</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<%if(request['REQUEST_METHOD']=="POST") {
+	set_single( 'service.system.reset=1' );
+	redirect('/system_reset.html?reboot')
+}
+%>
+<body>
+<div id="contentWrapper" style="min-height:450px;">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("system_reset");
+var reboot = <%_r=request['QUERY_STRING'];%>"@@_r";
+
+function doConfirm() {
+	if(confirm(_("rebootConfirm 90s") )) {
+		document.form.submit();
+	}
+}
+
+#ifdef PLATFORM_Platypus2
+var estTime=120;
+#else
+var estTime=60;
+#endif
+var counter=0;
+var rebootok=0;
+$(document).ready(function() {
+	if(reboot=="reboot") {
+		function check_reload() {
+			counter++;
+			percentage=parseInt(50*counter/estTime);
+			if( percentage<100 ) {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman rebooting");
+				document.getElementById( "rebootCt" ).innerHTML=percentage+" %"
+			}
+			else if( percentage<120 ) {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg5");//"If you connected via wireless and changed the password, you will need to reconnect.";
+				document.getElementById( "rebootCt" ).innerHTML=""
+			}
+			else {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg6");//"The reboot seems to be taking too long, you may need to manually power cycle the device";
+			}
+
+			if(percentage>60 && (counter%10)==0 ) {
+				$.get("/cgi-bin/ajax.cgi", function (){ rebootok++; });
+			}
+			if(rebootok) {
+				document.getElementById( "rebootMsg" ).innerHTML=_("setman warningMsg7");//"Reboot is successful, now redirecting to the Status page...";
+				if(reboot=="default") {
+					document.cookie="language=en; path=/";
+					setTimeout("window.location='http://" + defaultIP + "/index.html'", 3000);
+				}
+				else {
+					setTimeout("window.location='/index.html'", 3000);
+				}
+			}
+		}
+		document.getElementById("contentWrapper").style['display']='none';
+		document.getElementById("rebootFm").style['display']='';
+		document.getElementById("footer").style['display']='none';
+		setInterval(check_reload, 500);
+	}
+	else {
+		document.getElementById("contentWrapper").style['display']='';
+		document.getElementById("rebootFm").style['display']='none';
+	}
+});
+</script>
+
+<form name='form' class="content" method="POST" action="@@request['SCRIPT_NAME']">
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("setman reboot"));</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%"><tr><th>&nbsp;</th></tr></table>
+
+<table border="0" cellspacing="1" cellpadding="5" width="75%">
+<tr> 
+	<td style="height:15px;">&nbsp;</td>
+</tr>
+<tr align="center"> 
+	<td><p style="font-size:14px;">
+		<script language="JavaScript">document.write(_("rebootRequest"));</script><br/>
+		<script language="JavaScript">document.write(_("rebootTime"));</script></p>
+	</td>
+</tr>
+<tr> 
+	<td style="height:45px;">
+		<div align="center"><input name="button" type="button" onClick="doConfirm()" value="Reboot" style="width:120px;"></div>
+	</td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<p></p>
+</form>
+</div>
+
+<div id="rebootFm" style="color:#695E4A; display:none">
+	<div id="rebootMsg" align="center" style="font-size:16px; font-weight:bold; position:relative; top:80px;">
+	<script language="JavaScript">document.write(_("GUI rebooting"));</script>
+	</div>
+	<div align="center" style="position:relative; top:120px;">
+	<img width="500px" height="12px" src="/images/progress_bar.gif">&nbsp;&nbsp;
+	<b id="rebootCt" style="top:220px; left:400px">0 %</b>
+	</div>
+</div>
+
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.form.button.value="   "+_("setman reboot")+"   ";
+</script>
+</body>
+</html>

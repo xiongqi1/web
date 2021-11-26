@@ -1,0 +1,101 @@
+﻿<html class="no-js" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>String management</title>
+</head>
+<body>
+<script language="JavaScript" src="jquery.min.js"></script>
+<script type="text/javascript" src="/lang/b28n.min.js"></script>
+
+<script language=Javascript>
+var current_lang="<%_lang=get_single('webinterface.language');%>@@_lang";
+var current_ui="<%_u=get_single('webinterface.current_ui');%>@@_u";
+
+function setMainFrame(myFile) {
+	fileName=myFile.substr(0, myFile.indexOf("."));
+	document.getElementById("toolFrame").src="stringTool.html"+"?file='"+fileName+"';"
+	$.get("/cgi-bin/rdb.cgi?webinterface.current_ui="+myFile );
+	current_ui=myFile;
+	$('#mainFrame').attr('src', myFile);
+}
+
+function setToolFrame(ref_lang, dsp_lang) {
+	$.get("/cgi-bin/rdb.cgi?webinterface.ref_lang="+ref_lang );
+	fileName=$('#current_file').val().substr(0, $('#current_file').val().indexOf("."));
+	$('#toolFrame').attr('src', "stringTool.html"+"?file='"+fileName+"';")
+}
+
+function changeLanguage(dsp_lang) {
+	current_lang=dsp_lang;
+	setLanguage(dsp_lang);
+//	$.get("/cgi-bin/rdb.cgi?webinterface.language="+dsp_lang );
+	setMainFrame($('#current_file').val());
+}
+//var lang_list=["en", "ar", "fr", "ti", "cn"];
+var lang= new Array();
+
+$(document).ready(function() {
+	$.get("/cgi-bin/files_in_menu.cgi", function(v){
+		eval(v);
+		$("#uiCounter").html(st.length);
+		if( current_ui=="" || current_ui=="N/A" ) {
+			if( st.length ) {
+				current_ui=st[0];
+			}
+			else {
+				current_ui="index.html";
+			}
+		}
+		for(i=0; i<st.length; i++) {
+			if(st[i]==current_ui) {
+				document.getElementById("current_file").options[i] = new Option(st[i], st[i], false, true);
+			}
+			else {
+				document.getElementById("current_file").options[i] = new Option(st[i], st[i], false, false);
+			}
+		}
+		setToolFrame("en", "en");
+		
+		$('#mainFrame').attr('src', current_ui);
+	});
+	$.get("/cgi-bin/lang_list_arr.cgi", function(v){
+		eval(v);
+		$.each( ["#dsp_lang", "#ref_lang"], function(idx, el) {
+			$.each ( {
+					"en":"English",
+					"fr":"French",
+					"ar":"Arabic",
+					"de":"German",
+					"jp":"Japanese"
+				}, function(val, txt) {
+				//alert("en="+lang["en"]+" fr="+lang["fr"]+" ar="+lang["ar"]+" lang.length="+lang.length);
+					if(lang[val]==1) {
+						$(el).append("<option value='"+val+"'>"+txt+"</option>");
+					}
+				}
+			);
+		});
+		$("#dsp_lang").val(current_lang);
+	});
+	//$('#toolFrame').attr('src', "stringTool.html"+"?file='"+fileName+"';")
+});
+</script>
+
+<table border=0 cellSpacing=5 cellPadding=5 width="100%">
+<tr>
+	<td width="33%"><b>Total UI counter:</b>&nbsp;<font id="uiCounter" style="color:red"></font>&nbsp;&nbsp;&nbsp;&nbsp;<b>Select UI:</b>
+		<select id='current_file' name='current_file' onChange="setMainFrame(this.value)"></select>
+	</td>
+	<td width="33%"><b>Select Reference Language:</b>&nbsp;&nbsp;&nbsp;&nbsp;
+		<select id='ref_lang' name='ref_lang' onChange="setToolFrame(this.value, $('#dsp_lang').val())"></select>
+	</td>
+	<td width="33%"><b>Select Display Language:</b>&nbsp;&nbsp;&nbsp;&nbsp;
+		<select id='dsp_lang' name='dsp_lang' onChange="changeLanguage(this.value)"></select>
+	</td>
+</tr>
+</table>
+<iframe style="float:top" name="toolFrame" id="toolFrame" scrolling="auto" noresize src="stringTool.html" width="100%" height="200px"></iframe>
+<iframe style="float:bottom" name="mainFrame" id="mainFrame" src="#" width="100%" height="800px"></iframe>
+</body>
+</html>

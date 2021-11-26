@@ -1,0 +1,323 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>System | Firmware Upload</title>
+<style>
+    .bar1 {
+	background-color:#FFFFFF;
+	position:relative;
+	text-align:left;
+	height:12px;
+	width:800px;
+	border:1px solid #505050;
+	margin-left: 156px;
+}
+    .bar2 {background-color:#3F3629; position:relative; text-align:left; height:12px; width:0%;}
+</style>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<script language="javascript" type="text/javascript" src="../cedric.js"></script>
+<link href="../cdcs.css" rel="stylesheet" type="text/css" />
+<script language="javascript" type="text/javascript">
+var skin = <%val='\"'+get_single('system.product.skin')+'\"';%>@@val;
+var ceder = 0;
+function iniCedric() 
+{
+	if (!ceder) 
+	{
+		ceder = new Cedric( skin.indexOf('CDR')!=-1?660:838 );
+		ceder.zeroProgressBar();
+	}
+}
+
+function uploadFiles() 
+{
+	ceder.startProgressStatus = ceder.startNetProgressStatus;
+	ceder && ceder.runRabbit("/cgi-bin/CdcsProgress.cgi?g=CdcsProgress");
+}
+function uploadStop() 
+{
+	ceder && ceder.stopUpload();
+}	
+
+function submitF1()
+{	
+	var wfmess="Error: Wrong Upgrade File! (file must end in tar.gz or .tgz)";
+	var f = document.form1;
+
+	f.submit();
+	
+	uploadFiles();
+	
+/*	if(f.uploadFile.value.length == 0){ alert("Please enter a file."); return;}
+
+	var f1=f.uploadFile.value;
+	
+	var end=f1.indexOf(".tar.gz"); 
+	if(end == -1){ 
+		end=f1.indexOf(".tgz"); 
+		if(end == -1){
+			end=f1.indexOf(".cramfs"); 
+			if(end == -1){alert(wfmess);return;}
+		}
+	}
+	if (confirm("Do you wish to continue with the upgrade process? "))
+	{
+		f.submit();
+		alert("At the end of the upgrade, the device may not respond to commands for as long as one minute.\nThis is normal behavior.  Do not power off the device when the upgrade procedure is in progress.");
+		
+	}*/
+}
+
+function submitF2()
+{	
+	var wfmess="Error: Wrong Upgrade File!";
+	var f = document.form2;
+	if(f.file2.value.length == 0){ alert("Please enter a file."); return;}
+	var f1=f.file2.value;
+	var buffer;
+
+	var end1=f1.indexOf(".cfg"); 
+
+	if( end1 == -1 )
+	{ 
+		alert(wfmess);
+		return;
+	}
+	try
+	{	
+	    f.submit();
+	    alert("At the end of the download, the device may not respond to commands for as long as one minute.\nThis is normal behavior.  Do not power off the device when the upgrade procedure is in progress.");
+		uploadFiles();
+		location.reload();
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+    
+
+}
+
+
+//var reqObject;
+var ipvar = location.href.substring( 0, location.href.indexOf( "FirmUpload.html" )-1 );
+function submitF3()
+{	
+	var xmlHttp;
+	var findword;
+	var mystring;
+	var csq;
+  	try
+  	{  
+		xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");   
+   	}
+   	catch (e)
+   	{  // Internet Explorer  
+  		try
+    	{    
+			xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");   
+		}
+  		catch (e)
+    	{    
+			try
+      		{      
+				// Firefox, Opera 8.0+, Safari  
+  				xmlHttp=new XMLHttpRequest();  
+  
+			}
+    		catch (e)
+      		{      
+				alert("Your browser does not support AJAX!");      
+				return false;      
+			}    
+		}  
+	}
+	xmlHttp.open("GET","/cgi-bin/SaveSettings.cgi",true);
+  	xmlHttp.send('a'); 
+  	xmlHttp.onreadystatechange=function()
+    {
+    	if(xmlHttp.readyState==4)
+      	{
+			if( (findword = xmlHttp.responseText.indexOf("filename=") )!= -1 )
+			{
+				alert( "Please do not change the file extension!"+ipvar+xmlHttp.responseText );
+				mystring = xmlHttp.responseText.substring(findword+9, xmlHttp.responseText.length );
+				//location.href=''+ipvar+'/cfg/'+mystring+'.cfg';
+				location.href=''+ipvar+'/cfg/'+mystring+'';
+				//location.href=ipvar+mystring;
+//alert( ''+ipvar+'/cfg/'+mystring+'' );
+			}
+      	}
+    }	
+}
+
+var errors = "";
+function processErrors()
+{
+    if( errors != "" )
+    {
+        printf("<tr><td valign=\"top\" align=\"left\"><b>Errors:</b></td><td align=\"left\">");
+         printf( errors );
+         printf("</td></tr>");
+    }
+}
+
+function doConfirm()
+{
+	if (confirm('All the current settings will be lost!\nDevice IP address will be modified to 192.168.1.50,\nPlease use User Name: \"admin\", Password: \"password\".\nDo you wish to continue? '))
+	{
+		document.formS.submit();
+		setTimeout( top.location.href="http://192.168.1.50/index.html", 5*1000 );
+	}
+}
+
+</script>
+</head>
+
+<body onLoad="iniCedric();">
+<div id="contentWrapper">
+<!--div id="contentWrapper" style="padding-bottom:300px;"-->
+<% include menu.html %>
+
+<h3 >Application Load/Save</h3>
+
+
+ <div class="info" id="progress_info"  style="display:none">   
+      <table class="data" cellpadding='3' cellspacing='1'>
+        <tr>
+          <td width="80px" align="left"><b>Phase:</b></td>
+          <td align="center"><span id="phase"></span></td>
+        </tr>
+        <tr>
+          <td valign="top" align="left"><b>Messages:</b></td>
+          <td align="left"><span id="messages"></span></td>
+        </tr>
+        <script language=Javascript>
+        processErrors();
+        </script>
+        <tr>
+          <td valign="top" align="left"><b>Errors:</b></td>
+          <td align="left"><span id="errors"></span></td>
+        </tr>
+      </table>
+  </div>
+    <div id="progress_bar" style="display:none">   <!-- -->
+       <table class="data" cellpadding='3' cellspacing='1'>
+        <tr>
+          <td width="80px" align="left"><b>Percent Complete:</b></td>
+          <td align="center"><span id="percent">0%</span></td>
+        </tr>
+       </table>
+       <table class="data" cellpadding='3' cellspacing='1'>
+        <div class="bar1" id="upload_status_wrap" align="center">
+        <div align="center" class="bar2" id="upload_status"></div>
+        </div>
+        <tr>
+          <td width="80px" align="left"><b>Current Position:</b></td>
+          <td align="center"><span id="current">0</span> / <span id="total_kbytes"></span> KBytes</td>
+        </tr>
+        <tr>
+          <td align="left"><b>Elapsed time:</b></td>
+          <td align="center"><span id="time">0</span></td>
+        </tr>
+        <tr>
+          <td align="left"><b>Est Time Left:</b></td>
+          <td align="center"><span id="remain">0</span></td>
+        </tr>
+        <tr>
+          <td align="left"><b>Est Speed:</b></td>
+          <td align="center"><span id="speed">0</span> KB/s.</td>
+        </tr>
+      </table>
+   </div>
+
+
+<form style="margin-left:156px" action="/cgi-bin/allpages.cgi" name="form3">
+<input type="hidden" name="p" value="FirmUpload.html">
+<input type="hidden" name="doSave"  >
+
+<table width="800px">
+	<div class="line" style="margin:8px; width:780px;"></div>
+    <tr><th>Save a copy of current settings:</th></tr>
+</table>
+
+<table width="800px"> 
+<tr><input type="hidden" size="20" name="fileName"> 
+    <td width="100%"><div align=center><input name="file3" type=button VALUE="&nbsp;Save&nbsp;" onClick="javascript:submitF3();">
+    </div></td>
+</tr>
+</table>
+</form>
+
+
+<form style="margin-left:156px" name="form2" ID="Form2" target='target_upload' method=post action="/cgi-bin/AppUpload.cgi" encType="multipart/form-data">
+<input type="hidden" name="cmndUpgrade"> 
+
+<table width="800px">
+	<div class="line" style="margin:8px; width:780px;"></div>
+    <tr><th>Restore saved settings:</th></tr>
+</table>
+
+<table width="800px"> 
+<tr> 
+<td width="12%"> <div align="center">File</div></td>
+<td width="40%"> <input type=file height="40" size="35" name="file2"> </td>
+<td width="40%" ><div align=center><input type=Button VALUE="Restore" onClick="javascript:submitF2()">
+</div></td>
+</tr>
+</table>
+</form>
+
+<form style="margin-left:156px" name="form1" target='target_upload' method=post action="/cgi-bin/AppUpload.cgi" encType="multipart/form-data">
+<input type="hidden" name="cmndUpgrade"> 	 
+ <table width="800px">
+ 	<div class="line" style="margin:8px; width:780px;"></div>
+    <tr><th>Upload New Firmware:</th></tr>
+</table>
+
+<table width="800px"> 
+<tr> 
+<td width="12%"> <div align="center">File</div></td>
+<td width="40%"> <input type=file height="40" size="35" name="file1"> </td>
+<td width="40%" ><div align=center><input type=Button VALUE="Upload" onClick="javascript:submitF1();">
+</div></td>
+</tr>
+
+<tr> 
+<td colspan="3"><div align="right">
+<font face="Arial, Helvetica, sans-serif" color="#FF0000" size="2"> 
+<b>Note: The whole upgrade procedure can take 2~3 mins.</b></font></div>
+
+</td>
+</tr>
+</table>
+</form>
+<form style="margin-left:156px" name="formS" action="/cgi-bin/defaults.cgi">
+<table width="800px">
+	<div class="line" style="margin:8px; width:780px;"></div>
+    <tr>
+      <th>RESTORE FACTORY DEFAULTS:</th>
+    </tr>
+</table>
+<table width="800px"> 
+<tr>
+    <td width="100%"><div align=center><input name="file4" type='button' value="&nbsp;&nbsp;Restore&nbsp;&nbsp;" onclick="doConfirm()" /><!--javascript:location.href='defaults.html'-->
+    </div></td>
+</tr>
+</table>
+<div class="line" style="margin:8px; width:780px;"></div>
+</form>
+<div id="Div1" style="width:805px; height:205px; overflow:auto;">
+<iframe id='Iframe1' name="target_upload" frameborder=0 width="800" height="200">
+</iframe></div>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

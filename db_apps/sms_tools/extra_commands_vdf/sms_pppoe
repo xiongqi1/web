@@ -1,0 +1,183 @@
+#!/usr/bin/awk -f
+#
+# Copyright (C) 2018 NetComm Wireless Limited.
+#
+
+function exec(mycmd) {
+value="";
+	while(mycmd | getline) {
+		value = sprintf("%s%s", value, $0);
+	}
+	close(mycmd);
+	return value;
+}
+
+# Check whether a given V_VARIABLE is set to 'y' in variants.sh
+function v_var_enabled(v_var) {
+	while( (getline < var_file) > 0) {
+		if ( $0 == v_var "='y'" ) {
+			#print "\n " v_var " is enabled in variants.sh"
+			close(var_file)
+			return 1
+		}
+	}
+	#print "\n " v_var " is disabled in variants.sh"
+	close(var_file)
+	return 0
+}
+
+BEGIN {
+	var_file="/etc/variant.sh"
+
+	if( ARGC>=2 && ARGV[1]=="help" ) {
+		print "This AWK script file used by SMS tools to do the work of"
+        print "controlling PPPoE functionality."
+        if (!v_var_enabled("V_ROUTER_TERMINATED_PPPOE")) {
+            print "WARNING: Using this command may cause loss of network connectivity, and may ruin internal system state."
+        }
+        print "This script requires at least one parameter:"
+        print "get - prints out the current PPPoE settings."
+        print "set - changes PPPoE settings; must be used with one additional"
+        print "      parameter: either a single digit (0) to disable PPPoE,"
+        if (v_var_enabled("V_ROUTER_TERMINATED_PPPOE")) {
+            print "      or 4 comma-separated parameters to enable PPPoE <enable>,<debug logging enable>,<forward wan ip enable>,<service name>."
+        }
+        else {
+            print "      or 3 comma-separated parameters to enable PPPoE <enable>,<apn>,<service name>."
+        }
+		exit (0);
+	}
+
+	# get V variant
+	cell_nw=exec(". /etc/variant.sh; echo $V_CELL_NW")
+
+	if(ARGV[1]=="get") {
+                if (v_var_enabled("V_ROUTER_TERMINATED_PPPOE")) {
+                        en=exec("rdb_get service.pppoe.server.0.enable");
+                        if (en==1) {
+                                name=exec("rdb_get service.pppoe.server.0.service");
+                                if(name=="") {
+                                        name="Blank"
+                                }
+                                debugLogging=exec("rdb_get service.pppoe.server.0.verbose");
+                                forwardWanIpEnable=exec("rdb_get service.pppoe.server.0.wanipforward_enable");
+
+                                msg="enable="en", debug logging="debugLogging", forward wan ip="forwardWanIpEnable", service name="name
+                        }
+                        else
+                        {
+                                msg="enable="en
+                        }
+                }
+                else {
+                        en=exec("rdb_get service.pppoe.server.0.enable");
+                        apn=exec("rdb_get service.pppoe.server.0.apn");
+                        dialstr=exec("rdb_get service.pppoe.server.0.dialstr");
+                        if(apn=="") {
+                                apn="Blank"
+                        }
+                        name=exec("rdb_get service.pppoe.server.0.service");
+                        if(name=="") {
+                                name="Blank"
+                        }
+                        if(dialstr=="") {
+                                dialstr="Blank"
+                        }
+
+                        if(cell_nw=="cdma"){
+                                msg="enable="en", dial str="dialstr", service name="name
+                        }
+                        else {
+                                msg="enable="en", apn name="apn", service name="name
+                        }
+                }
+	}
+	else if(ARGV[1]=="set") {
+		FS=","
+		len=split(ARGV[2], a, ",");
+		if( v_var_enabled("V_ROUTER_TERMINATED_PPPOE") ) {
+                        if( len==1 ) {
+                                if ( ARGV[2]!="" && a[1]=="0" ) {
+                                        system("rdb_set service.pppoe.server.0.enable 0");
+                                        msg="enable=0"
+                                }
+                                else {
+                                        msg="Parameter ERROR";
+                                }
+                        }
+                        else {
+                                # 4 comma-separated parameters to enable PPPoE <enable>,<debug logging enable>,<forward wan ip enable>,<service name>
+                                # First field must be 1, both second and third must be 0 or 1. The final field, a string is optional.
+                                if ( a[1]=="1" && (a[2]=="0" || a[2]=="1") && (a[3]=="0" || a[3]=="1") && ((a[4]!="" && len==4) || (a[4]=="" && len==3)) ) {
+                                        system("rdb_set service.pppoe.server.0.enable "a[1]);
+                                        system("rdb_set service.pppoe.server.0.verbose "a[2]);
+                                        system("rdb_set service.pppoe.server.0.wanipforward_enable "a[3]);
+
+                                        # escape all special characters except '.'
+                                        serviceName=a[4];
+                                        gsub(/[^a-zA-Z0-9.]/, "\\\\&", serviceName);
+                                        system("rdb_set service.pppoe.server.0.service "serviceName);
+                                        if( a[4]=="" ) {
+                                                a[4]="Blank";
+                                        }
+                                        msg="enable="a[1]", debug logging="a[2]", forward wan ip="a[3]", service name="a[4]
+                                }
+                                else {
+                                        msg="Parameter ERROR";
+                                }
+                        }
+                }
+                else {
+                        if( len!=3 ) {
+                                if( ARGV[2]!="" && a[1]=="0" ) {
+                                        system("rdb_set service.pppoe.server.0.enable 0");
+                                        msg="enable=0"
+                                }
+                                else {
+                                        msg="Parameter ERROR";
+                                }
+                        }
+                        else {
+                                if( a[1]=="1" ) {
+                                        for(i=1; i<=6; i++) {
+                                                system("rdb_set link.profile."i".enable 0");
+                                        }
+                                        system("rdb_set service.pppoe.server.0.enable 1");
+                                }
+                                else if( a[1]=="0" ) {
+                                        system("rdb_set service.pppoe.server.0.enable 0");
+                                }
+                                else {
+                                        msg="Parameter ERROR";
+                                }
+                                if(msg!="Parameter ERROR") {
+                                        if(cell_nw=="cdma"){
+                                                system("rdb_set service.pppoe.server.0.dialstr "a[2]);
+                                        }
+                                        else {
+                                                system("rdb_set service.pppoe.server.0.apn "a[2]);
+                                        }
+                                        # escape all special characters
+                                        serviceName=a[3];
+                                        gsub(/[^a-zA-Z0-9]/, "\\\\&", serviceName);
+                                        system("rdb_set service.pppoe.server.0.service "serviceName);
+                                        if(a[2]=="") {
+                                                a[2]="Blank";
+                                        }
+                                        if(a[3]=="") {
+                                                a[3]="Blank";
+                                        }
+                                        msg="enable="a[1]", apn name="a[2]", service name="a[3]
+                                }
+                        }
+		}
+	}
+	else {
+		msg="ERROR - Invalid parameter";
+	}
+
+	# escape all special characters except space, '-', '=', '.' and ','.
+	gsub(/[^a-zA-Z0-9=,. \-]/, "\\\\&", msg);
+	system( "logger "msg );
+	print msg;
+}

@@ -1,0 +1,125 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<% _m=get_single('mhs.operationmode'); if(_m!="poweruser") redirect('/index.html');%>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Basic Login</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<style>body { direction:ltr; }</style>
+<script language="JavaScript">
+Butterlate.setTextDomain("GUI-login");
+function initTranslation() {
+	$("#username").html(_("GUI username"));
+	$("#passwd").html(_("password"));
+	$("#passWarning").html(_("admin passWarning"));
+	document.getElementById("CSsubmit").value = "  "+_("submit")+"  ";
+	document.getElementById("CSclear").value = "  "+_("clear")+"  ";
+}
+
+$(document).ready(function() {
+	document.form.username.focus();
+	initTranslation();
+	user_agent = <%val=headers['USER_AGENT'];%>"@@val";
+	if(user_agent.indexOf("IE")!=-1)
+		document.form.password.size="22";
+});
+</script>
+</head>
+<body>
+
+<form name="form"  class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<% include GUI-extra.html %>
+<div id="basicGUI">	
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+	<img style="position:absolute; top:0px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-status"><a href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+	<img style="position:absolute; top:121px; left:-5px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-login" style="left:4px;"><a href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+	<img style="position:absolute; top:200px; left:44px" src="/images/strip.png"/>
+	<img style="position:absolute; top:380px; left:44px" src="/images/strip.png"/>
+
+	<div class="div_text" style="top:60px" id="username">User Name</div>
+	<div class="div_input" style="top:60px" >
+	<input type="text" name="username" maxlength="20" size="20" value="@@form['username']">
+	</div>
+	<div class="div_text" style="top:120px" id="passwd">Password</div>
+	<div class="div_input" style="top:120px" >
+	<input type="password" name="password" maxlength="20" size="20" value="@@form['password']">
+	</div>
+	<div class=div_text style="top:250px; color:#000"><script language="JavaScript">document.write(_("login msg1"));</script></div>
+	<div id="ID1" class="div_button" style="top:435px">
+	<input type="submit" id="CSsubmit" value="Submit">
+	<input type="button" id="CSclear" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''">
+	</div>
+	<div id="ID0" style="position:absolute; font-size:12px; top:416px; left:75px; display:none">
+	<h4 style="margin-bottom:0px; color:#CC0000; width:300px" id="passWarning">User name or password is incorrect. Please try again!</h4>
+	</div>
+</div>
+<script language="JavaScript">
+initTranslation();
+user_agent = <%val=headers['USER_AGENT'];%>"@@val";
+if(user_agent.indexOf("IE")!=-1)
+	document.form.password.size="22";
+</script>
+</form>  
+</body>
+<%    
+if (request['REQUEST_METHOD'] == "POST") {
+	//check username and password
+	user = form['username'];
+	mypassword = form['password'];
+
+	router_user="";
+	router_password="";
+
+	syslog(7,"login.html: entering with POST request");
+
+
+	// new login method - name-password method
+	if( rdb_exists("admin.user.name") ) {
+		syslog(7,"login.html: configurable user name rdb detected");
+
+		router_user=get_single("admin.user.name");
+		router_password=get_single("admin.user.password");
+	}
+	else {
+		syslog(7,"login.html: fixed user name rdb detected");
+
+		if( rdb_exists("admin.user."+user) ) {
+			router_user=user
+			router_password=get_single( 'admin.user.'+user );
+		}
+		else {
+			syslog(7,"login.html: user name not found");
+		}
+	}
+
+	// if user name and password are correct
+	if( (router_user != "") && (user == router_user) && (mypassword==router_password) ) {
+	{
+		session["sessionid"] = request["SESSION_ID"];
+		redirect('/index.html');
+	}
+	else
+	{%>
+		<script language='JavaScript'>
+		document.getElementById( "ID0" ).style['display']='';
+		document.getElementById( "ID1" ).style['display']='none';
+		setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);
+		</script>
+	<%}
+}
+else {
+	if(request['QUERY_STRING']=='logoff') {
+		session["sessionid"] = '';
+	}
+	else if( request["SESSION_ID"]==session["sessionid"] ) {
+		redirect('/index.html??setdate');
+	}
+}
+%>
+</html>

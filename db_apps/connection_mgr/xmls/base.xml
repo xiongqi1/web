@@ -1,0 +1,1892 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+	<Country country="Albania" mcc="276">
+		<Carrier carrier="Vodafone Albenia" mnc="002">
+			<APN apn="Twa">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Algeria" mcc="603">
+		<Carrier carrier="Wataniya Algeria" mnc="003">
+			<APN apn="internet">
+				<UserName>nedjma</UserName>
+				<Password>nedjma</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Andorra" mcc="213">
+		<Carrier carrier="O2 Slovakia" mnc="006">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Argentina" mcc="722">
+		<Carrier carrier="CTI Argentina" mnc="310,320,330">
+			<APN apn="internet.ctimovil.com.ar">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Personal" mnc="034">
+			<APN apn="gprs.personal.com">
+				<UserName>mobile number</UserName>
+				<Password>adgj</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Australia" mcc="505">
+		<Carrier carrier="Telstra" mnc="001">
+			<APN apn="telstra.internet">
+			</APN>
+			<APN apn="telstra.extranet">
+			</APN>
+			<APN apn="telstra.bigpond">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Optus Australia" mnc="002">
+			<APN apn="connect">
+			</APN>
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="YES OPTUS" mnc="002">
+			<APN apn="preconnect">
+			</APN>
+		</Carrier>
+		<Carrier carrier="PRIMUS" mnc="002">
+			<APN apn="primuslns1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="ONEMobile" mnc="002">
+			<APN apn="SPLNS111A1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Three Australia" mnc="006">
+			<APN apn="3netaccess">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Three Prepaid" mnc="006">
+			<APN apn="3services">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Australia" mnc="003">
+			<APN apn="vfinternet.au">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Prepaid" mnc="003">
+			<APN apn="vfprepaymbb">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Crazy John's Australia" mnc="038,003">
+			<APN apn="purtona.net">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Dodo" mnc="002">
+			<APN apn="dodolns1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Virgin Mobile" mnc="002">
+			<APN apn="VirginBroadband">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+				<Auth>pap</Auth>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Blink" mnc="002">
+			<APN apn="splns888a1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Internode" mnc="002">
+			<APN apn="internode">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TPG" mnc="002">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Exetel" mnc="002">
+			<APN apn="Exetel1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="iiNet" mnc="002">
+			<APN apn="iiNet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="westnet" mnc="002">
+			<APN apn="splns555a1">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Pacnet" mnc="002">
+			<APN apn="pacnet">
+				<UserName>abc123</UserName>
+				<Password>abc123</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Austria" mcc="232">
+		<Carrier carrier="3 AT" mnc="010">
+			<APN apn="Drei.at">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Mobilkom - Austria" mnc="001">
+			<APN apn="a1.net">
+				<UserName>gprs@a1plus.at</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="one" mnc="005,012">
+			<APN apn="web.one.at">
+				<UserName>web</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telering Austria" mnc="007">
+			<APN apn="web">
+				<UserName>web@telering.at</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile Austria" mnc="003,007">
+			<APN apn="gprsinternet">
+				<UserName>t-mobile</UserName>
+				<Password>tm</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Azerbaijan" mcc="400">
+		<Carrier carrier="Azercell" mnc="001">
+			<APN apn="internet">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Bahrain" mcc="426">
+		<Carrier carrier="Batelco" mnc="001">
+			<APN apn="internet.batelco.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Bangladesh" mcc="470">
+		<Carrier carrier="Grameen Phone" mnc="001">
+			<APN apn="gpinternet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Belarus" mcc="257">
+		<Carrier carrier="VELCOM" mnc="001">
+			<APN apn="web.velcom.by">
+				<UserName>web</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Belgium" mcc="206">
+		<Carrier carrier="BASE/Orange Belguim" mnc="020">
+			<APN apn="orangeinternet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Belgacom MobileProximus" mnc="001">
+			<APN apn="internet.proximus.be">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Mobistar Belgum" mnc="010">
+			<APN apn="web.pro.be">
+				<UserName>mobistar</UserName>
+				<Password>mobistar</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Botswana" mcc="652">
+		<Carrier carrier="Mascom Wireless" mnc="001">
+			<APN apn="internet.mascom">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Brazil" mcc="724">
+		<Carrier carrier="Claro Brasil" mnc="005">
+			<APN apn="claro.com.br">
+				<UserName>claro</UserName>
+				<Password>claro</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Oi Brazil" mnc="018,031">
+		</Carrier>
+		<Carrier carrier="TELEMIGC" mnc="023">
+			<APN apn="gprs.telemigcelular.com.br">
+				<UserName>celular</UserName>
+				<Password>celular</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="TIM Brazil" mnc="002,004,003">
+			<APN apn="tim.br">
+				<UserName>tim</UserName>
+				<Password>tim</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="British Virgin Islands" mcc="348">
+		<Carrier carrier="CCT Boatphone" mnc="570">
+			<APN apn="cctmobilenet.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Bulgaria" mcc="284">
+		<Carrier carrier="GloBul" mnc="005">
+			<APN apn="internet.globul.bg">
+				<UserName>globul</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="GlOBUL Bulgaria" mnc="005">
+			<APN apn="internet.globul.bg">
+				<UserName>globul</UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Mobitel Bulgaria" mnc="001">
+			<APN apn="mms-gprs.mtel.bg">
+				<UserName>mtel</UserName>
+				<Password>mtel</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vivatel Bulgaria" mnc="003">
+			<APN apn="internet.vivatel.bg">
+				<UserName>vivatel</UserName>
+				<Password>vivatel</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Cameroon" mcc="624">
+		<Carrier carrier="MTN Cameroon" mnc="001">
+			<APN apn="INTERNET">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Canada" mcc="302">
+		<Carrier carrier="Bell Mobility 1" mnc="610">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Bell Mobility 2" mnc="640">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Bell Mobility 3" mnc="651">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Wind Mobile" mnc="490">
+			<APN apn="broadband.windmobile.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus ISP" mnc="220">
+			<APN apn="isp.telus.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus VPN" mnc="220">
+			<APN apn="vpn.telus.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus SP" mnc="220">
+			<APN apn="sp.internet.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Fido Internet" mnc="370">
+			<APN apn="internet.fido.ca">
+				<UserName>fido</UserName>
+				<Password>fido</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="lteinternet.apn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="ltemobile.apn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="internet.com">
+				<UserName>wapuser1</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet (VPN)" mnc="720">
+			<APN apn="vpn.com">
+				<UserName>wapuser1</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Chile" mcc="730">
+		<Carrier carrier="Entel Chile" mnc="010">
+			<APN apn="imovil.entelpcs.cl">
+				<UserName>entelpcs</UserName>
+				<Password>entelpcs</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telefonica Movil de Chile" mnc="002">
+			<APN apn="web.tmovil.cl">
+				<UserName>web</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="China" mcc="460">
+		<Carrier carrier="China Mobile" mnc="000">
+			<APN apn="cmnet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Colombia" mcc="732">
+		<Carrier carrier="Comcel 3GSM Colombia" mnc="101,111">
+			<APN apn="internet.comcel.com.co">
+				<UserName>COMCELWEB</UserName>
+				<Password>COMCELWEB</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tigo" mnc="111,103,003,008,003">
+			<APN apn="wap.sentelgsm.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Costa Rica" mcc="712">
+		<Carrier carrier="Ice Celular" mnc="001,002">
+			<APN apn="icecelular">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Croatia" mcc="219">
+		<Carrier carrier="Tele2 HR (Croatia)" mnc="002">
+			<APN apn="internet.tele2.hr">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Croatia" mnc="002">
+			<APN apn="internet.tele2.hr">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile HR (Croatia)" mnc="001">
+			<APN apn="web.htgprs">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile HR" mnc="013">
+			<APN apn="web.htgprs">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIPNET Start Croatia" mnc="010">
+			<APN apn="gprs0.vipnet.hr">
+				<UserName>38591</UserName>
+				<Password>38591</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIP HSDPA HR (Croatia)" mnc="010">
+			<APN apn="data.vip.hr">
+				<UserName>38591</UserName>
+				<Password>38591</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIPNET 3G Croatia" mnc="010">
+			<APN apn="3g.vip.hr">
+				<UserName>38591</UserName>
+				<Password>38591</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIPNET HSDPA Croatia" mnc="010">
+			<APN apn="data.vip.hr">
+				<UserName>38591</UserName>
+				<Password>38591</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIPNET Pro Croatia" mnc="010">
+			<APN apn="gprs5.vipnet.hr">
+				<UserName>38591</UserName>
+				<Password>38591</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Czech Republic" mcc="230">
+		<Carrier carrier="O2 Czech Republic" mnc="002">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile Czech Republic" mnc="001">
+			<APN apn="internet.t-mobile.cz">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="D.R.Congo" mcc="630">
+		<Carrier carrier="Vodacom Congo" mnc="001">
+			<APN apn="vodanet">
+				<UserName>vodanet</UserName>
+				<Password>vodalive</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Denmark" mcc="238">
+		<Carrier carrier="H3 Danmark" mnc="006">
+			<APN apn="data.tre.dk">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Denmark" mnc="030">
+			<APN apn="web.orange.dk">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sonofon Denmark" mnc="002,077">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TDC Mobil Danmark" mnc="001">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telia Danmark" mnc="020">
+			<APN apn="www.internet.mtelia.dk">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Dominican R." mcc="370">
+		<Carrier carrier="Centennial" mnc="004,030">
+			<APN apn="private.centennialwireless.com">
+				<UserName>privuser</UserName>
+				<Password>priv</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Dominican R." mnc="001">
+			<APN apn="orange.net.com.do">
+				<UserName>orange</UserName>
+				<Password>orange</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Egypt" mcc="602">
+		<Carrier carrier="MobiNil Egypt" mnc="001">
+			<APN apn="mobinilweb">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Egypt" mnc="002">
+			<APN apn="internet.vodafone.net">
+				<UserName>internet</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Etisalat" mnc="03">
+			<APN apn="etisalat">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Estonia" mcc="248">
+		<Carrier carrier="Elisa Estonia" mnc="002">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="EMT Estonia" mnc="001">
+			<APN apn="internet.emt.ee">
+			</APN>
+		</Carrier>
+		<Carrier carrier="RLE Estonia" mnc="002">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Eesti AS" mnc="003">
+			<APN apn="mobileinternet.tele2.ee">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Finland" mcc="244">
+		<Carrier carrier="DNA Finland" mnc="003">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Elisa Finland" mnc="005">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Radiolinja" mnc="005">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sonera Finland" mnc="091">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="France" mcc="208">
+		<Carrier carrier="Bouygues Telecom" mnc="020">
+			<APN apn="ebouygtel.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="B.Telecom Entreprises" mnc="021">
+			<APN apn="a2bouygtel.com">
+				<UserName>a2b</UserName>
+				<Password>acces</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Bouygues Telecom VPN" mnc="088">
+			<APN apn="vpnbouygtel.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange France (3G)" mnc="001">
+			<APN apn="orange.fr">
+				<UserName>orange</UserName>
+				<Password>orange</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Fr Enterprise" mnc="002">
+			<APN apn="internet-enterprise">
+				<UserName>orange</UserName>
+				<Password>orange</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="SFR-France" mnc="010">
+			<APN apn="websfr">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Germany" mcc="262">
+		<Carrier carrier="E-Plus" mnc="003">
+			<APN apn="internet.eplus.de">
+				<UserName>eplus</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="O2 Germany" mnc="007,008">
+			<APN apn="surfo2">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile D (Germany)" mnc="001">
+			<APN apn="internet.t-mobile">
+				<UserName>t-mobile</UserName>
+				<Password>tm</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Germany" mnc="002">
+			<APN apn="web.vodafone.de">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Ghana" mcc="620">
+		<Carrier carrier="Areeba" mnc="001,040">
+			<APN apn="internet.spacefon.com">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone" mnc="002">
+			<APN apn="browse">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Greece" mcc="202">
+		<Carrier carrier="Cosmote" mnc="001">
+			<APN apn="internet">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Q-telecom" mnc="009">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telestet (STET)" mnc="010">
+			<APN apn="gnet.b-online.gr">
+				<UserName>phonenumber</UserName>
+				<Password>24680</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="WIND Greece" mnc="010">
+		</Carrier>
+		<Carrier carrier="Vodafone Greece" mnc="005">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Guatemala" mcc="704">
+		<Carrier carrier="Comcel Guatemala" mnc="002">
+			<APN apn="Wap.tigo.gt">
+				<UserName>Wap</UserName>
+				<Password>Wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="PCS Digital" mnc="001">
+			<APN apn="ideasalo">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Guyana" mcc="738">
+		<Carrier carrier="GT &amp; T Cellink Plus" mnc="002">
+			<APN apn="wap.cellinkgy.com">
+				<UserName>test</UserName>
+				<Password>test</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Honduras" mcc="708">
+		<Carrier carrier="Alo Pcs" mnc="001">
+			<APN apn="internet.ideasalo.ni">
+				<UserName>internet</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Hong Kong" mcc="454">
+		<Carrier carrier="CSL" mnc="000,002,018">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="New World" mnc="010">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Hong Kong" mnc="004">
+			<APN apn="web.orangehk.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Peoples - Hong Kong" mnc="012">
+			<APN apn="peoples.net">
+			</APN>
+		</Carrier>
+		<Carrier carrier="SmarTone-Vodafone" mnc="006,015">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sunday" mnc="019,016">
+			<APN apn="sgprs">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Three Hong Kong" mnc="003,004">
+			<APN apn="mobile.three.com.hk">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Hungary" mcc="216">
+		<Carrier carrier="Pannon" mnc="001">
+			<APN apn="net">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile HU" mnc="030">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Hungary" mnc="070">
+			<APN apn="internet.vodafone.net">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Iceland" mcc="274">
+		<Carrier carrier="Nova - Iceland" mnc="011">
+			<APN apn="internet.nova.is">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Siminn" mnc="001">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="India" mcc="404">
+		<Carrier carrier="AirTel" mnc="049,010,031,003,040,002,093,095,097,096,094,056,051,054,053,055,052,092,090,045,098">
+			<APN apn="airtelgprs.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="BPL India" mnc="021">
+			<APN apn="bplgprs.com">
+				<UserName>bplmobile</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="BSNL" mnc="034,062,064,066">
+			<APN apn="celloneportal">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Hutch India" mnc="011">
+			<APN apn="www">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Idea Cellular India" mnc="082,089,087,024,022,007,078,004,012,056,019">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="MTNL" mnc="069">
+			<APN apn="mmsmtnlmum">
+				<UserName>mtnl</UserName>
+				<Password>mtnl123</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange India" mnc="020">
+			<APN apn="portalnmms">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Indonesia" mcc="510">
+		<Carrier carrier="Excelcomindo Excelcom" mnc="011">
+			<APN apn="www.xlgprs.net">
+				<UserName>xlgprs</UserName>
+				<Password>proxl</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="IM3" mnc="001,021">
+			<APN apn="www.indosat-m3.net">
+				<UserName>gprs</UserName>
+				<Password>im3</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Indostat" mnc="001,021">
+			<APN apn="satelindogprs.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telkomsel Flash" mnc="011">
+			<APN apn="flash">
+				<UserName>wap</UserName>
+				<Password>wap123</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telkomsel Data" mnc="010">
+			<APN apn="telkomsel">
+				<UserName>wap</UserName>
+				<Password>wap123</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Ireland" mcc="272">
+		<Carrier carrier="Meteor" mnc="003">
+			<APN apn="isp.mymeteor.ie">
+				<UserName>my</UserName>
+				<Password>meteor</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="O2 Ireland" mnc="002">
+			<APN apn="open.internet">
+				<UserName>ada</UserName>
+				<Password>ada</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone (Contract) Ie." mnc="001">
+			<APN apn="isp.vodafone.ie">
+				<UserName>vodafone</UserName>
+				<Password>vodafone</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone (Pre-pay) Ie." mnc="001">
+			<APN apn="live.vodafone.ie">
+				<UserName>vodafone</UserName>
+				<Password>vodafone</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Israel" mcc="425">
+		<Carrier carrier="Cellcom Israel" mnc="02">
+			<APN apn="etecsa">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Internet Pelephone" mnc="003,004">
+			<APN apn="internet.pelephone.net.il">
+				<UserName>pcl@3g</UserName>
+				<Password>pcl</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Israel" mnc="01">
+			<APN apn="orangeinternet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Italy" mcc="222">
+		<Carrier carrier="BLU Contratto Italy" mnc="098">
+			<APN apn="INTERNET">
+			</APN>
+		</Carrier>
+		<Carrier carrier="BLU Prepagata Italy" mnc="098">
+			<APN apn="PINTERNET">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Blue Italy" mnc="098">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="H3G Italy" mnc="099">
+			<APN apn="tre.it">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TIM Italy" mnc="001">
+			<APN apn="ibox.tim.it">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TIM Web" mnc="001">
+			<APN apn="ibox.tim.it">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Omnitel Italy" mnc="010">
+			<APN apn="web.omnitel.it">
+			</APN>
+		</Carrier>
+		<Carrier carrier="WIND Aziende" mnc="088">
+			<APN apn="internet.wind.biz">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Jamaica" mcc="338">
+		<Carrier carrier="Cable &amp; Wireless Jamaica" mnc="180">
+			<APN apn="wap">
+			</APN>
+		</Carrier>
+		<Carrier carrier="DigiCel Jamaica" mnc="005">
+			<APN apn="web.digiceljamaica.com">
+				<UserName>wapuser</UserName>
+				<Password>wap03jam</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Japan" mcc="440">
+		<Carrier carrier="DoCoMo" mnc="010">
+			<APN apn="mopera.net">
+			</APN>
+			<APN apn="mopera.flat.foma.ne.jp">
+			</APN>
+			<APN apn="mpr.ex-pkt.net">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Jordan" mcc="416">
+		<Carrier carrier="Zain" mnc="001">
+			<APN apn="zain">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Umniah" mnc="003">
+			<APN apn="">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange " mnc="077">
+			<APN apn="wap.orange.jo">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Kazakhstan" mcc="401">
+		<Carrier carrier="Beeline Kazakhstan" mnc="001">
+			<APN apn="internet.beeline.kz">
+				<UserName>internet.beeline</UserName>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Kenya" mcc="639">
+		<Carrier carrier="SafariCom" mnc="002">
+			<APN apn="web.safaricom.com">
+				<UserName>web</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="South Korea" mcc="450">
+		<Carrier carrier="KTF HSDPA Internet" mnc="008">
+			<APN apn="hsdpa-internet.ktfwing.com">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="SKTelecom" mnc="005">
+			<APN apn="internet.sktelecom.com">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Kuwait" mcc="419">
+		<Carrier carrier="MTC Kuwait" mnc="002">
+			<APN apn="apn01">
+				<UserName>anything</UserName>
+				<Password>anything</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Wataniya Kuwait" mnc="003">
+			<APN apn="action.wataniya.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Laos" mcc="457">
+		<Carrier carrier="ETL" mnc="003">
+			<APN apn="etlnet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Latvia" mcc="247">
+		<Carrier carrier="LMT Latvia" mnc="001">
+			<APN apn="internet.lmt.lv">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Latvia" mnc="002">
+			<APN apn="mobileinternet.tele2.lv">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Baltcom GSM Latvia" mnc="002">
+			<APN apn="internet.tele2.lv">
+				<UserName>gprs</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Lebanon" mcc="415">
+		<Carrier carrier="Cellis FTML" mnc="001">
+			<APN apn="internet.ftml.com.lb">
+				<UserName>plugged</UserName>
+				<Password>plugged</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="MTC Touch Lebannon" mnc="003">
+			<APN apn="gprs.mtctouch.com.lb">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Lithuania" mcc="246">
+		<Carrier carrier="Bite GSM Lithuania" mnc="002">
+			<APN apn="banga">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Omnitel" mnc="001">
+			<APN apn="gprs.omnitel.net">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Lietuva" mnc="003">
+			<APN apn="mobileinternet.tele2.lt">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Luxembourg" mcc="270">
+		<Carrier carrier="LUXGSM" mnc="001">
+			<APN apn="web.pt.lu">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tango" mnc="077">
+			<APN apn="internet">
+				<UserName>tango</UserName>
+				<Password>tango</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2Tango HSPA" mnc="077">
+			<APN apn="hspa">
+				<UserName>tango</UserName>
+				<Password>tango</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="VOXMobile" mnc="099">
+			<APN apn="vox.lu">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Macau" mcc="455">
+		<Carrier carrier="CTM Macau" mnc="001">
+			<APN apn="ctm-mobile">
+			</APN>
+		</Carrier>
+		<Carrier carrier="M.Hutchison Telecom" mnc="003">
+			<APN apn="web.hutchisonmacau.com">
+				<UserName>hutchison</UserName>
+				<Password>1234</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="R.Macedonia" mcc="294">
+		<Carrier carrier="Mobimak" mnc="001">
+			<APN apn="internet">
+				<UserName>internet</UserName>
+				<Password>mobimak</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Malaysia" mcc="502">
+		<Carrier carrier="Celcom Malaysia" mnc="019">
+			<APN apn="celcom3g">
+			</APN>
+		</Carrier>
+		<Carrier carrier="DIGI" mnc="016">
+			<APN apn="diginet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Maxis 2G" mnc="012">
+			<APN apn="internet.gprs.maxis">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Maxis 3G (Contract)" mnc="012">
+			<APN apn="unet">
+				<UserName>maxis</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Maxis 3G (Pre-pay)" mnc="012">
+			<APN apn="net">
+				<UserName>maxis</UserName>
+				<Password>net</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Timecel" mnc="001,000,017">
+			<APN apn="timenet.com.my">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TM Touch" mnc="013">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Malta" mcc="278">
+		<Carrier carrier="Go Mobile" mnc="021">
+			<APN apn="rtgsurfing">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Malta" mnc="001">
+			<APN apn="internet">
+				<UserName>internet</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Mexico" mcc="334">
+		<Carrier carrier="Telcel - Mexico" mnc="002,020">
+			<APN apn="internet.itelcel.com">
+				<UserName>iesgprs</UserName>
+				<Password>iesgprs2002</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telefonica Mexico" mnc="003">
+		</Carrier>
+	</Country>
+	<Country country="Moldova" mcc="259">
+		<Carrier carrier="MoldCell" mnc="002">
+			<APN apn="gprs">
+				<UserName>gprs</UserName>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Morocco" mcc="604">
+		<Carrier carrier="Maroc Telecom" mnc="001">
+			<APN apn="iam">
+				<UserName>wac</UserName>
+				<Password>1987</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Medi Telecom" mnc="000">
+			<APN apn="wap.meditel.ma">
+				<UserName>MEDIWAP</UserName>
+				<Password>MEDIWAP</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Mozambique" mcc="643">
+		<Carrier carrier="Mcel (isp)" mnc="001">
+			<APN apn="isp.mcel.mz">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Mcel (wap)" mnc="001">
+			<APN apn="wap.mcel.mz">
+				<UserName>guest</UserName>
+				<Password>guest</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodacom" mnc="004">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Netherlands" mcc="204">
+		<Carrier carrier="KPN Netherlands" mnc="008">
+			<APN apn="internet">
+				<UserName>KPN</UserName>
+				<Password>gprs</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Netherlands" mnc="020">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Netherlands" mnc="002">
+			<APN apn="internet.tele2.nl">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Breedband" mnc="012">
+			<APN apn="internet.versatel.nl">
+				<UserName>username</UserName>
+				<Password>password</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telfort Breedband" mnc="012">
+			<APN apn="internet">
+				<UserName>telfortnl</UserName>
+				<Password>password</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile Netherlands" mnc="016">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="New Zealand" mcc="530">
+		<Carrier carrier="Vodafone NZ" mnc="001">
+			<APN apn="www.vodafone.net.nz">
+			</APN>
+		</Carrier>
+		<Carrier carrier="CallPlus APN" mnc="001">
+			<APN apn="www.callplus.net.nz">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Slingshot APN" mnc="001">
+			<APN apn="www.slingshot.net.nz">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telstra Clear (Vodafone)" mnc="001">
+			<APN apn="www.telstraclear.net.nz">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telecom NZ CDMA" mnc="002">
+			<APN apn="">
+				<UserName>mobile@jamamobile</UserName>
+				<Password>telecom</Password>
+				<Dial>#777</Dial>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Spark NZ" mnc="005">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+				<Dial>*99#</Dial>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telstra Clear" mnc="004">
+			<APN apn="www.telstraclear.net.nz">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Nigeria" mcc="621">
+		<Carrier carrier="Globacom (WAP)" mnc="050">
+			<APN apn="glowap">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Globacom (Internet)" mnc="050">
+			<APN apn="gprs">
+				<UserName>wap</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="MTN Nigeria" mnc="030">
+			<APN apn="web.gprs.mtnnigeria.net">
+				<UserName>wap</UserName>
+				<Password>gprs</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Norway" mcc="242">
+		<Carrier carrier="Netcom Norge" mnc="002">
+			<APN apn="internet.netcom.no">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Norway" mnc="004">
+			<APN apn="mobileinternet.tele2.no">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telenor Norway" mnc="001">
+			<APN apn="telenor">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Norway" mnc="001">
+			<APN apn="internet.vodafone.net">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Pakistan" mcc="410">
+		<Carrier carrier="Ufone" mnc="003">
+			<APN apn="ufone.internet">
+				<UserName>ufone</UserName>
+				<Password>ufone</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Panama" mcc="714">
+		<Carrier carrier="Cable &amp; Wireless Panama" mnc="001">
+			<APN apn="apn01.cwpanama.com.pa">
+				<UserName>xxx</UserName>
+				<Password>xxx</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Paraguay" mcc="744">
+		<Carrier carrier="CTI Paraguay" mnc="002">
+			<APN apn="internet.ctimovil.com.py">
+				<UserName>ctigprs</UserName>
+				<Password>ctigprs999</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Peru" mcc="716">
+		<Carrier carrier="Claro (TIM) Peru" mnc="010">
+			<APN apn="tim.pe">
+				<UserName>tim</UserName>
+				<Password>tulibertad</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Philippines" mcc="515">
+		<Carrier carrier="Globe Telecoms" mnc="002">
+			<APN apn="www.globe.com.ph">
+				<UserName>globe</UserName>
+				<Password>globe</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Global Philippines" mnc="002">
+			<APN apn="www.globe.com.ph">
+				<UserName>globe</UserName>
+				<Password>globe</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="SMART Philippines" mnc="003">
+			<APN apn="internet">
+				<UserName>witsductoor</UserName>
+				<Password>banonoy</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sun Cellular" mnc="005">
+			<APN apn="minternet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Poland" mcc="260">
+		<Carrier carrier="ERA Poland" mnc="002">
+			<APN apn="erainternet">
+				<UserName>erainternet</UserName>
+				<Password>erainternet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Idea Poland" mnc="003">
+			<APN apn="www.idea.pl">
+				<UserName>idea</UserName>
+				<Password>idea</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Poland" mnc="003">
+			<APN apn="internet">
+				<UserName>internet</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Plus GSM/Polkomtel" mnc="001">
+			<APN apn="www.plusgsm.pl">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Portugal" mcc="268">
+		<Carrier carrier="Optimus" mnc="003">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="TMN" mnc="006">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Telecel Pt." mnc="001">
+			<APN apn="internet.vodafone.pt">
+				<UserName>vodafone</UserName>
+				<Password>vodafone</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Qatar" mcc="427">
+		<Carrier carrier="Q-Tel" mnc="001">
+			<APN apn="gprs.qtel">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Reunion(France)" mcc="647">
+		<Carrier carrier="Orange Re" mnc="000">
+			<APN apn="orangerun">
+				<UserName>orange</UserName>
+				<Password>orange</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Romania" mcc="226">
+		<Carrier carrier="Orange Romania" mnc="010">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Romania" mnc="001">
+			<APN apn="internet.connex.ro">
+				<UserName>internet.connex.ro</UserName>
+				<Password>connex</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Russian Federation" mcc="250">
+		<Carrier carrier="VimpelCom" mnc="099">
+			<APN apn="internet.beeline.ru">
+				<UserName>beeline</UserName>
+				<Password>beeline</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="MegaFon RU" mnc="002">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Motiv" mnc="020,035">
+			<APN apn="internet.beeline.ru">
+				<UserName>beeline</UserName>
+				<Password>beeline</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="MTS" mnc="001">
+			<APN apn="internet.mts.ru">
+				<UserName>mts</UserName>
+				<Password>mts</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="NCC" mnc="003">
+			<APN apn="internet">
+				<UserName>ncc</UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="NTC (New Telephone Co)" mnc="016">
+			<APN apn="internet.ntc">
+			</APN>
+		</Carrier>
+		<Carrier carrier="PrimTel" mnc="092">
+			<APN apn="internet.primtel.ru">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Saint Lucia" mcc="358">
+		<Carrier carrier="Cable and Wireless" mnc="110,180">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="DigiCel St.Lucia" mnc="050">
+			<APN apn="web.digiceloecs.com">
+				<UserName>wapoecs</UserName>
+				<Password>wap03oecs</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Saudi Arabia" mcc="420">
+		<Carrier carrier="Mobily Saudi Arabia" mnc="003">
+			<APN apn="web1">
+				<UserName></UserName>
+			</APN>
+			<APN apn="web2">
+				<UserName></UserName>
+			</APN>
+		</Carrier>
+		<Carrier carrier="STC" mnc="001">
+			<APN apn="jawalnet.com.sa">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Zain" mnc="004">
+			<APN apn="Zain">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Serbia" mcc="220">
+		<Carrier carrier="Mobtel Srbija" mnc="003">
+			<APN apn="internet">
+				<UserName>mobtel</UserName>
+				<Password>gprs</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telekom Srbija" mnc="003">
+			<APN apn="gprsinternet">
+				<UserName>mts</UserName>
+				<Password>064</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telekom Srbija (WAP)" mnc="003">
+			<APN apn="gprswap">
+				<UserName>mts</UserName>
+				<Password>064</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telekom Srbija (MMS)" mnc="003">
+			<APN apn="mms">
+				<UserName>mts</UserName>
+				<Password>064</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile CG (Montenegro)" mnc="004">
+			<APN apn="internet.postpaid">
+				<UserName>38167</UserName>
+				<Password>38167</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Singapore" mcc="525">
+		<Carrier carrier="M1 Singapore" mnc="003">
+			<APN apn="sunsurf">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Singtel Singapore" mnc="001">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Starhub Singapore" mnc="005">
+			<APN apn="shwapint">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Slovakia" mcc="231">
+		<Carrier carrier="Orange Slovakia" mnc="001">
+			<APN apn="internet">
+				<UserName>jusernejm</UserName>
+				<Password>pasvord</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile SK (Slovakia)" mnc="002,100">
+			<APN apn="internet">
+				<UserName>internet</UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Slovenia" mcc="293">
+		<Carrier carrier="Mobitel UMTS/HSDPA" mnc="041">
+			<APN apn="internet">
+				<UserName>mobitel</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Si.mobil SI" mnc="040">
+			<APN apn="internet.simobil.si">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-2" mnc="064">
+			<APN apn="t-2.net">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="South Africa" mcc="655">
+		<Carrier carrier="Cell-C South Africa" mnc="007">
+			<APN apn="internet">
+				<UserName>Cellcis</UserName>
+				<Password>Cellcis</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="MTN South Africa" mnc="010">
+			<APN apn="myMTN">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodacom South Africa" mnc="001">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telkom" mnc="02">
+			<APN apn="Internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="8.ta" mnc="02">
+			<APN apn="Internet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Spain" mcc="214">
+		<Carrier carrier="Amena" mnc="003">
+			<APN apn="internet">
+				<UserName>CLIENTE</UserName>
+				<Password>AMENA</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Movistar Spain" mnc="007">
+			<APN apn="movistar.es">
+				<UserName>movistar</UserName>
+				<Password>movistar</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange ES" mnc="003">
+			<APN apn="internet">
+				<UserName>CLIENTE</UserName>
+				<Password>AMENA</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telefonica Spain" mnc="007">
+			<APN apn="movistar.es">
+				<UserName>movistar</UserName>
+				<Password>movistar</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone Spain" mnc="001">
+			<APN apn="airtelnet.es">
+				<UserName>vodafone</UserName>
+				<Password>vodafone</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Sri Lanka" mcc="413">
+		<Carrier carrier="Dialog GSM (Contract)" mnc="002">
+			<APN apn="www.dialogsl.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Dialog GSM (Pre Pay)" mnc="002">
+			<APN apn="ppwap">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Mobitel SriLanka" mnc="001,071">
+			<APN apn="isp">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Sweden" mcc="240">
+		<Carrier carrier="S Comviq" mnc="007,010">
+			<APN apn="internet.tele2.se">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="SpringMobil SE" mnc="010">
+		</Carrier>
+		<Carrier carrier="SWEDEN" mnc="004">
+		</Carrier>
+		<Carrier carrier="Sweden 3G" mnc="005">
+		</Carrier>
+		<Carrier carrier="Tele2 Sweden" mnc="007">
+			<APN apn="mobileinternet.tele2.se">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Sweden" mnc="010,005">
+			<APN apn="isplnk1.swip.net">
+				<UserName>gprs</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telenor SE" mnc="008">
+			<APN apn="internet.telenor.se">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telia AB Sweden" mnc="001">
+			<APN apn="online.telia.se">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tre Sweden" mnc="002">
+			<APN apn="data.tre.se">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Switzerland" mcc="228">
+		<Carrier carrier="Orange Switzerland" mnc="003">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sunrise" mnc="002">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Swisscom Mobile" mnc="001">
+			<APN apn="gprs.swisscom.ch">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tele2 Switzerland" mnc="008">
+			<APN apn="internet.tele2.ch">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Taiwan" mcc="466">
+		<Carrier carrier="Chung Wa Telecom T." mnc="092">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Far Eas Tone" mnc="001">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="KG Telecom" mnc="088">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Taiwan Cellular" mnc="097">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="威寶電信" mnc="089">
+			<APN apn="vibo">
+			</APN>
+		</Carrier>
+		<Carrier carrier="VIBO Prepaid" mnc="089">
+			<APN apn="viboone">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Thailand" mcc="520">
+		<Carrier carrier="AIS" mnc="001">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="DTAC" mnc="018">
+			<APN apn="www.dtac.co.th">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange Thailand" mnc="099">
+			<APN apn="internet">
+				<UserName>orange</UserName>
+				<Password>orange</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Turkey" mcc="286">
+		<Carrier carrier="Aria" mnc="003">
+			<APN apn="aycell">
+			</APN>
+		</Carrier>
+		<Carrier carrier="AVEA" mnc="003">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Turkcell Turkey" mnc="001">
+			<APN apn="internet">
+				<UserName>gprs</UserName>
+				<Password>gprs</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone TR" mnc="002">
+			<APN apn="internet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Ukraine" mcc="255">
+		<Carrier carrier="Astelit" mnc="006">
+			<APN apn="internet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Beeline UA" mnc="002">
+			<APN apn="internet.beeline.ua">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Kyivstar" mnc="003">
+			<APN apn="www.kyivstar.net">
+				<UserName>igprs</UserName>
+				<Password>internet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="UMC Ukraine" mnc="001">
+			<APN apn="www.umc.ua">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="United Arab Emirates" mcc="424">
+		<Carrier carrier="du UAE" mnc="003">
+			<APN apn="Du">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Etisalat" mnc="002">
+			<APN apn="etisalat.ae">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Etisalat UAE" mnc="002">
+			<APN apn="mnet">
+				<UserName>mnet</UserName>
+				<Password>mnet</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Etisalat Wasel" mnc="002">
+			<APN apn="waselmnet">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="United Kingdom" mcc="234">
+		<Carrier carrier="3 UK" mnc="020">
+			<APN apn="three.co.uk">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Jersey Telecom" mnc="050">
+			<APN apn="pepper">
+				<UserName>abc</UserName>
+				<Password>abc</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="O2 UK Mobile Web" mnc="010">
+			<APN apn="MOBILE.O2.CO.UK">
+				<UserName>faster</UserName>
+				<Password>password</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="O2 UK VPN" mnc="010">
+			<APN apn="VPN.O2.CO.UK">
+				<UserName>username</UserName>
+				<Password>password</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Tesco-prepay" mnc="010">
+			<APN apn="prepay.tesco-mobile.com">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Orange UK" mnc="033">
+			<APN apn="orangeinternet">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Three UK" mnc="020">
+			<APN apn="three.co.uk">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile (One2One) UK" mnc="030,031,032">
+			<APN apn="general.t-mobile.uk">
+				<UserName>Username</UserName>
+				<Password>one2one</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile UK" mnc="030,031,032">
+			<APN apn="general.t-mobile.uk">
+				<UserName>t-mobile</UserName>
+				<Password>tm</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Virgin Mobile UK" mnc="000,001,031,032">
+			<APN apn="goto.virginmobile.com">
+				<UserName>user</UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone (Contract) UK" mnc="015">
+			<APN apn="internet">
+				<UserName>web</UserName>
+				<Password>web</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Vodafone (Pre-pay) UK" mnc="015">
+			<APN apn="pp.vodafone.co.uk">
+				<UserName>wap</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="USA" mcc="310">
+		<Carrier carrier="Verizon Wireless" mnc="004,005,012">
+			<APN apn="vzwinternet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sprint" mnc="120">
+			<APN apn="r.ispsn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="AT&amp;T" mnc="150,170,380,410">
+			<APN apn="m2m.com.attz">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Cellular One USA" mnc="059,190">
+			<APN apn="cellular1wap">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile (Non-contract)" mnc="260,270,250,200,031,220,160,660,240,230,210,026">
+			<APN apn="wap.voicestream.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="T-Mobile USA" mnc="026,031,160,200,210,220,230,240,250,260,270,660">
+			<APN apn="internet2.voicestream.com">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Unicel Info2Go" mnc="890">
+			<APN apn="apn.unicel.com">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="USA" mcc="311">
+		<Carrier carrier="Verizon Wireless" mnc="012,048,480">
+			<APN apn="vzwinternet">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Sprint" mnc="490">
+			<APN apn="r.ispsn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Uruguay" mcc="748">
+		<Carrier carrier="ANCEL" mnc="000,001">
+			<APN apn="gprs.ancel">
+			</APN>
+		</Carrier>
+		<Carrier carrier="CTI Uruguay" mnc="010">
+			<APN apn="internet.ctimovil.com.uy">
+				<UserName>ctiweb</UserName>
+				<Password>ctiweb999</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Uzbekistan" mcc="434">
+		<Carrier carrier="Uzdunrobita" mnc="007">
+			<APN apn="net.urd.uz">
+				<UserName>user</UserName>
+				<Password>pass</Password>
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="Venezuela" mcc="734">
+		<Carrier carrier="Digitel TIM" mnc="001,002,003">
+			<APN apn="gprsweb.digitel.ve">
+			</APN>
+		</Carrier>
+	</Country>
+	<Country country="test" mcc="001">
+		<Carrier carrier="Test" mnc="001">
+			<APN apn="TestAPN">
+			</APN>
+		</Carrier>
+	</Country>
+</Rt>

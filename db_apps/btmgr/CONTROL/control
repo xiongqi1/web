@@ -1,0 +1,8 @@
+Package: btmgr
+Priority: optional
+Section: Misc
+Version: 1.0.0
+Architecture: arm
+Maintainer: support@netcommwireless.com
+Depends:bluez
+Description: Bluetooth device manager.

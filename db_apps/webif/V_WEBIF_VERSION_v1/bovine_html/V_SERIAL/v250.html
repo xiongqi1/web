@@ -1,0 +1,268 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>V250</title>
+<script language="javascript" src="util.js"></script>
+<!--script language="JavaScript" src="stdlibjs.htm"></script-->
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['v250baud'];
+	retval = set_single( 'confv250.Baud_rate='+tempval );
+	tempval = form['v250icto'];
+	retval = set_single( 'confv250.Inter_Character_Timeout='+tempval );
+	tempval = form['v250id'];
+	retval = set_single( 'confv250.Ident='+tempval );
+	tempval = form['v250ignoreStr'];
+	retval = set_single( 'confv250.ignoreStr='+tempval );
+
+	tempval = form['dialPort'];
+	retval = set_single( 'confv250.dialPort='+tempval );
+	tempval = form['v250dtr'];
+	retval = set_single( 'confv250.opt_dtr='+tempval );
+	tempval = form['v250dcd'];
+	retval = set_single( 'confv250.opt_dcd='+tempval );
+	tempval = form['v250fc'];
+	retval = set_single( 'confv250.opt_fc='+tempval );
+	tempval = form['v250ri'];
+	retval = set_single( 'confv250.opt_ri='+tempval );
+	tempval = form['modemAutoAnswer'];
+	retval = set_single( 'confv250.modemAutoAnswer='+tempval );
+	tempval = form['autoDialNumber'];
+	retval = set_single( 'confv250.autoDialNumber='+tempval );
+
+	set_single( 'link.profile.modememulator_update=2', '-p');
+}
+else { /*GET*/
+	temp = get_single( 'confv250.Inter_Character_Timeout' );
+	form['v250icto'] = temp;
+	temp = get_single( 'confv250.Ident' );
+	form['v250id'] = temp;
+	temp = get_single( 'confv250.ignoreStr' );
+	form['v250ignoreStr'] = temp;
+	temp = get_single( 'confv250.autoDialNumber' );
+	form['autoDialNumber'] = temp;
+}
+_dialPort=get_single('confv250.dialPort');
+_v250dtr=get_single('confv250.opt_dtr');
+_v250fc=get_single('confv250.opt_fc');
+_v250dcd=get_single('confv250.opt_dcd');
+_v250ri=get_single('confv250.opt_ri');
+_modemAutoAnswer=get_single('confv250.modemAutoAnswer');
+_v250baud=get_single('confv250.Baud_rate');
+
+confv250_enable = get_single( 'confv250.enable' );
+confv250_padd_enable = get_single( 'confv250.padd_enable' );
+%>
+</head>
+<body onload="init();">
+<div id="contentWrapper">
+<% include menu.html %> 
+<script language="JavaScript">
+Butterlate.setTextDomain("v250");
+//ipm='Either you have not entered all of the numbers \n or some of the numbers you entered are invalid. \n The number in each entry box should be between 0 - 255.';
+var _v250dtr = "@@_v250dtr";
+function showSelectv250dtr() {
+	document.write(""+
+	"<select name=\"v250dtr\">"+
+	"    <option value=\"0\">"+_("ignore")+"</option>"+
+	"    <option value=\"1\">"+_("command")+"</option>"+
+	"    <option value=\"2\">"+_("disconnect")+"</option>"+
+	"    <option value=\"4\">"+_("highAutoDial")+"</option>"+
+	"    <option value=\"5\">"+_("lowAutoDial")+"</option>"+
+	"    <option value=\"6\">"+_("lowPass")+"</option>"+
+	"</select>");
+}
+
+var _v250fc = "@@_v250fc";
+function showSelectv250fc() {
+	document.write(""+
+	"<select name=\"v250fc\">"+
+	"    <option value=\"0\">"+_("off")+"</option>"+
+	"    <option value=\"34\">"+_("hardware")+"</option>"+
+	"</select>");
+}
+
+var _v250dcd = "@@_v250dcd";
+function showSelectv250dcd() {
+	document.write(""+
+	"<select name=\"v250dcd\">"+
+	"    <option value=\"0\">"+_("always on")+"</option>"+
+	"    <option value=\"1\">"+_("connect on")+"</option>"+
+	"    <option value=\"2\">"+_("always off")+"</option>"+
+	"    <option value=\"3\">"+_("ppp on")+"</option>"+
+	"</select>");
+}
+
+var _dialPort = "@@_dialPort";
+function showSelectdialPort() {
+	document.write(""+
+	"<select name=\"dialPort\">"+
+	"    <option value=\"0\">"+_("dialString")+"</option>"+
+	"    <option value=\"1\">"+_("profile")+"</option>"+
+	"    <option value=\"2\">"+_("circuit")+"</option>"+
+	"    <option value=\"3\">"+_("packet")+"</option>"+
+	"</select>");
+}
+
+var _v250ri = "@@_v250ri";
+function showSelectv250ri() {
+	document.write(""+
+	"<select name=\"v250ri\">"+
+	"    <option value=\"1\">"+_("incoming ring")+"</option>"+
+	"    <option value=\"0\">"+_("always on")+"</option>"+
+	"    <option value=\"2\">"+_("always off")+"</option>"+
+	"</select>");
+}
+
+var _modemAutoAnswer = "@@_modemAutoAnswer";
+function showSelectmodemAutoAnswer() {
+	document.write(""+
+	"<select name=\"modemAutoAnswer\">"+
+	"    <option value=\"0\">"+_("off")+"</option>"+
+	"    <option value=\"1\">1</option>"+
+	"    <option value=\"2\">2</option>"+
+	"    <option value=\"3\">3</option>"+
+	"    <option value=\"4\">4</option>"+
+	"    <option value=\"5\">5</option>"+
+	"    <option value=\"6\">6</option>"+
+	"    <option value=\"7\">7</option>"+
+	"    <option value=\"8\">8</option>"+
+	"    <option value=\"9\">9</option>"+
+	"    <option value=\"10\">10</option>"+
+	"    <option value=\"11\">11</option>"+
+	"    <option value=\"12\">12</option>"+
+	"</select>");
+}
+
+var _v250baud = "@@_v250baud";
+function init() {
+//document.form1.v250icto.value="50";
+<%if( confv250_enable == 1 && confv250_padd_enable != 1 ) {%>
+	with ( document.forms[0] ) {
+		setSelect( v250baud, _v250baud);
+		setSelect( v250dtr, _v250dtr);
+		setSelect( v250fc, _v250fc);
+		setSelect( v250dcd, _v250dcd);
+		setSelect( dialPort, _dialPort);
+		setSelect( v250ri, _v250ri);
+		setSelect( modemAutoAnswer, _modemAutoAnswer);
+	}
+<%}%>
+	$("#saveBtn").val(_("CSsave"));
+}
+
+function submitF() {       
+	var f=document.form;
+	if (f.v250icto.value < 0 || f.v250icto.value > 65535) {
+		alert(_("Msg122"));//Error: 'Intercharacter timeout must have a value between 0 and 65535.
+		f.v250icto.select();
+		return;
+	}
+	document.form.submit();
+} 
+</script>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > "+_("modem"));</script></h3>
+<% if ( confv250_enable == 1 && confv250_padd_enable != 1 ) { %>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("modem settings"));</script></th></tr>
+</table>
+
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("baud rate"));</script></font></td>
+	<td>
+	<select name="v250baud" size=1 ><option value=300>300</option><option value=1200>1200</option>
+	<option value=2400>2400</option><option value=4800>4800</option><option value=9600>9600</option>
+	<option value=19200>19200</option><option value=38400>38400</option><option value=57600>57600</option>
+	<option value=115200>115200</option>
+	</select></td>
+</tr>
+
+<tr>
+	<td><script language="JavaScript">document.write(_("inter character timeout"));</script></td>
+	<td><input type=text name="v250icto" size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['v250icto']"> &nbsp;(0-65535) miliseconds</td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("id"));</script></td>
+	<td><input type=text name="v250id" size=32 maxlength=64 value="@@form['v250id']"></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("ignore string"));</script></td>
+	<td><input type=text name="v250ignoreStr" size=32 maxlength=128 value="@@form['v250ignoreStr']"></td>
+</tr>
+</table>
+
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("connection settings"));</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("connect to"));</script></font></td>
+	<td><script language=Javascript>showSelectdialPort();</script></td>
+</tr>
+#ifdef V_SERIAL_HAS_FC_y
+<tr>
+#else
+<tr style="display:none">
+#endif
+	<td><script language="JavaScript">document.write(_("dtr action"));</script></td>
+	<td>
+		<script language=Javascript>showSelectv250dtr();</script>
+	</td>
+</tr>
+#ifdef V_SERIAL_HAS_FC_y
+<tr>
+#else
+<tr style="display:none">
+#endif
+	<td><script language="JavaScript">document.write(_("dcd action"));</script></td>
+	<td><script language=Javascript>showSelectv250dcd();</script></td>
+</tr>
+#ifdef V_SERIAL_HAS_FC_y
+<tr>
+#else
+<tr style="display:none">
+#endif
+	<td><script language="JavaScript">document.write(_("flow control"));</script></td>
+	<td><script language=Javascript>showSelectv250fc();</script></td>
+</tr>
+#ifdef V_SERIAL_HAS_FC_y
+<tr>
+#else
+<tr style="display:none">
+#endif
+	<td><script language="JavaScript">document.write(_("ri action"));</script></td>
+	<td><script language=Javascript>showSelectv250ri();</script></td>
+</tr>
+<tr>
+	<td>Circuit AutoAnswer Rings<script language="JavaScript">document.write(_("circuit autoAnswer rings"));</script></td>
+	<td><script language=Javascript>showSelectmodemAutoAnswer();</script></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("auto dial number"));</script></td>
+	<td><input type=text name="autoDialNumber" size=32 maxlength=64 value="@@form['autoDialNumber']"></td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="center">
+<p></p>
+<input type="Button" value="Save" id="saveBtn" onClick="javascript:submitF()" style="width:120px;">
+</div>
+<% }else{ %>
+<P></P>
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("Msg123"));</script></P>
+<%}%>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

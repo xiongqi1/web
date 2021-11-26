@@ -1,0 +1,280 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End Points List</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+#include "end_point_types.inc"
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+
+<script language="JavaScript">
+var MAX_END_POINTS=50;
+// copy the global end point list, and delete end points not allowed
+enabled_types_list = g_ep_types_list;
+
+// delete bluetooth SPP/GC endpoints
+#ifndef V_BLUETOOTH
+	delete enabled_types_list["16"];
+	delete enabled_types_list["17"];
+#endif
+
+#ifdef V_MODCOMMS_y
+	if (rf_mice_ready != "ready") {
+		delete enabled_types_list["16"];
+		delete enabled_types_list["17"];
+	}
+#endif
+
+// delete GPS end point if needed
+#if (!defined V_GPS) || (!defined V_HAS_SGPS)
+	delete enabled_types_list["6"];
+#elif defined(V_MODCOMMS_y)
+	if (gps_mice_ready != "ready" && gps_can_mice_ready != "ready") {
+		delete enabled_types_list["6"];
+	}
+#endif
+
+// delete RS232/RS485/RS422 end points
+#ifdef V_SERIAL_IO_MODE_none
+	delete enabled_types_list["8"];
+	delete enabled_types_list["9"];
+	delete enabled_types_list["10"];
+#elif defined(V_MODCOMMS_y)
+	if (io_mice_ready != "ready" && aeris_mice_ready != "ready") {
+		delete enabled_types_list["8"];
+		delete enabled_types_list["9"];
+		delete enabled_types_list["10"];
+	}
+#endif
+
+// delete modem emulator end points if necessary
+// these are only allowed on built-in ports,
+// so if V_SERIAL is set to "none" then disable
+#ifdef V_SERIAL_none
+	delete enabled_types_list["11"];
+	delete enabled_types_list["12"];
+	delete enabled_types_list["13"];
+#elif defined(V_MODCOMMS_y)
+	if (io_mice_ready != "ready" && aeris_mice_ready != "ready") {
+		delete enabled_types_list["11"];
+		delete enabled_types_list["12"];
+		delete enabled_types_list["13"];
+	}
+#endif
+
+// delete CSD if necessary
+#ifndef V_DATA_STREAM_SWITCH_HAS_CSD
+	delete enabled_types_list["14"];
+#elif defined(V_MODCOMMS_y)
+	if (io_mice_ready != "ready" && aeris_mice_ready != "ready") {
+		delete enabled_types_list["14"];
+	}
+#endif
+
+
+function submitList() {
+	blockUI_wait(_("GUI pleaseWait"));
+	var c=""
+	for (var i=0; i<endpoints.length; i++) {
+		if( i>0 ) c += ",";
+		c+=endpoints[i].name+":"+endpoints[i].type;
+	}
+	$.get("/cgi-bin/end_points.cgi?<%appendCsrfTokenToQueryString();%>setup&"+c, function(){window.location.href="/end_points.html?success"});
+}
+
+function delentry(idx) {
+	endpoints.splice(idx, 1)
+	renew_list();
+}
+
+function nameFilter2(field) {
+	nameFilter(field);
+	field.value=field.value.replace(/^[0-9]/,'')
+}
+
+function endpoints_edit(idx) {
+	clear_alert();
+	if(idx<0) { //add
+		if(endpoints.length>=MAX_END_POINTS) {
+			blockUI_alert(_("maxendpoint"));
+			return;
+		}
+		var h="";
+		$.each(
+			enabled_types_list, function(val,txt) { h+="<option value='"+val+"'>"+enabled_types_list[val]+"</option>";}
+		);
+
+		$.blockUI( {message: "\
+			<div><table>\
+				<tr>\
+					<td style='text-align:right'>\
+						"+_("endPointName")+"\
+					</td>\
+					<td>\
+						<input type='text' class='large' id='new_name' onKeyUp='nameFilter2(this);' value=''>\
+					</td>\
+				<tr>\
+				<tr>\
+					<td style='text-align:right'>\
+						"+_("endPointTypes")+"\
+					</td>\
+					<td>\
+						<select id='id_ep_types' style='width:auto'>"+h+"</select>\
+					</td>\
+				<tr>\
+			</table>\
+			<div style='padding: 15px 0 5px 20px'><button class='secondary med' style='display:inline;float:none' id='blockui_yes'>"+_("CSok")+"</button>\
+			<button class='secondary med' style='display:inline;float:none' id='blockui_no'>"+_("cancel")+"</button>\
+			</div>\
+			</div>", css: {width:'360px', height:'160px', padding:'20px 20px'}
+		});
+		/* blockui - no */
+		$("#blockui_no").click(function() {
+			$.unblockUI();
+		});
+
+		/* blockui - yes */
+		$("#blockui_yes").click(function() {
+			if(typeof(endpoints)=="undefined") {
+				idx=0;
+			}
+			else {
+				idx=endpoints.length;
+			}
+			if($("#new_name").val()=="") {
+				blockUI_alert(_("epNameBlank"));
+				return;
+			}
+			for (var i=0; i<endpoints.length;i++) {
+				if($("#new_name").val()==endpoints[i].name) {
+					blockUI_alert(_("invalidEndpointName"));
+					return;
+				}
+			}
+			window.location.href="/End_Point_Type"+$("#id_ep_types").val()+".html?"+$("#new_name").val();
+		});
+	}
+	else {
+		window.location.href="/End_Point_Type"+endpoints[idx].type+".html?"+endpoints[idx].name;
+	}
+}
+
+function get_summary(s) {
+	c="";
+	var arr=s.split(";");
+	for( x in arr ) {
+		y=arr[x].split(":");
+		if(y.length==2) {
+			z=y[0].split(".");
+			if(y.length>0) {
+				c+=z[z.length-1]+": "+htmlNumberEncode(y[1])+"</br>";
+			}
+		}
+	}
+	return c;
+}
+
+function renew_list() {
+var h="";
+	for (var i=0; i<endpoints.length;i++) {
+		h+="<tr>\
+		<td>"+breakWord(endpoints[i].name,13, 1)+"</td>\
+		<td>"+enabled_types_list[endpoints[i].type]+"</td>\
+		<td>"+get_summary(endpoints[i].sum)+"</td>\
+		</div></td>";
+#ifdef V_WEBIF_SPEC_vdf
+		h+="<td class='last'><a href='javascript:endpoints_edit("+i+")' class='secondary sml'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+		h+="<td class='last'><a href='javascript:endpoints_edit("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+		h+="<td class='last'><a href='javascript:delentry("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close'></i></a></td>\
+		</tr>";
+	}
+	if(validated=="0") {
+		validate_alert( _("epValidateFailed"), error_msg )
+	}
+	$("#title-head").css("display", "");
+	$("#submit-div").css("display", "");
+	$("#EDPlist").html(h);
+}
+
+$(document).ready(function() {
+	if(typeof(endpoints)=="undefined" || endpoints.length == 0) {
+		h="<tr><th colspan=\"9\"><div align=\"center\">"+_("EDPempty")+"</div></th></tr>";
+		$("#title-head").css("display", "none");
+		$("#submit-div").css("display", "none");
+		$("#EDPlist").html(h);
+	}
+	else {
+		renew_list();
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<div class="pad" id="stream_list">
+			<form class="validate" novalidate="novalidate">
+				<div class="grid-50">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("endPointsList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-50">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="endpoints_edit(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<table class="above-5-column name-list">
+					<colgroup>
+						<col width="100px">
+						<col width="130px">
+						<col width="180px">
+						<col width="auto">
+						<col width="20px">
+					</colgroup>
+					<thead id="title-head">
+					<tr>
+						<th class="align10"><script language=Javascript>document.write(_("name"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("type"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("summary"))</script></th>
+						<th>&nbsp;</th>
+						<th>&nbsp;</th>
+					</tr>
+					<tbody id="EDPlist"></tbody>
+					</thead>
+				</table>
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitList();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+</script>
+</body>
+</html>

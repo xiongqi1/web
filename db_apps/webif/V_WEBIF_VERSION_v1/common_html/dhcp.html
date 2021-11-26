@@ -1,0 +1,742 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>DHCP</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/cgi-bin/dhcp.cgi"></script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['DHCPrange'];
+	retval = set_single( 'service.dhcp.range.0='+tempval, '-p' );
+	tempval = form['DHCPenable'];
+	retval = set_single( 'service.dhcp.enable='+tempval, '-p' );
+	tempval = form['DHCPLease'];
+	retval = set_single( 'service.dhcp.lease.0='+tempval, '-p' );
+	tempval = form['DDNsuffix'];
+	retval = set_single( 'service.dhcp.suffix.0='+tempval, '-p' );
+
+	tempval = form['DNS1'];
+	retval = set_single( 'service.dhcp.dns1.0='+tempval, '-p' );
+	tempval = form['DNS2'];
+	retval = set_single( 'service.dhcp.dns2.0='+tempval, '-p' );
+	tempval = form['WINSIP1'];
+	retval = set_single( 'service.dhcp.win1.0='+tempval, '-p' );
+	tempval = form['WINSIP2'];
+	retval = set_single( 'service.dhcp.win2.0='+tempval, '-p' );
+
+	tempval = form['NTPserver'];
+	retval = set_single( 'service.dhcp.ntp_server.0='+tempval, '-p' );
+	tempval = form['TFTPserver'];
+	retval = set_single( 'service.dhcp.tftp_server.0='+tempval, '-p' );
+	tempval = form['option150'];
+	retval = set_single( 'service.dhcp.option150.0='+tempval, '-p' );
+	tempval = form['option160'];
+	retval = set_single( 'service.dhcp.option160.0='+tempval, '-p' );
+
+	tempval = form['DHCPrelay'];
+	retval = set_single( 'service.dhcp.relay.0='+tempval, '-p' );
+	tempval = form['DHCPServerAddr'];
+	retval = set_single( 'service.dhcp.relay.server.0='+tempval, '-p' );
+
+	tempval = form['rdbCmd'];
+	set_list( tempval, '-p' );
+}
+else { /*GET*/
+	tempval = get_single( 'service.dhcp.range.0' );
+	form['DHCPrange'] = tempval;
+	tempval = get_single( 'service.dhcp.enable' );
+	form['DHCPenable'] = tempval;
+
+	tempval = get_single( 'service.dhcp.lease.0' );
+	form['DHCPLease'] = tempval;
+	tempval = get_single( 'service.dhcp.suffix.0' );
+	form['DDNsuffix'] = tempval;
+	tempval = get_single( 'service.dhcp.dns1.0' );
+	form['DNS1'] = tempval;
+	tempval = get_single( 'service.dhcp.dns2.0' );
+	form['DNS2'] = tempval;
+	tempval = get_single( 'service.dhcp.win1.0' );
+	form['WINSIP1'] = tempval;
+	tempval = get_single( 'service.dhcp.win2.0' );
+	form['WINSIP2'] = tempval;
+
+	tempval = get_single( 'service.dhcp.ntp_server.0' );
+	form['NTPserver'] = tempval;
+	tempval = get_single( 'service.dhcp.tftp_server.0' );
+	form['TFTPserver'] = tempval;
+	tempval = get_single( 'service.dhcp.option150.0' );
+	form['option150'] = tempval;
+	tempval = get_single( 'service.dhcp.option160.0' );
+	form['option160'] = tempval;
+	
+	tempval = get_single( 'service.dhcp.relay.0' );
+	form['DHCPrelay'] = tempval;
+	tempval = get_single( 'service.dhcp.relay.server.0' );
+	form['DHCPServerAddr'] = tempval;
+}
+%>
+<body>
+<div id="contentWrapper" >
+<% include menu.html %>
+
+<script language="JavaScript">
+Butterlate.setTextDomain("dhcp");
+var f = document.form;
+
+function checkAddr(myaddr) {
+	if(myaddr=="0.0.0.0" || myaddr=="")
+		return 1;
+	if(!isValidIpAddress(myaddr)) {
+		alert(myaddr+" "+_("dhcp warningMsg01"));
+		return false;
+	}
+	return true;
+}
+function submitF() {
+var f=document.form;
+	// if the dhcp is enabled then validate all the DHCP values...
+	if (f.DHCPConf[0].checked == true) {
+		if ( (f.DHCPStart1.value == "") || (f.DHCPStart2.value == "")
+			|| (f.DHCPStart3.value == "") || (f.DHCPStart4.value == "") ) {
+			alert(_("dhcp warningMsg02"));
+			return;
+		}
+
+		if ( (f.DHCPEnd1.value == "") || (f.DHCPEnd2.value == "")
+			|| (f.DHCPEnd3.value == "") || (f.DHCPEnd4.value == "") ) {
+			alert(_("dhcp warningMsg03"));
+			return;
+		}
+
+		if (f.DHCPLease.value == "") {
+			alert(_("dhcp warningMsg04"));
+			f.DHCPLease.select();
+			return;
+		}
+		
+		if (f.DHCPLease.value < 120) {
+			alert(_("minimumLeaseTime"));
+			f.DHCPLease.select();
+			return;
+		}
+
+		if ( (f.DNSAddress11.value == "") || (f.DNSAddress12.value == "")
+			|| (f.DNSAddress13.value == "") || (f.DNSAddress14.value == "") ) {
+			alert(_("dhcp warningMsg05"));
+			return;
+		}
+
+		if ( (f.DNSAddress21.value == "") || (f.DNSAddress22.value == "")
+			|| (f.DNSAddress23.value == "") || (f.DNSAddress24.value == "") ) {
+			alert(_("dhcp warningMsg06"));
+			return;
+		}
+
+		var myip="<%val=get_single('link.profile.0.address');%>@@val";
+		var mymask="<%val=get_single('link.profile.0.netmask');%>@@val";
+		startAddr=f.DHCPStart1.value + "." +
+					f.DHCPStart2.value + "." +
+					f.DHCPStart3.value + "." +
+					f.DHCPStart4.value;
+		endAddr  =f.DHCPEnd1.value + "." +
+					f.DHCPEnd2.value + "." +
+					f.DHCPEnd3.value + "." +
+					f.DHCPEnd4.value;
+		if (!isSameSubNet(myip, mymask, startAddr, mymask)) {
+			alert(_("dhcp warningMsg14"));
+			return;
+		}
+		if (!isSameSubNet(myip, mymask, endAddr, mymask)) {
+			alert(_("dhcp warningMsg15"));
+			return;
+		}
+	}
+
+	if (f.DHCPRelayConf[0].checked == true) {
+		if ( (f.DHCPServerAddr1.value == "") || (f.DHCPServerAddr2.value == "")
+			|| (f.DHCPServerAddr3.value == "") || (f.DHCPServerAddr4.value == "") ) {
+			alert(_("dhcp warningMsg07"));
+			return;
+		}
+	}
+	if ( (f.NTPserver1.value == "") || (f.NTPserver2.value == "")
+		|| (f.NTPserver3.value == "") || (f.NTPserver4.value == "") ) {
+		alert(_("dhcp warningMsg08"));
+		return;
+	}
+	ungreyOutAllDHCPFields();
+	f.DHCPServerAddr.value = f.DHCPServerAddr1.value + "."  + f.DHCPServerAddr2.value + "." + f.DHCPServerAddr3.value + "." + f.DHCPServerAddr4.value;
+	if(!checkAddr(f.DHCPServerAddr.value))
+		return;
+	startAddr=f.DHCPStart1.value + "."  + f.DHCPStart2.value + "." + f.DHCPStart3.value + "." + f.DHCPStart4.value;
+	if(!checkAddr(startAddr))
+		return;
+	endAddr=f.DHCPEnd1.value + "."  + f.DHCPEnd2.value + "." + f.DHCPEnd3.value + "." + f.DHCPEnd4.value;
+	if(!checkAddr(endAddr))
+		return;
+	f.DHCPrange.value = startAddr + "," + endAddr;
+	f.DNS1.value = f.DNSAddress11.value + "."  + f.DNSAddress12.value + "." + f.DNSAddress13.value + "." + f.DNSAddress14.value;
+	if(!checkAddr(f.DNS1.value))
+		return;
+	f.DNS2.value = f.DNSAddress21.value + "."  + f.DNSAddress22.value + "." + f.DNSAddress23.value + "." + f.DNSAddress24.value;
+	if(!checkAddr(f.DNS2.value))
+		return;
+	f.WINSIP1.value = f.WINSIP11.value + "."  + f.WINSIP12.value + "." + f.WINSIP13.value + "." + f.WINSIP14.value;
+	if(!checkAddr(f.WINSIP1.value))
+		return;
+	f.WINSIP2.value = f.WINSIP21.value + "."  + f.WINSIP22.value + "." + f.WINSIP23.value + "." + f.WINSIP24.value;
+	if(!checkAddr(f.WINSIP2.value))
+		return;
+	f.NTPserver.value = f.NTPserver1.value + "."  + f.NTPserver2.value + "." + f.NTPserver3.value + "." + f.NTPserver4.value;
+	if(!checkAddr(f.NTPserver.value))
+		return;
+	for(var i=0; i<=f.maxReservation.value; i++) {
+		if(!( document.getElementById('macid'+i) )) {
+			continue;
+		}
+		else {
+			if(!isValidMacAddress(document.getElementById('macid'+i).value))//&&(document.getElementById('name'+i).value)=="")
+			{
+				alert(_("invalid MAC address")+" "+_("Please specify a HEX value")+" "+_("mac example"));
+				return;
+			}
+		}
+	}
+	k=0;
+	f.rdbCmd.value="";
+	for( i=0; i<f.maxReservation.value; i++) {
+		if(!( document.getElementById('ipid'+i) )) {
+			continue;
+		}
+		else {
+			document.getElementById('ipid'+i).value = document.getElementById('ip1'+i).value+"."+document.getElementById('ip2'+i).value+"."+document.getElementById('ip3'+i).value+"."+document.getElementById('ip4'+i).value;
+			for(var j="1"; j<i; j++ ) {
+				// alert(document.getElementById('ipid'+j).value);
+				if(!( document.getElementById('ipid'+j) )) {
+					continue;
+				}
+				if(   ( (document.getElementById('ipid'+j).value) == (document.getElementById('ipid'+i).value) ) ) {
+					alert(_("dhcp warningMsg09")+document.getElementById('ipid'+j).value+", "+_("dhcp warningMsg10"));
+					return;
+				}
+			}
+		}
+		if( k>0 ) f.rdbCmd.value+='&';
+		var enable = document.getElementById('enabled'+i).checked==true?"enabled":"disabled";
+	//	var enable = document.getElementById('enabled'+i).checked;
+		f.rdbCmd.value += "service.dhcp.static."+k+"="+document.getElementById('name'+i).value+","+document.getElementById('macid'+i).value+","+document.getElementById('ipid'+i).value+","+enable;
+		k++;
+	}
+	if(k==0) f.rdbCmd.value = "service.dhcp.static.0";
+	else f.rdbCmd.value += "&service.dhcp.static."+k;
+	f.rdbCmd.value += "&service.dhcp.static.trigger=1";
+	f.submit();
+}
+
+// for when submit form
+function ungreyOutAllDHCPFields() {
+var f=document.form;
+	f.DHCPStart1.disabled = false;
+	f.DHCPStart2.disabled = false;
+	f.DHCPStart3.disabled = false;
+	f.DHCPStart4.disabled = false;
+
+	f.DHCPEnd1.disabled = false;
+	f.DHCPEnd2.disabled = false;
+	f.DHCPEnd3.disabled = false;
+	f.DHCPEnd4.disabled = false;
+
+	f.DHCPLease.disabled = false;
+	f.DDNsuffix.disabled = false;
+
+	f.DNSAddress11.disabled = false;
+	f.DNSAddress12.disabled = false;
+	f.DNSAddress13.disabled = false;
+	f.DNSAddress14.disabled = false;
+
+	f.DNSAddress21.disabled = false;
+	f.DNSAddress22.disabled = false;
+	f.DNSAddress23.disabled = false;
+	f.DNSAddress24.disabled = false;
+
+	f.WINSIP11.disabled = false;
+	f.WINSIP12.disabled = false;
+	f.WINSIP13.disabled = false;
+	f.WINSIP14.disabled = false;
+
+	f.WINSIP21.disabled = false;
+	f.WINSIP22.disabled = false;
+	f.WINSIP23.disabled = false;
+	f.WINSIP24.disabled = false;
+
+	f.DHCPServerAddr1.disabled = false;
+	f.DHCPServerAddr2.disabled = false;
+	f.DHCPServerAddr3.disabled = false;
+	f.DHCPServerAddr4.disabled = false;
+}
+
+// this is when enabling DHCP Relay
+function greyOutDHCPFields() {
+var f=document.form;
+	f.DHCPenable.value='0';
+	f.DHCPConf[1].checked=true;
+
+	f.DHCPStart1.disabled = true;
+	f.DHCPStart2.disabled = true;
+	f.DHCPStart3.disabled = true;
+	f.DHCPStart4.disabled = true;
+
+	f.DHCPEnd1.disabled = true;
+	f.DHCPEnd2.disabled = true;
+	f.DHCPEnd3.disabled = true;
+	f.DHCPEnd4.disabled = true;
+
+	f.DHCPLease.disabled = true;
+	f.DDNsuffix.disabled = true;
+
+	f.DNSAddress11.disabled = true;
+	f.DNSAddress12.disabled = true;
+	f.DNSAddress13.disabled = true;
+	f.DNSAddress14.disabled = true;
+
+	f.DNSAddress21.disabled = true;
+	f.DNSAddress22.disabled = true;
+	f.DNSAddress23.disabled = true;
+	f.DNSAddress24.disabled = true;
+
+	f.WINSIP11.disabled = true;
+	f.WINSIP12.disabled = true;
+	f.WINSIP13.disabled = true;
+	f.WINSIP14.disabled = true;
+
+	f.WINSIP21.disabled = true;
+	f.WINSIP22.disabled = true;
+	f.WINSIP23.disabled = true;
+	f.WINSIP24.disabled = true;
+
+	f.NTPserver1.disabled = true;
+	f.NTPserver2.disabled = true;
+	f.NTPserver3.disabled = true;
+	f.NTPserver4.disabled = true;
+
+	f.TFTPserver.disabled = true;
+	f.NTPserver.disabled = true;
+	f.option150.disabled = true;
+	f.option160.disabled = true;
+}
+
+// this is when disabling DHCP
+function ungreyOutDHCPFields() {
+var f=document.form;
+	f.DHCPenable.value='1';
+	f.DHCPConf[0].checked=true;
+	greyOutRelayFields();
+
+	f.DHCPStart1.disabled = false;
+	f.DHCPStart2.disabled = false;
+	f.DHCPStart3.disabled = false;
+	f.DHCPStart4.disabled = false;
+
+	f.DHCPEnd1.disabled = false;
+	f.DHCPEnd2.disabled = false;
+	f.DHCPEnd3.disabled = false;
+	f.DHCPEnd4.disabled = false;
+
+	f.DHCPLease.disabled = false;
+	f.DDNsuffix.disabled = false;
+
+	f.DNSAddress11.disabled = false;
+	f.DNSAddress12.disabled = false;
+	f.DNSAddress13.disabled = false;
+	f.DNSAddress14.disabled = false;
+
+	f.DNSAddress21.disabled = false;
+	f.DNSAddress22.disabled = false;
+	f.DNSAddress23.disabled = false;
+	f.DNSAddress24.disabled = false;
+
+	f.WINSIP11.disabled = false;
+	f.WINSIP12.disabled = false;
+	f.WINSIP13.disabled = false;
+	f.WINSIP14.disabled = false;
+
+	f.WINSIP21.disabled = false;
+	f.WINSIP22.disabled = false;
+	f.WINSIP23.disabled = false;
+	f.WINSIP24.disabled = false;
+
+	f.NTPserver1.disabled = false;
+	f.NTPserver2.disabled = false;
+	f.NTPserver3.disabled = false;
+	f.NTPserver4.disabled = false;
+
+	f.TFTPserver.disabled = false;
+	f.NTPserver.disabled = false;
+	f.option150.disabled = false;
+	f.option160.disabled = false;
+}
+
+// this is when enabling DHCP Relay
+function greyOutRelayFields() {
+	document.form.DHCPrelay.value='0'
+	document.form.DHCPRelayConf[1].checked=true;
+	document.form.DHCPServerAddr1.disabled = true;
+	document.form.DHCPServerAddr2.disabled = true;
+	document.form.DHCPServerAddr3.disabled = true;
+	document.form.DHCPServerAddr4.disabled = true;
+}
+
+// this is when disabling DHCP Relay
+function ungreyOutRelayFields() {
+	greyOutDHCPFields();
+	document.form.DHCPrelay.value='1';
+	document.form.DHCPRelayConf[0].checked=true;
+	document.form.DHCPServerAddr1.disabled = false;
+	document.form.DHCPServerAddr2.disabled = false;
+	document.form.DHCPServerAddr3.disabled = false;
+	document.form.DHCPServerAddr4.disabled = false;
+}
+
+function checkDHCPConf() { //onload
+	if (document.form.DHCPrelay.value == '0')
+		greyOutRelayFields();
+	else
+		ungreyOutRelayFields();
+
+	if (document.form.DHCPenable.value=='0')
+		greyOutDHCPFields();
+	else
+		ungreyOutDHCPFields();
+}
+
+function setDNS1Addr() {
+	f.DNSAddress11.value = f.LANEtherIP1.value;
+	f.DNSAddress12.value = f.LANEtherIP2.value;
+	f.DNSAddress13.value = f.LANEtherIP3.value;
+	f.DNSAddress14.value = f.LANEtherIP4.value;
+}
+
+function resetDNS1Addr() {
+	// since DNS masquerade is being disabled then we write 0's to the DNS addresses by default.
+	f.DNSAddress11.value = "0";
+	f.DNSAddress12.value = "0";
+	f.DNSAddress13.value = "0";
+	f.DNSAddress14.value = "0";
+
+	f.DNSAddress21.value = "0";
+	f.DNSAddress22.value = "0";
+	f.DNSAddress23.value = "0";
+	f.DNSAddress24.value = "0";
+}
+
+function checkDNSMasq() {
+	if (f.DNSMasq[1].checked == true) {
+		f.DNSAddress11.disabled = false;
+		f.DNSAddress12.disabled = false;
+		f.DNSAddress13.disabled = false;
+		f.DNSAddress14.disabled = false;
+		f.DNSAddress21.disabled = false;
+		f.DNSAddress22.disabled = false;
+		f.DNSAddress23.disabled = false;
+		f.DNSAddress24.disabled = false;
+	}
+	else if (f.DNSMasq[0].checked == true) {
+		greyOutDNSFields();
+	}
+}
+
+function greyOutPortField() {
+	f.incomingPort.disabled = true;
+}
+
+function ungreyOutPortField() {
+	// if the remote admin button is enabled then un-grey out the port field
+	f.incomingPort.disabled = false;
+	if ( (f.incomingPort.value < 1) || (f.incomingPort.value > 65534) )
+		f.incomingPort.value = "8080";
+}
+
+function CheckRemAdminEnable() {
+	if (f.remAdmin[0].checked == true)
+		f.incomingPort.disabled = false;
+	else
+		f.incomingPort.disabled = true;
+}
+
+function cloneLeasesData( hostname, mac, ip ) {
+	if( document.getElementById( "reservationdiv1" ).style['display']=='none' )
+		hideItem('reservationdiv', 1);
+	addElement( hostname, mac, ip, '0');
+}
+
+function displayReservationData() {
+	for(i=0; i<reservationdata.length; i++) { 
+		addElement( reservationdata[i].computerName, reservationdata[i].mac, reservationdata[i].ip, reservationdata[i].enable=='enabled'? 0:1 );
+	}
+}
+
+function addElement(name, mac, ip, enabled) { 
+var ni = document.getElementById('ReservationDiv'); 
+var numi = document.getElementById('maxReservation'); 
+var num = document.getElementById('maxReservation').value; 
+numi.value = num; 
+var newdiv = document.createElement('div');
+var divIdName = 'myDiv'+num;
+var enableVar = (enabled=='0')?"checked=1":"";
+var disableVar = (enabled=='0')?"":"checked=1";//true:false;;
+var radioEnabled = (enabled!='1')?"0":"1";
+var ray = new Array();
+
+	ray = ip.split(".");
+	if(ray.length != 4 ){ray[0]='0';ray[1]='0';ray[2]='0';ray[3]='0';}
+	newdiv.setAttribute('id',divIdName);
+	newdiv.innerHTML = '<table border=0 cellspacing=1 cellpadding=0 width="90%" id="ReservationTable"><tr><td width="20%"><input type=text id=name'+num+' name=listname+'+num+' size=12 value='+name+'></td> \
+	<td width="20%"><input type=text id=macid'+num+' name=mac'+num+' size=14 value='+mac+'></td> \
+	<td width="30%"><input maxLength=3 name=p1'+num+' id="ip1'+num+'" size=2 value='+ray[0]+' onkeyup="javascript:WinExpIP_1(this,event)">.<input maxLength=3 name=p2'+num+' id="ip2'+num+'" size=2 value='+ray[1]+' onkeyup="javascript:WinExpIP(this,event)">.<input maxLength=3 name=p3'+num+' id="ip3'+num+'" size=2 value='+ray[2]+' onkeyup="javascript:WinExpIP(this,event)">.<input maxLength=3 name=p4'+num+' id="ip4'+num+'" size=2 value='+ray[3]+' onkeyup="javascript:WinExpIP(this,event)"></td> \
+	<input type=hidden name=ip'+num+' id="ipid'+num+'" > \
+	<td width="18%">&nbsp;<input type=checkbox id="enabled'+num+'" name=enable'+num+' '+enableVar+' value='+radioEnabled+' >&nbsp;&nbsp;&nbsp;'+_("enable")+'</td> \
+	<td width="12%"><input type=button value='+_("remove")+" onClick=\"javascript:removeElement(document.getElementById('"+divIdName+"'))\"></tr></table>";
+	//for(var i=0;i<f.elements.length;i++){alert(f.elements[i].name);}
+	ni.appendChild(newdiv);
+	document.form.maxReservation.value++;
+} 
+
+function removeElement(dId) { 
+	var ni = document.getElementById("ReservationDiv");
+	ni.removeChild(dId);
+} 
+
+function setall() {
+var f = document.form;
+var ray = new Array();
+	if(f.DHCPenable.value=='1')
+		f.DHCPConf[0].checked=true;
+	else
+		f.DHCPConf[1].checked=true;
+	ray = f.DHCPrange.value.split(",")[0].split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.DHCPStart1.value=ray[0];f.DHCPStart2.value=ray[1];
+	f.DHCPStart3.value=ray[2];f.DHCPStart4.value=ray[3];
+	ray = f.DHCPrange.value.split(",")[1].split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.DHCPEnd1.value=ray[0];f.DHCPEnd2.value=ray[1];
+	f.DHCPEnd3.value=ray[2];f.DHCPEnd4.value=ray[3];
+		
+	ray = f.DNS1.value.split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.DNSAddress11.value=ray[0];f.DNSAddress12.value=ray[1];
+	f.DNSAddress13.value=ray[2];f.DNSAddress14.value=ray[3];
+	ray = f.DNS2.value.split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.DNSAddress21.value=ray[0];f.DNSAddress22.value=ray[1];
+	f.DNSAddress23.value=ray[2];f.DNSAddress24.value=ray[3];
+	ray = f.WINSIP1.value.split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.WINSIP11.value=ray[0];f.WINSIP12.value=ray[1];
+	f.WINSIP13.value=ray[2];f.WINSIP14.value=ray[3];
+	ray = f.WINSIP2.value.split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.WINSIP21.value=ray[0];f.WINSIP22.value=ray[1];
+	f.WINSIP23.value=ray[2];f.WINSIP24.value=ray[3];
+	
+	if(f.DHCPrelay.value=='1')
+		f.DHCPRelayConf[0].checked=true;
+	else
+		f.DHCPRelayConf[1].checked=true;
+	ray = f.DHCPServerAddr.value.split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.DHCPServerAddr1.value=ray[0];f.DHCPServerAddr2.value=ray[1];
+	f.DHCPServerAddr3.value=ray[2];f.DHCPServerAddr4.value=ray[3];
+	f.maxReservation.value = reservationdata.length;
+	
+	ray = f.NTPserver.value.split(",")[0].split(".");
+	if(ray.length != 4 ){ray[0]='0'; ray[1]='0';ray[2]='0'; ray[3]='0';}
+	f.NTPserver1.value=ray[0];f.NTPserver2.value=ray[1];
+	f.NTPserver3.value=ray[2];f.NTPserver4.value=ray[3];
+}
+
+var ajaxerror=0;
+function displayLeasesData(ld) {
+	ajaxerror=0;
+	eval(ld);
+	var ht="";
+
+	for(var i=0; i<leasesdata.length; i++ ) {
+		ht+="<tr align=left><td width='24%'>"+leasesdata[i].hostname+"</td><td width='18%'>"+leasesdata[i].mac+"</td><td width='18%'>"+leasesdata[i].ip+"</td><td width='30%'>"+new Date((leasesdata[i].ends)*1000).toLocaleString()+"</td><td width='10%'>";
+		ht+="<input type='button' value=\"&nbsp;&nbsp;&nbsp;"+_("clone")+"&nbsp;&nbsp;&nbsp;\" onClick=\"javascript:cloneLeasesData('"+leasesdata[i].hostname+"','"+leasesdata[i].mac+"','"+leasesdata[i].ip+"')\"></td></tr>";
+	}
+	$("#lease_data").html(ht);
+}
+
+function initTranslation() {
+	$("#saveButton").val(_("CSsave"));
+	$("#addbutton01").val("  "+_("add")+"  ");
+}
+
+$(document).ready(function() {
+var IPForward="<%val=get_single('service.bridge.3GIPForward');%>@@val";
+	checkDHCPConf();
+	if(IPForward == "1") {
+		greyOutDHCPFields();
+		f.DHCPConf[0].checked=true;
+		f.DHCPConf[1].checked=false;
+		alert(_("transparent bridge warnMsg1"));
+		window.location="/LAN.html?ipsetup";
+	}
+	initTranslation();
+	setall();
+	displayReservationData();
+	var startPoll = function() {
+		if( ++ajaxerror<=5)
+			$.get('/cgi-bin/dhcp.cgi', displayLeasesData);
+		else
+			location.reload();
+	}
+	$.get('/cgi-bin/dhcp.cgi', displayLeasesData);
+	setInterval(startPoll, 3000);
+});
+</script>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3 id="DHCPdiv"><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("lan")+" > "+_("DHCP"));</script></h3>
+
+<input type="hidden" name="DHCPrange" value="@@form['DHCPrange']">
+<input type="hidden" name="DHCPenable" value="@@form['DHCPenable']">
+<input type="hidden" name="DNS1" value="@@form['DNS1']">
+<input type="hidden" name="DNS2" value="@@form['DNS2']">
+<input type="hidden" name="WINSIP1" value="@@form['WINSIP1']">
+<input type="hidden" name="WINSIP2" value="@@form['WINSIP2']">
+<input type="hidden" name="DHCPrelay" value="@@form['DHCPrelay']">
+<input type="hidden" name="DHCPServerAddr" value="@@form['DHCPServerAddr']">
+<input type="hidden" value="0" id="maxReservation" />
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/>
+<input type="hidden" name="NTPserver" value="@@form['NTPserver']" />
+
+<div id="confdiv1" >
+<table width="90%" border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%"><script language="JavaScript">document.write(_("dhcp configuraion"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+	<td width="38%">DHCP</td>
+	<td>
+	<input type="radio"  name='DHCPConf' value='1' onClick="javascript:ungreyOutDHCPFields()">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+	<input type=radio name='DHCPConf' value='0' onClick="javascript:greyOutDHCPFields()">&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dhcp start range"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("DHCPStart");document.form.DHCPStart4.focus();</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dhcp end range"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("DHCPEnd");</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dhcp lease time"));</script></td>
+	<td><input type="text" name="DHCPLease" size="8" maxLength="5" onKeyUp="NumfieldEntry(this);" value="@@form['DHCPLease']">&nbsp;(<script language="JavaScript">document.write(_("seconds"));</script>)</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("default domainname"));</script></td>
+	<td><input type="text" name="DDNsuffix" size="26" maxLength="128" value="@@form['DDNsuffix']">&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dns1ip"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("DNSAddress1");</script>&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dns2ip"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("DNSAddress2");</script>&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("winsServer1"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("WINSIP1");</script>&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("winsServer2"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("WINSIP2");</script>&nbsp;</td>
+</tr>
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("opt42"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("NTPserver");</script>&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("opt66"));</script></td>
+	<td><input type="text" name="TFTPserver" size="26" maxLength="128" value="@@form['TFTPserver']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("opt150"));</script></td>
+	<td><input type="text" name="option150" size="26" maxLength="128" value="@@form['option150']"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("opt160"));</script></td>
+	<td><input type="text" name="option160" size="26" maxLength="128" value="@@form['option160']"></td>
+</tr>
+</table>
+</div>
+
+<div id="relaydiv1" >
+<table width="90%" border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%"><script language="JavaScript">document.write(_("dhcp relay config"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("dhcp relay"));</script></td>
+	<td><label for="Radio9"></label><input type=radio name='DHCPRelayConf' value=1 onClick="javascript:ungreyOutRelayFields()">&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+		<label for="Radio10"></label><input type=radio name='DHCPRelayConf' value=0 onClick="javascript:greyOutRelayFields()">&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("dhcp serveraddr"));</script></td>
+	<td class="td_ltr"><script language=javascript>htmlGenIpBlocks("DHCPServerAddr");</script>&nbsp;</td>
+</tr>
+</table>
+</div>
+
+<div id="reservationdiv1" >
+<table width="90%" border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%"><script language="JavaScript">document.write(_("addr reservation list"));</script></th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="20%"><b><script language="JavaScript">document.write(_("compName"));</script></b></td>
+<td width="20%"><b><script language="JavaScript">document.write(_("macAddress"));</script></b></td>
+<td width="30%"><b><script language="JavaScript">document.write(_("ip address"));</script></b></td>
+<td width="18%">&nbsp;</td>
+<td width="12%">
+<input type="Button" id="addbutton01" VALUE="&nbsp;&nbsp;&nbsp;Add&nbsp;&nbsp;&nbsp;&nbsp;" onClick="javascript:addElement('','','0.0.0.0','0')">
+</td>
+</tr>
+</table>
+<div id= "ReservationDiv" ></div>
+</div>
+
+<div id="leasediv1" >
+<table width="90%" border="0" cellpadding="0" cellspacing="0">
+	<tr><th width="100%"><script language="JavaScript">document.write(_("dhcp dynamic clist"));</script></th></tr>
+</table>
+<table width="90%">
+<tr align=left>
+	<td width="24%"><b><script language="JavaScript">document.write(_("compName"));</script></b></td>
+	<td width="18%"><b><script language="JavaScript">document.write(_("macAddress"));</script></b></td>
+	<td width="18%"><b><script language="JavaScript">document.write(_("ip address"));</script></b></td>
+	<td width="30%"><b><script language="JavaScript">document.write(_("expTime"));</script></b></td>
+	<td width="10"><b></b></td>
+</tr>
+</table>
+<table width="90%" id="lease_data"></table>
+</div>
+
+<div align="center">
+<br/><input type="button" value="Save" id="saveButton" onClick="javascript:submitF()" style="width:120px;"><br/>
+</div>
+
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+In general this is a replacement for the display daemon (dispd) which contained ever-expanding hard-coded "business rules" for controlling LEDs on a per-project basis, along with rules to allow for non-dispd usage.  The primary change is to place specific RDB variables representing the LEDs in-between, so as to allow template-based (or similar) business rules to set the desired LED behaviour, with that behaviour then translated into actual control of the LED via this new leds_monitor daemon.
+
+As with dispd, most of the low-level control of the LEDs is done with the CDCS trigger LED class drivers (installed in sysfs) - see https://pdgwiki.netcommwireless.com/mediawiki/index.php/LEDs
+
+The aim here is to keep the LEDs as logical entities in RDB (i.e., not break-out the R, G, and B parts individually), where we specify/support two basic string formats for the RDB values - one that explicitly allows specification of colour (and optional pattern), and one that invokes a specific handler (or trigger).  For example:
+    <color>[@[pattern:]tempo_msec/cycle_msec]
+or just:
+    <handler>[@params]
+
+Some examples:
+* Set the info LED to solid yellow colour (red + green) at 100% brightness
+    rdb_set system.leds.info "yellow"
+* Blink the heartbeat LED red in a two-pulse heartbeat pattern at a tempo of 100msec, and a total cycle time of 1.5 seconds.
+    rdb_set system.leds.heartbeat "red@1010:100/1500"
+* Blink the info LED using its default colour in a 50% duty cycle of 1 second duration (equivalent to "on@10:500/1000", or equally "on@01:500/1000").
+    rdb_set system.leds.info "on@500/1000"
+* Invoke the "blink" handler for the voicemail LED, for whatever that means on the particular LED - e.g., this could be identical to "on@500/1000" or could be something completely different.
+    rdb_set system.leds.voicemail "blink"
+* Invoke the "auto" handler for this led with parameter "wlan0" - e.g., for wifi LED this might cause it to use the wlan0 interface to blink the LED when there was activity on it.
+    rdb_set system.leds.wifi "auto@wlan0"
+
+Where we might have some possible/example colour definitions like:
+"off" (or empty string) - LED turned off (equivalent to 0x000000 in hex for RGB)
+"on" - whatever the default colour is for this LED (equivalent to 0xFFFFFF - which would be white for RGB)
+"red", "green", "blue" - primary colours (0xFF0000, 0x00FF00, 0x0000FF)
+"yellow", "magenta", "white" - example combination colours (0xFFFF00, 0x00FFFF, 0xFFFFFF)
+"red50" - a half-intensity red (0x800000) if such was supported needed
+"ffa07a" - example RGB-specifier (LightSalmon in this case, but if the underlying hardware had no brightness control, then this would be whatever colour the LED would show for white)
+
+In principle the format simply reduces to:
+    <handler>[@params]
+where we have a default "handler" which simply tries to interpret the given handler-name as a colour (red, green, etc.), and where it is the colour-handler that supports an optional "[pattern:]tempo/cycle" parameter value.
+
+Likewise, some handlers can be implemented as simple wrappers around other handlers - e.g., "blink@colour" --> "colour@500/1000"
+
+Note that the above colour@pattern handling can't support colour "chasers" (i.e., can't cycle through different colours on the same LED automatically) without exposing each of those colours as a separate RDB variables, or by using a specific handler/daemon that supports that, but I don't really see a general use-case for that.
+
+For the code here:
+* leds_config.c is intended to be the primary point of configuration on a per-project/per-hardware basis.
+* leds_handler.c already has the default colour/pattern handler described above, and can be customised to add new handlers as required
+    - E.g., a "wifi" handler to tie a particular LED to WiFi control (which isn't needed BTW on the modem side for Hunter).
+    - Currently there are just two additional handlers defined - blink (1Hz) and fastblink (10Hz)
+    - The CDCS trigger drivers also support other behaviours, such as WiFi triggered blinking, etc., which can be integrated as/when needed.
+* The code is written in (effectively) C99, but with assumption of being compiled with C++ compiler (g++) so as allow for some helpful features (parameter defaults, bool, etc.).  Some rework may be required if we can't use g++ for this for some reason.
+* Doxygen used throughout, with included Doxyfile (outputs to current directory).
+* Makefile, config.mk, and commands.mk are just used for this desktop build, and will be replaced/discarded when integrated into the real build tree.
+

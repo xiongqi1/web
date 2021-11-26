@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "Clearing FaultMgmt data..."
+rdb unset $(rdb list tr069.FaultMgmt | grep -e "^tr069.FaultMgmt")
+echo "Done"

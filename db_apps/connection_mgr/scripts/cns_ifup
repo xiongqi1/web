@@ -1,0 +1,95 @@
+#!/bin/sh
+
+ScriptName=${0##*/}
+PostFix=${ScriptName##*_}
+PostFix=${PostFix:-ifup}
+
+
+printErr() {
+	logger -t "cns_ifup" "$@"
+	echo -e "$@" >&2
+}
+
+getUsbDev() {
+	USB_DIR=`ls -d /sys/bus/usb/drivers/sierra_net/[0-9]*/usb[0-9]* 2> /dev/null`
+	
+	if [ -n "$USB_DIR" ]; then
+		echo ${USB_DIR##*/}
+	else
+		USB_DIR=`ls -d /sys/bus/usb/drivers/sierra_net/[0-9]*/net:*[0-9]* 2> /dev/null || (echo :wwan0; printErr "sierra_net not found. usbnet will be used")`
+		echo ${USB_DIR##*:}
+	fi
+
+}
+
+# get usb device
+Dev=`getUsbDev`
+Dev=${Dev:-wwan0}
+
+Usage()
+{
+	echo -e "Apply cns profile settings and"
+	echo -e "bring up or bring down 3G interface."
+	echo
+	echo -e "Usage: "
+	echo -e "\t`basename $0` <ifup|ifdn>"
+	echo
+}
+
+runDHCPC() {
+	udhcpc -f -q -n -i $Dev -s /sbin/udhcpc.sh 2> /dev/null > /dev/null
+}
+
+case $PostFix in
+
+	'ifup')
+		# write profile
+		if [ $# -gt 0 ]; then
+			if ! cns_profile write $@ > /dev/null 2> /dev/null; then
+					printErr "failed to write"
+				exit 1
+			fi
+		fi
+		
+		# activate profile
+		if ! cns_profile activate >/dev/null 2>/dev/null; then
+			printErr "cannot activate"
+			exit 1
+		fi
+		
+		# make interface up
+		if ! ifconfig $Dev up; then
+			printErr "failed to make $Dev up"
+			exit 1
+		fi
+		
+		# restart DHCP client
+		if ! runDHCPC; then
+			printErr "DHCP lease not obtained"
+			exit 1
+		fi
+		
+		# add default route
+		if ! route add -net default dev $Dev metric 0; then
+			printErr "failed to add default route"
+			exit 1
+		fi
+		;;
+
+	'ifdn')
+		# make interface up
+		if ! ifconfig $Dev down; then
+			printErr "failed to make $Dev down"
+			exit 1
+		fi
+
+		# activate profile
+		if ! cns_profile deactivate >/dev/null 2>/dev/null; then
+			printErr "cannot deactivate"
+			exit 1
+		fi
+		;;
+	*)
+		Usage
+		exit
+esac

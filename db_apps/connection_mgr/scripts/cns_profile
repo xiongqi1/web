@@ -1,0 +1,474 @@
+#!/bin/sh
+
+#CNSPROFILE=`basename "$0"`
+CNSPROFILE="cnsprofile"
+
+# print error
+printErr() {
+	logger -t "cns_profile" "$@"
+	echo -e "$@" >&2
+}
+# print version
+printVersion() {
+	echo "$CNSPROFILE version 0.1 - CnS profile management"
+	echo
+}
+
+log() {
+	logger -t "cns_profile" -- "$@"
+}
+
+# set default configuration
+WWAN_ID="0"
+PROFILE_ID="0"
+AUTH_TYPE="pap"
+PDP_TYPE="ipv4"
+APN=""
+
+USERNAME=""
+PASSWORD=""
+HEADER_COMPRESSION=""
+DATA_COMPRESSION=""
+PDP_ADDRESS=""
+LABEL=""
+
+PROFILE_COMMAND=""
+
+# print help screeen
+printUsage() {
+	printVersion
+
+	echo
+	echo "Usage: $CNSPROFILE [ options ]"
+
+	echo
+	echo -e "\t write|activate|deactivate (compulsory)"
+	echo -e "\t\t Specify profile command"
+
+	echo
+	echo -e "\t wwan wwan_id"
+	echo -e "\t\t Specifies database wwan prefix id (default:$WWAN_ID)"
+
+	echo
+	echo -e "\t id profile_id"
+	echo -e "\t\t Specifies profile id (default:$PROFILE_ID)"
+
+#	echo
+#	echo -e "\t defaultroute"
+#	echo -e "\t\t Sets up default route when the interface is up"
+#	echo
+
+	echo -e "\t pap|chap|none"
+	echo -e "\t\t Specifies authentication type (default:$AUTH_TYPE)"
+	echo
+
+	echo -e "\t apn apn_name"
+	echo -e "\t\t Sets the APN used for authenticating the local system to the peer to name. (default:$APN)"
+	echo
+
+	echo -e "\t user username"
+	echo -e "\t\t Sets the name used for authenticating the local system to the peer to name."
+	echo
+
+	echo -e "\t password password-string"
+	echo -e "\t\t Specifies the password to use for authenticating to the peer."
+	echo
+
+	echo -e "\t prefIP IP-Address"
+	echo -e "\t\t Specifies the preferred IP address for wwan interface"
+	echo
+
+	echo -e "\t ipv4|ipv6|ppp"
+	echo -e "\t\t Specifies PDP type. (default:$PDP_TYPE)"
+	echo
+
+	echo -e "\t header_compression"
+	echo -e "\t\t Uses header compression"
+	echo
+	
+	echo -e "\t data_compression"
+	echo -e "\t\t Uses data compression"
+	echo
+}
+
+
+# parse command line argument
+command_arg=""
+
+i=0
+while true; do
+
+	i=$(( i + 1 ))
+
+	if [ $i -gt $# ]; then
+		break;
+	fi
+
+	opt=`eval "echo \\\$${i}"`
+
+	if [ -z "$command_arg" ]; then
+
+		command_arg=""
+
+		case $opt in
+			'write'|'activate'|'deactivate')
+				PROFILE_COMMAND=$opt
+				;;
+
+			'id'|'password'|'user'|'apn'|'dev'|'wwan'|'prefIP')
+				command_arg=$opt
+				;;
+
+			'data_compression')
+				DATA_COMPRESSION="1"
+				;;
+			'header_compression')
+				HEADER_COMPRESSION="1"
+				;;
+
+			'ipv4'|'ipv6'|'ipv4v6'|'ppp'|'pdp-ipv4v6'|'IPV4'|'IPV6'|'PPP'|'PDP-IPV4V6'|'PDP-IP'|'PDP-PPP'|'PDP-IPV6'|'PDP-IPV4V6')
+				PDP_TYPE=$opt
+				;;
+
+			'pap'|'chap'|'none'|'PAP'|'CHAP'|'NONE'|'PAP|CHAP')
+				AUTH_TYPE=$opt
+				;;
+
+			'defaultroute')
+				DEFAULT_ROUTE=1
+				;;
+
+			*)
+				echo "Unknown command - $opt" 
+				printUsage
+				exit 1
+				;;
+		esac
+
+	else
+		case $command_arg in
+			'password')
+				PASSWORD=$opt
+				;;
+
+			'user')
+				USERNAME=$opt
+				;;
+
+			'apn')
+				APN=$opt
+				;;
+
+			'id')
+				PROFILE_ID=$opt
+				;;
+
+			'wwan')
+				WWAN_ID=$opt
+				;;
+				
+			'prefIP')
+				PREFIP=$opt
+				;;
+		esac
+
+		command_arg=""
+	fi
+	
+done
+
+# check compulsory arguments
+if [ -z "$PROFILE_COMMAND" ]; then
+	printErr "arguments error - compulsory arugments not specified"
+	printUsage
+	exit 1
+fi
+
+
+INIT_STAT=`rdb_get wwan.$WWAN_ID.session.$PROFILE_ID.status`
+
+
+# check previously status
+if [ "$PROFILE_COMMAND" = 'activate' -a "$INIT_STAT" = "1" ]; then
+	printErr "already online"
+	exit 0
+#elif [ "$PROFILE_COMMAND" = 'deactivate' -a "$INIT_STAT" = "0" ]; then
+#	printErr "already offline"
+#	exit 0
+else
+	rdb_set "wwan.$WWAN_ID.session.$PROFILE_ID.status" ""
+fi
+
+
+rdbWaitCmdClear() {
+	for i in 1 2 3 4 5; do
+		cmd=`rdb_get "wwan.$WWAN_ID.profile.cmd.command"`
+		if [ -z "$cmd" ]; then
+			break;
+		fi
+
+		sleep 1
+	done
+}
+
+# RDB var for sending AT command via simple_at_manager
+DB_CMD="wwan.0.umts.services.command"
+DB_CMD_ST="wwan.0.umts.services.command.status"
+DB_RESULT="wwan.0.umts.services.command.response"
+
+# send AT command and wait for result, return 0 if successful
+send_at_cmd() {
+	atcmd="$1"
+	if [ -z "$atcmd" ]; then
+		log "ERROR: empty AT command string"
+		return 1
+	fi
+
+	# clear command result and status
+	rdb set "$DB_RESULT" ""
+	rdb set "$DB_CMD_ST" ""
+
+	# send command
+	rdb set "$DB_CMD" "$atcmd"
+
+	# wait until the command is done
+	i=0
+	while [ $i -lt 10 ]; do
+		st=$(rdb_get "$DB_CMD_ST")
+		test -n "$st" && break
+		sleep 1
+	done
+
+	st=$(rdb_get "$DB_CMD_ST")
+	if [ -z $st ]; then
+		log "ERROR: AT command timeout $atcmd"
+		return 1
+	fi
+
+	return 0
+}
+
+# set profile parameter
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.profile_id" "$PROFILE_ID"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.apn" "$APN"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.auth_type" "$AUTH_TYPE"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.pdp_type" "$PDP_TYPE"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.user" "$USERNAME"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.password" "$PASSWORD"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.header_compression" "$HEADER_COMPRESSION"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.data_compression" "$DATA_COMPRESSION"
+rdb_set "wwan.$WWAN_ID.profile.cmd.param.ipv4_addr_pref" "$PREFIP"
+
+if [ "$PROFILE_COMMAND" = "write" ]; then
+	. /etc/variant.sh
+	if [ "$V_MODULE" = "EC21" -a "$APN" = "" ]; then
+		clearESM=0
+		case "$V_SKIN" in
+			VDF|VDF2)
+				clearESM=1
+				;;
+			*)
+				if [ "$USERNAME" = "" -a "$PASSWORD" = "" -a "$AUTH_TYPE" = "none" ]; then
+					clearESM=1
+				fi
+				;;
+		esac
+		if [ "$clearESM" = "1" ]; then
+			pdp=$((WWAN_ID+1))
+			log "Clear ESM flag with AT comamnds for pdp=$pdp"
+			# clear ESM information transfer flag by using Quectel work around:
+			# (1)clear authentication flag, (2) delete and (3) re-create PDP context
+			send_at_cmd "AT+QICSGP=$pdp,1,\"\",\"\",\"\",0"
+			send_at_cmd "AT+CGDCONT=$pdp"
+			send_at_cmd "AT+CGDCONT=$pdp,\"IP\""
+		fi
+	fi
+
+	log << EOF
+* profile settings
+PROFILE_ID  : "$PROFILE_ID" ==> wwan.$WWAN_ID.profile.cmd.param.profile_id" 
+APN         : "$APN" ==> wwan.$WWAN_ID.profile.cmd.param.apn" 
+AUTH_TYPE   : "$AUTH_TYPE" ==> wwan.$WWAN_ID.profile.cmd.param.auth_type" 
+PDP_TYPE    : "$PDP_TYPE" ==> wwan.$WWAN_ID.profile.cmd.param.pdp_type" 
+USERNAME    : "$USERNAME" ==> wwan.$WWAN_ID.profile.cmd.param.user" 
+PASSWORD    : "****" ==> wwan.$WWAN_ID.profile.cmd.param.password" 
+HEADER_COMP : "$HEADER_COMPRESSION" ==> wwan.$WWAN_ID.profile.cmd.param.header_compression" 
+DATA_COMP   : "$DATA_COMPRESSION" ==> wwan.$WWAN_ID.profile.cmd.param.data_compression" 
+PREFIP      : "$PREFIP" ==> wwan.$WWAN_ID.profile.cmd.param.ipv4_addr_pref" 
+EOF
+fi
+
+# init wait status
+rdb_set "wwan.$WWAN_ID.profile.cmd.status" ""
+
+wait_for_session_status() {
+	timeout="$1"
+	target="$2"
+
+	i=0
+	while [ $i -lt $timeout ]; do
+		cur_status=$(rdb_get "wwan.$WWAN_ID.session.$PROFILE_ID.status")
+		if [ -n "$cur_status" ]; then
+			log "PDP session status changed - [wwan.$WWAN_ID.session.$PROFILE_ID.status]='$cur_status'"
+			return 0
+		fi
+
+		sleep 1
+		i=$(( i + 1 ))
+	done
+
+
+	return 1
+}
+
+wait_for_profile_stat() {
+	timeout="$1"
+
+	i=0
+	while [ $i -lt $timeout ]; do
+		cur_status=$(rdb_get "wwan.$WWAN_ID.profile.cmd.status")
+		if [ -n "$cur_status" ]; then
+			log "PDP command processed - [wwan.$WWAN_ID.profile.cmd.command]=$PROFILE_COMMAND"
+			return 0
+		fi
+
+		sleep 1
+		i=$(( i + 1 ))
+	done
+
+
+	return 1
+}
+
+
+#The value is from Chapter 11 of TS 123.008 standard.
+case "$PROFILE_COMMAND" in
+	'activate')
+		# PDP context avtivation timeour is (T3380(30sec) * 5) 
+		TIMEOUT=150
+		;;
+	'deactivate')
+		# PDP context deacvtivation timeour is (T3390(8sec) * 5)
+		TIMEOUT=40
+		;;
+	*)
+		# default 60 seconds
+		TIMEOUT=60
+		;;
+esac
+
+# do profile command
+rdb_set "wwan.$WWAN_ID.profile.cmd.command" "$PROFILE_COMMAND"
+wait_for_profile_stat "$TIMEOUT"
+
+# wait for command
+profile_status=$(rdb_get "wwan.$WWAN_ID.profile.cmd.status")
+if [ "$profile_status" != "[done]" ]; then
+	printErr "manager returns error status - cmd=$PROFILE_COMMAND,status=$(rdb_get wwan.$WWAN_ID.profile.cmd.status)"
+	exit 1
+fi
+
+# wait for clear
+rdbWaitCmdClear
+
+# CnS manage does not have result error code string
+str_error_code() {
+	case $1 in
+		0x0008) echo "Operator Determined Barring";;
+		0x0019) echo "LLC or SNDCP failure";;
+		0x001a) echo "Insufficient resources";;
+		0x001b) echo "Missing or unknown APN";;
+		0x001c) echo "Unknown PDP address or type";;
+		0x001d) echo "User authentication failed";;
+		0x001e) echo "Activation rejected by GGSN";;
+		0x0020) echo "Service Option not supported";;
+		0x0021) echo "Service Option not subscribed";;
+		0x0022) echo "Service Option temporarily out of order";;
+		0x0024) echo "Regular deactivation";;
+		0x0025) echo "QOS not accepted";;
+		0x0026) echo "Network failure";;
+		0x0027) echo "Reactivation required";;
+		0x0028) echo "Feature not supported";;
+		0x0029) echo "Semantic error in the TFT operation";;
+		0x002a) echo "Syntactical error in the TFT operation";;
+		0x002b) echo "Unknown PDP context";;
+		0x002c) echo "PDP context without TFT already activated";;
+		0x002d) echo "Semantic errors in packet filter(s)";;
+		0x002e) echo "Syntactical errors in packet filter(s)";;
+		0x0051) echo "Invalid transaction identifier value";;
+		0x005f) echo "Semantically incorrect message";;
+		0x0060) echo "Invalid mandatory information";;
+		0x0061) echo "Message type non-existent or not imple-mented";;
+		0x0062) echo "Message type not compatible with the protocol state";;
+		0x0063) echo "Information element non-existent or not implemented";;
+		0x0064) echo "Conditional IE error";;
+		0x0065) echo "Message not compatible with the protocol state";;
+		0x006f) echo "Protocol error, unspecified";;
+		0x0100) echo "Invalid Connection ID";;
+		0x0101) echo "Invalid NSAPI";;
+		0x0102) echo "Invalid PRI NSAPI";;
+		0x0103) echo "Invalid field";;
+		0x0104) echo "SNDCP failure";;
+		0x0105) echo "RAB Setup failure";;
+		0x0106) echo "No GPRS Context";;
+		0x0107) echo "PDP Establish Max Timeout";;
+		0x0108) echo "PDP Activate Max Timeout";;
+		0x0109) echo "PDP Modify Max Timeout";;
+		0x010a) echo "PDP Inactivate Max Timeout";;
+		0x010b) echo "PDP Lower layer Error";;
+		0x010c) echo "PDP Duplicate";;
+		0x010d) echo "UE RAT Change";;
+		0x7000) echo "Normal inactivate state (default value when there has never been a prior active packet session)";;
+		*)        echo "unknown error - $1";;
+	esac
+}
+
+
+case "$PROFILE_COMMAND" in
+
+	'activate')
+		# using a minute delay for being up
+		wait_for_session_status "$TIMEOUT"
+		ACTION_STATUS=`rdb_get "wwan.$WWAN_ID.session.$PROFILE_ID.status"`
+		ERROR_CODE=`rdb_get "wwan.$WWAN_ID.session.$PROFILE_ID.reason_code"`
+		
+		if [ ! "$ACTION_STATUS" = 1 ]; then
+
+			if [ -z "$ACTION_STATUS" ]; then
+				printErr "activation failure - timeout"
+
+				# recursive call to a quite deactivation
+				cns_profile deactivate > /dev/null 2>&1
+			else
+				printErr "activation failure - status=$ACTION_STATUS,ErrorCode=$ERROR_CODE $(str_error_code $ERROR_CODE)"
+			fi
+
+			exit 1
+		fi
+		;;
+
+	'deactivate')
+		# using 5 second delay for being down because offline is not checked up by anyone
+		wait_for_session_status "$TIMEOUT"
+		ACTION_STATUS=`rdb_get "wwan.$WWAN_ID.session.$PROFILE_ID.status"`
+		ERROR_CODE=`rdb_get "wwan.$WWAN_ID.session.$PROFILE_ID.reason_code"`
+
+		if [ ! "$ACTION_STATUS" = 0 ]; then
+			if [ -z "$ACTION_STATUS" ]; then
+				printErr "deactivation failure - timeout"
+			else
+				printErr "deactivation failure - status=$ACTION_STATUS,ErrorCode=$ERROR_CODE $(str_error_code $ERROR_CODE)"
+			fi
+
+			exit 1
+		fi
+
+		rdb_set wwan.$WWAN_ID.session.$PROFILE_ID.status 0
+		;;
+
+	*)
+		echo "done"
+		;;
+esac
+
+exit 0

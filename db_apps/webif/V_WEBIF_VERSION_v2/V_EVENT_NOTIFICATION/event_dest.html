@@ -1,0 +1,431 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Event Destination</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<style>
+.infoBox {
+	position: absolute;
+	margin-left: -350px;
+	width: 350px;
+	background: #ffffff;
+	border: 1px solid #ccc;
+	box-shadow: 3px 3px 7px #777;
+	-webkit-box-shadow: 3px 3px 7px #777;
+	-moz-box-shadow: 3px 3px 7px #777;
+	display: none;
+}
+</style>
+<script language="JavaScript">
+
+#include "event_notif.inc"
+
+<%
+function setDest() {
+	var idx=form['editIdx'];
+	rdbBase = "service.eventnoti.conf.dest."+idx+"."
+	updateRdb("name", form["destName"]);
+	updateRdb("email_addr", form["destEmail"]);
+	updateRdb("sms_addr", form["destSMS"]);
+	updateRdb("tcp_addr", form["destTCP"]);
+	updateRdb("tcp_port", form["TCPportnumber"]);
+	updateRdb("udp_addr", form["destUDP"]);
+	updateRdb("udp_port", form["UDPportnumber"]);
+	if (session["user"] == "root") {
+		updateRdb("cmd", form["destCommand"]);
+	}
+}
+
+dstBase="";
+srcBase="";
+//getRDB is from event_notif.inc
+function copyRdb(name) {
+ 	setRdb(dstBase+name,getRdb(srcBase+name));
+}
+
+function deleteDest() {
+	var idx=form['editIdx'];
+	idx=idx-0;
+	rdbBase="service.eventnoti.conf.";
+	// Move all entries down
+	var more=true;
+	for (var i=idx; more; i++ )
+	{
+		dstBase = "dest."+i+".";
+		srcBase = "dest."+(i+1)+".";
+		var name=getRdb(srcBase+"name");
+		if (name=="") more=false;
+		setRdb(dstBase+"name",name);
+		copyRdb("email_addr");
+		copyRdb("sms_addr");
+		copyRdb("tcp_addr");
+		copyRdb("tcp_port");
+		copyRdb("udp_addr");
+		copyRdb("udp_port");
+		copyRdb("cmd");
+	}
+	// Adjust destinations of events
+	for (i=1; i<=numEventTypes;i++) {
+		var name = "type."+i+".dest_idx";
+		var dest= getRdb(name);
+		dest=dest-0;
+		if (dest>idx) {
+			setRdb(name, dest-1);
+		}
+	}
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	if ( form["cmd"]=="EVTNOTI_DEST_SET" ) {
+		setDest();
+	}
+	else if ( form["cmd"]=="EVTNOTI_DEST_DEL" ) {
+		deleteDest();
+	}
+	redirect('/event_dest.html?success');
+}
+%>
+
+var current_edit_idx=-1
+
+function edit_dest_save() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	tport=$("#TCPportnumber").val();
+	uport=$("#UDPportnumber").val();
+	if ((tport != '' && (tport == 0 || tport > 65535)) ||
+		(uport != '' && (uport == 0 || uport > 65535))) {
+		validate_alert("", _("warningMsg08"));
+		return;
+	}
+	if ((($("#destTCP").val() == '' && tport != '') || ($("#destTCP").val() != '' && tport == '')) ||
+		(($("#destUDP").val() == '' && uport != '') || ($("#destUDP").val() != '' && uport == ''))) {
+		validate_alert("", _("client setting warning01"));
+		return;
+	}
+	if($("#destEmail").val()!="" && /\S+@\S+\.\S+/.test($("#destEmail").val())==false) {
+		validate_alert("", _("invalidEmailAddr"));
+		return;
+	}
+	// check if destination name unique. Note: index starts at 1.
+	for (var i=1; i<EventNotiDestName.length; i++) {
+		if (i == current_edit_idx) continue;
+		if ( $("#destName").val() == EventNotiDestName[i] ) {
+			validate_alert("", _("notUniqueDestName"));
+			return;
+		}
+	}
+        // allows only alplhanumeric and '-_'
+	if($("#destName").val()!="" &&  !/[^a-z_-\d]/i.test($("#destName").val())==false) {
+		validate_alert("", _("invalidDestName"));
+		return;
+	}
+
+	$("#cmd").val("EVTNOTI_DEST_SET" );
+	$("#editIdx").val(current_edit_idx);
+	$("#form").submit();
+}
+
+function edit_dest(idx) {
+	$("#dest_edit").css("display", "");
+	$("#dest_list").css("display", "none");
+	clear_alert();
+
+	if(idx<0 || idx>EventNotiDestName.length ) { //add
+		if(EventNotiDestName.length==0) {
+			idx=1;
+		}
+		else {
+			idx=EventNotiDestName.length;
+		}
+
+		$("#destName").val("");
+		$("#destEmail").val("");
+		$("#destTCP").val("");
+		$("#TCPportnumber").val("");
+		$("#destUDP").val("");
+		$("#UDPportnumber").val("");
+		$("#destSMS").val("");
+		$("#destCommand").val("");
+	}
+	else {
+		$("#destName").val(EventNotiDestName[idx]);
+		$("#destEmail").val(EventNotiDestEmailAddr[idx]);
+		$("#destTCP").val(EventNotiDestTcpAddr[idx]);
+		$("#TCPportnumber").val(EventNotiDestTcpPort[idx]);
+		$("#destUDP").val(EventNotiDestUdpAddr[idx]);
+		$("#UDPportnumber").val(EventNotiDestUdpPort[idx]);
+		$("#destSMS").val(EventNotiDestSmsAddr[idx]);
+		$("#destCommand").val(Base64.decode(EventNotiDestCommand[idx]));
+	}
+	current_edit_idx=idx;
+}
+
+function delentry(idx) {
+	$("#cmd").val("EVTNOTI_DEST_DEL" );
+	$("#editIdx").val(idx);
+	$("#form").submit();
+}
+var showingInfoBoxIdx = 0
+function showInfo(idx) {
+	clear_alert();
+	if (showingInfoBoxIdx > 0) {
+		$("#infoBox"+showingInfoBoxIdx).css("display", "none");
+		showingInfoBoxIdx = 0;
+	}
+	var msg="<div class='message_box' style='text-align:left;padding:20px;width:auto;'>"+_("linkedEvent")+" ("+EventNotiDestName[idx]+"):"+"<br/>";
+	for (var i=1; i<=evtnoti_list.length; i++) {
+		if(EventNotiDestIdx[i]==idx && evtnoti_list[i-1]!="") {
+			msg+="<br/>"+evtnoti_list[i-1];
+		}
+	}
+	msg+="<br/></div><div style='align-items:center;text-align:center'><button class='secondary mini' style='float:none;margin-bottom:10px;margin-left:0px;margin-right:0px' onClick='$(\"#infoBox"+idx+"\").css(\"display\", \"none\");' type='button'>"+_("CSok")+"</button><div/>";
+	$("#infoBox"+idx).html(msg);
+	$("#infoBox"+idx).css("display", "block");
+	showingInfoBoxIdx = idx;
+	return;
+}
+
+function check_usage(idx) {
+	for (var i=1; i<=evtnoti_list.length; i++) {
+		if(EventNotiDestIdx[i]==idx) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function BuildEventDestFields() {
+var h="";
+#ifdef V_WEBIF_SPEC_vdf
+var ntc_offset=0;
+#else
+var ntc_offset=0;
+#endif
+	if (EventNotiDestName.length == 0) {
+		h="<tr><th colspan='8'><div align='center'>"+_("eventNotiDest empty")+"</div></th></tr>";
+		$("#title-head").css("display", "none");
+		$("#submit-div").css("display", "none");
+		$("#evtnotiList").html(h);
+		return;
+	}
+	for (var i=1; i<EventNotiDestName.length; i++) {
+		var tcp_addr=EventNotiDestTcpAddr[i];
+		tcp_addr+=EventNotiDestTcpPort[i]==""?"":(":"+EventNotiDestTcpPort[i]);
+		var udp_addr=EventNotiDestUdpAddr[i];
+		udp_addr+=EventNotiDestUdpPort[i]==""?"":(":"+EventNotiDestUdpPort[i]);
+		h+="<tr>"
+		h+="<td>"+breakWord(EventNotiDestName[i],(11+ntc_offset))+"</td>";
+		h+="<td>"+breakWord(EventNotiDestEmailAddr[i],(12+ntc_offset))+"</td>";
+		h+="<td>"+breakWord(tcp_addr,(13+ntc_offset))+"</td>";
+		h+="<td>"+breakWord(udp_addr,(13+ntc_offset))+"</td>";
+		h+="<td>"+breakWord(EventNotiDestSmsAddr[i],(12+ntc_offset))+"</td>";
+		h+="<td>"+breakWord(Base64.decode(EventNotiDestCommand[i]),(64+ntc_offset))+"</td>";
+#ifdef V_WEBIF_SPEC_vdf
+		h+="<td class='last'><a class='secondary sml' href='javascript:clear_alert();edit_dest("+i+");'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+		h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:clear_alert();edit_dest("+i+");' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+		if(check_usage(i)) {
+			h+="<td class='last' style='padding-top:4px'><a href='javascript:showInfo("+i+");' id='info' title='"+_("showEvents")+"' style='background-color:transparent;'><i id='net-info' style='margin:3px'></i></a><div id='infoBox"+i+"' class='infoBox'></div></td></tr>";
+		}
+		else {
+			h+="<td class='last'><a href='javascript:delentry("+i+")' class='secondary sml' style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close'></i></a></td></tr>";
+		}
+	}
+	$("#evtnotiList").html(h);
+}
+
+var smsDestRegEx = /[^(\d+\+)]/g;
+function check_sms_addrs(addrs) {
+	var addr_ar = new Array();
+	var new_val='';
+	addr_ar = addrs.value.split(",");
+	for (i = 0; i < addr_ar.length; i++) {
+		if (i > 0) new_val+=',';
+		new_val+=addr_ar[i].replace(smsDestRegEx,'');
+	}
+	addrs.value=new_val;
+}
+
+$(document).ready( function() {
+	blockUI_wait(_("GUI pleaseWait"));
+	BuildEventDestFields();
+	$.unblockUI();
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+		<form name="form" id="form" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name="cmd" id="cmd"/>
+			<input type="hidden" name="editIdx" id="editIdx"/>
+			<div class="pad" id="dest_list">
+				<div class="grid-50">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("eventDestinationList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-50">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="edit_dest(-1)"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<table class="above-5-column name-list">
+				<colgroup>
+					<col width="150px">
+					<col width="150px">
+					<col width="160px">
+					<col width="160px">
+					<col width="150px">
+					<col width="160px">
+					<col width="50px">
+					<col width="auto">
+				</colgroup>
+				<thead id="title-head">
+				<tr>
+					<th class="align10"><script language=Javascript>document.write(_("destinationName"))</script></th>
+					<th class="align10"><script language=Javascript>document.write(_("email address"))</script></th>
+					<th class="align10"><script language=Javascript>document.write(_("tcpAddress"))</script></th>
+					<th class="align10"><script language=Javascript>document.write(_("udpAddress"))</script></th>
+					<th class="align10"><script language=Javascript>document.write(_("smsNumber"))</script></th>
+					<th class="align10"><script language=Javascript>document.write(_("customCommand"))</script></th>
+					<th class="align10">&nbsp;</th>
+					<th class="align10">&nbsp;</th>
+				</tr>
+				</thead>
+				<tbody id="evtnotiList"></tbody>
+				</table>
+				<div class="submit-row" id="submit-div">
+					<button type="button" id="wtSave" onClick="window.location='event_dest.html?success'"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='event_dest.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			<div class="pad" id="dest_edit" style="display:none">
+				<h2><script language=Javascript>document.write(_("eventDestinationEdit"))</script></h2>
+				<div class="form-row">
+					<label for="destName"><script language=Javascript>document.write(_("destinationName"))</script></label>
+					<input type=text name='destName' id='destName' class="required validate[required] large" maxlength=64 onkeyup="urlFilter(this);">
+				</div>
+				<div class="form-row">
+					<label for="destEmail"><script language=Javascript>document.write(_("email address"))</script></label>
+					<div class="field">
+						<input type=text name='destEmail' id='destEmail' class="large" maxlength=64 onkeyup="urlFilter(this);">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("requiresEmailConfig"))</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="destTCP"><script language=Javascript>document.write(_("tcpAddress"))</script></label>
+					<input type=text name='destTCP' id='destTCP' class="large" maxlength=64 onkeyup="urlFilter(this);">
+				</div>
+				<div class="form-row">
+					<label for="TCPportnumber"><script language=Javascript>document.write(_("tcpPort"))</script></label>
+					<div class="field">
+						<input type="text" name="TCPportnumber" id="TCPportnumber" class="large validate[funcCall[validate_port]] port" value="" maxlength=5 onkeyup="NumfieldEntry(this);">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="destUDP"><script language=Javascript>document.write(_("udpAddress"))</script></label>
+					<input type=text name='destUDP' id='destUDP' class="large" maxlength=64 onkeyup="urlFilter(this);">
+				</div>
+				<div class="form-row">
+					<label for="UDPportnumber"><script language=Javascript>document.write(_("udpPort"))</script></label>
+					<div class="field">
+						<input type="text" name="UDPportnumber" id="UDPportnumber" class="large validate[funcCall[validate_port]] port" value="" maxlength=5 onkeyup="NumfieldEntry(this);">
+					</div>
+					<div>
+						<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for="destSMS"><script language=Javascript>document.write(_("smsNumber"))</script></label>
+					<input type=text name='destSMS' id='destSMS' class="large" maxlength=64 onkeyup='check_sms_addrs(this);'>
+				</div>
+				<div class="form-row">
+					<label for="destCommand"><script language=Javascript>document.write(_("customCommand"))</script></label>
+					<script language='javascript'>
+						if (<%_val = session["user"];%>"@@_val" == "root") {
+							document.write("<input type=text name='destCommand' id='destCommand' class=\"large\" maxlength=64>")
+						} else {
+							document.write("<input type=text name='destCommand' id='destCommand' class=\"large\" maxlength=64 disabled>")
+						}
+					</script>
+				</div>
+				<div class="form-row">
+					<p style="font-size:8pt;"><script language=Javascript>document.write(_("event noti sms disclaimer1"))</script>
+					<a href='/SMS_Diagnostics.html' style="color:BLUE;"><script language=Javascript>document.write(_("event noti sms disclaimer2"))</script></a>
+					<script language=Javascript>document.write(_("event noti sms disclaimer3"))</script></p>
+				</div>
+				<div class="submit-row">
+					<button type="button" onClick="edit_dest_save()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='event_dest.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+		</form>
+		</div>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Services", "EVENT_DEST", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('event noti saved'));
+<%	}%>
+
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	$.validator.addMethod("port",function(c,a) {
+		if( c.length==0 ) {
+			return true;
+		}
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		return true;
+	},_("Msg126"));//Port number must have a value between 1 and 65535.
+#else
+/********* for NTC ValidationEngine **********/
+	function validate_port(field, rules, i, options) {
+		if( field.val().length>0 && ( field.val() < 1 || field.val() > 65535 )) {
+			return _("Msg126");
+		}
+	}
+#endif
+</script>
+</body>
+</html>

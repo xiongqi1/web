@@ -1,0 +1,191 @@
+#!/bin/sh -f
+#
+# Connect script for Generic PPTP
+#
+# This script is called by connection_mgr as follows:-
+#
+# SSierraUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+PROFILE=$1
+INSTANCE=$2
+
+DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+TTY=`/usr/bin/rdb_get $DEV.data_if.$INSTANCE`
+
+# get options
+PPPTP_USERNAME=`/usr/bin/rdb_get link.profile.$PROFILE.user`
+PPPTP_PASSWORD=`/usr/bin/rdb_get link.profile.$PROFILE.pass`
+PPPTP_SERVICEADDR=`/usr/bin/rdb_get link.profile.$PROFILE.serveraddress`
+PPPTP_DEFAULTROUTE=`/usr/bin/rdb_get link.profile.$PROFILE.default.defaultroutemetric`
+PPPTP_USEPEERDNS=`/usr/bin/rdb_get link.profile.$PROFILE.default.dnstopptp`
+PPPTP_DEBUG=`/usr/bin/rdb_get link.profile.$PROFILE.verbose_logging`
+PPTP_RETRY=`/usr/bin/rdb_get link.profile.$PROFILE.PPTP_RETRY`
+AUTH_TYPE=`/usr/bin/rdb_get link.profile.$PROFILE.authtype`
+MPPE_EN=`/usr/bin/rdb_get link.profile.$PROFILE.mppe_en`
+CUSTOM_OPT=`/usr/bin/rdb_get link.profile.$PROFILE.opt`
+
+log() {
+	logger -t "SPPTP" -- $@
+}
+
+# log connection information
+cat << EOF | log
+PPTP connection information
+=============================================
+user name    : $PPPTP_USERNAME
+service addr : $PPPTP_SERVICEADDR
+defaultroute : $PPPTP_DEFAULTROUTE
+usepeerdns   : $PPPTP_USEPEERDNS
+debug        : $PPPTP_DEBUG
+retry        : $PPTP_RETRY
+auth type    : $AUTH_TYPE
+=============================================
+EOF
+
+#DEBUG="debug "
+#DEFAULTROUTE="defaultroute "
+#DNS="usepeerdns "
+
+# build PPTP command line
+PPTP_CMD="pptp $PPPTP_SERVICEADDR --nolaunchpppd"
+
+
+if [ -z "$MPPE_EN" -o "$MPPE_EN" = "1" ]; then
+	MPPE_OPT="require-mppe"
+else
+	MPPE_OPT=""
+fi
+
+# build PPPD command line - params
+PPPD_CMD="pppd nodetach noipdefault crtscts noauth $MPPE_OPT $CUSTOM_OPT ipparam $PROFILE linkname $PROFILE"
+if [ "$PPPTP_DEBUG" != "0" -a "$PPPTP_DEBUG" != "undefined" ]; then
+	PPPD_CMD="$PPPD_CMD debug"
+fi
+test -n "$PPPTP_USERNAME" && PPPD_CMD="$PPPD_CMD user $PPPTP_USERNAME"
+test -n "$PPPTP_PASSWORD" && PPPD_CMD="$PPPD_CMD password $PPPTP_PASSWORD"
+
+getRefuseAuth() {
+	echo "refuse-chap refuse-mschap refuse-mschap-v2 refuse-eap refuse-pap " | sed "s/$1 //g"
+}
+
+case "$AUTH_TYPE" in
+	'ms-chap-v2')	PPPD_CMD="$PPPD_CMD `getRefuseAuth refuse-mschap-v2`";;
+	'ms-chap')	PPPD_CMD="$PPPD_CMD `getRefuseAuth refuse-mschap`";;
+	'chap')		PPPD_CMD="$PPPD_CMD `getRefuseAuth refuse-chap`";;
+	'eap')		PPPD_CMD="$PPPD_CMD `getRefuseAuth refuse-eap`";;
+	'pap')		PPPD_CMD="$PPPD_CMD `getRefuseAuth refuse-pap`";;
+esac
+
+# build PPPD command line - defaultroute
+# In ip-up.d scritps, we add the routing entry to have control on metrics
+#if [ "$PPPTP_DEFAULTROUTE" = 0 ]; then
+PPPD_CMD="$PPPD_CMD nodefaultroute"
+#else
+#	PPPD_CMD="$PPPD_CMD defaultroute"
+#fi
+
+# build PPPD command line - dns
+test "$PPPTP_USEPEERDNS" = 1 && PPPD_CMD="$PPPD_CMD usepeerdns"
+
+add_host_route() {
+	PPP_IPPARAM="$PROFILE"
+	PPTP_SERVER="$PPPTP_SERVICEADDR"
+
+	log "### add host route roule for vpn"
+
+	PPTP_DEFGW=$(rdb_get link.profile.${PPP_IPPARAM}.default.defaultroutemetric)
+	PPTP_SERVER=$(rdb_get link.profile.${PPP_IPPARAM}.serveraddress)
+
+	log "vpn (defgw='$PPTP_DEFGW',server='$PPTP_SERVER')"
+
+	#
+	# pppd daemon does not replace the gateway if it exists
+	# we have to manually add the default gateway for pptp
+	#
+
+	if [ "$PPTP_DEFGW" = "1" ]; then
+		log "### route"
+		route -n | log
+
+		# get gw and dev from route info
+		if echo "$PPTP_SERVER" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
+			pptp_serverip="$PPTP_SERVER"
+		else
+			pptp_serverip=$(nslookup "$PPTP_SERVER" | grep '^Name:[[:space:]]\+.*' -A 1 | sed -n 's/Address[[:space:]][0-9]\+:[[:space:]]\+\([0-9\.]\+\).*/\1/p')
+		fi
+
+		# get primary interface
+		local primary_pf=""
+		local primary_dev=""
+
+		primary_pf=$(rdb_get "service.failover.x.primary")
+		test -n "$primary_pf" && primary_dev=$(rdb_get "link.profile.$primary_pf.interface")
+
+		# get route via the primary dev
+		if [ -n "$primary_dev" ]; then
+			log "*hop - ipaddr=$pptp_serverip,primary_dev=$primary_dev"
+			ip route get "$pptp_serverip" dev "$primary_dev" | log
+
+			hop_info=$(ip route get "$pptp_serverip" dev "$primary_dev")
+		else
+			hop_info=""
+		fi
+
+		# get route via the default gw
+		if [ -z "$hop_info" ]; then
+			log "*hop - ipaddr=$pptp_serverip,primary_dev=$primary_dev"
+			ip route get "$pptp_serverip" | log
+
+			hop_info=$(ip route get "$pptp_serverip")
+		fi
+
+		gw=$(echo "$hop_info" | sed -n 's/.* via \([0-9\.]\+\) .*/\1/p')
+		dev=$(echo "$hop_info" | sed -n 's/.* dev \([^ ]\+\) .*/\1/p')
+
+		log "adding pptp route - gw='$gw',if='$dev'"
+
+		if [ -z "$gw" -a -z "$dev" ]; then
+			log "route not found - use default gw"
+			eval $(route -n | sed -n 's/0\.0\.0\.0 \+\([^ ]\+\) \+0.0.0.0 \+'UG' \+[0-9]\+ \+[0-9]\+ \+[0-9]\+ \+\(.*\)/gw="\1";dev="\2";/p')
+		fi
+
+		# get gateway option
+		if [ -n "$gw" -a "$gw" != "0.0.0.0" ]; then
+			opt_gw="gw $gw"
+		else
+			opt_gw=""
+		fi
+
+		# get dev option
+		if [ -n "$dev" ]; then
+			opt_dev="dev $dev"
+		else
+			opt_dev=""
+		fi
+
+		if [ -z "$opt_gw" -a -z "$dev" ]; then
+			log "ERR: no route to the server"
+		else
+
+			log "deleting host rules - route del -host '$pptp_serverip'"
+			# delete
+			while route del -host "$pptp_serverip" 2>/dev/null ; do
+				:
+			done
+
+			log "adding... route add -host "$pptp_serverip" $opt_gw $opt_dev"
+			route add -host "$pptp_serverip" $opt_gw $opt_dev
+		fi
+	fi
+}
+
+# add host route rule
+add_host_route
+
+log "launching... $PPPD_CMD pty '$PPTP_CMD'"
+# let Connectioni manager monitor the pptp proccess directly
+exec $PPPD_CMD pty "$PPTP_CMD"

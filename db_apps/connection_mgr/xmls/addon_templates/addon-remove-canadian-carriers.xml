@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+<Exclude>
+	<Country country="Canada" mcc="302">
+		<Carrier carrier="Bell Mobility 1" mnc="610">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Bell Mobility 2" mnc="640">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Bell Mobility 3" mnc="651">
+			<APN apn="pda2.bell.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Wind Mobile" mnc="490">
+			<APN apn="broadband.windmobile.ca">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus ISP" mnc="220">
+			<APN apn="isp.telus.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus VPN" mnc="220">
+			<APN apn="vpn.telus.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Telus SP" mnc="220">
+			<APN apn="sp.internet.com">
+			</APN>
+		</Carrier>
+		<Carrier carrier="Fido Internet" mnc="370">
+			<APN apn="internet.fido.ca">
+				<UserName>fido</UserName>
+				<Password>fido</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="lteinternet.apn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="ltemobile.apn">
+				<UserName></UserName>
+				<Password></Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet" mnc="720">
+			<APN apn="internet.com">
+				<UserName>wapuser1</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+		<Carrier carrier="Rogers Internet (VPN)" mnc="720">
+			<APN apn="vpn.com">
+				<UserName>wapuser1</UserName>
+				<Password>wap</Password>
+			</APN>
+		</Carrier>
+	</Country>
+</Exclude>	
+</Rt>

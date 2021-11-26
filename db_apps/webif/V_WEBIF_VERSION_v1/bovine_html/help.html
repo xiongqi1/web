@@ -1,0 +1,55 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Help</title>
+
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/jquery-1.6.min.js"></script>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+</head>
+<body>
+
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("help");
+function help_src(url) {
+	window.resizeTo(980,680);
+	window.location=url;
+}
+
+function init_help(responseText) {
+	eval(responseText);
+	if(doclist.length==1) {
+		help_src("/doc/"+doclist[0].name);
+	}
+	else if(doclist.length>1) {
+			h="<tr><td><b>File Name</b></td><td><b>Date</b></td><td><b>Size</b></td><td><b>Action</b></td></tr>";
+			for(i=0; i< doclist.length; i++) {
+				idx=doclist[i].name.indexOf(".pdf");
+				if(idx==-1)
+					idx=doclist[i].name.indexOf(".PDF");
+				h += "<tr><td><a href='javascript:help_src(\"/doc/"+doclist[i].name+"\")'>"+doclist[i].name+"</a></td><td>"+doclist[i].date+"</td><td>"+doclist[i].size+"</td><td><a href='/cgi-bin/file_action.cgi?delPDFfile&"+doclist[i].name+"'>"+_("delete")+"</a></td></tr>";
+			}
+			$("#FileList").html(h);
+	}
+	else {
+		alert(_("no help file"));
+		window.close();
+	}
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/get_files.cgi?getPDFfilelist', init_help);
+});
+
+</script>
+<div align="center">
+<br/><h2><script language="JavaScript">document.write(_("help file list"));</script></h2>
+</div>
+<br/>
+<form name="form">
+<table id="FileList"></table>
+</form>
+</body>
+</html>

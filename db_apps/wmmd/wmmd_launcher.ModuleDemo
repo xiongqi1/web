@@ -1,0 +1,30 @@
+#!/bin/sh
+
+
+log() {
+	logger -t "wmmd_launcher" "$*"
+}
+
+clean_up_child() {
+	pkill -9 -P $$
+	wait
+	exit
+}
+
+trap clean_up_child SIGTERM
+
+# HACK to get out of library hell...
+
+pid="$$"
+log "remove launcher from OOM (pid=$pid)"
+echo "-17" > "/proc/$pid/oom_adj"
+
+while true; do
+	log "starting wmmd"
+	LD_LIBRARY_PATH=/cache/staging/usr/lib lua /usr/bin/wmmd_start.lua 2>&1 | logger -t "wmmd_launcher" 2> /dev/null > /dev/null &
+	wait
+
+	log "sleep for 60 seconds"
+	sleep 60
+done
+

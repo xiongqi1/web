@@ -1,0 +1,91 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Voice</title>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript">
+function submitProf()
+{
+	if( !isValidIpByte(document.formS.timeOut.value) || (document.formS.timeOut.value < 1) )
+	{
+		alert("Error: Timeout value not entered or out of range");
+		return;
+	}
+	document.formS.submit();
+}
+
+function defaultProf()
+{
+	document.formS.expression.value = "^0[23478][0-9]{8,8}|^[2-9][0-9]{7,7}|^000|^112";
+	document.formS.prefix.value = "0011";
+	document.formS.timeOut.value = 5;
+}
+</script>
+</head>
+<%
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+    	temp=form['expression'];
+		retval=set_single( 'wwan.0.voicecall.dial_plan.regex='+temp );  
+ 		temp=form['prefix'];
+		retval=set_single( 'wwan.0.voicecall.dial_plan.international_prefix='+temp );
+        temp=form['timeOut'];
+		retval=set_single( 'wwan.0.voicecall.dial_plan.timeout='+temp );
+	}
+	else //GET
+	{
+        form['expression'] = get_single( 'wwan.0.voicecall.dial_plan.regex' ); 
+        form['prefix'] = get_single( 'wwan.0.voicecall.dial_plan.international_prefix' );    
+        form['timeOut'] = get_single( 'wwan.0.voicecall.dial_plan.timeout' ); 
+	}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+
+<form name="formS" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+
+<h3>Voice Call Settings</h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<table width="90%">
+    <tr><th>Voice Call Settings</th></tr>
+</table>
+<table width="90%">
+
+<tr> 
+	<td width="30%">Dial Plan </td>
+	<td><input type=text name='expression' size="48" maxlength=128 value="@@form['expression']"></td>
+</tr>
+
+<tr> 
+	<td>IDD International Prefix</td>
+	<td><input name='prefix' value="@@form['prefix']"></td>
+</tr>
+
+<tr> 
+	<td>Dial Keypad Inactivity Timeout</td>
+	<td><input type=text name='timeOut' maxlength=3 value="@@form['timeOut']">&nbsp;&nbsp;(1 - 255)</td>
+</tr>
+</table>
+
+<div align="left" style="margin-left:35% ">
+<p></p>
+<input type="button" name="submitForm" value="&nbsp;Save&nbsp;" onClick="submitProf();">&nbsp;&nbsp;
+&nbsp;&nbsp;<input type="button" name="submitForm" value="Default" onClick="defaultProf();">
+<p></p>
+</div>
+
+</form>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

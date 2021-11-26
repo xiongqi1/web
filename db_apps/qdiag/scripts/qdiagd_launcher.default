@@ -1,0 +1,27 @@
+#!/bin/sh
+
+
+log() {
+	logger -t "qdiagd_launcher" "$*"
+}
+
+clean_up_child() {
+	pkill -P $$
+	exit
+}
+
+trap clean_up_child SIGTERM
+
+pid="$$"
+log "remove launcher from OOM (pid=$pid)"
+echo "-17" > "/proc/$pid/oom_adj"
+
+while true; do
+	log "starting qdiagd"
+	/bin/qdiagd 2>&1 | logger -t "qdiagd_launcher" &
+	wait
+
+	log "sleep for 60 seconds"
+	sleep 60
+done
+

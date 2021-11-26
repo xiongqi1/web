@@ -1,0 +1,143 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Package Manager</title>
+<script language="JavaScript" src="/cgi-bin/pkManager.cgi"></script>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript">
+
+
+
+</script>
+</head>
+<%
+    if (request['REQUEST_METHOD'] == "POST" )
+	{
+		i=form['delindex'];
+        set_single( 'service.firewall.dnat.'+i+'=' ); //delete last
+		tempval = form['rdbCmd'];
+		set_list( tempval, '-p' );
+
+   /*     if( form['submit']=="Save" )
+        {
+        	if( form['editindex'] > 0 )
+            {
+            	set_single( 'service.firewall.dnat.'+form['editindex']+'=\"-p '+form['ProtocolText']+' -s '+form['ipmapsrcip']+' --dport '+form['ipmapsrcport']+':'+form['ipmapsrcport2']+' -i ppp0 -j DNAT --to-destination '+form['ipmapdstip']+':'+form['ipmapdstport']+'-'+form['ipmapdstport2']+' \"');
+                set_single( 'service.firewall.dnat.trigger=1' );
+            }
+        }
+        else
+        { 
+            set_single( 'service.firewall.dnat.'+form['delindex']+'=delete' ); //delete
+            set_single( 'service.firewall.dnat.trigger=1' );
+        }*/
+	}
+%>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<div class="content" >
+<form name="form" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>System > Load/Save > Package Manager</h3>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>	
+<input type="hidden" name="editindex" value="@@form['editindex']">
+
+<table width="85%">
+    <tr><th>Package List View</th></tr>
+</table>	
+<table width="85%" border="0" cellspacing="0" ID="Table2">
+<tr>
+	<TD width="30%"><b>Package Name</b></div></TD>
+	<TD width="15%"><b>Version</b></div></TD>
+	<TD width="20%"><b>Architecture</b></div></TD>
+	<TD width="15%"><b>Installed Time</b></div></TD>
+	<TD width="20%">&nbsp;</TD>
+</tr>
+<script language="Javascript">
+function uninstall( idx )
+{
+	if( st[idx].detail.indexOf("/etc/appweb/appweb.conf")>0 )
+	{
+		msg = "Stop!\nThis package contains the web server configuration file,\nuninstall this package will disable the web server!\n"
+	}
+	msg += "Do you really want to uninstall the "+st[idx].Package+" ?";
+	if (confirm(msg) )
+	{
+		var xmlHttp;
+		try
+		{  
+			xmlHttp=new ActiveXObject("Microsoft.XMLHTTP");   
+		}
+		catch (e)
+		{  // Internet Explorer  
+			try
+			{    
+				xmlHttp=new ActiveXObject("Msxml2.XMLHTTP");   
+			}
+			catch (e)
+			{    
+				try
+				{      
+					// Firefox, Opera 8.0+, Safari  
+					xmlHttp=new XMLHttpRequest();  
+	  
+				}
+				catch (e)
+				{      
+					alert("Your browser does not support AJAX!");      
+					return false;      
+				}    
+			}  
+		}
+		xmlHttp.open("GET","/cgi-bin/file_action.cgi?U&"+st[idx].Package,true);
+		xmlHttp.send('a'); 
+		xmlHttp.onreadystatechange=function()
+		{
+			if(xmlHttp.readyState==4)
+			{
+				alert( xmlHttp.responseText );	
+				location.reload();
+			}
+		}	
+	}
+}
+
+function makeList()
+{   
+	if (st.length == 0)
+	{
+		document.write( "<tr><td colspan='8' align='center'>Package List is empty</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) 
+	{
+		document.write("<tr>"); 
+		document.write("<td><a href=javascript:uninstall(\""+i+"\"); title=\"Uninstall "+st[i].Package+"\">"+st[i].Package+"</td>");
+	    document.write("<td>"+st[i].Version+"</td>");
+		document.write("<td>"+st[i].Status+"</td>");
+		document.write("<td>"+st[i].Installed_Time+"</td>");
+		document.write("<td><a href=javascript:alert(\""+st[i].detail+"\"); title=\""+st[i].description+"&#10"+st[i].title+"\">Package details</a></td>");
+		document.write("</tr>");
+	}
+}
+makeList();
+</script>
+</table>
+<div class="line" style="margin: 8px 15% 16px 0;"></div>
+</form>
+</div>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

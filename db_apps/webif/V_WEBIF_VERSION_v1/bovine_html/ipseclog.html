@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Log File</title>
+<link href="BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<script language="javascript" src="/util.js"></script>
+<script language="JavaScript">
+function createAjax() {
+	var ajaxHttp;
+
+	try {
+		ajaxHttp = new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			ajaxHttp = new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				ajaxHttp = new XMLHttpRequest();
+
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+	return ajaxHttp;
+}
+
+function ipsecVerboseLogDn() {
+
+	document.getElementById("ipsec_dn_action").value="ipsecLogDn";
+	document.getElementById("ipsec_dn_param").value= "";
+	document.getElementById("formIpsecActionDn").submit();
+}
+
+function ipsecLogOnChange()
+{
+	alert('Changing the log level will restart the IPsec service. As a result this will disconnect any tunnels that are currently connected.');
+	return;
+}
+
+function ipsecVerlogApply() {
+
+	document.formIPsec.submit();
+
+	var req="/cgi-bin/ipsec_action.cgi?action=ipsecLogApply&param=";
+
+	var ajaxIpsecLog = createAjax();
+
+	ajaxIpsecLog.onreadystatechange = function() {
+		if (ajaxIpsecLog.readyState != 4)
+			return;
+
+		document.body.style.cursor = 'default';
+
+		if (ajaxIpsecLog.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxIpsecLog.responseText);
+
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert("failed");
+				return;
+		}
+
+	}
+	document.body.style.cursor = 'wait';
+
+	ajaxIpsecLog.open('GET', req, true);
+	ajaxIpsecLog.send(null);
+}
+
+
+document.write('<style type="text/css">\n.logfile{display: none;}\n</style>')
+</script>
+</head>
+<%
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+        	tmp_verblog = form['IPsecLog'];
+        	tmp2_verblog = get_single('ipsec.0.verblog');
+		if (tmp_verblog != tmp2_verblog)
+		{
+    			retval = set_list('ipsec.0.verblog='+tmp_verblog,'-p');
+		}
+        }
+	else /*GET*/
+	{
+        	form['IPsecLog'] = get_single('ipsec.0.verblog' );
+	}
+%>
+
+<body id="body-log">
+<div id="contentWrapper-log">
+<% include menu.html %><br/>
+
+<h3>VPN > IPsec Log</h3>
+
+<form name="formIPsec" class="content" method="post">
+
+<table border=0 cellspacing=0 cellpadding=0 width="100%">
+    <tr>
+	<td width="38%">IPsec Verbose Log</td>
+        <td>
+        <select name=IPsecLog ID="IPsecLog" value="@@form['IPsecLog']" onchange="ipsecLogOnChange()" size=1 >
+           	<option value="none">None</option>
+            	<option value="all">All</option>
+            	<option value="crypt">Crypt</option>
+            	<option value="raw">Raw</option>
+            	<option value="parsing">Parsing</option>
+            	<option value="emitting">Emitting</option>
+            	<option value="control">Control</option>
+            	<option value="controlmore">ControlMore</option>
+    		<option value="lifecycle">Lifecycle</option>
+            	<option value="pfkey">Pfkey</option>
+ 		<option value="dns">Dns</option>
+ 		<option value="dpd">Dpd</option>
+ 		<option value="natt">Natt</option>
+ 		<option value="oppo">Oppo</option>
+ 		<option value="private">Private</option>
+	</select>
+        </td>
+    </tr>
+<script type="text/javascript">
+
+	document.formIPsec.IPsecLog.value="@@form['IPsecLog']";
+	if(document.formIPsec.IPsecLog.value=="")
+		document.formIPsec.IPsecLog.value="none";
+
+</script>
+</table>
+<br/>
+<br/>
+<br/>
+<br/>
+<a href=/ipseclog.txt>&nbsp;&nbsp;&nbsp;Download IPsec Log File</a>
+<br></br>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<div class="line" style="margin: 20px 10% 16px 0;"></div>
+	<div align="center" style="margin-right:10% ">
+		<p></p>
+		<INPUT TYPE="button" VALUE="Apply" id="submitBtn" onClick="javascript:ipsecVerlogApply()">&nbsp;&nbsp;
+		<INPUT TYPE="button" VALUE="&nbsp;Exit&nbsp;" onClick="location='VPN.html'">
+	</div>
+</div>
+
+</form>
+
+
+<form id="formIpsecActionDn" name="formIpsecActionDn" method="GET" action="/cgi-bin/ipsec_action.cgi" encType="multipart/form-data" style='display:none'>
+<input type="hidden" id="ipsec_dn_action" name="action" value=""/>
+<input type="hidden" id="ipsec_dn_param" name="param" value=""/>
+</form>
+
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

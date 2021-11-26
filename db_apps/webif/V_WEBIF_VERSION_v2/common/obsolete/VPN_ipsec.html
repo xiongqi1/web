@@ -1,0 +1,1663 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>IPSec</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<% include vpnCommon.inc %>
+<%
+// The following code assembles required link information from the RDB and puts it into an array called "st".
+// See vpnCommon.inc for more details
+var createStDevices=new Array ("ipsec.0","ipsec.0"); // Specify twice otherwise its not a proper array
+var createStArgs=new Array ( new Array("enable","","0"), "remote_lan", "remote_lan2",
+"remote_lan3", "remote_lan4", "remote_mask", "local_gateway", "local_lan", "local_mask", "enccap_protocol", "ike_mode",
+"pfs", "ike_enc", "ike_hash", "ipsec_enc", "ipsec_hash", "ipsec_dhg", new Array ("ipsec_method","","none"), "ipsec_dpd",
+"life_time", "ike_time", "dpd_time",
+"dpd_timeout",
+);
+var needEncodingArgs = new Array("name", "remote_gateway", "psk_value", "psk_remoteid", "psk_localid", "rsa_remoteid", "rsa_localid", "key_password",
+#ifndef V_SCEP_CLIENT_none
+"scep_remoteid",
+#endif
+);
+stElements=createVpnElements( createStDevices, createStArgs, needEncodingArgs );
+%>
+<script>
+var st=[@@stElements];
+</script>
+
+<script language="JavaScript" src="vpnUtils.js"></script>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+<script type="text/javascript" src="/js/zxcvbn.js"></script>
+#endif
+
+<script language="JavaScript">
+#include "net_util.js"
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+#if (0)
+/*-----------------------------------------------------------------------*/
+// combine multiple line warning messages
+/*-----------------------------------------------------------------------*/
+
+/* password warning message for submit
+
+   Passwords configured on the router must meet the following criteria:
+     • Be a minimum of 8 characters and no more than 128 characters in length.
+     • Contain at least one upper case and one number.
+     • Contain at least one special character, such as: `~!@#$%^&*()-_=+[{]}\|;:'",<.>/?.
+ */
+#endif
+var pwdWarn1=[];
+	pwdWarn1[0] = _("passwordWarning6");
+	pwdWarn1[1] = bulletHead+_("passwordWarning2");
+	pwdWarn1[2] = bulletHead+_("passwordWarning3");
+	pwdWarn1[3] = bulletHead+_("passwordWarning4")+convert_to_html_entity('`~!@#$%^&*()-_=+[{]}\|;:\'\",\<.>/?.');
+
+#if (0)
+/*-----------------------------------------------------------------------*/
+#endif
+#endif
+
+var actTunnelNum=0;
+var ipsecTunnelMap=new Array();
+var notUsed1 = _("maxEnabledProfilesExceeded"); // Used in vpnUtils.js @todo TT#9132
+var notUsed2 = _("errorsTitle");                // ditto
+
+var infoFetched = false; // Flag to indicate whether ipsec info has been fetched or not.
+
+var IPSRsaKeyValid="nofile";
+var IPSRsaLocalCertValid="nofile";
+var IPSRsaRemoteCertValid="nofile";
+var IPSRsaCACertValid="nofile";
+var IPSRsaCRLCertValid="optional";
+var left_rsa_file="";
+var right_rsa_file="";
+var private_key_file="";
+var local_public_key_file="";
+var remote_public_key_file="";
+var ca_certi_file="";
+var crl_certi_file="";
+
+function exitHandler() {
+	show_ipsec_profile();
+}
+
+function hasSubStr(str, substr) {
+	return str.search(substr) >= 0;
+}
+
+function checkIpsecForm() {
+	var f=document.form;
+
+	var vpnserver=f.vpnserver.value;
+	// 1. if domain name format address then no need to check validation here, let network do it, just pass this condition
+	// 2. if numeric ip address format then do ip address validation, if fails then alert
+	if(isDomainNameFormat(vpnserver) == false && isValidIpAddress(vpnserver) == false) {
+		validate_alert("",_("Msg131"));//Error: No server IP address entered or not entered correctly
+		return false;
+	}
+
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	var keyMode = f.IpSecMethod.value;
+	if (keyMode == "psk") {
+		if (f.PskValue.value.length > 128 || f.PskValue.value.length < 8 || passStrengthValidation(f.PskValue.value) == false) {
+			validate_alert(_("securityAdvise"), pwdWarn1, true);	// Passwords configured on the router must meet the following criteria:...
+			return false;
+		}
+	}
+#endif
+
+	return true;
+
+	var keyMode = f.IpSecMethod.value;
+	if (keyMode == "")
+		keyMode = "none";
+	if ((keyMode != "none") &&
+		((f.remote_lan1.value  == "") ||
+		(f.remote_lan2.value  == "") ||
+		(f.remote_lan3.value  == "") ||
+		(f.remote_lan4.value == "") ||
+		(f.remote_mask1.value  == "") ||
+		(f.remote_mask2.value  == "") ||
+		(f.remote_mask3.value  == "") ||
+		(f.remote_mask4.value == "") ||
+		(f.local_lan1.value  == "") ||
+		(f.local_lan2.value  == "") ||
+		(f.local_lan3.value  == "") ||
+		(f.local_lan4.value == "") ||
+		(f.local_mask1.value  == "") ||
+		(f.local_mask2.value  == "") ||
+		(f.local_mask3.value  == "") ||
+		(f.local_mask4.value == ""))) {
+		blockUI_alert(_("Msg64"));//All IP address and mask values for local and gateway must be filled in.
+		return;
+	}
+	if (keyMode == "psk") {
+		if (f.PskValue.value == "") {
+			blockUI_alert(_("Msg65"));//Key Mode PSK requires a PSK Password.
+			return false;
+		}
+	}else if(keyMode == "rsa") {
+		 //nothing to check
+	}
+	else if (keyMode == "cert") {
+		if (f.KeyPassword.value == "") {
+			blockUI_alert(_("Msg66"));//Your secret private key should be protected by a password.
+			return false;
+		}
+	}
+	if(isNaN(parseInt(f.IpsecLifeTime.value)) == true){
+		blockUI_alert(_("Msg67"));//You need to input a valid lifetime number.
+		return false;
+	}
+	if(isNaN(parseInt(f.IpsecIkeTime.value)) == true){
+		blockUI_alert(_("Msg68"));//You need to input a valid iketime number.
+		return false;
+	}
+	if(isNaN(parseInt(f.DpdTimeout.value)) == true){
+		blockUI_alert(_("Msg69"));//You need to input a valid dpd timeout number.
+		return false;
+	}
+	if(isNaN(parseInt(f.DpdTimeDelay.value)) == true){
+		blockUI_alert(_("Msg70"));//You need to input a valid dpd keep alive time.
+		return false;
+	}
+	return true;
+}
+
+function isValidIpAddress(str) {
+	regaddr=/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/
+	return regaddr.exec(str)!=null;
+}
+
+function submitIpsecForm() {
+	var f=document.form;
+	f.rdbBase.value=i;
+    f.leftrsa.value=left_rsa_file;
+    f.rightrsa.value=right_rsa_file;
+    f.privkey.value=private_key_file;
+    var ext = local_public_key_file.slice(local_public_key_file.indexOf('.'));
+    if (ext == ".pem") {
+        f.localpubkey_pem.value = local_public_key_file;
+        f.localpubkey_crt.value = "";
+    } else{
+        f.localpubkey_pem.value = "";
+        f.localpubkey_crt.value = local_public_key_file;
+    }
+    ext = remote_public_key_file.slice(remote_public_key_file.indexOf('.'));
+    if (ext == ".pem") {
+        f.remotepubkey_pem.value = remote_public_key_file;
+        f.remotepubkey_crt.value = "";
+    } else{
+        f.remotepubkey_pem.value = "";
+        f.remotepubkey_crt.value = remote_public_key_file;
+    }
+    ext = ca_certi_file.slice(ca_certi_file.indexOf('.'));
+    if (ext == ".pem") {
+        f.cacerts_pem.value = ca_certi_file;
+        f.cacerts_crt.value = "";
+    } else{
+        f.cacerts_pem.value = "";
+        f.cacerts_crt.value = ca_certi_file;
+    }
+    ext = crl_certi_file.slice(crl_certi_file.indexOf('.'));
+    if (ext == ".pem") {
+        f.crlcerts_pem.value = crl_certi_file;
+        f.crlcerts_crt.value = "";
+    } else{
+        f.crlcerts_pem.value = "";
+        f.crlcerts_crt.value = crl_certi_file;
+    }
+	$("button").attr("disabled",true);
+	f.submit();
+}
+
+function submitForm() {
+	var f=document.form;
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	f.vpnserver.value = f.vpnserver_in.value;
+	f.remote_lan.value = f.remote_lan1.value + "." + f.remote_lan2.value + "." + f.remote_lan3.value + "." + f.remote_lan4.value;
+	f.remote_mask.value = f.remote_mask1.value + "." + f.remote_mask2.value + "." + f.remote_mask3.value + "." + f.remote_mask4.value;
+	f.local_lan.value = f.local_lan1.value + "." + f.local_lan2.value + "." + f.local_lan3.value + "." + f.local_lan4.value;
+	f.local_mask.value = f.local_mask1.value + "." + f.local_mask2.value + "." + f.local_mask3.value + "." + f.local_mask4.value;
+	try {
+		document.form.rdbCmd.value = "setEntry";
+		if ($("input:radio.access[name=vpnenable]:checked").val() == '1') {
+			if(!checkIpsecForm())
+				return;
+		}
+
+		value = parseInt(f.editindex.value);
+		if( st.length==0 || isNaN(value)==true || value < 0 || value >= st.length ) {
+			i = getNewLinkProfile();
+			if (isNaN(i)) {
+				return;
+			}
+		}
+		else if( isNaN(st[value].profilenum)==true ) {
+			blockUI_alert(_("Msg94"));	//Error: Profile number incorrectly
+			return;
+		}
+		else {
+			i=st[value].profilenum;
+		}
+		submitIpsecForm();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function delentry( index ) {
+	try {
+		var f=document.form;
+		i=st[index].profilenum;
+		f.rdbBase.value=i;
+		f.rdbCmd.value = "delEntry";
+		$("button").attr("disabled",true);
+		f.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function Ipseclist() {
+	var tunnel_num = 0;
+	actTunnelNum=0;
+
+	/* Go through tunnel list and work out how many are IPsec */
+	for (var i = 0; i < st.length; i++) {
+		if ((st[i].type=="ipsec.0")) {
+			tunnel_num++;
+			if(st[i].enable=="1") {
+				ipsecTunnelMap[actTunnelNum] = i;
+				actTunnelNum ++;
+			}
+		}
+	}
+
+	/* If the list is empty don't setup the columns, just return */
+	if (tunnel_num == 0) {
+		document.write("<br/><table class='empty above-5-column'>");
+		document.write("<thead><tr><th>" + _("IPsec empty")+ "</th></tr></thead>");
+		document.write("</table>");
+		return;
+	}
+
+	/* Display the headings for the table here */
+	document.write("<br/><table class='above-5-column'>");
+	document.write("<thead>");
+	document.write("<tr>");
+	document.write("<th class='align10'>#</th>");
+	document.write("<th class='align10'>"+_("name")+"</th>");
+	document.write("<th class='align10'>"+_("remoteLanAddressMask")+"</th>");
+	document.write("<th class='align10'>"+_("remoteGateway")+"</th>");
+	document.write("<th class='align10'>"+_("localLanAddressMask")+"</th>");
+	document.write("<th class='align10'>"+_("enable")+"</th>");
+	document.write("<th class='align10'>"+_("edit")+"</th>");
+	document.write("<th></th>");
+	document.write("</thead><tbody>");
+
+	//document.form2.stlength.value = st.length;
+	tunnel_num = 0;
+	for (i = 0; i < st.length; i++) {
+		if((st[i].type=="ipsec.0")) {
+			tunnel_num++;
+			document.write("<tr>");
+			document.write("<td>"+tunnel_num+"</td>");
+			document.write("<td style='word-wrap:break-word;width:36px;'>"+breakWord(st[i].name, 7, 1)+"</td>");
+			document.write("<td>"+st[i].remote_lan+"/"+maskBits(st[i].remote_mask)+"</td>");
+			document.write("<td>"+htmlNumberEncode(st[i].remote_gateway)+"</td>");
+			document.write("<td>"+st[i].local_lan+"/"+maskBits(st[i].local_mask)+"</td>");
+			document.write("<td>"+(st[i].enable=='1'?'enabled':'disabled')+"</td>");
+#ifdef V_WEBIF_SPEC_vdf
+			document.write("<td><a class='secondary sml' href='javascript:clear_alert();show_ipsec_profile("+i+");'><i class='icon edit'>"+_("edit")+"</i></a></td>");
+			document.write("<td class='last' style='padding:0'><a class='secondary sml' style='padding:0;margin:0;border:0;' href='javascript:delentry("+i+");' title='"+_("delete")+"'><i class='icon close'></i></a></td>");
+			document.write("</tr>");
+#else
+			document.write("<td><a class='secondary sml' style='padding:0;border:0;' href='javascript:clear_alert();show_ipsec_profile("+i+");' title='"+_("edit")+"'><i class='icon edit'></i></a></td>");
+			document.write("<td class='last' style='padding:0'><a class='secondary sml' style='padding:0;border:0;' href='javascript:delentry("+i+");' title='"+_("delete")+"'><i class='icon close'></i></a></td>");
+			document.write("</tr>");
+#endif
+		}
+	}
+	document.write("</tbody>");
+	document.write("</table>");
+}
+
+function initIpsecForm(idx) {
+	var f=document.form;
+
+	load_value_to_element("input:radio.access[name=vpnenable]",st[idx].enable==1);
+
+	f.newname.value=st[idx].name;
+	f.vpnserver.value=st[idx].remote_gateway;
+	f.remote_lan.value=st[idx].remote_lan;
+	f.remote_mask.value=st[idx].remote_mask;
+	f.local_lan.value=st[idx].local_lan;
+	f.local_mask.value=st[idx].local_mask;
+	f.ipsecEncap.value=st[idx].enccap_protocol;
+	f.ipsec_ikemode.value=st[idx].ike_mode;
+	f.ipsec_pfs.value=st[idx].pfs;
+	f.ipsec_ikeenc.value=st[idx].ike_enc;
+	f.ipsec_ikehash.value=st[idx].ike_hash;
+	f.ipsec_enc.value=st[idx].ipsec_enc;
+	f.ipsec_hash.value=st[idx].ipsec_hash;
+	f.ipsec_dhg.value=st[idx].ipsec_dhg;
+	f.ipsec_dpdaction.value=st[idx].ipsec_dpd;
+	f.DpdTimeDelay.value=st[idx].dpd_time;
+	f.DpdTimeout.value=st[idx].dpd_timeout;
+	f.IpsecIkeTime.value=st[idx].ike_time;
+	f.IpsecLifeTime.value=st[idx].life_time;
+	f.IpSecMethod.value=st[idx].ipsec_method;
+	f.PskValue.value=st[idx].psk_value;
+	f.PskRemoteId.value=st[idx].psk_remoteid;
+	f.PskLocalId.value=st[idx].psk_localid;
+	f.RsaRemoteId.value=st[idx].rsa_remoteid;
+	f.RsaLocalId.value=st[idx].rsa_localid;
+	f.KeyPassword.value=st[idx].key_password;
+#ifndef V_SCEP_CLIENT_none
+	f.ScepRemoteId.value=st[idx].scep_remoteid;
+#endif
+	f.old_local_lan.value=f.local_lan.value;
+	f.old_local_lan_mask.value=f.local_mask.value;
+	f.old_remote_lan.value=f.remote_lan.value;
+	f.old_remote_lan_mask.value=f.remote_mask.value;
+	f.old_remote_gateway.value=f.vpnserver.value;
+	var f = document.form;
+
+	$("#vpnserver_in").val(f.vpnserver.value);
+	parse_ip_into_fields(f.remote_lan.value, "remote_lan");
+	parse_ip_into_fields(f.remote_mask.value, "remote_mask");
+	parse_ip_into_fields(f.local_lan.value, "local_lan");
+	parse_ip_into_fields(f.local_mask.value, "local_mask");
+
+	$("#IpSecMethod").trigger("change");
+}
+
+function initEmptyForm(idx) {
+	var f=document.form;
+
+	load_value_to_element("input:radio.access[name=vpnenable]",true);
+
+	f.newname.value='';
+	f.vpnserver.value='';
+	f.remote_lan.value='';
+	f.remote_mask.value='255.255.255.0';
+	f.local_lan.value='';
+	f.local_mask.value='255.255.255.0';
+	f.ipsecEncap.value="esp";
+	f.ipsec_ikemode.value="main";
+	f.ipsec_pfs.value="on";
+	f.ipsec_ikeenc.value="any";
+	f.ipsec_ikehash.value="any";
+	f.ipsec_enc.value="any";
+	f.ipsec_hash.value="any";
+	f.ipsec_dhg.value="any";
+	f.ipsec_dpdaction.value="hold";
+	f.DpdTimeDelay.value="10";
+	f.DpdTimeout.value="60";
+	f.IpSecMethod.value="psk";
+	f.PskValue.value="";
+	f.PskRemoteId.value="";
+	f.PskLocalId.value="";
+	f.RsaRemoteId.value="";
+	f.RsaLocalId.value="";
+	f.KeyPassword.value="";
+#ifndef V_SCEP_CLIENT_none
+	f.ScepRemoteId.value="";
+#endif
+	f.IpsecIkeTime.value="3600";
+	f.IpsecLifeTime.value="28800";
+
+	$("#vpnserver_in").val(f.vpnserver.value);
+	parse_ip_into_fields(f.remote_lan.value, "remote_lan");
+	parse_ip_into_fields(f.remote_mask.value, "remote_mask");
+	parse_ip_into_fields(f.local_lan.value, "local_lan");
+	parse_ip_into_fields(f.local_mask.value, "local_mask");
+
+	$("#IpSecMethod").trigger("change");
+}
+
+// This routine translates an IP address (i.e in 192.168,etc form) to the individual
+// segments needed to fill in the form in the web browser
+function parse_ip_into_fields(ipAddress, documentItem) {
+	var i;
+	var ip_array;
+
+	ip_array=ipAddress.split(".");
+	for(i=0;i<4;i++) {
+		$("input[name="+documentItem+(i+1)+"]").val(ip_array[i]||"0");
+	}
+}
+
+function show_edit_mode(edit_mode) {
+	// hide the profile list in edit mode. otherwise show
+	$("#editDiv,#editDiv1,#saveDiv").toggle(edit_mode);
+	$("#listDiv").toggle(!edit_mode);
+}
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+function checkPassStrength() {
+	var f, t;
+	f = document.form.PskValue;
+	t = document.getElementById("PassStrength");
+	updatePassStrength(f, t);
+}
+#endif
+
+function show_current_ipsec_profile() {
+	var edit_mode;
+	idx=$("#editindex").val();
+
+	// idx has to be bigger than 0 (all extra profile start from 4)
+	edit_mode=!isNaN(parseInt(idx));
+
+	if(edit_mode) {
+		initEmptyForm(idx);
+		initIpsecForm(idx);
+
+		UpdateIpsecInfo();
+
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+		checkPassStrength();
+#endif
+
+	}
+
+	show_edit_mode(edit_mode);
+}
+
+function add_ipsec_profile() {
+	clear_alert();
+	// change current index to the new
+	$("#editindex").val(st.length);
+
+	// wipe out the open vpn form
+	initEmptyForm();
+
+	// show edit mode
+	show_edit_mode(true);
+}
+
+function show_ipsec_profile(idx) {
+	clear_alert();
+	$("#editindex").val((idx===undefined)?"":idx);
+	show_current_ipsec_profile();
+}
+
+function readElement(elementName) {
+	var element;
+
+	element=document.getElementById(elementName);
+	if( (typeof(element)=="undefined") || (element==null) ) {
+		alert("not found - " + elementName);
+		return "";
+	}
+	return document.getElementById(elementName).value;
+}
+
+function enableElement(elementName,ena) {
+	document.getElementById(elementName).disabled=!ena;
+	if(ena) {
+		$("#elementName").blur();
+	}
+}
+
+function checkElement(elementName,check) {
+	document.getElementById(elementName).checked=check;
+}
+
+function showElement(elementName,show) {
+	document.getElementById(elementName).style['display']=show?"":"none";
+}
+
+function createAjax() {
+	var ajaxHttp;
+	try {
+		ajaxHttp = new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	catch (e) {  // Internet Explorer
+		try {
+			ajaxHttp = new ActiveXObject("Msxml2.XMLHTTP");
+		}
+		catch (e) {
+			try {
+				// Firefox, Opera 8.0+, Safari
+				ajaxHttp = new XMLHttpRequest();
+
+			}
+			catch (e) {
+				alert("Your browser does not support AJAX!");
+				return false;
+			}
+		}
+	}
+	return ajaxHttp;
+}
+
+// now key file names are randomly named and later changed with profile number surfix so
+// displaying key file name has no meaning, changed to simply show upload status
+function displayFileName() {
+	var keyMode = document.form.IpSecMethod.value;
+	var uploadfiletype = document.getElementById("uploadFileType").value;
+	var namestr = '';
+	if (keyMode == 'rsa') {
+		if (left_rsa_file != '') {
+			$("#leftRsaFileName").html(_("uploaded"));
+		} else {
+			$("#leftRsaFileName").html(_("not uploaded"));
+		}
+		if (right_rsa_file != '') {
+			$("#rightRsaFileName").html(_("uploaded"));
+		} else {
+			$("#rightRsaFileName").html(_("not uploaded"));
+		}
+	} else if (keyMode == 'cert') {
+		if(uploadfiletype=="key")
+			namestr = private_key_file;
+		else if(uploadfiletype=="local")
+			namestr = local_public_key_file;
+		else if(uploadfiletype=="remote")
+			namestr = remote_public_key_file;
+		else if(uploadfiletype=="ca")
+			namestr = ca_certi_file;
+		else if(uploadfiletype=="crls")
+			namestr = crl_certi_file;
+		if (namestr != '') {
+			$("#certiFileName").html(_("uploaded"));
+		} else {
+			$("#certiFileName").html(_("not uploaded"));
+		}
+	}
+}
+
+function UpdateIpsecInfo() {
+	editIndex = document.form.editindex.value;
+	var method = document.form.IpSecMethod.value
+
+	if(infoFetched == false && editIndex < parseInt(st.length)) {
+		profileNum= st[editIndex].profilenum;
+
+		var req="/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=info&param="+ profileNum;
+
+		var ajaxRmClient = createAjax();
+
+		ajaxRmClient.onreadystatechange = function() {
+			if (ajaxRmClient.readyState != 4) {
+				return;
+			}
+			document.body.style.cursor = 'default';
+			if (ajaxRmClient.status != 200) {
+				return;
+			}
+
+			var result;
+			ipsec_clear_cert_info();
+			eval(ajaxRmClient.responseText);
+
+			if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert("failed");
+				return;
+			}
+			infoFetched = true;
+			if (method == "cert") {
+				setCertificateText();
+			} else if (method == "rsa") {
+				enableElement("ipsecDnRsaBtn", left_rsa_file!="")
+			}
+			displayFileName();
+		}
+		document.body.style.cursor = 'wait';
+		ajaxRmClient.open('GET', req, true);
+		ajaxRmClient.send(null);
+	} else {
+		if (method == "cert") {
+			setCertificateText();
+		} else if (method == "rsa") {
+			enableElement("ipsecDnRsaBtn", left_rsa_file!="")
+		}
+		displayFileName();
+	}
+}
+
+function ipsecRmCertBtnClick() {
+	certiName=document.getElementById("ipsecCertiName").value;
+	var req="/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=rmcert&param="+certiName;
+	var ajaxRmClient = createAjax();
+
+	ajaxRmClient.onreadystatechange = function() {
+		if (ajaxRmClient.readyState != 4) {
+			return;
+		}
+		document.getElementById(" ipsecRmCertBtn").disabled = false;
+		document.body.style.cursor = 'default';
+
+		if (ajaxRmClient.status != 200) {
+			return;
+		}
+
+		var result;
+		eval(ajaxRmClient.responseText);
+		if ( typeof(result)=="undefined" || result!="ok" ) {
+			alert("failed");
+			return;
+		}
+	}
+
+	document.getElementById(" ipsecRmCertBtn").disabled = true;
+	document.body.style.cursor = 'wait';
+	ajaxRmClient.open('GET', req, true);
+	ajaxRmClient.send(null);
+}
+
+function ipsecSecretKeyGenBtnClick() {
+	function confirmed_func() {
+        var profileNum;
+        editIndex = document.form.editindex.value;
+        if (editIndex >= parseInt(st.length)) {
+            profileNum = "-1"; // No profile number available yet.
+        } else {
+            profileNum = st[editIndex].profilenum;
+        }
+
+		var req="/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=genrsa&param="+ profileNum;
+		var ajaxGenRsa = createAjax();
+
+		ajaxGenRsa.onreadystatechange = function() {
+			if (ajaxGenRsa.readyState != 4) {
+				return;
+			}
+			document.getElementById("ipsecSecretKeyGenBtn").disabled = false;
+			document.body.style.cursor = 'default';
+
+			if (ajaxGenRsa.status != 200) {
+				return;
+			}
+
+			var result;
+
+
+			eval(ajaxGenRsa.responseText);
+
+			if ( typeof(result)=="undefined" || result!="ok" ) {
+				alert("failed");
+				return;
+			}
+			if (left_rsa_file != "") {
+				document.getElementById("ipsecDnRsaBtn").disabled = false;
+			}
+		}
+		document.getElementById("ipsecSecretKeyGenBtn").disabled = true;
+		document.body.style.cursor = 'wait';
+
+		ajaxGenRsa.open('GET', req, true);
+		ajaxGenRsa.send(null);
+	}
+	blockUI_confirm_l(_("Msg72")+"</br></br>"+_("Msg73"), confirmed_func);
+}
+
+function ipsecDnRsaBtnClick() {
+	var profileNum;
+	if (editIndex >= parseInt(st.length)) { // For a pending profile, get the "profileNum" from leftrsa file name.
+		profileNum = left_rsa_file.slice("leftrsa".length, left_rsa_file.indexOf("."));
+	} else {
+		profileNum = st[editIndex].profilenum;
+	}
+	var dnForm = document.getElementById("formIpsecActionDn")
+	dnForm.param.value = profileNum;
+	dnForm.submit();
+}
+
+function ipsecCertiUpFileChange() {
+	var f1 = document.getElementById("ipsecCertiUpFile").value;
+	var end = f1.indexOf(".pem");
+	if(end == -1){
+		end = f1.indexOf(".crt");
+		if(end == -1) {
+			end = f1.indexOf(".key");
+			if(end == -1) {
+				blockUI_alert(_("Msg74"));//Error: Wrong Type of File! File must end in .crt, .key or .pem
+				document.getElementById("ipsecCertiUpBtn").disabled= true;
+				return;
+			}
+		}
+	}
+	var rc=document.getElementById("uploadFileType").value;
+
+	selected=document.getElementById("ipsecCertiUpFile").value.length>0;
+	document.getElementById("ipsecCertiUpBtn").disabled=!selected;
+	editIndex = document.form.editindex.value;
+    profileNum = "-1";
+    if(editIndex < st.length) {
+		profileNum= st[editIndex].profilenum;
+    }
+	certFileName =  document.getElementById("ipsecCertiUpFile").value;
+	document.getElementById("ipsecCertiUpParam").value= profileNum+ ","+certFileName + ","+rc ;
+	var startIndex = certFileName.lastIndexOf("\\");
+	if (startIndex == -1) {
+		document.getElementById("ipsecCertiUpFileName").value=certFileName;
+	} else {
+		document.getElementById("ipsecCertiUpFileName").value=certFileName.substr(startIndex);;
+	}
+}
+
+function ipsecRsaUpFileChange() {
+	editIndex = document.form.editindex.value;
+	selected=document.getElementById("ipsecRsaUpFile").value.length>0;
+	var profileNum = "-1";
+	if (editIndex < parseInt(st.length)) {
+		profileNum = st[editIndex].profilenum;
+	}
+	document.getElementById("ipsecRsaUpParam").value= profileNum;
+	document.getElementById("ipsecRsaUpBtn").disabled=!selected;
+
+	var f1 = document.getElementById("ipsecRsaUpFile").value;
+	var end = f1.indexOf(".key");
+	if(end == -1){
+		blockUI_alert(_("Msg76"));//Error: Wrong Type of File! File must end in .key
+		document.getElementById("ipsecRsaUpBtn").disabled= true;
+		return;
+	}
+	var startIndex = f1.lastIndexOf("\\");
+	if (startIndex == -1) {
+		document.getElementById("ipsecRsaUpFileName").value= f1;
+	} else {
+		document.getElementById("ipsecRsaUpFileName").value= f1.substr(startIndex);
+	}
+}
+
+function ipsecLocalRsaUpFileChange() {
+	editIndex = document.form.editindex.value;
+	selected=document.getElementById("ipsecLocalRsaUpFile").value.length>0;
+	var profileNum = "-1";
+	if (editIndex < parseInt(st.length)) {
+		profileNum = st[editIndex].profilenum;
+	}
+	document.getElementById("ipsecLocalRsaUpParam").value= profileNum;
+	document.getElementById("ipsecLocalRsaUpBtn").disabled=!selected;
+
+	var f1 = document.getElementById("ipsecLocalRsaUpFile").value;
+	var end = f1.indexOf(".key");
+	if(end == -1) {
+		blockUI_alert(_("Msg76"));//Error: Wrong Type of File! File must end in .key
+		document.getElementById("ipsecLocalRsaUpBtn").disabled= true;
+		return;
+	}
+	var startIndex = f1.lastIndexOf("\\");
+	if (startIndex == -1) {
+		document.getElementById("ipsecLocalRsaUpFileName").value= f1;
+	} else {
+		document.getElementById("ipsecLocalRsaUpFileName").value= f1.substr(startIndex);
+	}
+}
+
+function ipsecUploadLocalRsa() {
+    var param =  document.getElementById("ipsecLocalRsaUpParam").value;
+    var fileName = document.getElementById("ipsecLocalRsaUpFileName").value;
+	var formData = new FormData();
+	formData.append("filedata", document.getElementById("ipsecLocalRsaUpFile").files[0]);
+	blockUI_wait(_("GUI pleaseWait"));
+	$.ajax({
+			url: "/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=upload&param="+param+"&subaction=upIpsecLocalRsa"+"&filename="+fileName,
+			data: formData,
+			processData: false,
+			type: 'post',
+			success: function(data) {eval(data); ipsecUploadTargetOnLoad();}
+			});
+	enableElement("ipsecLocalRsaUpBtn",false);
+}
+
+function ipsecUploadRsa() {
+    var param =  document.getElementById("ipsecRsaUpParam").value;
+    var fileName = document.getElementById("ipsecRsaUpFileName").value;
+	var formData = new FormData();
+	formData.append("filedata", document.getElementById("ipsecRsaUpFile").files[0]);
+	blockUI_wait(_("GUI pleaseWait"));
+	$.ajax({
+			url: "/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=upload&param="+param+"&subaction=upIpsecRsa"+"&filename="+fileName,
+			data: formData,
+			processData: false,
+			type: 'post',
+			success: function(data) {eval(data); ipsecUploadTargetOnLoad();}
+			});
+	enableElement("ipsecRsaUpBtn",false);
+}
+
+function ipsecUploadCerti() {
+    var param =  document.getElementById("ipsecCertiUpParam").value;
+    var fileName = document.getElementById("ipsecCertiUpFileName").value;
+	var formData = new FormData();
+	formData.append("filedata", document.getElementById("ipsecCertiUpFile").files[0]);
+	blockUI_wait(_("GUI pleaseWait"));
+	$.ajax({
+			url: "/cgi-bin/ipsec_action.cgi?<%appendCsrfTokenToQueryString();%>action=upload&param="+param+"&subaction=upIpsecCert"+"&filename="+fileName,
+			data: formData,
+			processData: false,
+			type: 'post',
+			success: function(data) {eval(data); ipsecUploadTargetOnLoad();}
+			});
+	enableElement("ipsecCertiUpBtn",false);
+}
+
+function resetForm(formName) {
+	document.getElementById(formName).reset();
+}
+
+function ipsecUploadTargetOnLoad() {
+	$.unblockUI();
+	if ( typeof(result)=="undefined" || result!="ok" ) {
+		blockUI_alert(_("Msg77"));//The upload operation has failed. Please ensure the connection to the router
+		return;
+	}
+
+	document.body.style.cursor = 'default';
+	UpdateIpsecInfo();
+
+	enableElement("ipsecLocalRsaUpBtn",false);
+	enableElement("ipsecRsaUpBtn",false);
+	enableElement("ipsecCertiUpBtn",false);
+
+	$("#ipsecLocalRsaUpBtn").blur();
+	$("#ipsecRsaUpBtn").blur();
+	$("#ipsecCertiUpBtn").blur();
+}
+
+function ipsec_div_display(id, display) {
+	if(document.getElementById){
+		var el = document.getElementById(id);
+		el.style.display = display ? '' : 'none';
+	}
+}
+
+function ipsecKeyModeEnable(mode) {
+	ipsec_div_display("ipsecPresharedKeyDiv", mode == "psk");
+	ipsec_div_display("ipsecRsaKeyDiv",     mode == "rsa");
+	ipsec_div_display("ipsecRemoteRsaDiv", mode == "rsa");
+	ipsec_div_display("ipsecLocalRsaDiv", 	mode == "rsa");
+	ipsec_div_display("ipsecCertsDiv",    	mode == "cert");
+	ipsec_div_display("ipsecFormCertDiv",   mode == "cert");
+#ifndef V_SCEP_CLIENT_none
+	ipsec_div_display("ipsecScepKeyDiv",   mode == "scep");
+#endif
+}
+
+function certValidToString(val) {
+	if (val == "ok")
+		return _("uploaded");
+	else if (val == "nofile")
+		return _("not uploaded");
+	else if (val == "wrongformat")
+		return _("Msg78");//Upload but not valid (e.g. not PKCS#1)
+	else if (val == "optional")
+		return _("optional");
+	return _("invalid");//Invalid
+}
+function ipsec_clear_cert_info() {
+	IPSRsaLocalCertValid="nofile";
+	IPSRsaRemoteCertValid="nofile";
+	IPSRsaKeyValid="nofile";
+	IPSRsaCACertValid="nofile";
+	IPSRsaCRLCertValid="optional";
+}
+
+function setCertificateText() {
+	var StrToDisplay;
+	var uploadfiletype=document.getElementById("uploadFileType").value;
+	if(uploadfiletype=="key")
+		StrToDisplay=certValidToString(IPSRsaKeyValid);
+	else if(uploadfiletype=="local")
+		StrToDisplay=certValidToString(IPSRsaLocalCertValid);
+	else if(uploadfiletype=="remote")
+		StrToDisplay=certValidToString(IPSRsaRemoteCertValid);
+	else if(uploadfiletype=="ca")
+		StrToDisplay=certValidToString(IPSRsaCACertValid);
+	else if(uploadfiletype=="crls")
+		StrToDisplay=certValidToString(IPSRsaCRLCertValid);
+	$('#certUploadMsg').html(StrToDisplay);
+}
+
+function setKeyMode() {
+	var method = document.form.IpSecMethod.value;
+	ipsecKeyModeEnable(method);
+	UpdateIpsecInfo();
+}
+
+function getCheckedValue(radioObj) {
+	if(!radioObj) {
+		return "";
+	}
+	var radioLength = radioObj.length;
+	if(radioLength == undefined)
+		if(radioObj.checked)
+			return radioObj.value;
+		else
+			return "";
+	for(var i = 0; i < radioLength; i++) {
+		if(radioObj[i].checked) {
+			return radioObj[i].value;
+		}
+	}
+	return "";
+}
+
+var SITE = SITE || {};
+SITE.fileInputs = function() {
+	var $this = $(this),
+	$val = $this.val(),
+	valArray = $val.split('\\'),
+	newVal = valArray[valArray.length-1],
+	$button = $this.siblings('.button'),
+	$fakeFile = $this.siblings('.file-holder');
+	if(newVal !== '') {
+		$button.text(_("fileChosen"));
+		if($fakeFile.length === 0) {
+			$button.after("<span class='file-holder'>"+newVal+"</span>");
+		}
+		else {
+			$fakeFile.text(newVal);
+		}
+	}
+};
+
+$(document).ready( function() {
+	$(".file-wrapper input[type=file]").bind("change focus click", SITE.fileInputs);
+	show_current_ipsec_profile();
+#ifdef V_ENFORCE_PASSWORD_POLICY_y
+	$("#passwordInfo").prop("title", _("passwordWarning10"));
+#endif
+});
+</script>
+
+<%
+function validateInput() {
+	validateOnOffRadio(form['vpnenable']);
+	// WARNING: no validation on newname except maxlength 64
+	if (string_length(form['newname']) > 64) {
+		onBadRequest();
+	}
+	// WARNING: vpnserver is domain name or IP address but no strict validation on this field
+	if (form['vpnserver'] == "" || string_length(form['vpnserver']) > 128) {
+		onBadRequest();
+	}
+	validateIpAddress(form['remote_lan']);
+	validateNetmask(form['remote_mask']);
+	validateIpAddress(form['local_lan']);
+	validateNetmask(form['local_mask']);
+	if (form['ipsecEncap'] != "any" && form['ipsecEncap'] != "esp" && form['ipsecEncap'] != "ah") {
+		onBadRequest();
+	}
+	var ipsecIkeModeOpts = new Array("any", "main", "aggressive");
+	if (isElementOfArray(form['ipsec_ikemode'], ipsecIkeModeOpts) == false) {
+		onBadRequest();
+	}
+	if (form['ipsec_pfs'] != "on" && form['ipsec_pfs'] != "off") {
+		onBadRequest();
+	}
+	var ipsecIkeEncOpts = new Array("any", "aes", "aes128", "aes192", "aes256", "3des");
+	if (isElementOfArray(form['ipsec_ikeenc'], ipsecIkeEncOpts) == false) {
+		onBadRequest();
+	}
+	var ipsecIkeHashOpts = new Array("any", "md5", "sha1", "sha2_256", "sha2_512");
+	if (isElementOfArray(form['ipsec_hash'], ipsecIkeHashOpts) == false) {
+		onBadRequest();
+	}
+	var ipsecDhgOpts = new Array("any", "modp768", "modp1024", "modp1536", "modp2048", "modp3072", "modp4096", "modp6144", "modp8192");
+	if (isElementOfArray(form['ipsec_dhg'], ipsecDhgOpts) == false) {
+		onBadRequest();
+	}
+	var ipsecDpdActionOpts = new Array("none", "clear", "hold", "restart");
+	if (isElementOfArray(form['ipsec_dpdaction'], ipsecDpdActionOpts) == false) {
+		onBadRequest();
+	}
+	var dpdTimeDelay = string_to_number(form['DpdTimeDelay']);
+	var dpdTimeout = string_to_number(form['DpdTimeout']);
+	var ipsecIkeTime = string_to_number(form['IpsecIkeTime']);
+	var ipsecLifeTime = string_to_number(form['IpsecLifeTime']);
+	var ipSecMethodOpts = new Array("psk", "rsa", "cert",
+#ifndef V_SCEP_CLIENT_none
+	"scep",
+#endif
+	);
+	if (isElementOfArray(form['IpSecMethod'], ipSecMethodOpts) == false) {
+		onBadRequest();
+	}
+	if( ! isEmpty(form['old_local_lan']) ){
+	validateIpAddress(form['old_local_lan']);
+	}
+	if( ! isEmpty(form['old_local_lan_mask']) ){
+	validateNetmask(form['old_local_lan_mask']);
+	}
+	if( ! isEmpty(form['old_remote_lan']) ){
+	validateIpAddress(form['old_remote_lan']);
+	}
+	if( ! isEmpty(form['old_remote_lan_mask'])){
+	validateNetmask(form['old_remote_lan_mask']);
+	}
+}
+if (request['REQUEST_METHOD'] == "POST") {
+	cmd = form['rdbCmd'];
+	i=validate_number(form['rdbBase']);
+	rdbBase="link.profile."+i+".";
+	if( cmd == "delEntry" ) {
+		set_single_direct("-p",rdbBase+"enable","0");
+		set_single_direct("-p",rdbBase+"name","");
+		set_single_direct("-p",rdbBase+"delflag","1" );
+	} else {
+
+		validateInput();
+
+		/* The following directory definitions should be aligned with those in ipsec_action.cgi. */
+        IPSEC_KEY_DIR="/etc/ipsec.d/";
+        IPSEC_CERTS_DIR=IPSEC_KEY_DIR+"certs/";
+        IPSEC_CACERTS_DIR=IPSEC_KEY_DIR+"cacerts/";
+        IPSEC_CRLCERTS_DIR=IPSEC_KEY_DIR+"crls/";
+        IPSEC_PRIVATEKEY_DIR=IPSEC_KEY_DIR+"private/";
+        IPSEC_RSAKEY_DIR=IPSEC_KEY_DIR+"rsakey/";
+
+		// TODO: validate input
+		set_single_direct("-p",rdbBase+"dev","ipsec.0");
+		set_single_direct("-p",rdbBase+"enable",form['vpnenable']);
+		set_single_direct("-p",rdbBase+"name",form['newname']);
+		set_single_direct("-p",rdbBase+"remote_gateway",form['vpnserver']);
+		set_single_direct("-p",rdbBase+"remote_lan",form['remote_lan']);
+		set_single_direct("-p",rdbBase+"remote_mask",form['remote_mask']);
+		set_single_direct("-p",rdbBase+"local_lan",form['local_lan']);
+		set_single_direct("-p",rdbBase+"local_mask",form['local_mask']);
+		set_single_direct("-p",rdbBase+"enccap_protocol",form['ipsecEncap']);
+		set_single_direct("-p",rdbBase+"ike_mode",form['ipsec_ikemode']);
+		set_single_direct("-p",rdbBase+"pfs",form['ipsec_pfs']);
+		set_single_direct("-p",rdbBase+"ike_enc",form['ipsec_ikeenc']);
+		set_single_direct("-p",rdbBase+"ike_hash",form['ipsec_ikehash']);
+		set_single_direct("-p",rdbBase+"ipsec_enc",form['ipsec_enc']);
+		set_single_direct("-p",rdbBase+"ipsec_hash",form['ipsec_hash']);
+		set_single_direct("-p",rdbBase+"ipsec_dhg",form['ipsec_dhg']);
+		set_single_direct("-p",rdbBase+"ipsec_dpd",form['ipsec_dpdaction']);
+		set_single_direct("-p",rdbBase+"dpd_time",form['DpdTimeDelay']);
+		set_single_direct("-p",rdbBase+"dpd_timeout",form['DpdTimeout']);
+		set_single_direct("-p",rdbBase+"ike_time",form['IpsecIkeTime']);
+		set_single_direct("-p",rdbBase+"life_time",form['IpsecLifeTime']);
+		set_single_direct("-p",rdbBase+"ipsec_method",form['IpSecMethod']);
+		set_single_direct("-p",rdbBase+"psk_value",form['PskValue']);
+		set_single_direct("-p",rdbBase+"psk_remoteid",form['PskRemoteId']);
+		set_single_direct("-p",rdbBase+"psk_localid",form['PskLocalId']);
+		set_single_direct("-p",rdbBase+"rsa_remoteid",form['RsaRemoteId']);
+		set_single_direct("-p",rdbBase+"rsa_localid",form['RsaLocalId']);
+		set_single_direct("-p",rdbBase+"key_password",form['KeyPassword']);
+#ifndef V_SCEP_CLIENT_none
+		set_single_direct("-p",rdbBase+"scep_remoteid",form['ScepRemoteId']);
+#endif
+		set_single_direct("-p","ipsec.0.profile",i);
+		set_single_direct("-p",rdbBase+"delflag","0" );
+		set_single_direct("-p","ipsec.1.old_local_lan",form['old_local_lan']);
+		set_single_direct("-p","ipsec.1.old_local_lan_mask",form['old_local_lan_mask']);
+		set_single_direct("-p","ipsec.1.old_remote_lan",form['old_remote_lan']);
+		set_single_direct("-p","ipsec.1.old_remote_lan_mask",form['old_remote_lan_mask']);
+		set_single_direct("-p","ipsec.1.old_remote_gateway",form['old_remote_gateway']);
+		set_single_direct("-p","ipsec.1.new_remote_gateway",form['vpnserver']);
+		set_single_direct("-p","ipsec.1.new_local_lan",form['local_lan']);
+		set_single_direct("-p","ipsec.1.new_local_lan_mask",form['local_mask']);
+		set_single_direct("-p","ipsec.1.new_remote_lan",form['remote_lan']);
+		set_single_direct("-p","ipsec.1.new_remote_lan_mask",form['remote_mask']);
+		// Rename all files to match their profile number.
+		if (form['leftrsa'] != "leftrsa"+i+".key") {
+			rename(IPSEC_RSAKEY_DIR+form['leftrsa'], IPSEC_RSAKEY_DIR+"leftrsa"+i+".key");
+		}
+		if (form['rightrsa'] != "rightrsa"+i+".key") {
+			rename(IPSEC_RSAKEY_DIR+form['rightrsa'], IPSEC_RSAKEY_DIR+"rightrsa"+i+".key");
+		}
+		if (form['privkey'] != "local"+i+".key") {
+			rename(IPSEC_PRIVATEKEY_DIR+form['privkey'], IPSEC_PRIVATEKEY_DIR+"local"+i+".key");
+		}
+		if (form['localpubkey_pem'] != "") {
+			rename(IPSEC_CERTS_DIR+form['localpubkey_pem'], IPSEC_CERTS_DIR+"local"+i+".pem");
+		}
+		if (form['localpubkey_crt'] != "") {
+			rename(IPSEC_CERTS_DIR+form['localpubkey_crt'], IPSEC_CERTS_DIR+"local"+i+".crt");
+		}
+		if (form['remotepubkey_pem'] != "") {
+			rename(IPSEC_CERTS_DIR+form['remotepubkey_pem'], IPSEC_CERTS_DIR+"remote"+i+".pem");
+		}
+		if (form['remotepubkey_crt'] != "") {
+			rename(IPSEC_CERTS_DIR+form['remotepubkey_crt'], IPSEC_CERTS_DIR+"remote"+i+".crt");
+		}
+		if (form['cacerts_pem'] != "") {
+			rename(IPSEC_CACERTS_DIR+form['cacerts_pem'], IPSEC_CACERTS_DIR+"ca"+i+".pem");
+		}
+		if (form['cacerts_crt'] != "") {
+			rename(IPSEC_CACERTS_DIR+form['cacerts_crt'], IPSEC_CACERTS_DIR+"ca"+i+".crt");
+		}
+		if (form['crlcerts_pem'] != "") {
+			rename(IPSEC_CRLCERTS_DIR+form['cacerts_pem'], IPSEC_CRLCERTS_DIR+"crl"+i+".pem");
+		}
+		if (form['crlcerts_crt'] != "") {
+			rename(IPSEC_CRLCERTS_DIR+form['cacerts_crt'], IPSEC_CRLCERTS_DIR+"crl"+i+".crt");
+		}
+	}
+	redirect('/VPN_ipsec.html?success');
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box  hide_for_pppoe_en">
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+#ifdef V_WEBIF_SPEC_vdf
+			<div class="hide_for_pppoe_en">
+#else
+			<div class="pad hide_for_pppoe_en">
+#endif
+				<input type="hidden" id="editindex" name="editindex" value="@@form['editindex']">
+				<div id="listDiv" style="display:none">
+					<div class="grid-33">
+						<div class="pad alpha">
+							<h2><script language=Javascript>document.write(_("IPsecList"))</script></h2>
+						</div>
+					</div>
+					<div class="grid-66">
+						<div class="pad omega">
+							<div class="submit-row-condensed">
+								<button type="button" class="secondary sml fr" onClick="javascript:add_ipsec_profile()"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+							</div>
+						</div>
+					</div>
+				<!-- Display a table of IPsec Clients -->
+				<script language="JavaScript">Ipseclist();</script>
+				</div>
+				<div id="editDiv" style="display:none">
+					<input type="hidden" name="vpnserver" id="vpnserver"/>
+					<input type="hidden" name="remote_lan" id="remote_lan"/>
+					<input type="hidden" name="remote_mask" id="remote_mask"/>
+					<input type="hidden" name="local_lan" id="local_lan"/>
+					<input type="hidden" name="local_mask" id="local_mask"/>
+					<input type="hidden" name="old_local_lan" id="old_local_lan"/>
+					<input type="hidden" name="old_local_lan_mask" id="old_local_lan_mask"/>
+					<input type="hidden" name="old_remote_lan" id="old_remote_lan"/>
+					<input type="hidden" name="old_remote_lan_mask" id="old_remote_lan_mask"/>
+					<input type="hidden" name="old_remote_gateway" id="old_remote_gateway"/>
+					<input type="hidden" name="leftrsa" id="leftrsa"/>
+					<input type="hidden" name="rightrsa" id="rightrsa"/>
+					<input type="hidden" name="privkey" id="privkey"/>
+					<input type="hidden" name="localpubkey_pem" id="localpubkey_pem"/>
+					<input type="hidden" name="localpubkey_crt" id="localpubkey_crt"/>
+					<input type="hidden" name="remotepubkey_pem" id="remotepubkey_pem"/>
+					<input type="hidden" name="remotepubkey_crt" id="remotepubkey_crt"/>
+					<input type="hidden" name="cacerts_pem" id="cacerts_pem"/>
+					<input type="hidden" name="cacerts_crt" id="cacerts_crt"/>
+					<input type="hidden" name="crlcerts_pem" id="crlcerts_pem"/>
+					<input type="hidden" name="crlcerts_crt" id="crlcerts_crt"/>
+					<input type="hidden" name="rdbCmd"/>
+					<input type="hidden" name="rdbBase"/>
+					<div class="row">
+						<div class="grid-33">
+							<div class="pad alpha">
+								<h2><script language=Javascript>document.write(_("ipSecProfileEdit"))</script></h2>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_2144_pin">
+						<div class="form-row no-bg-form">
+							<label for="field-1"><script language=Javascript>document.write(_("ipSecProfile"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div id="vpnEnable" class="radio-switch">
+										<input type="radio" id="radio-1" name="vpnenable" class="access" value=1>
+										<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="radio-2" name="vpnenable" class="access" value=0>
+										<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="newname"><script language=Javascript>document.write(_("profile name"))</script></label>
+							<div class="field">
+								<input id="newname" type="text" name="newname" class="large" onKeyUp="hostNameFilter(this);" maxlength="64">
+							</div>
+						</div>
+						<div class="row">
+							<div class="grid-9">
+								<h2><script language=Javascript>document.write(_("ipSecPhase1"))</script></h2>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="vpnserver_in"><script language=Javascript>document.write(_("remoteIPsecServerAddress"))</script></label>
+							<div class="field">
+								<input id="vpnserver_in" type="text" name="vpnserver_in" class=" validate[required] large required" maxlength="128" onkeyup="urlFilter(this);">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="IpSecMethod"><script language=Javascript>document.write(_("key mode"))</script></label>
+							<div class="field">
+								<select name="IpSecMethod" id="IpSecMethod" onChange="setKeyMode()">
+									<option value="psk"><script>document.write(_("preSharedKeys"))</script></option>
+									<option value="rsa"><script>document.write(_("rsa keys"))</script></option>
+									<option value="cert"><script>document.write(_("certificates"))</script></option>
+#ifndef V_SCEP_CLIENT_none
+									<option value="scep"><script>document.write(_("scepClient"))</script></option>
+#endif
+								</select>
+							</div>
+						</div>
+						<div id="ipsecPresharedKeyDiv">
+							<div class="form-row">
+								<label for="PskValue"><script language=Javascript>document.write(_("preSharedKey"))</script></label>
+								<div class="field">
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+									<input id="PskValue" type="text" name="PskValue" class="large required validate[required]" onkeyup="checkPassStrength()">
+									<a href='javascript:showStrongPasswordInfo();' id="passwordInfo" style='background-color:transparent;'>
+									<i id='net-info' style='margin:5px;'></i></a>
+#else
+									<input id="PskValue" type="text" name="PskValue" class="large required validate[required]" onkeyup="urlFilter(this);">
+#endif
+								</div>
+							</div>
+#ifdef V_CHECK_PASSWORD_STRENGTH_y
+							<div class="form-row">
+								<label for="PassStrength"><script language=Javascript>document.write(_("passwordStrength"))</script></label>
+								<div class="field">
+									<span class="normal-text" id="PassStrength"></span>
+								</div>
+							</div>
+#endif
+							<div class="form-row">
+								<label for="PskRemoteId"><script language=Javascript>document.write(_("remote id"))</script></label>
+								<div class="field">
+									<input id="PskRemoteId" type="text" name="PskRemoteId" class="large" maxlength=64 onkeyup="urlFilter(this);">
+								</div>
+								<div>
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("xySampleOrBlank"))</script></span>
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="PskLocalId"><script language=Javascript>document.write(_("local id"))</script></label>
+								<div class="field">
+									<input id="PskLocalId" type="text" name="PskLocalId" class="large" maxlength=64 onkeyup="urlFilter(this);">
+								</div>
+								<div>
+									<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("xySampleOrBlank"))</script></span>
+								</div>
+							</div>
+						</div>
+						<div id="ipsecRsaKeyDiv">
+							<div class="form-row">
+								<label for="RsaRemoteId"><script language=Javascript>document.write(_("remote id"))</script></label>
+								<div class="field">
+									<input id="RsaRemoteId" type="text" name="RsaRemoteId" class="large" maxlength=64>
+								</div>
+								<div class="field-des"><script language=Javascript>document.write(_("xySampleOrBlank"))</script></div>
+							</div>
+							<div class="form-row">
+								<label for="RsaLocalId"><script language=Javascript>document.write(_("local id"))</script></label>
+								<div class="field">
+									<input id="RsaLocalId" type="text" name="RsaLocalId" class="large" maxlength=64>
+								</div>
+								<div class="field-des"><script language=Javascript>document.write(_("xySampleOrBlank"))</script></div>
+							</div>
+							<div class="form-row">
+								<label for="ipsecRsaKeyTime"><script language=Javascript>document.write(_("update time2"))</script></label>
+								<div class="field">
+									<input type="text" id="ipsecRsaKeyTime" name="ipsecRsaKeyTime" size=30 maxlength=64 value="Sep 19 2011 14:18:00" class="certi_menu_item" readonly>
+								</div>
+							</div>
+							<div class="submit-row">
+								<button type="button" class="secondary minimum" id="ipsecSecretKeyGenBtn" onClick="ipsecSecretKeyGenBtnClick()"><script language=Javascript>document.write(_("generate"))</script></button>
+								<button type="button" class="secondary minimum" id="ipsecDnRsaBtn" onClick="ipsecDnRsaBtnClick()" disabled=true><script language=Javascript>document.write(_("download"))</script></button>
+							</div>
+						</div>
+						<div id="ipsecFormCertDiv">
+							<div class="form-row">
+								<label for="KeyPassword"><script language=Javascript>document.write(_("privateKeyPassphrase"))</script></label>
+								<div class="field">
+									<input id="KeyPassword" type="text" class="required validate[required]" name="KeyPassword">
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="uploadFileType"><script language=Javascript>document.write(_("keyCertificate"))</script></label>
+								<div class="field">
+									<select name="uploadFileType" id="uploadFileType" onClick="UpdateIpsecInfo()">
+									<!--<option value="psk" onClick="javascript:document.form.IpSecMethod.value='psk'">Pre-shared Keys</option> -->
+										<option value="key"><script>document.write(_("local private key"))</script></option>
+										<option value="local"><script>document.write(_("local public certificate"))</script></option>
+										<option value="remote"><script>document.write(_("remote public certificate"))</script></option>
+										<option value="ca"><script>document.write(_("ca certificate"))</script></option>
+										<option value="crls"><script>document.write(_("crl certificate"))</script></option>
+									</select>
+								</div>
+								<div class="field-des" id=certUploadMsg><script language=Javascript>document.write(_("not uploaded"))</script></div>
+							</div>
+						</div>
+#ifndef V_SCEP_CLIENT_none
+						<div id="ipsecScepKeyDiv">
+							<div class="form-row">
+								<label for="ScepRemoteId"><script language=Javascript>document.write(_("scep remote id"))</script></label>
+								<div class="field">
+									<input id="ScepRemoteId" type="text" name="ScepRemoteId" class="large required" maxlength=64>
+								</div>
+								<div class="field-des"><script language=Javascript>document.write(_("distinguishedName"))</script></div>
+								</div>
+						</div>
+#endif
+#ifdef V_WEBIF_SPEC_vdf
+						<div id="editDiv1" class="grey-box" style="display:none; margin:-12px 0px;">
+#else
+						<div id="editDiv1" class="grey-box" style="display:none; margin:-12px 10px;">
+#endif
+							<div style="margin-left:-14px">
+								<div id="ipsecLocalRsaDiv" id="box_2144_pin">
+									<input type="hidden" id="ipsecLocalRsaUpParam" name="param" value=""/>
+									<input type="hidden" id="ipsecLocalRsaUpFileName" name="filename" value=""/>
+									<div class="form-row" style="padding-top:30px;margin-bottom:0px">
+										<label for="upIpsecLocalRsaFile"><script language=Javascript>document.write(_("local rsa key upload"))</script></label>
+										<div class="field">
+											<span class="file-wrapper">
+												<input type="file" id="ipsecLocalRsaUpFile" name="ipsecLocalRsaUpFile" onchange="ipsecLocalRsaUpFileChange()">
+												<span class="secondary button"><script language=Javascript>document.write(_("chooseFile"))</script></span>
+											</span>
+										</div>
+									</div>
+									<button type="button" class="secondary file-upload" id="ipsecLocalRsaUpBtn" onClick="ipsecUploadLocalRsa()" disabled=true><script language=Javascript>document.write(_("upload"))</script></button>
+									<div class="field-des"><span id="leftRsaFileName"></span></div>
+								</div>
+								<div id="ipsecRemoteRsaDiv" id="box_2144_pin">
+									<input type="hidden" id="ipsecRsaUpParam" name="param" value=""/>
+									<input type="hidden" id="ipsecRsaUpFileName" name="filename" value=""/>
+									<div class="form-row" style="padding-top:30px;margin-bottom:0px">
+										<label for="ipsecRsaUpFile"><script language=Javascript>document.write(_("remote rsa key upload"))</script></label>
+										<div class="field">
+											<span class="file-wrapper">
+												<input type="file" id="ipsecRsaUpFile" name="ipsecRsaUpFile" onchange="ipsecRsaUpFileChange()">
+												<span class="secondary button"><script language=Javascript>document.write(_("chooseFile"))</script></span>
+											</span>
+										</div>
+									</div>
+									<button type="button" class="secondary file-upload" id="ipsecRsaUpBtn" onClick="ipsecUploadRsa()" disabled=true><script language=Javascript>document.write(_("upload"))</script></button>
+									<div class="field-des"><span id="rightRsaFileName"></span></div>
+								</div>
+								<div id="ipsecCertsDiv" id="box_2144_pin">
+									<input type="hidden" id="ipsecCertiUpParam" name="param" value=""/>
+									<input type="hidden" id="ipsecCertiUpFileName" name="filename" value=""/>
+									<div class="form-row" style="padding-top:30px;margin-bottom:0px">
+										<label for="ipsecCertiUpFile"><script language=Javascript>document.write(_("ipsec certificate upload"))</script></label>
+										<div class="field">
+											<span class="file-wrapper">
+												<input type="file" id="ipsecCertiUpFile" name="ipsecCertiUpFile" onchange="ipsecCertiUpFileChange()">
+												<span class="secondary button"><script language=Javascript>document.write(_("chooseFile"))</script></span>
+											</span>
+										</div>
+									</div>
+									<button type="button" class="secondary file-upload" id="ipsecCertiUpBtn" onClick="ipsecUploadCerti()" disabled=true><script language=Javascript>document.write(_("upload"))</script></button>
+										<div class="field-des"><span id="certiFileName"></span></div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_ikemode"><script language=Javascript>document.write(_("ike mode"))</script></label>
+							<div class="field">
+								<select name="ipsec_ikemode" id="ipsec_ikemode">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="main"><script>document.write(_("main"))</script></option>
+									<option value="aggressive"><script>document.write(_("aggressive"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_pfs"><script language=Javascript>document.write(_("Pfs"))</script></label>
+							<div class="field">
+								<select name="ipsec_pfs" id="ipsec_pfs">
+									<option value="on"><script>document.write(_("On"))</script></option>
+									<option value="off"><script>document.write(_("Off"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_ikeenc"><script language=Javascript>document.write(_("ike encryption"))</script></label>
+							<div class="field">
+								<select name="ipsec_ikeenc" id="ipsec_ikeenc">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="aes"><script>document.write(_("aes"))</script></option>
+									<option value="aes128"><script>document.write(_("aes128"))</script></option>
+									<option value="aes192"><script>document.write(_("aes192"))</script></option>
+									<option value="aes256"><script>document.write(_("aes256"))</script></option>
+									<option value="3des"><script>document.write(_("3des"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_ikehash"><script language=Javascript>document.write(_("ike hash"))</script></label>
+							<div class="field">
+								<select name="ipsec_ikehash" id="ipsec_ikehash">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="md5"><script>document.write(_("md5"))</script></option>
+									<option value="sha1"><script>document.write(_("sha1"))</script></option>
+									<option value="sha2_256"><script>document.write(_("sha256"))</script></option>
+									<option value="sha2_512"><script>document.write(_("sha512"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_dhg"><script language=Javascript>document.write(_("dh group"))</script></label>
+							<div class="field">
+								<select name="ipsec_dhg" id="ipsec_dhg">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="modp768"><script>document.write(_("group1"))</script></option>
+									<option value="modp1024"><script>document.write(_("group2"))</script></option>
+									<option value="modp1536"><script>document.write(_("group5"))</script></option>
+									<option value="modp2048"><script>document.write(_("group14"))</script></option>
+									<option value="modp3072"><script>document.write(_("group15"))</script></option>
+									<option value="modp4096"><script>document.write(_("group16"))</script></option>
+									<option value="modp6144"><script>document.write(_("group17"))</script></option>
+									<option value="modp8192"><script>document.write(_("group18"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="IpsecIkeTime"><script language=Javascript>document.write(_("ike rekey time"))</script></label>
+							<div class="field">
+								<input id="IpsecIkeTime" type="text" name="IpsecIkeTime" class="validate[required,funcCall[validate_IpsecIkeTime] sml required IpsecIkeTime" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("Msg79"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_dpdaction"><script language=Javascript>document.write(_("dpd action"))</script></label>
+							<div class="field">
+								<select name="ipsec_dpdaction" id="ipsec_dpdaction">
+									<option value="none"><script>document.write(_("none"))</script></option>
+									<option value="clear"><script>document.write(_("clear"))</script></option>
+									<option value="hold"><script>document.write(_("hold"))</script></option>
+									<option value="restart"><script>document.write(_("restart"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="DpdTimeDelay"><script language=Javascript>document.write(_("dpd keep alive time"))</script></label>
+							<div class="field">
+								<input id="DpdTimeDelay" type="text" name="DpdTimeDelay" class="validate[required] sml required" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("secs"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="DpdTimeout"><script language=Javascript>document.write(_("dpd timeout"))</script></label>
+							<div class="field">
+								<input id="DpdTimeout" type="text" name="DpdTimeout" class="validate[required] sml required" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("secs"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="IpsecLifeTime"><script language=Javascript>document.write(_("sa life time"))</script></label>
+							<div class="field">
+								<input id="IpsecLifeTime" type="text" name="IpsecLifeTime" class="validate[required,funcCall[validate_IpsecLifeTime] sml required IpsecLifeTime" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("Msg79"))</script></span>
+							</div>
+						</div>
+						<div class="row">
+							<div class="grid-9">
+								<h2><script language=Javascript>document.write(_("ipSecPhase2"))</script></h2>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="remotelan"><script language=Javascript>document.write(_("remoteLanAddress"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocks0("remote_lan");</script>
+						</div>
+						<div class="form-row">
+							<label for="remotemask"><script language=Javascript>document.write(_("remoteLanSubnetMask"))</script></label>
+							<script language="JavaScript">htmlGenMaskBlocks("remote_mask");</script>
+						</div>
+						<div class="form-row">
+							<label for="locallan"><script language=Javascript>document.write(_("localLanAddress"))</script></label>
+							<script language="JavaScript">htmlGenIpBlocks0("local_lan");</script>
+						</div>
+						<div class="form-row">
+							<label for="localmask"><script language=Javascript>document.write(_("localLanSubnetMask"))</script></label>
+							<script language="JavaScript">htmlGenMaskBlocks("local_mask");</script>
+						</div>
+						<div class="form-row">
+							<label for="ipsecEncap"><script language=Javascript>document.write(_("encapsulationType"))</script></label>
+							<div class="field">
+								<select name="ipsecEncap" id="ipsecEncap">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="esp"><script>document.write(_("ESP"))</script></option>
+									<option value="ah"><script>document.write(_("AH"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_enc"><script language=Javascript>document.write(_("IPsec encryption"))</script></label>
+							<div class="field">
+								<select name="ipsec_enc" id="ipsec_enc">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="aes"><script>document.write(_("aes"))</script></option>
+									<option value="aes128"><script>document.write(_("aes128"))</script></option>
+									<option value="aes192"><script>document.write(_("aes192"))</script></option>
+									<option value="aes256"><script>document.write(_("aes256"))</script></option>
+									<option value="3des"><script>document.write(_("3des"))</script></option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="ipsec_hash"><script language=Javascript>document.write(_("IPsec hash"))</script></label>
+							<div class="field">
+								<select name="ipsec_hash" id="ipsec_hash">
+									<option value="any"><script>document.write(_("any"))</script></option>
+									<option value="md5"><script>document.write(_("md5"))</script></option>
+									<option value="sha1"><script>document.write(_("sha1"))</script></option>
+									<option value="sha2_256"><script>document.write(_("sha256"))</script></option>
+									<option value="sha2_512"><script>document.write(_("sha512"))</script></option>
+								</select>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			</form>
+			<!--- hidden download form for IPSEC--->
+			<form id="formIpsecActionDn" name="formIpsecActionDn" method="GET" action="/cgi-bin/ipsec_action.cgi" encType="multipart/form-data" style='display:none'>
+				<input type="hidden" id="ipsec_dn_action" name="action" value="dnrsa"/>
+				<input type="hidden" id="ipsec_dn_param" name="param" value=""/>
+				<input type="hidden" name="@@csrfTokenNameForGet" value="@@session[csrfTokenName]">
+			</form>
+#ifdef V_WEBIF_SPEC_vdf
+			<div id="saveDiv" class="submit-row" style="padding-left:12px;display:none">
+#else
+			<div id="saveDiv" class="submit-row" style="display:none">
+#endif
+				<button type="button" name="saveButton" id="submitBtn" type="submit" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				<button type="button" class="secondary" name="exitButton" id="exitBtn" type="submit" onClick="javascript:exitHandler()"><script language=Javascript>document.write(_("exit"))</script></button>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "IP_Sec", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["IpsecIkeTime"]=_("ike warningMsg");
+	$.validator.addMethod("IpsecIkeTime",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 78400 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.IpsecIkeTime);
+
+	VALIDATOR.config.errors["IpsecLifeTime"]=_("sa warningMsg");
+	$.validator.addMethod("IpsecLifeTime",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 78400 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.IpsecLifeTime);
+#else
+/********* NTC ValidationEngine **********/
+function validate_IpsecIkeTime(field) {
+	if( field.val() < 0 || field.val() > 78400) {
+		return _("ike warningMsg");
+	}
+}
+
+function validate_IpsecLifeTime(field) {
+	if( field.val() < 0 || field.val() > 78400) {
+		return _("sa warningMsg");
+	}
+}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('ipsecSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

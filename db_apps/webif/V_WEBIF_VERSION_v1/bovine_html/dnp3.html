@@ -1,0 +1,88 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>DNP3</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	tempval = form['dnp3enable'];
+	retval = set_single( 'service.dnp3.enable='+tempval );
+	tempval = form['dnp3comm'];
+	retval = set_single( 'service.dnp3.comms='+tempval );
+}
+else { /*GET*/
+	temp = get_single( 'service.dnp3.enable' );
+	form['dnp3enable'] = temp;
+	temp = get_single( 'service.dnp3.comms' );
+	form['dnp3comm'] = temp;
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("dnp3");
+function submitDnpForm() {
+	var f=document.form;
+	f.dnp3comm.value = f.dnp3Comm.value;
+	f.submit();
+}
+
+function bodyOnLoad() {
+	var f=document.form;
+	if(f.dnp3enable.value == "1")
+		f.dnp3Enable[0].checked = true;
+	else
+		f.dnp3Enable[1].checked = true;
+	f.dnp3Comm.value= f.dnp3comm.value;
+}
+</script>
+<body onload="bodyOnLoad();">
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<h3><script language="JavaScript">document.write(_("services")+" > DNP3 Client")</script></h3>
+
+<input type="hidden" name="dnp3enable" value="@@form['dnp3enable']"/>
+<input type="hidden" name="dnp3comm" value="@@form['dnp3comm']"/>
+
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("dnp3 configuration"))</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("enable dnp3"))</script></td>
+	<td><input type=radio name='dnp3Enable' value=1 onClick="javascript:document.form.dnp3enable.value='1';" >&nbsp;<script language="JavaScript">document.write(_("enable"))</script>&nbsp;&nbsp;
+	<input type=radio name='dnp3Enable' value=0 onClick="javascript:document.form.dnp3enable.value='0';" >&nbsp;<script language="JavaScript">document.write(_("disable"))</script></td>
+</tr>
+
+<tr>
+	<td id="dnp3commTxt" width="38%"><script language="JavaScript">document.write(_("dnp3comm method"));</script></td>
+	<td>
+		<select id="dnp3Comm" name="dnp3Comm" >
+			<option value="0"><script language="JavaScript">document.write(_("dnp3tcp"));</script></option>
+			<option value="1"><script language="JavaScript">document.write(_("dnp3serial"));</script></option>
+		</select>
+	</td>
+</tr>
+</table>
+
+<table>
+<br>
+<br>
+<br>
+<br>
+<a href=/pointmap.txt>&nbsp;&nbsp;&nbsp;Download DNP3 Mapping File</a>
+</table>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>
+<div align="center"><p></p><input type="button" value="Save" id="save_button" onClick="submitDnpForm()" style="width:120px;"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

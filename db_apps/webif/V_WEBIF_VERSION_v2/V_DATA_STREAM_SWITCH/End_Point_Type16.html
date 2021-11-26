@@ -1,0 +1,280 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type16 (Bluetooth Serial Port Profile)</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+<%
+var EP_Type="16";
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p", varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=form['idxEP'];
+	EP_Name=form['nameEP'];
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type", EP_Type);
+	setDsmRdb(EP_Name+".rule_property", form['rule_property']);
+	setDsmRdb(EP_Name+".rule_operator", form['rule_operator']);
+	if ((form['rule_negate_operator'] == "") ||
+		(form['rule_negate_operator'] == undefined)) {
+		setDsmRdb(EP_Name+".rule_negate", "0");
+	} else {
+		setDsmRdb(EP_Name+".rule_negate", "1");
+	}
+	setDsmRdb(EP_Name+".rule_value", form['rule_value']);
+	setDsmRdb(EP_Name+".conn_fail_retry", form['fail_retry']);
+	setDsmRdb(EP_Name+".conn_success_retry", form['success_retry']);
+	setDsmRdb(EP_Name+".uuid", "spp");
+
+	set_single_direct("","service.dsm.trigger", "1");
+	redirect('/end_points.html?success');
+}
+%>
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+	$("#idxEP").val(i);
+	$("#nameEP").val(EP_Name);
+	$("#form").submit();
+}
+
+$(document).ready(function() {
+	$("#rule_property").
+		val("<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.rule_property');%>");
+	$("#rule_operator").
+		val("<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.rule_operator');%>");
+	var negate = "<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.rule_negate');%>"
+	if (negate == "1") {
+		$("#rule_negate_operator").prop('checked', true);
+	} else {
+		$("#rule_negate_operator").prop('checked', false);
+	}
+	$("#rule_value").
+		val("<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.rule_value');%>");
+	$("#fail_retry").
+		val("<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.conn_fail_retry');%>");
+	$("#success_retry").
+		val("<% get_single_direct('service.dsm.ep.conf.' + request['QUERY_STRING'] + '.conn_success_retry');%>");
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type16")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<div class="grey-box">
+
+					<!-- Rule Property -->
+					<div class="form-row">
+						<label for="rule_property">
+							<script language=Javascript>
+								document.write(_("property"))
+							</script>
+						</label>
+						<div class="field">
+							<select id="rule_property" name="rule_property">
+								<option value="0">
+									<script language=Javascript>
+										document.write(_("bluetooth_name"))
+									</script>
+								</option>
+								<option value="1">
+									<script language=Javascript>
+										document.write(_("bluetooth_address"))
+									</script>
+								</option>
+							</select>
+						</div>
+					</div>
+
+					<!-- Rule Operator -->
+					<div class="form-row">
+						<label for="rule_operator">
+							<script language=Javascript>
+								document.write(_("operator"))
+							</script>
+						</label>
+						<div class="field">
+							<select id="rule_operator" name="rule_operator">
+								<option value="0">
+									<script language=Javascript>
+										document.write(_("OperatorIs"))
+									</script>
+								</option>
+								<option value="1">
+									<script language=Javascript>
+										document.write(_("OperatorContains"))
+									</script>
+								</option>
+								<option value="2">
+									<script language=Javascript>
+										document.write(_("OperatorStarts"))
+									</script>
+								</option>
+								<option value="3">
+									<script language=Javascript>
+										document.write(_("OperatorEnds"))
+									</script>
+								</option>
+							</select>
+						</div>
+					</div>
+
+					<!-- Rule Operator Negate -->
+					<div class="form-row">
+						<label for="rule_negate_operator">
+							<script language=Javascript>
+								document.write(_("OperatorNegate"))
+							</script>
+						</label>
+							<input type="checkbox" id="rule_negate_operator"
+								name="rule_negate_operator">
+					</div>
+
+					<!-- Rule Value -->
+					<div class="form-row">
+						<label for="rule_value">
+							<script language=Javascript>
+								document.write(_("value"))
+							</script>
+						</label>
+						<input type="text" id="rule_value" name="rule_value">
+					</div>
+
+					<!-- Fail retry time -->
+					<div class="form-row">
+						<label for="fail_retry">
+							<script language=Javascript>
+								document.write(_("FailRetry"))
+							</script>
+						</label>
+						<input type="text" id="fail_retry" name="fail_retry" class="large required field1and3600 validate[required, funcCall[validate_field1and3600]]" maxLength="4" onKeyUp='NumfieldEntry(this)' value="">
+						<!-- Help text: valid values -->
+						<span class="normal-text">
+							&nbsp;
+							<script language=Javascript>
+								document.write(_("1-3600"))
+							</script>
+						</span>
+					</div>
+
+					<!-- Success retry time -->
+					<div class="form-row">
+						<label for="success_retry">
+							<script language=Javascript>
+								document.write(_("SuccessRetry"))
+							</script>
+						</label>
+						<input type="text" id="success_retry" name="success_retry" class="large required field1and604800 validate[required, funcCall[validate_field1and604800]]" maxLength="6" onKeyUp='NumfieldEntry(this)' value="">
+						<!-- Help text: valid values -->
+						<span class="normal-text">
+							&nbsp;
+							<script language=Javascript>
+								document.write(_("1-604800"))
+							</script>
+						</span>
+					</div>
+
+				</div>
+
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("field1and3600",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 3600 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and3600"));
+
+	$.validator.addMethod("field1and604800",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 604800 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and604800"));
+#else
+function validate_field1and3600(field) {
+	if( field.val() < 1 || field.val() > 3600 ) {
+		return _("field1and3600");
+	}
+}
+function validate_field1and604800(field) {
+	if( field.val() < 1 || field.val() > 604800 ) {
+		return _("field1and604800");
+	}
+}
+#endif
+</script>
+
+</body>
+</html>

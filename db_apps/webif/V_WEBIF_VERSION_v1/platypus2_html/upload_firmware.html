@@ -1,0 +1,421 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<title>Upload Firmware</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<link rel="stylesheet" type="text/css" href="BovineStyle.css"/>
+</head>
+
+<body>
+<div id="contentWrapper">
+<style type="text/css">
+#loading {
+	width: 250px;
+	height: 200px;
+	background-color: #3399ff;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	margin-top: -150px;
+	margin-left: -250px;
+	text-align: center;
+}
+.bar1 {background-color:Silver; position:relative; text-align:left; height:12px; width:100%;}
+.bar2 {background-color:blue; position:relative; text-align:left; height:12px; width:0%;}
+</style>
+
+<% include menu.html %>
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("upload_firmware");
+function hasSubStr(str, substr) {
+	return str.search(substr) >= 0;
+}
+
+var _enableTimer = false;
+var _timerID = null;
+var _downloadPercent = 0;
+var _baseSec = 1;
+var _totalPeriod = 5 * 60;
+var _pastSeconds = 0;
+var _launchIndexSecond = 100;
+var _reqObj = null;
+var _ajaxProg = null;
+
+function updateIndexPage() {
+	_reqObj = $.ajax( {
+		url: "/cgi-bin/webfileupd.cgi?webfileupd_env_action=getprogress",
+		success: function() {
+			stopAjaxStatus();
+			$("#uploadFWApply").css("display", "none");
+			$("#percent").html(100 + "%");
+			$("#upload_status").css("width", 100+"%");
+			//$("#upload_status").html(  100 + "%" );
+			setTimeout( "window.location = '/status.html'", 2000);
+		}
+	});
+}
+
+function timeoutAjaxStatus() {
+	if(( !_reqObj && !_ajaxProg) || ((_downloadPercent%5)==0)) { //not send to many ajax if already has procedure waiting for response
+		if (_pastSeconds < _launchIndexSecond) {
+			if(_reqObj){ //close other ajax
+				_reqObj.close;
+				_reqObj=null;
+			}
+			updateAjaxStatus();
+		}
+		else {
+			if(_ajaxProg){ //close other ajax
+				_ajaxProg.close;
+				_ajaxProg=null;
+			}
+			updateIndexPage();
+		}
+	}
+	if(_downloadPercent<50) {
+		_downloadPercent++;
+		if(document.getElementById("phase").innerHTML == "" )
+			$("#phase").html(_("upload firmware"));
+	}
+	else if(_downloadPercent>=50) {
+		_pastSeconds += _baseSec;
+		_downloadPercent = 50 + Math.round(_pastSeconds * 100 / _totalPeriod / 2);
+	}
+	_downloadPercent = (_downloadPercent > 100)?100:_downloadPercent;
+
+	// set timer
+	if(_enableTimer)
+		_timerID = setTimeout(function() { timeoutAjaxStatus(); }, _baseSec * 1000);
+
+	if (_downloadPercent==100) {
+		window.location = "/status.html"; //tiomout
+		return;
+	}
+	$("#percent").html(Math.round(_downloadPercent) + "%");
+	$("#upload_status").css("width", Math.round(_downloadPercent) + "%");
+	//$("#upload_status").html(  Math.round(_downloadPercent) + "%" );
+}
+
+function startAjaxStatus() {
+	// show progressive bar
+	showAjaxStatus(true);
+	_enableTimer = true;
+	_pastSeconds = 0;
+	_timerID = setTimeout(function() { timeoutAjaxStatus(); }, 1000);
+}
+
+function stopAjaxStatus() {
+	_enableTimer = false;
+	// clear timer
+	if(_timerID!=null)
+		clearTimeout(_timerID);
+	_timerID = null;
+}
+
+function showAjaxStatus(show) {
+	$("#progress_info").css("display", show ? "" : "none");
+	$("#progress_bar").css("display", show ? "" : "none");
+}
+
+function updateAjaxStatus() {
+	_ajaxProg = $.ajax({
+		url: "/cgi-bin/webfileupd.cgi?webfileupd_env_action=getprogress",
+		success: function() {
+			var progObj = eval('(' + _ajaxProg.responseText + ')');
+			// title
+			if (typeof (progObj.title) != "undefined")
+				$("#phase").html( progObj.title);
+
+			// message
+			if (typeof (progObj.messages) != "undefined") {
+				$("#messages").html( progObj.messages.join("<br />") );
+
+				if(hasSubStr(progObj.messages.toString(), /error:/i ))
+					stopAjaxStatus();
+			}
+
+			// progress
+			if (typeof (progObj.total_bytes) != "undefined" && typeof (progObj.last_bytes_read) != "undefined") {
+				newPercent = Math.round(progObj.last_bytes_read * 100 / progObj.total_bytes / 2);
+				_downloadPercent = (newPercent > _downloadPercent)?newPercent:_downloadPercent
+				$("#total_kbytes").html( Math.round(progObj.total_bytes / 1024) );
+				$("#current").html( Math.round(progObj.last_bytes_read / 1024) );
+
+				if (_downloadPercent < 50) {
+					$("#percent").html( Math.round(_downloadPercent) + "%" );
+					//$("#upload_status").html( _downloadPercent + "%" );
+				}
+			}
+		}
+	});
+}
+</script>
+
+<script language="JavaScript" type="text/javascript">
+document.write("<div id=\"loading\" style=\"display: none;\"><br><br><br>Uploading firmware <br><br>Please be patient and don't remove usb device if it presented...</div>");
+
+var isStorageBuilt = "<% /*getStorageBuilt();*/ %>";
+var firmware_path = "";
+var secs;
+var timerID = null;
+var timerRunning = false;
+var timeout = 3;
+var delay = 1000;
+
+function InitializeTimer() {
+	if(!isStorageBuilt)
+		return;
+	// Set the length of the timer, in seconds
+	secs = timeout;
+	StopTheClock();
+	StartTheTimer();
+}
+
+function StopTheClock() {
+	if(timerRunning)
+		clearTimeout(timerID);
+	timerRunning = false;
+}
+
+function StartTheTimer() {
+	if(!isStorageBuilt)
+		return;
+
+	if (secs==0) {
+		StopTheClock();
+		timerHandler();
+		secs = timeout;
+		StartTheTimer();
+	}
+	else {
+		self.status = secs;
+		secs = secs - 1;
+		timerRunning = true;
+		timerID = self.setTimeout("StartTheTimer()", delay);
+	}
+}
+
+function timerHandler() {
+	if(!isStorageBuilt)
+		return;
+	$.get("/goform/storageGetFirmwarePath", alertContents);
+}
+
+function alertContents(responseText) {
+	if(!isStorageBuilt)
+		return;
+	updateStorageStatus(responseText);
+}
+
+function updateStorageStatus(str) {
+	if(!isStorageBuilt)
+		return;
+
+	if(firmware_path == str)
+		return;
+
+	firmware_path = str;
+	var paths = new Array();
+	paths = firmware_path.split("\n");
+
+	if(paths.length) {
+		document.UploadFirmwareUSB.firmware_path.length = 0;
+		for(var i=0; i<paths.length; i++) {
+			var j = document.UploadFirmwareUSB.firmware_path.options.length;
+			document.UploadFirmwareUSB.firmware_path.options[j] = new Option(paths[i].substring(12), paths[i], false, false);
+		}
+	}
+}
+
+var upgradeDone=false;
+
+function setProgressBar(percentCur) {
+	var newWidth;
+	var maxWidth=720;
+
+	newWidth=(percentCur*maxWidth/100).toFixed(0);
+	$("#upload_status").css("width", newWidth);
+	//$("#upload_status").html( (percentCur).toFixed(0) + '%' );
+	$("#percent").html( (percentCur).toFixed(0) + '%' );
+
+	if(percentCur>=100)
+		upgradeDone=true;
+}
+
+var _singleton = 0;
+function uploadFirmwareCheck() {
+	setProgressBar(0);
+
+	if (confirm(_("upload warningMsg1"))) {//"The router will download and upgrade the firmware. The whole upgrade procedure can take 3 minutes. The router shows the status page when the upgrade procedure finishes. Click OK to process\n"
+		if(_singleton)
+			return false;
+		if(document.UploadFirmware.webfileupd_env_uploadfile.value == "") {
+			alert(_("upload warningMsg2"));//"Firmware Upgrade: Please specify a file."
+			return false;
+		}
+
+		document.UploadFirmwareUSB.UploadFirmwareUSBSubmit.disabled = true;
+		$("#loading").css("display", "none");
+		_singleton = 1;
+		document.UploadFirmware.submit();
+		$("#webfileupd_env_uploadfile").css("disabled", true);
+		$("#uploadFWApply").css("disabled", true);
+		startAjaxStatus();
+		return true;
+	}
+	else {
+		return;
+	}
+}
+
+function uploadFirmwareUSBCheck() {
+	if(_singleton)
+		return false;
+	if(!firmware_path.length) {
+		alert(_("upload warningMsg3"));//"No firmware is selected."
+		return false;
+	}
+	StopTheClock();
+	document.UploadFirmware.UploadFirmwareSubmit.disabled = true;
+	$("#loading").css("display", "none");
+	_singleton = 1;
+	return true;
+}
+
+function initTranslation() {
+	$("#uploadTitle").html(_("upload firmware"));
+<% var _system_skin=get_single('system.product.skin'); if( _system_skin=='ts' ) { %>
+	$("#uploadIntroduction1").html(_("upload TSintroduction1")+" ");
+	$("#uploadIntroduction2").html(_("upload TSintroduction2"));
+<%}else{%>
+	$("#uploadIntroduction1").html(_("upload introduction1")+" ");
+	$("#uploadIntroduction2").html(_("upload introduction2"));
+<%}%>
+	$("#uploadFWLocation").html(_("upload firmware"));
+	$("#uploadFWApply").val(_("apply"));
+	$("#uploadFWFromUSB").html(_("upload firmware from usb"));
+	$("#uploadFWUSBLocation").html(_("location"));
+	$("#uploadFWUSBApply").val(_("apply"));
+	$("#download phase").html(_("download phase"));
+	$("#wMessages").html(_("messages"));
+	$("#wMessages").html(_("messages"));
+	$("#percent_l").html(_("percent complete"));
+	$("#current_l").html(_("current position"));
+	$("#kbytes").html(_("kbytes"));
+}
+
+function pageInit() {
+	initTranslation();
+	if(isStorageBuilt) {
+		$.get("/goform/storageGetFirmwarePath", alertContents);
+		InitializeTimer();
+	}
+	document.UploadFirmware.UploadFirmwareSubmit.disabled = false;
+	$("#loading").css("display", "none");
+}
+
+function upLoad() {
+	alert(_("upload warningMsg5"));//"UPGRADE FIRMWARE - DO NOT POWER OFF\n\nThe router will upgrade the firmware. During the upgrade procedure the LEDs will be blinking. Loss of power during the blinking period damages the router firmware. Click OK when you are ready to start upgrading\n\n"
+
+	$.get("/cgi-bin/upload.cgi", function() {
+		$("#uploadwait").css("display", "");
+		$("#uploadFWApply").css("display", "none");
+		setTimeout("window.location='/index.html'",180*1000);
+		alert(_("upload warningMsg6"));//"UPGRADING FIRMWARE - DO NOT POWER OFF\n\nThe router is currently upgrading. Please wait until the LEDsstop blinking. When the LEDs stop blinking, open the router configuration page again"
+	});
+}
+
+$(document).ready(function() {
+	pageInit();
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("upload title"))</script></h3>
+<p></p>
+<table class="body">
+	<tr><th id="uploadTitle"></th></tr>
+</table>
+
+<!-- Upload firmware Settings -->
+<form method=post target='target_upload' name="UploadFirmware" action="/cgi-bin/webfileupd.cgi" enctype="multipart/form-data">
+<!--form method=post target='target_upload' name="UploadFirmware" action="/cgi-bin/test.cgi" enctype="multipart/form-data"-->
+<input type=hidden name="webfileupd_env_script" value="webfileupd_fw.sh">
+<!-- action="/cgi-bin/upload.cgi" -->
+<table border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<td colspan="2"><br/><font id="uploadIntroduction1"></font><font id="uploadIntroduction2" color="#ff0000"></font><br/><br/></td>
+</tr>
+<tr>
+	<td id="uploadFWLocation"></td>
+	<td><input id="webfileupd_env_uploadfile" name="webfileupd_env_uploadfile" size="20" maxlength="256" type="file"></td>
+</tr>
+</table>
+<table cellpadding="2" cellspacing="1"><tr align="center"><td>
+<input value="" style="width:120px;" id="uploadFWApply" name="UploadFirmwareSubmit" type="button" onClick="return uploadFirmwareCheck();">&nbsp;&nbsp;
+</td></tr>
+<tr><td align="center"><img src="/images/waiting.gif" width="18" height="18" id="uploadwait" style="display:none"/></td></tr>
+</table>
+<hr/>
+<!-- uploading information table -->
+<table width="85%" border="0" cellspacing="0" cellpadding="10">
+<tr>
+<td colspan="2">
+	<div class="info" id="progress_info" style="display:none" >
+		<table class="data" cellpadding='3' cellspacing='1'>
+		<tr>
+			<td width="160px" align="left" id="download phase" ><b></b></td>
+			<td align="left"><span id="phase"></span></td>
+		</tr>
+		<tr>
+			<td valign="top" align="left" id="wMessages"><b></b></td>
+			<td align="left"><span id="messages" dir="ltr"></span></td>
+		</tr>
+		</table>
+	</div>
+	<div id="progress_bar" style="display:none">
+		<table class="data" cellpadding='3' cellspacing='1'>
+		<tr>
+			<td width="160px" align="left"><b><span id="percent_l"></b></td>
+			<td align="left"><span id="percent">0%</span></td>
+		</tr>
+		</table>
+		<div class="bar1" id="upload_status_wrap" align="left">
+			<div align="left" class="bar2" id="upload_status" ></div>
+		</div>
+		<table class="data" cellpadding='3' cellspacing='1'>
+			<tr>
+				<td width="160px" align="left"><b><span id="current_l"></b></td>
+				<td align="left"><span id="current">0</span> / <span id="total_kbytes"></span> <span id="kbytes"></span></td>
+			</tr>
+		</table>
+	</div>
+</table>
+</form>
+<form method="get" name="UploadFirmwareUSB" action="/cgi-bin/usb_upgrade.cgi" style="display:none">
+<table id="uploadFWUSBTable" name="uploadFWUSBTable" border="0" cellpadding="2" cellspacing="1" width="95%">
+<tr>
+	<td class="title" colspan="2" id="uploadFWFromUSB"></td>
+</tr>
+<tr>
+	<td class="head" id="uploadFWUSBLocation">Location:</td>
+	<td>
+		<select name="firmware_path" size="1">
+		<!--Javascript will update these options -->
+		</select>
+	</td>
+</tr>
+</table>
+<table cellpadding="2" cellspacing="1"><tr align="center"><td>
+<input value="Apply" id="uploadFWUSBApply" name="UploadFirmwareUSBSubmit" type="submit" onClick="return uploadFirmwareUSBCheck();">&nbsp;&nbsp;
+</td></tr></table>
+<hr/>
+</form>
+
+<iframe id='target_upload' name="target_upload" frameborder=0 width="100%" height="200" align="center" style="display:none">
+</iframe>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

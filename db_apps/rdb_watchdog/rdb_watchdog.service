@@ -1,0 +1,13 @@
+# Copyright (c) 2021 Casa Systems
+
+[Unit]
+Description=RDB watchdog
+Requires=dd_driver.service rdbmgr-cfg.service rdbmgr-sta.service rdbmgr-tpl.service
+After=dd_driver.service rdbmgr-cfg.service rdbmgr-sta.service rdbmgr-tpl.service
+
+[Service]
+ExecStart=/sbin/rdb_watchdog -t 5 -T 15 -w /dev/watchdog -r /etc/rdb_watchdog.conf -s
+Nice=-3
+
+[Install]
+WantedBy=multi-user.target

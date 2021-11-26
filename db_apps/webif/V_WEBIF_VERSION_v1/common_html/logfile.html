@@ -1,0 +1,178 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Log File</title>
+<link href="BovineStyle.css" rel="stylesheet" type="text/css"/>
+<!-- <script language="JavaScript" src="/stdlibjs.htm"></script> -->
+<script language="JavaScript" src="/virtualpaginate.js"></script>
+</head>
+
+<body id="body-log">
+<div id="contentWrapper-log">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("logfile");
+function loglines(allLines, level) {
+var lineCnt;
+var ostr = "";
+var splitStr = new RegExp(" +");
+var levelmap = {
+	emerg: 8,
+	emergency: 8,
+	alert: 7,
+	crit: 6,
+	critical: 6,
+	err: 5,
+	error: 5,
+	warn: 4,
+	warning: 4,
+	note: 3,
+	notice: 3,
+	info: 2,
+	debug: 1,
+	all: 0 };
+var levelNumber = 0;
+var allIndex;
+var lastIgnore = 0;
+	if (level && level.length && levelmap.hasOwnProperty(level))
+		levelNumber = levelmap[level];
+	lineCnt = 0;
+
+	for (allIndex = allLines.length - 1; allIndex > 0; allIndex--) {
+		var line = allLines[allIndex];
+		var ray = new Array();
+		ray = line.split(": ");
+		var details = new Array();
+
+		details = ray.shift().split(splitStr);
+	/* 0 month, 1 day number, 2 time, 3 machine, 4 facility.level */
+	/* determine if level should be set */
+		if (details.length < 5) {
+			if (lastIgnore)
+				continue;
+		}
+		else if (levelNumber > 0) {
+			var lvsplit = details[4].indexOf(".");
+			if (lvsplit) {
+				lvsplit = details[4].substring(lvsplit+1);
+				lvsplit.toLowerCase();
+				if (!levelmap.hasOwnProperty(lvsplit) || levelmap[lvsplit] < levelNumber) {
+					lastIgnore = 1;
+					continue;
+				}
+			}
+			else {
+				if (lastIgnore)
+					continue;
+			}
+		}
+
+		lastIgnore = 0;
+		var firstColumn = details.shift();
+		details[0] = firstColumn + " " + details[0];
+
+		if (!lineCnt) {
+			ostr += "<table class='logfile' width='100%'>\n"+
+			"<tr><td width='15%' style='color:#ffffff; background:#897A5F'>"+_("date")+"  &  "+_("time")+"</td>\n"+
+			"<td width='10%' style='color:#ffffff; background:#695E4A'>"+_("machine")+"</td>\n"+
+			"<td width='8%' style='color:#ffffff; background:#897A5F'>"+_("level")+"</td>\n"+
+			"<td width='10%' style='color:#ffffff; background:#695E4A'>"+_("process")+"</td>\n"+
+			"<td style='color:#ffffff; background:#897A5F'>"+_("message")+"</td></tr>\n";
+		}
+		if ((lineCnt % 2) == 1) {
+			ostr += "<tr><td class='odd'>";
+			td10 = "</td><td class='odd'>";
+			//td12 = "</td><td class='odd' style='font-size:12px'>";
+		}
+		else {
+			ostr += "<tr><td class='even'>";
+			td10 = "</td><td class='even'>";
+			//td12 = "</td><td class='even' style='font-size:12px'>";
+		}
+		ostr += details[0]+"  "+details[1]+td10+details[2]+td10+details[3]+td10+details[4]+td10+ray.join(": ")+"</td></tr>"
+		lineCnt++;
+		if (lineCnt > 22) {
+			lineCnt = 0;
+			ostr += "</table>\n";
+		}
+	}
+	if (lineCnt) {
+		ostr += "</tr>\n</table>\n";
+	}
+	return ostr;
+}
+
+function setSpanIdHTML(field, value) {
+	document.getElementById(field).innerHTML = value;
+}
+var newscriptsalt;
+function displayLogData(level) {
+	var res = loglines(logdata.messages, level);
+	setSpanIdHTML('logdata', res);
+	newscriptsalt=new virtualpaginate("logfile", 1, "table")
+	newscriptsalt.buildpagination("scriptspaginatealt")
+}
+function setLogLevel() {
+	var i = document.formS.Level.value;
+	displayLogData(i);
+}
+function ClearAllLog() {
+	if(!confirm(_("confirm cleanLog")))
+		return;
+	$.get('/cgi-bin/clearlog.cgi', function(){location.href='/logfile.html';})
+}
+
+document.write('<style type="text/css">\n.logfile{display: none;}\n</style>')
+</script>
+
+<form name="formS">
+<table border=0 cellspacing=0 cellpadding=0 width="100%">
+<tr>
+	<td colspan="3" style="background-color:#FFFFFF">
+		<span id="selLabel" class="paginationstyle" >
+		<b><script language="JavaScript">document.write(_("logFile"));</script></b>
+		&nbsp;&nbsp;<script language="JavaScript">document.write(_("displayLevel"));</script>
+		<select name=Level ID="SetLevel" onchange="setLogLevel()" size=1 >
+			<option value="all" ><script language="JavaScript">document.write(_("log all"));</script> </option>
+			<option value="debug" ><script language="JavaScript">document.write(_("log debug"));</script> </option>
+			<option value="info" ><script language="JavaScript">document.write(_("log info"));</script> </option>
+			<option value="notice" ><script language="JavaScript">document.write(_("log notice"));</script> </option>
+			<option value="warn" ><script language="JavaScript">document.write(_("log warning"));</script> </option>
+			<option value="err" ><script language="JavaScript">document.write(_("log Error"));</script> </option>
+		</select>
+		</span>
+		<span id="scriptspaginatealt" class="paginationstyle">
+		&nbsp;&nbsp;&nbsp;&nbsp;
+<%lang=get_single('webinterface.language'); if(lang=='ar') {%>
+		<a href="#" rel="previous" class="imglinks"><img src="/images/roundright.gif" /></a> <select></select> <a href="#" rel="next" class="imglinks"><img src="/images/roundleft.gif" /></a>
+<%} else {%>
+		<a href="#" rel="previous" class="imglinks"><img src="/images/roundleft.gif" /></a> <select></select> <a href="#" rel="next" class="imglinks"><img src="/images/roundright.gif" /></a>
+<%}%>
+		</span>
+		&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type="button" name="clear" value="Clear Log File" onClick="javascript:ClearAllLog();"/>
+	</td>
+</tr>
+</table>
+<span id="logdata" class="paginationstyle"></span>
+<script language="JavaScript">
+<%exec_cmd("/usr/bin/logfile -q");%>
+<%skin=get_single('system.product.skin'); if(skin=='MOB' || skin=='mob') {%>
+document.getElementById('SetLevel').options.selectedIndex=5;
+<%}%>
+</script>
+<br/>
+<a href="/logfile.txt">&nbsp;&nbsp;&nbsp;<script language="JavaScript">document.write(_("log download"));</script></a>
+</form>
+</div>
+<br/>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+</html>

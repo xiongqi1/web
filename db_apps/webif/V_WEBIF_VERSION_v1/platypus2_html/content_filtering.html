@@ -1,0 +1,371 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<title>Content Filter Settings</title>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if(request["QUERY_STRING"]=='webContentFilter') {
+		tempval=form['websFilterProxyh'];
+		set_single( 'service.firewall.websFilterProxy='+tempval );
+		tempval=form['websFilterJavah'];
+		set_single( 'service.firewall.websFilterJava='+tempval );
+		tempval=form['websFilterActivexh'];
+		set_single( 'service.firewall.websFilterActivex='+tempval );
+		tempval=form['websFilterCookiesh'];
+		set_single( 'service.firewall.websFilterCookies='+tempval );
+	}
+	else if(request["QUERY_STRING"]=='websURLFilter') {
+		URLs = form['NewURLFiltersStr'];
+		set_single( 'service.firewall.URLFilters='+URLs, '-p' );
+	}
+	else if(request["QUERY_STRING"]=='websURLFilterDelete') {
+		URLs = form['NewURLFiltersStr'];
+		set_single( 'service.firewall.URLFilters='+URLs, '-p' );
+	}
+	else if(request["QUERY_STRING"]=='websHostFilter') {
+		Hosts = form['NewHostFiltersStr'];
+		set_single( 'service.firewall.HostFilters='+Hosts, '-p' );
+	}
+	else if(request["QUERY_STRING"]=='websHostFilterDelete') {
+		Hosts = form['NewHostFiltersStr'];
+		set_single( 'service.firewall.HostFilters='+Hosts, '-p' );
+	}
+	else if(request["QUERY_STRING"]=='webContentFilterScop') {
+		tempVal = form['websFilterScopeh'];
+		set_single( 'service.firewall.websFilterScope='+tempVal, '-p' );
+	}
+}
+else { /*GET*/
+	;
+}
+
+proxy = get_single( 'service.firewall.websFilterProxy' );
+form['websFilterProxyh']=proxy;
+
+java = get_single( 'service.firewall.websFilterJava' );
+form['websFilterJavah']=java;
+
+activex = get_single( 'service.firewall.websFilterActivex' );
+form['websFilterActivexh']=activex;
+
+cookies = get_single( 'service.firewall.websFilterCookies' );
+form['websFilterCookiesh']=cookies;
+
+scop= get_single( 'service.firewall.websFilterScope' );
+form['websFilterScopeh']=scop;
+%>
+<body onLoad=" updateState()">
+<div id="contentWrapper">
+<% include menu.html %>
+
+<script language="JavaScript" type="text/javascript">
+Butterlate.setTextDomain("content_filtering");
+var url_str = <%val='\"'+get_single('service.firewall.URLFilters')+'\"';%>@@val;
+var host_str = <%val='\"'+get_single('service.firewall.HostFilters')+'\"';%>@@val;
+var URLFilterNum = 0;
+var HostFilterNum = 0;
+var url_entries = new Array();
+var host_entries = new Array();
+
+function deleteClick() {
+	return true;
+}
+
+function formCheck() {
+	return true;
+}
+
+function updateState() {
+	var IPForward="<%val=get_single('service.bridge.3GIPForward');%>@@val";
+	if(IPForward == "1") {
+		alert(_("transparent bridge warnMsg2"));
+		window.location="/LAN.html?ipsetup";
+	}
+	if (document.webContentFilter.websFilterProxyh.value == "1")
+		document.webContentFilter.websFilterProxy.checked = true;
+	if (document.webContentFilter.websFilterJavah.value == "1")
+		document.webContentFilter.websFilterJava.checked = true;
+	if (document.webContentFilter.websFilterActivexh.value == "1")
+		document.webContentFilter.websFilterActivex.checked = true;
+	if (document.webContentFilter.websFilterCookiesh.value == "1")
+		document.webContentFilter.websFilterCookies.checked = true;
+
+	switch(document.webContentFilterScop.websFilterScopeh.value) {
+		case "3G":
+			document.webContentFilterScop.websFilterScope.options.selectedIndex=0;
+			break;
+		case "WAN":
+			document.webContentFilterScop.websFilterScope.options.selectedIndex=1;
+			break;
+		default:
+			document.webContentFilterScop.websFilterScope.options.selectedIndex=2;
+	}
+}
+
+function webContentFilterClick() {
+	document.webContentFilter.websFilterProxyh.value = document.webContentFilter.websFilterProxy.checked ? "1": "0";
+	document.webContentFilter.websFilterJavah.value = document.webContentFilter.websFilterJava.checked ? "1": "0";
+	document.webContentFilter.websFilterActivexh.value = document.webContentFilter.websFilterActivex.checked ? "1": "0";
+	document.webContentFilter.websFilterCookiesh.value = document.webContentFilter.websFilterCookies.checked ? "1": "0";
+	var f=document.webContentFilter;
+	f.submit();
+}
+
+function deleteWebsURLClick() {
+	var f=document.websURLFilterDelete;
+	var delRules = "0";
+	f.NewURLFiltersStr.value="";
+	for(i=0; i< URLFilterNum; i++) {
+		var tmp = eval("f.DR"+i);
+		if(tmp.checked == true)
+			delRules="1";
+		else {
+			if( f.NewURLFiltersStr.value!="" )
+				f.NewURLFiltersStr.value += ";";
+			f.NewURLFiltersStr.value+=url_entries[i];
+			
+		}
+	}
+	if (delRules == "0") {
+		alert(_("content filter warningMsg1"));
+	}
+	else
+		f.submit();
+}
+
+function AddWebsURLFilterClick() {
+	if(document.websURLFilter.addURLFilter.value == "") {
+		alert(_("content filter warningMsg2"));
+		return false;
+	}
+	var f=document.websURLFilter;
+	f.NewURLFiltersStr.value=url_str==""?"":url_str+";";
+	f.NewURLFiltersStr.value += f.addURLFilter.value;
+	f.submit();
+}
+
+function deleteWebsHostClick() {
+	var f=document.websHostFilterDelete;
+	var delRules = "0";
+	f.NewHostFiltersStr.value="";
+	for(i=0; i< HostFilterNum; i++) {
+		var tmp = eval("f.DR"+i);
+		if(tmp.checked == true)
+			delRules="1";
+		else {
+			if(f.NewHostFiltersStr.value!="" )
+				f.NewHostFiltersStr.value += ";";
+			f.NewHostFiltersStr.value+=host_entries[i];
+		}
+	}
+	if (delRules == "0") {
+		alert(_("content filter warningMsg1"));
+	}
+	else
+		f.submit();
+}
+
+function AddWebsHostFilterClick() {
+	if(document.websHostFilter.addHostFilter.value == "") {
+		alert(_("content filter warningMsg3"));
+		return false;
+	}
+	var f=document.websHostFilter;
+	f.NewHostFiltersStr.value=host_str==""?"":host_str+";";
+	f.NewHostFiltersStr.value += f.addHostFilter.value;
+	f.submit();
+}
+
+function WebsFilterScopeApplyClick() {
+	document.webContentFilterScop.websFilterScopeh.value=document.webContentFilterScop.websFilterScope.value;
+	var f=document.webContentFilterScop;
+	f.submit();	
+}
+</script>
+
+<h3><script language="JavaScript">document.write(_("treeapp internet settings")+" > "+_("routing")+" > "+_("treeapp content filtering"));</script></h3>
+<table>
+<tr>
+	<th><script language="JavaScript">document.write( _("introduction"))</script></th>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write( _("content filter introduction"))</script></td>
+</tr>
+</table>
+
+#if defined (V_ETH_PORT_4pw_llll) || defined (V_ETH_PORT_4plllw_l)
+<form method=post name="webContentFilterScop" action="@@request['SCRIPT_NAME']?webContentFilterScop">
+#else
+<form method=post name="webContentFilterScop" action="@@request['SCRIPT_NAME']?webContentFilterScop" style="display:none">
+#endif
+<input type='hidden' name='websFilterScopeh' value="@@form['websFilterScopeh']">
+<table border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<th colspan="2" id="filter_scope"><script language="JavaScript">document.write( _("filter scope"))</script></th>
+</tr>
+<tr align="center">
+	<td>
+		<select name="websFilterScope" size="1">
+		<option value="3G"><script language="JavaScript">document.write( _("3G connection only"))</script></option>
+		<option value="WAN"><script language="JavaScript">document.write( _("WAN only"))</script></option>
+		<option value="All"><script language="JavaScript">document.write( _("both 3G and WAN"))</script></option>
+		</select>
+	</td>
+</tr>
+<tr align="center">
+  <td>
+	<input type="button" value="Apply" style="width:120px;" id="WebsFilterScopeApply" name="WebsFilterScopeApply" onClick="WebsFilterScopeApplyClick()">
+  </td>
+</tr>
+</table>
+</form>
+
+<form name="webContentFilter" method="POST" action="@@request['SCRIPT_NAME']?webContentFilter">
+<input type='hidden' name='websFilterProxyh' value="@@form['websFilterProxyh']">
+<input type='hidden' name='websFilterJavah' value="@@form['websFilterJavah']">
+<input type='hidden' name='websFilterActivexh' value="@@form['websFilterActivexh']">
+<input type='hidden' name='websFilterCookiesh' value="@@form['websFilterCookiesh']">
+
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+<tr>
+	<th class="title" colspan="2" ><script language="JavaScript">document.write( _("content filter webs content filter"))</script></th>
+</tr>
+<tr>
+	<td width="30%"><script language="JavaScript">document.write( _("filter"))</script></td>
+	<td>
+		<input type=checkbox name=websFilterProxy value="0" >Proxy&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type=checkbox name=websFilterJava value="0" >Java&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type=checkbox name=websFilterActivex value="0" >ActiveX&nbsp;&nbsp;&nbsp;&nbsp;
+		<input type=checkbox name=websFilterCookies value="0" >Cookies
+	</td>
+</tr>
+</table>
+<div align="center">
+<p></p>
+	<input type="button" value="Apply" id="WebsContentFilterApply" name="addFilterPort" onClick="webContentFilterClick()" style="width:120px;"> &nbsp;&nbsp;
+	<input type="reset" value="Reset" id="WebsContentFilterReset" name="reset" style="width:120px;">
+<p></p>
+</div>
+</form>
+<table width="80%">
+<tr>
+	<th><script language="JavaScript">document.write(_("content filter webs URL filter title"))</script></th>
+</tr>
+</table>
+<form name="websURLFilterDelete" method="POST" action="@@request['SCRIPT_NAME']?websURLFilterDelete">
+<input type='hidden' name='NewURLFiltersStr'>
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+	<tr>
+		<td class="title" colspan="5" id="WebURLFilterCurrent"><script language="JavaScript">document.write(_("content filter webs url filter current"))</script></td>
+	</tr>
+	<tr>
+		<td id="WebURLFilterNo"><script language="JavaScript">document.write(_("number"))</script></td>
+		<td id="WebURLFilterURL"><script language="JavaScript">document.write( _("content filter webs url fitler url"))</script></td>
+	</tr>
+	<script language="JavaScript" type="text/javascript">
+	var i;
+	if(url_str.length) {
+		url_entries = url_str.split(";");
+		for(i=0; i<url_entries.length; i++) {
+			document.write("<tr><td>");
+			document.write(i+1);
+			document.write("<input type=checkbox name=DR"+i+"></td>");
+			document.write("<td>"+ url_entries[i] +"</td>");
+			document.write("</tr>\n");
+		}
+		URLFilterNum = url_entries.length;
+	}
+	</script>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Delete" id="WebURLFilterDel" name="deleteSelPortForward" onClick="deleteWebsURLClick()" style="width:120px;">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebURLFilterReset" name="reset" style="width:120px;">
+<p></p>
+</div>
+</form>
+
+<form name="websURLFilter" method="POST" action="@@request['SCRIPT_NAME']?websURLFilter">
+<input type='hidden' name='NewURLFiltersStr'>
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+	<tr>
+		<td class="title" colspan="5" ><script language="JavaScript">document.write( _("content filter webs url fitler add title"))</script></td>
+	</tr>
+	<tr>
+		<td width="38%"><script language="JavaScript">document.write( _("content filter webs url fitler url"))</script></td>
+		<td><input name="addURLFilter" id="addURLFilter" size="16" maxlength="32" type="text"></td>
+	</tr>
+</table>
+<div align="center">
+<p></p>
+	<input type="button" value="&nbsp;Add&nbsp;" id="WebURLFilterAdd" name="addwebsurlfilter" onClick="AddWebsURLFilterClick()" style="width:120px;">&nbsp;&nbsp;
+	<input type="reset" value="Reset" id="WebURLFilterReset" name="reset" style="width:120px;">
+<p></p>
+</div>
+</form>
+<table width="80%">
+<tr>
+	<th><script language="JavaScript">document.write( _("content filter webs host fitler title"))</script></th>
+</tr>
+</table>
+<!--form action='/goform/websHostFilterDelete' method='POST' name="websHostFilterDelete"-->
+<form name="websHostFilterDelete" method="POST" action="@@request['SCRIPT_NAME']?websHostFilterDelete">
+<input type='hidden' name='NewHostFiltersStr'>
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+	<tr>
+		<td class="title" colspan="5" ><script language="JavaScript">document.write( _("content filter webs host fitler current"))</script></td>
+	</tr>
+	<tr>
+		<td id="WebsHostFilterNo"><script language="JavaScript">document.write( _("number"))</script></td>
+		<td id="WebsHostFilterHost"><script language="JavaScript">document.write( _("content filter webs host filter host"))</script></td>
+	</tr>
+	<script language="JavaScript" type="text/javascript">
+	var i;
+
+	if(host_str.length) {
+		host_entries = host_str.split(";");
+		for(i=0; i<host_entries.length; i++) {
+			document.write("<tr><td>");
+			document.write(i+1);
+			document.write("<input type=checkbox name=DR"+i+"></td>");
+			document.write("<td>"+ host_entries[i] +"</td>");
+			document.write("</tr>\n");
+		}
+		HostFilterNum = host_entries.length;
+	}
+	</script>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Delete" id="WebsHostFilterDel" name="deleteSelPortForward" onClick="deleteWebsHostClick()" style="width:120px;">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebsHostFilterReset" name="reset" style="width:120px;">
+<p></p>
+</div>
+</form>
+
+<form name="websHostFilter" method="POST" action="@@request['SCRIPT_NAME']?websHostFilter">
+<input type='hidden' name='NewHostFiltersStr'>
+<table width="80%" border="0" cellpadding="2" cellspacing="1">
+	<tr>
+		<th class="title" colspan="2" ><script language="JavaScript">document.write(_("content filter webs host fitler add title"))</script></th>
+	</tr>
+	<tr>
+		<td width="38%" id="WebsHostFilterKeyword"><script language="JavaScript">document.write(_("content filter webs host fitler keyword"))</script></td>
+		<td><input name="addHostFilter" size="16" maxlength="32" type="text"></td>
+	</tr>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Add" id="WebsHostFilterAdd" name="addwebscontentfilter" onClick="AddWebsHostFilterClick()" style="width:120px;">&nbsp;&nbsp;
+<input type="reset" value="Reset" id="WebsHostFilterReset" name="reset" style="width:120px;">
+</div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

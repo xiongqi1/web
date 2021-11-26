@@ -1,0 +1,616 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>GRE</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<% include vpnCommon.inc %>
+<%
+// The following code assembles required link information from the RDB and puts it into an array called "st".
+// See vpnCommon.inc for more details
+var createStDevices=new Array ("pptp.0","gre.0");
+var createStArgs=new Array(new Array("enable","","0"), "user", "pass", new Array("defaultgw","","0"),
+"local_ipaddr", "remote_ipaddr", "remote_nwaddr", "remote_nwmask", new Array("defaultroutemetric","metric","30"),
+new Array("authtype", "", "any"), new Array("snat", "", "0"), new Array("default.defaultroutemetric","sdefgw","0"),
+new Array("reconnect_delay", "", "30" ), new Array("reconnect_retries", "", "0" ), new Array("default.dnstopptp","dnstopptp","0"),
+"verbose_logging", new Array("pppdebug","","0"), new Array("mppe_en","", "1"), "opt", new Array("ttl","","255" ) );
+var needEncodingArgs = new Array("name", "serveraddress");
+stElements=createVpnElements( createStDevices, createStArgs, needEncodingArgs);
+%>
+<script>
+var st=[@@stElements];
+</script>
+
+<script language="JavaScript" src="vpnUtils.js"></script>
+
+<script language="JavaScript">
+#include "net_util.js"
+
+var notUsed1 = _("maxEnabledProfilesExceeded");	// Used in vpnUtils.js @todo TT#9132
+var notUsed2 = _("errorsTitle");								// ditto
+
+function exitHandler() {
+	clear_alert();
+	if(document.form.curindex.value != "" && document.form.curindex.value >= 0)
+		window.location="/VPN_grec.html"
+	else
+		showedit( 'edit', false, st.length );
+}
+
+function checkGreForm() {
+	var f=document.form;
+
+	var vpnserver=f.vpnserver.value;
+
+	// 1. if domain name format address then no need to check validation here, let network do it, just pass this condition
+	// 2. if numeric ip address format then do ip address validation, if fails then alert
+	if(isDomainNameFormat(vpnserver) == false && isValidIpAddress(vpnserver) == false) {
+		validate_alert("",_("Msg131"));//Error: No server IP address entered or not entered correctly
+		return false;
+	}
+	return true;
+}
+
+function submitGreForm() {
+	var f=document.form;
+	f.rdbBase.value=i;
+	$("button").attr("disabled",true);
+	f.submit();
+}
+
+function submitForm() {
+	var f=document.form;
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		validate_group("vpnserver");
+		validate_group("localaddr");
+		validate_group("remoteaddr");
+		validate_group("peernw");
+		validate_group("peermask");
+		return;
+	}
+#endif
+	if(!$("#form").valid()) {
+		return;
+	}
+	// f.vpnserver.value = f.vpnserver1.value + "." + f.vpnserver2.value + "." + f.vpnserver3.value + "." + f.vpnserver4.value;
+	f.vpnserver.value = f.vpnserver_in.value;
+	f.greLocalAddr.value = f.localaddr1.value + "." + f.localaddr2.value + "." + f.localaddr3.value + "." + f.localaddr4.value;
+	f.greRemoteAddr.value = f.remoteaddr1.value + "." + f.remoteaddr2.value + "." + f.remoteaddr3.value + "." + f.remoteaddr4.value;
+	f.grePeerNwAddr.value = f.peernw1.value + "." + f.peernw2.value + "." + f.peernw3.value + "." + f.peernw4.value;
+	f.grePeerNwMask.value = f.peermask1.value + "." + f.peermask2.value + "." + f.peermask3.value + "." + f.peermask4.value;
+	try {
+		document.form.rdbCmd.value = "setEntry";
+		if (f.vpnenable.value == '1') {
+			if(!checkGreForm()) {
+				return;
+			}
+		}
+		value = parseInt(f.editindex.value);
+		if( st.length==0 || isNaN(value)==true || value < 0 || value >= st.length ) {
+			i = getNewLinkProfile();
+			if (isNaN(i)) {
+				return;
+			}
+		}
+		else if( isNaN(st[value].profilenum)==true ) {
+			validate_alert("",_("Msg94"));	//Error: Profile number incorrectly
+			return;
+		}
+		else {
+			i=st[value].profilenum;
+		}
+		submitGreForm();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function delentry( index ) {
+	try {
+		var f=document.form;
+		i=st[index].profilenum;
+		f.rdbCmd.value = "delEntry";
+		f.rdbBase.value=i;
+		$("button").attr("disabled",true);
+		f.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+/* This function parses the tunnel info structures and puts it into a tabular
+ * format for display.
+ */
+function GRElist() {
+	var tunnel_num = 0;
+
+	/* Display empty table if there are no entries */
+	if (st.length == 0) {
+		document.write("<br/><table class='empty above-5-column'>");
+		document.write("<thead><tr><th>" + _("greClientListEmpty")+ "</th></tr></thead>");
+		document.write("</table>");
+		return;
+	}
+
+	/* Display the headings for the table here */
+	document.write("<br/><table class='above-5-column'>");
+	document.write("<thead>");
+	document.write("<tr>");
+	document.write("<th class='align10'>#</th>");
+	document.write("<th class='align10'>"+_("name")+"</th>");
+	document.write("<th class='align10'>"+_("gre remote address")+"</th>");
+	document.write("<th class='align10'>"+_("local tunnel address")+"</th>");
+	document.write("<th class='align10'>"+_("remote tunnel address")+"</th>");
+	document.write("<th class='align10'>"+_("status")+"</th>");
+	document.write("<th class='align10'>"+_("edit")+"</th>");
+	document.write("<th></th>");
+	document.write("<tbody>");
+
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		if((st[i].type=="gre.0")) {
+			/* Display each row of data for the GRE tunnels */
+			tunnel_num ++;
+
+			document.write("<tr>");
+			document.write("<td>"+tunnel_num+"</td>");
+			document.write("<td>"+breakWord(st[i].name, 18, 1)+"</td>");
+			document.write("<td>"+breakWord(st[i].serveraddress, 20, 1)+"</td>");
+			document.write("<td>"+st[i].local_ipaddr+"</td>");
+			document.write("<td>"+st[i].remote_ipaddr+"</td>");
+			document.write("<td>"+(st[i].enable=='1'?'enabled':'disabled')+"</td>");
+#ifdef V_WEBIF_SPEC_vdf
+			document.write("<td><a class='secondary sml' href=\"javascript:clear_alert();showedit('edit',true,"+i+");\"><i class='icon edit'>"+_("edit")+"</i></a></td>");
+#else
+			document.write("<td><a class='secondary sml' style='padding:0;border:0;' href=\"javascript:clear_alert();showedit('edit',true,"+i+");\" title='"+_("edit")+"'><i class='icon edit'></i></a></td>");
+#endif
+			document.write("<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:delentry("+i+");' title='"+_("delete")+"'><i class='icon close'></i></a></td>");
+			document.write("</tr>");
+		}
+	}
+	document.write("</tbody>");
+	document.write("</table>");
+}
+
+function init_gre_edit_buttons(idx) {
+	var f=document.form;
+
+	load_values_to_elements( {
+		"input:radio.access[name=radio-1]":f.vpnenable.value=='1',
+		"input:radio.access[name=radio-3]":pppDebug = st[idx].verbose_logging,
+	});
+
+}
+
+function initGreForm(idx) {
+	var f=document.form;
+	f.vpnenable.value=st[idx].enable;
+	f.vpnserver.value=st[idx].serveraddress;
+	f.newname.value=st[idx].name;
+	f.greLocalAddr.value=st[idx].local_ipaddr;
+	f.greRemoteAddr.value=st[idx].remote_ipaddr;
+	f.grePeerNwAddr.value=st[idx].remote_nwaddr;
+	f.grePeerNwMask.value=st[idx].remote_nwmask;
+	f.reconnectDelay.value = st[idx].reconnect_delay;
+	f.reconnectRetries.value = st[idx].reconnect_retries;
+	f.pppdebug.value = st[idx].verbose_logging;
+	f.ttl.value = st[idx].ttl;
+	init_gre_edit_buttons(idx);
+
+	if (st[idx].enable=='1') {
+		$('#radio-1').attr("checked","checked");
+	} else {
+		$('#radio-2').attr("checked","checked");
+	}
+	if (st[idx].verbose_logging=='1') {
+		$('#radio-3').attr("checked","checked");
+	}
+	else {
+		$('#radio-4').attr("checked","checked");
+	}
+
+	//parse_ip(f.vpnserver, "vpnserver1", "vpnserver2", "vpnserver3", "vpnserver4");
+	$("#vpnserver_in").val(f.vpnserver.value);
+	parse_ip(f.greLocalAddr, "localaddr1", "localaddr2", "localaddr3", "localaddr4");
+	parse_ip(f.greRemoteAddr, "remoteaddr1", "remoteaddr2", "remoteaddr3", "remoteaddr4");
+	parse_ip(f.grePeerNwAddr, "peernw1", "peernw2", "peernw3", "peernw4");
+	parse_ip(f.grePeerNwMask, "peermask1", "peermask2", "peermask3", "peermask4");
+}
+
+/*
+ * Initialise a new empty form for creating a GRE tunnel
+ */
+function initEmptyForm(idx) {
+	var f=document.form;
+	// gre variables
+	f.vpnenable.value='1';
+	f.grePeerNwAddr.value="";
+	f.grePeerNwMask.value="";
+	f.greLocalAddr.value="";
+	f.greRemoteAddr.value="";
+	f.newname.value='';
+	f.vpnserver.value='';
+	f.reconnectDelay.value = "30";
+	f.reconnectRetries.value = "0";
+	f.ttl.value = '255';
+	f.pppdebug.value='0';
+}
+
+/*
+ * This function changes the page display to hide the table and show the input
+ * fields for creating a new tunnel.
+ */
+function showedit( myid, action, idx ) {
+	document.form.editindex.value=idx;
+	document.getElementById( myid+"Div" ).style['display']=action?"":"none";
+	document.getElementById( "listDiv" ).style['display']=action?"none":"";
+	document.getElementById( "saveDiv" ).style['display']=action?"":"none";
+
+	if( action ) {
+		initEmptyForm(idx);
+		if( idx < st.length ) {
+			initGreForm(idx);
+		}
+	}
+	else {
+		document.form.editindex.value=-1;
+	}
+}
+
+function readElement(elementName) {
+	var element;
+
+	element=document.getElementById(elementName);
+	if( (typeof(element)=="undefined") || (element==null) ) {
+		alert("not found - " + elementName);
+		return "";
+	}
+	return document.getElementById(elementName).value;
+}
+
+function enableElement(elementName,ena) {
+	document.getElementById(elementName).disabled=!ena;
+}
+
+function checkElement(elementName,check) {
+	document.getElementById(elementName).checked=check;
+}
+
+function showElement(elementName,show) {
+	document.getElementById(elementName).style['display']=show?"":"none";
+}
+
+
+function parse_ip(ip_addr, f1, f2, f3, f4) {
+	/* Parse the IP address for display */
+	var ip_array = new Array();
+	ip_array = ip_addr.value.split(".");
+	if(ip_array.length != 4 ){ip_array[0]='0';ip_array[1]='0';ip_array[2]='0';ip_array[3]='0';}
+	document.getElementById(f1).value=ip_array[0];
+	document.getElementById(f2).value=ip_array[1];
+	document.getElementById(f3).value=ip_array[2];
+	document.getElementById(f4).value=ip_array[3];
+
+}
+
+$(document).ready( function() {
+	var f = document.form;
+	/* Initialise which sections of the page to display */
+	var editIndex = f.editindex.value;
+	var curIndex = f.curindex.value;
+
+	load_values_to_elements( {
+		"input:radio.access[name=radio-1]":true,
+		"input:radio.access[name=radio-3]":true,
+	});
+	if( curIndex != "" && curIndex >= 0) {
+		showedit("edit",true, curIndex);
+	}
+	else if( editIndex == "") {
+		showedit("edit",false, 0);
+	}
+	else if( editIndex >=0 ) {
+		showedit("edit",true, editIndex);
+	}
+	else
+		showedit("edit",false, 0);
+
+});
+</script>
+
+<%
+function validateInput() {
+	validateOnOffRadio(form['vpnenable']);
+	var reconnectDelay = string_to_number(form['reconnectDelay']);
+	if (reconnectDelay < 30 || reconnectDelay > 65535) {
+		onBadRequest();
+	}
+	var reconnectRetries = string_to_number(form['reconnectRetries']);
+	if (reconnectRetries < 0 || reconnectRetries > 65535) {
+		onBadRequest();
+	}
+	var ttl = string_to_number(form['ttl']);
+	if (ttl < 0 || ttl > 255) {
+		onBadRequest();
+	}
+	validateOnOffRadio(form['pppdebug']);
+	validateIpAddress(form['greLocalAddr']);
+	validateIpAddress(form['greRemoteAddr']);
+	validateIpAddress(form['grePeerNwAddr']);
+	validateNetmask(form['grePeerNwMask']);
+}
+if (request['REQUEST_METHOD'] == "POST") {
+	cmd = form['rdbCmd'];
+	i=validate_number(form['rdbBase']);
+	rdbBase="link.profile."+i+".";
+	if( cmd == "delEntry" ) {
+		set_single_direct("-p",rdbBase+"enable","0");
+		set_single_direct("-p",rdbBase+"name","");
+		set_single_direct("-p",rdbBase+"delflag","1" );
+	} else {
+		validateInput();
+
+		set_single_direct("-p",rdbBase+"dev","gre.0");
+		set_single_direct("-p",rdbBase+"enable",form['vpnenable']);
+		set_single_direct("-p",rdbBase+"name",form['newname']);
+		set_single_direct("-p",rdbBase+"serveraddress",form['vpnserver']);
+		set_single_direct("-p",rdbBase+"reconnect_delay",form['reconnectDelay']);
+		set_single_direct("-p",rdbBase+"reconnect_retries",form['reconnectRetries']);
+		set_single_direct("-p",rdbBase+"ttl",form['ttl']);
+		set_single_direct("-p",rdbBase+"verbose_logging",form['pppdebug']);
+		set_single_direct("-p",rdbBase+"local_ipaddr",form['greLocalAddr']);
+		set_single_direct("-p",rdbBase+"remote_ipaddr",form['greRemoteAddr']);
+		set_single_direct("-p",rdbBase+"remote_nwaddr",form['grePeerNwAddr']);
+		set_single_direct("-p",rdbBase+"remote_nwmask",form['grePeerNwMask']);
+		set_single_direct("-p","service.vpn.gre.profile",i);
+		set_single_direct("-p",rdbBase+"delflag","0" );
+	}
+	redirect('/VPN_gre.html?success');
+}
+else { /*GET*/
+	//form['editindex'] = -1;
+}
+
+if(request['QUERY_STRING']!="" && request['QUERY_STRING']!="success") {
+	form['curindex'] = validate_number(request['QUERY_STRING']);
+}
+else {
+	form['curindex'] = -1;
+}
+%>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<div class="grid-9 alpha pppoeEnablesMsg" style="display:none">
+			<div class="note-lrg">
+				<div class="wrap alert clearfix">
+					<h2><script language=Javascript>document.write(_("pppoeEnabled"))</script></h2>
+					<p><script language=Javascript>document.write(_("functionNotAvailable"))</script></p>
+				</div>
+			</div>
+		</div>
+		<form name="form" id="form" class="validate hide_for_pppoe_en" method="POST" action="@@request['SCRIPT_NAME']">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<input type="hidden" name="editindex" value="@@form['editindex']">
+				<input type="hidden" name="curindex" value="@@form['curindex']">
+				<input type="hidden" name="sdefGwEnable" value="@@form['sdefGwEnable']">
+				<div id="listDiv">
+<!-- 				<div class="row"> -->
+					<div class="grid-33">
+						<div class="pad alpha" style="width:300px">
+							<h2><script language=Javascript>document.write(_("gre client list"))</script></h2>
+						</div>
+					</div>
+					<div class="grid-66">
+						<div class="pad omega">
+							<div class="submit-row-condensed">
+								<button type="button" class="secondary sml fr" onClick="javascript:clear_alert();showedit( 'edit', true, st.length )"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+							</div>
+						</div>
+					</div>
+<!-- 				</div> -->
+				<!-- Display a table of GRE tunnels -->
+				<script language="JavaScript">GRElist();</script>
+				</div>
+				<div id="editDiv" style="display:none">
+					<input type="hidden" name="vpnenable" id="vpnenable"/>
+					<input type="hidden" name="pppdebug">
+					<input type="hidden" name="rdbCmd"/>
+					<input type="hidden" name="rdbBase"/>
+					<input type="hidden" name="vpnserver" id="vpnserver"/>
+					<input type="hidden" name="greLocalAddr" id="greLocalAddr"/>
+					<input type="hidden" name="greRemoteAddr" id="greRemoteAddr"/>
+					<input type="hidden" name="grePeerNwAddr" id="grePeerNwAddr"/>
+					<input type="hidden" name="grePeerNwMask" id="grePeerNwMask"/>
+					<div class="row">
+						<div class="grid-33">
+							<div class="pad alpha">
+								<h2><script language=Javascript>document.write(_("gre client edit"))</script></h2>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_2144_pin">
+						<div class="form-row no-bg-form">
+							<label for="field-1"><script language=Javascript>document.write(_("enable vpn"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div id="vpnEnable" class="radio-switch">
+										<input type="radio" id="radio-1" name="radio-1" class="access" onClick="javascript:document.form.vpnenable.value=1">
+										<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="radio-2" name="radio-1" class="access" onClick="javascript:document.form.vpnenable.value=0">
+										<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="newname"><script language=Javascript>document.write(_("profile name"))</script></label>
+							<div class="field">
+								<input id="newname" type="text" name="newname" class="large" maxlength="128">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="field-2"><script language=Javascript>document.write(_("gre server address"))</script></label>
+							<div class="field">
+								<input id="vpnserver_in" type="text" name="vpnserver_in" class=" validate[required] large required" maxlength="128">
+							</div>
+							<!-- <script language=javascript>htmlGenIpBlocks("vpnserver");</script> -->
+						</div>
+						<div class="form-row">
+							<label for="localaddr1"><script language=Javascript>document.write(_("local tunnel address"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("localaddr");</script>
+						</div>
+						<div class="form-row">
+							<label for="remoteaddr1"><script language=Javascript>document.write(_("remote tunnel address"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("remoteaddr");</script>
+						</div>
+						<div class="form-row">
+							<label for="peernw1"><script language=Javascript>document.write(_("remoteNetworkAddress"))</script></label>
+							<script language=javascript>htmlGenIpBlocks("peernw");</script>
+						</div>
+						<div class="form-row">
+							<label for="peermask1"><script language=Javascript>document.write(_("remoteNetworkMask"))</script></label>
+							<script language=javascript>htmlGenMaskBlocks("peermask");</script>
+						</div>
+						<div class="form-row">
+							<label for="ttl"><script language=Javascript>document.write(_("TTL"))</script></label>
+							<div class="field">
+								<input id="ttl" type="text" name="ttl" class="validate[required,funcCall[validate_ttl]] sml required ttl" maxlength=3 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;(0-255)</span>
+							</div>
+						</div>
+						<div class="form-row no-bg-form">
+							<label for="logging_enable"><script language=Javascript>document.write(_("verbose logging"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div id="logging_enable" class="radio-switch">
+										<input type="radio" id="radio-3" name="radio-3" class="access" onClick="javascript:document.form.pppdebug.value=1">
+										<label for="radio-3" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="radio-4" name="radio-3" class="access" onClick="javascript:document.form.pppdebug.value=0">
+										<label for="radio-4" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="reconnectDelay"><script language=Javascript>document.write(_("reconnectDelay"))</script></label>
+							<div class="field">
+								<input id="reconnectDelay" type="text" name="reconnectDelay" class="validate[required,funcCall[validate_reconnectDelay]] sml required reconnectDelay" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("thirtyTo65535secs"))</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="reconnectRetries"><script language=Javascript>document.write(_("reconnectRetries"))</script></label>
+							<div class="field">
+								<input id="reconnectRetries" type="text" name="reconnectRetries" class="validate[required,funcCall[validate_reconnectRetries]] sml required reconnectRetries" maxlength=5 onkeyup=NumfieldEntry(this);>
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("zTo65535Unlimited"))</script></span>
+							</div>
+						</div>
+					</div>
+					<div id="saveDiv" class="submit-row" style="display:none">
+						<button name="saveButton" type="button" onClick="javascript:submitForm()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+						<button name="exitButton" class="secondary" type="button" onClick="javascript:exitHandler()"><script language=Javascript>document.write(_("exit"))</script></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='JavaScript'>
+        set_menu("Internet", "GRE", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["ttl"]=_("Msg93");
+	$.validator.addMethod("ttl",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 255 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.ttl);
+
+	VALIDATOR.config.errors["reconnectDelay"]=_("Msg91");
+	$.validator.addMethod("reconnectDelay",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 30 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.reconnectDelay);
+
+	VALIDATOR.config.errors["reconnectRetries"]=_("Msg92");
+	$.validator.addMethod("reconnectRetries",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 0 || c > 65535 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.reconnectRetries);
+#else
+/********* NTC ValidationEngine **********/
+function validate_ttl(field) {
+	if( field.val() < 0 || field.val() > 255 || !isAllNum(field.val()) ) {
+		return _("Msg93");
+	}
+}
+function validate_reconnectDelay(field) {
+	if( field.val() < 30 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("Msg91");
+	}
+}
+function validate_reconnectRetries(field) {
+	if( field.val() < 0 || field.val() > 65535 || !isAllNum(field.val()) ) {
+		return _("Msg92");
+	}
+}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('vpngreSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

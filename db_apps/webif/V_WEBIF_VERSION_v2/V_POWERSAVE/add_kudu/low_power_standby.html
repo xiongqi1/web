@@ -1,0 +1,470 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Power Management</title>
+
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	tempval = form['powerprofile1triggerH'];
+	retval = set_single( 'power.profile.1.trigger='+tempval, '-p' );
+	tempval = form['powerprofile2triggerH'];
+	retval = set_single( 'power.profile.2.trigger='+tempval, '-p' );
+	tempval = form['powerprofile3triggerH'];
+	retval = set_single( 'power.profile.3.trigger='+tempval, '-p' );
+	tempval = form['powerprofile4triggerH'];
+	retval = set_single( 'power.profile.4.trigger='+tempval, '-p' );
+	tempval = form['powerprofile5triggerH'];
+	retval = set_single( 'power.profile.5.trigger='+tempval, '-p' );
+	tempval = form['powerprofile6triggerH'];
+	retval = set_single( 'power.profile.6.trigger='+tempval, '-p' );
+	tempval = form['wakeupafterH'];
+	syslog(7, "wakeupafterH="+tempval);
+	retval = set_single( 'service.powersave.wakeupafter='+tempval, '-p' );
+	tempval = form['sleepgranularity'];
+	retval = set_single( 'service.powersave.sleepgranularity='+tempval, '-p' );
+	redirect('/low_power_standby.html?success');
+}
+else { /*GET*/
+
+	form['powerprofile1triggerH'] = get_single( 'power.profile.1.trigger' );
+	form['powerprofile2triggerH'] = get_single( 'power.profile.2.trigger' );
+	form['powerprofile3triggerH'] = get_single( 'power.profile.3.trigger' );
+	form['powerprofile4triggerH'] = get_single( 'power.profile.4.trigger' );
+	form['powerprofile5triggerH'] = get_single( 'power.profile.5.trigger' );
+	form['powerprofile6triggerH'] = get_single( 'power.profile.6.trigger' );
+
+	form['sleepM1H'] = get_single( 'power.profile.1.sleepmode' );
+	form['sleepM2H'] = get_single( 'power.profile.2.sleepmode' );
+	form['sleepM3H'] = get_single( 'power.profile.3.sleepmode' );
+	form['sleepM4H'] = get_single( 'power.profile.4.sleepmode' );
+	form['sleepM5H'] = get_single( 'power.profile.5.sleepmode' );
+	form['sleepM6H'] = get_single( 'power.profile.6.sleepmode' );
+
+	form['wakeM1H'] = get_single( 'power.profile.1.wakemode' );
+	form['wakeM2H'] = get_single( 'power.profile.2.wakemode' );
+	form['wakeM3H'] = get_single( 'power.profile.3.wakemode' );
+	form['wakeM4H'] = get_single( 'power.profile.4.wakemode' );
+	form['wakeM5H'] = get_single( 'power.profile.5.wakemode' );
+	form['wakeM6H'] = get_single( 'power.profile.6.wakemode' );
+
+}
+%>
+<script language="JavaScript">
+var max_uprof=1;
+var MaxUProf=7;
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+	if(!$("#form").valid()) {
+		validate_alert("","");
+		return;
+	}
+#else
+ if(!$("#form").validationEngine("validate")) {
+  validate_alert("","");
+  return;
+ }
+#endif
+ en=$("input:radio.access[name=lpm_enable]:checked").val();
+
+ switch ( $("#wakeMode").val() ) {
+  case "1": //Only wake after specified duration and ignore ignition pin
+   v1="ignore";
+   v1v=0;
+   v2="ignore";
+   v2v=0;
+  break;
+  case "2": //Wake triggered by ignition pin status
+   v1="ignore";
+   v1v=0;
+   v2=$("input:radio.access[name=wakeIgnition]:checked").val();
+   v2v=100;
+   $("#guard").val("4294967");
+  break;
+  case "3": //Advanced
+   v1=$("input:radio.access[name=c1]:checked").val();
+   v1v=(v1=="ignore")?0:$("#v1").val();
+   v2=$("input:radio.access[name=c2]:checked").val();
+   v2v=(v2=="ignore")?0:$("#v2").val();
+  break;
+ }
+
+ switch ( $("#sleepMode").val() ) {
+  case "1": //Sleep by manual trigger only
+   sleepIgnition="ignore";
+   sleepTimer="-1"
+  break;
+  case "2": //Sleep after specified duration and ignore ignition pin
+   sleepIgnition="ignore";
+   sleepTimer=parseInt($("#sleepTimer").val())*100;
+
+  break;
+  case "3": //Sleep triggered by ignition pin status
+   sleepIgnition=$("input:radio.access[name=sleepIgnition]:checked").val();
+   sleepTimer="-1"
+  break;
+  case "4": //Sleep after specified duration or triggered by ignition pin
+   sleepIgnition=$("input:radio.access[name=sleepIgnition]:checked").val();
+   sleepTimer=parseInt($("#sleepTimer").val())*100;
+  break;
+ }
+ document.form.submit();
+ rdbCmd="power.switch.Standby="+en+" -p&power.switch.Standby.options=\""+v1+","+v1v+","+v2+","+v2v+","+$("#guard").val()+":"+$("#wakeMode").val()+":"+sleepIgnition+","+sleepTimer+":"+$("#sleepMode").val()+"\" -p";
+ $.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+rdbCmd, function() {
+  $.get("/cgi-bin/power_profile.cgi?<%appendCsrfTokenToQueryString();%>cmd=setup", function() {window.location.href="/low_power_standby.html?success"});
+ });
+}
+
+function check_default(idx) {
+ if( $("#user_pprofile"+(idx-1)+"-1").is(":checked") ) {
+  if(checkEnabledProfiles() && emulator_en) {
+   load_value_to_element($("input:radio[name=pppAutoCon"+(def_profile-1)+"]"), false);
+   stpf[def_profile-1].enable=0;
+  }
+  else if(checkEnabledProfiles()>=max_enabled_profiles) {
+   load_value_to_element($("input:radio[name=pppAutoCon"+(def_profile-1)+"]"), false);
+   stpf[def_profile-1].enable=0;
+  }
+  load_value_to_element($("input:radio[name=pppAutoCon"+(idx-1)+"]"), true);
+  stpf[idx-1].enable=1;
+ }
+ def_profile=idx;
+}
+
+function check_enable(idx, val) {
+ current_en=checkEnabledProfiles();
+ if( val==1 && stpf[idx].enable!=1 && current_en>0 && emulator_en ) {
+  blockUI_alert(_("enableMultiProfileWarning1"));
+  el="input:radio.access[name=pppAutoCon"+idx+"]";
+  load_value_to_element(el,false);
+ }
+ else if( val==1 && stpf[idx].enable!=1 && current_en>=max_enabled_profiles ) {
+  blockUI_alert(_("maxEnabledProfilesExceeded"));
+  el="input:radio.access[name=pppAutoCon"+idx+"]";
+  load_value_to_element(el,false);
+ }
+ else {
+  clear_alert();
+  stpf[idx].enable=val;
+  if(val==0 && $("input[name=def_profile]:checked").val()==(idx+1)) {
+   for( i=0; i<stpf.length; i++ ) {
+    if(stpf[i].enable == 1) {
+     document.form.def_profile[i].checked=true;
+     def_profile=i+1;
+     break;
+    }
+   }
+  }
+  else if(current_en==0) {
+   def_profile=idx+1;
+   document.form.def_profile[idx].checked=true;
+  }
+ }
+}
+
+function update_whitelist() {
+ var h="";
+ var diplay_style="";
+ var hide="";
+    for(i=0,j=0; i<DiagUserNo.length; i++) {
+  j++;
+  h+="<tr id='whitelist"+i+"' style='display:"+hide+"'>";
+  if (j < 10)
+   h+="<td style='text-align:center'> 0"+j+"</td>";
+  else
+   h+="<td style='text-align:center'>"+j+"</td>";
+  h+="<td style='text-align:center'>";
+  h+="<input type='text' id='DiagUserNo"+i+"' value='"+DiagUserNo[i]+"' onkeyup='check_phoneRegex(this)'/></td>";
+  h+="<td style='text-align:center'>";
+  h+="<input type='text' id='DiagPassword"+i+"' value='"+DiagPassword[i]+"' onKeyUp='nameFilter(this);'/></td>";
+  h+="<td style='padding-right:0'>";
+  h+="<button type='button' class='secondary sml' name='delete_wl' onclick='DeleteWhiteList("+i+")' style='padding:0;border:0'><i class='icon close'></i></button>";
+  h+="</td>";
+  h+="</tr>";
+ }
+ $("#white_list").html(h);
+ for(i=DiagUserNo.length-1; i>=0; i--) {
+  if(DiagUserNo[i]=="") {
+   $("#whitelist"+i).css("display", "none");
+  }
+  else {
+   break;
+  }
+ }
+ if(i<0) {
+  $("#whitelistEmpty").css("display", "");
+  $("#whitelistTitle").css("display", "none");
+ }
+ else {
+  $("#whitelistEmpty").css("display", "none");
+  $("#whitelistTitle").css("display", "");
+ }
+ max_wl_tx_dst_idx=i;
+}
+
+function DecreaseWlMaxTxDstIdx(idx) {
+ var i;
+ for(i=idx; i<max_uprof; i++) {
+  //$("#DiagUserNo"+i).val( $("#DiagUserNo"+(i+1)).val());
+  //$("#DiagPassword"+i).val( $("#DiagPassword"+(i+1)).val());
+ }
+ $("#whitelist"+max_wl_tx_dst_idx).css("display", "none");
+ max_uprof--;
+ $("#DiagUserNo"+i).val('');
+ $("#DiagPassword"+i).val('');
+ if($("#DiagUserNo0").val()=="" && $("#DiagPassword0").val()=="") {
+  $("#whitelistEmpty").css("display", "");
+  $("#whitelistTitle").css("display", "none");
+ }
+}
+
+function IncreaseWlMaxTxDstIdx() {
+ if (max_uprof >= parseInt(MaxUProf)) {
+  validate_alert("", _("sms warning03"));
+  return;
+ }
+ $("#profileListEmpty").css("display", "none");
+ $("#whitelistTitle").css("display", "");
+ clear_alert();
+ max_uprof++;
+ $("#powerProfile"+max_uprof).css("display", "");
+ //$("#DiagUserNo"+max_wl_tx_dst_idx).focus();
+ init_list();
+}
+
+function init_list1() {
+var h="";
+ for( i=1; i<7; i++ ) {
+  h+= "<tr id='powerProfile"+i+"'><td class='first'>PowerProfile"+i+"</td>";
+  h+= "<td>"
+  h+='<div class="location-settings radio-switch">         <input type="radio" id="uprof'+i+'-0" name="uprof'+i+'" class="access" onClick="document.form.powerprofile'+i+'triggerH.value=1" value=1';
+
+
+  h+='><label for="uprof'+i+'-0" class="on">'+_("on")+'</label><input type="radio" id="uprof'+i+'-1" name="uprof'+i+'" class="access" onClick="document.form.powerprofile'+i+'triggerH.value=0" value=0';
+
+  h+='><label for="uprof'+i+'-1" class="off">'+_("off")+'</label></div>';
+
+  h+= "</td><td class='last'><a class='secondary sml' style='padding:0;border:0;' href='Power_Profile_Settings.html?profileidx="+i+"' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+  h+= "</td><td class='last'><a class='secondary sml' style='padding:0;border:0;' href='Power_Profile_Settings.html?profileidx="+i+"' title='"+"close"+"'><i class='icon close'></i></a></td>";
+  //h+= '<td><button type="button" class="secondary sml" onclick="DecreaseWlMaxTxDstIdx("+i+")"><i class="icon close"></i></button></td></tr>';
+ }
+ $("#TBlist").html(h);
+ $.get("/js/selectivizr.js");
+}
+
+function init_list() {
+var h="";
+ var a=[
+ <%
+   var pname;
+   for (var i = 1; i < 6; i++) {
+      pname=get_single("power.profile."+i+".profilename")
+ %>
+ "@@pname",
+ <%
+ }
+ %>
+ ];
+ for( i=1; i<6; i++ ) {
+  h+= "<tr id='powerProfile"+i+"'><td class='first'>"+a[i-1]+"</td>";
+  h+= "<td>"
+  h+='<div class="location-settings radio-switch">         <input type="radio" id="uprof'+i+'-0" name="uprof'+i+'" class="access" onClick="document.form.powerprofile'+i+'triggerH.value=1" value=1';
+
+  h+='><label for="uprof'+i+'-0" class="on">'+_("on")+'</label><input type="radio" id="uprof'+i+'-1" name="uprof'+i+'" class="access" onClick="document.form.powerprofile'+i+'triggerH.value=0" value=0';
+
+  h+='><label for="uprof'+i+'-1" class="off">'+_("off")+'</label></div>';
+
+  h+= "</td>"
+  h+= "<td><span class='normal-text' id='sleepM"+i+"'></span></td>"
+  h+= "<td><span class='normal-text' id='wakeM"+i+"'></span></td>"
+#ifdef V_WEBIF_SPEC_vdf
+  h+="<td class='last'><a class='secondary sml' href='Power_Profile_Settings.html?profileidx="+i+"' title='"+_("edit")+"'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+  h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='Power_Profile_Settings.html?profileidx="+i+"' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+  //h+= '<td><button type="button" class="secondary sml" onclick="DecreaseWlMaxTxDstIdx("+i+")"><i class="icon close"></i></button></td></tr>';
+  //h+= "</td><td class='last'><a class='secondary sml' style='padding:0;border:0;' href='low_power_standby.html?profileidx="+i+"' title='"+"close"+"'><i class='icon close'></i></a></td>";
+ }
+ $("#TBlist").html(h);
+ $.get("/js/selectivizr.js");
+}
+
+$(document).ready( function() {
+ var i;
+ init_list();
+ for( i=1; i<6; i++ ) {
+  if($("#powerprofile"+i+"triggerH").val()=='1') {
+    $("#uprof"+i+"-0").attr("checked", "checked");
+    if($("#sleepM"+i+"H").val()=='1') {
+      $("#sleepM"+i).html("Timer");
+    }
+    else if($("#sleepM"+i+"H").val()=='3') {
+      $("#sleepM"+i).html("Scheduled");
+    }
+    else if($("#sleepM"+i+"H").val()=='4') {
+      $("#sleepM"+i).html("Ignition");
+    }
+
+    if($("#wakeM"+i+"H").val()=='2') {
+      $("#wakeM"+i).html("Ignition");
+    }
+    else if($("#wakeM"+i+"H").val()=='3') {
+      $("#wakeM"+i).html("Scheduled");
+    }
+  }
+  else {
+    $("#uprof"+i+"-1").attr("checked", "checked");
+  }
+ }
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+ <aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+ <div class="grid-9 omega">
+  <form class="validate" name="form" id ="form" novalidate="novalidate" method="POST" >
+  <%appendCsrfToken();%>
+  <div class="right-column white-box" id="boot_setup">
+   <div class="pad">
+    <h2><script language=Javascript>document.write(_("powerManagement"))</script></h2>
+    <div class="p-des-full-width">
+     <!-- <p><script language=Javascript>document.write("This device can be configured to enter or return from a low power sleep mode.It can be scheduled or triggered via wired ignition input pin.")</script></p> -->
+    </div>
+
+     <input type="hidden" name="powerprofile1triggerH" id="powerprofile1triggerH" value="@@form['powerprofile1triggerH']"/>
+     <input type="hidden" name="powerprofile2triggerH" id="powerprofile2triggerH" value="@@form['powerprofile2triggerH']"/>
+     <input type="hidden" name="powerprofile3triggerH" id="powerprofile3triggerH" value="@@form['powerprofile3triggerH']"/>
+     <input type="hidden" name="powerprofile4triggerH" id="powerprofile4triggerH" value="@@form['powerprofile4triggerH']"/>
+     <input type="hidden" name="powerprofile5triggerH" id="powerprofile5triggerH" value="@@form['powerprofile5triggerH']"/>
+     <input type="hidden" name="powerprofile6triggerH" id="powerprofile6triggerH" value="@@form['powerprofile6triggerH']"/>
+
+     <input type="hidden" name="sleepM1H" id="sleepM1H" value="@@form['sleepM1H']"/>
+     <input type="hidden" name="sleepM2H" id="sleepM2H" value="@@form['sleepM2H']"/>
+     <input type="hidden" name="sleepM3H" id="sleepM3H" value="@@form['sleepM3H']"/>
+     <input type="hidden" name="sleepM4H" id="sleepM4H" value="@@form['sleepM4H']"/>
+     <input type="hidden" name="sleepM5H" id="sleepM5H" value="@@form['sleepM5H']"/>
+     <input type="hidden" name="sleepM6H" id="sleepM6H" value="@@form['sleepM6H']"/>
+
+     <input type="hidden" name="wakeM1H" id="wakeM1H" value="@@form['wakeM1H']"/>
+     <input type="hidden" name="wakeM2H" id="wakeM2H" value="@@form['wakeM2H']"/>
+     <input type="hidden" name="wakeM3H" id="wakeM3H" value="@@form['wakeM3H']"/>
+     <input type="hidden" name="wakeM4H" id="wakeM4H" value="@@form['wakeM4H']"/>
+     <input type="hidden" name="wakeM5H" id="wakeM5H" value="@@form['wakeM5H']"/>
+     <input type="hidden" name="wakeM6H" id="wakeM6H" value="@@form['wakeM6H']"/>
+
+    <!-- <div style="padding:15px 0 60px 20px; width:660px;">
+     <label for="field-1"><script language=Javascript>document.write(_("lpmFunctionality"))</script></label>
+     <div class="field">
+      <div class="location-settings">
+       <div id="lpm_enable-div" class="radio-switch">
+        <input type="radio" id="lpm_enable-0" name="lpm_enable" class="access" value="1">
+        <label for="lpm_enable-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+        <input type="radio" id="lpm_enable-1" name="lpm_enable" class="access" value="0">
+        <label for="lpm_enable-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+       </div>
+      </div>
+     </div>
+    </div> -->
+    <div id="lpm-toggle-div">
+     <!-- <b><script language=Javascript>document.write("Sleep Granularity")</script></b> -->
+     <div style="padding:15px 0 0 20px; width:660px;">
+      <div class="form-row">
+      <!-- <div class="field">
+      <div class="radio-box-group" style="width:auto">
+             <div class="radio-box">
+                    <input type="radio" name="gransel" class="access" id="gransel-1" onClick="$('#usergran').css('display', 'none');$('#profiles-div').css('display', '');$('#allothersettings-div').css('display', 'none');" value="1">
+                           <label for="gransel-1"><div class="radiotext"><script language=Javascript>document.write("User")</script></div></label>
+             </div>
+             <div class="radio-box">
+                    <input type="radio" name="gransel" class="access" id="gransel-0" onClick="$('#usergran').css('display', 'none');$('#profiles-div').css('display', 'none');$('#allothersettings-div').css('display', '');" value="0">
+                           <label for="gransel-0"><div class="radiotext"><script language=Javascript>document.write("Processor")</script></div></label>
+             </div>
+      </div>
+      </div> -->
+    <div class="pad" id="profiles-div">
+    <h2><script language=Javascript>document.write(_("profile name"))</script></h2>
+    <table class="name-list">
+     <colgroup>
+      <col width="170px">
+      <col width="120px">
+      <col width=auto>
+      <col width=auto>
+      <col width=auto>
+     </colgroup>
+     <thead>
+      <tr>
+       <th></th>
+       <th style="padding-right:8px;"><script language=Javascript>document.write(_("status"))</script></th>
+       <th style="padding-right:8px;"><script language=Javascript>document.write(_("sleepMode"))</script></th>
+       <th style="padding-right:8px;"><script language=Javascript>document.write(_("wakeMode"))</script></th>
+       <th></th>
+      </tr>
+     </thead>
+
+     <tbody id="profileListEmpty" style="display:none"><tr><th colspan=4 style='text-align:center'><script language=Javascript>document.write("Profile List is Empty")</script></th></tr></tbody>
+     <tbody id="TBlist"></tbody>
+    </table>
+   </div>
+<!-- taken to Profile_Settings.html -->
+    <!-- <div class="p-des-full-width" id="allothersettings-div" style="padding:15px 0 0 20px; width:660px;">
+      <div class="form-row" id="guard2_time-div">
+       <label for="wakeupafterH"><script language=Javascript>document.write(_("wakeUpAfter"))</script></label>
+       <div class="field">
+        <input type="wakeupafterH" name="wakeupafterH" id="wakeupafterH" class="validate[required] required large" value="@@form['wakeupafterH']">
+        <span class="normal-text">&nbsp;<script language=Javascript>document.write("&nbsp;&nbsp;seconds")</script></span>
+       </div>
+      </div>
+     </div> -->
+    <div class="submit-row" style="margin-left:252px;">
+     <button type="button" onClick="submitForm()" style="margin-left:0"><script language=Javascript>document.write(_("CSsave"))</script></button>
+    </div>
+   </div>
+  </div>
+  </form>
+ </div>
+</div></div></div>
+
+<footer class="footer">
+ <div class="container">
+  <p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+ </div>
+</footer>
+
+<script language='javascript'>
+#ifdef V_WEBIF_SPEC_vdf
+ set_menu("Services", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#else
+ set_menu("System", "POWERSAVE", <%_val = session["user"];%>"@@_val");
+#endif
+<% if(request['QUERY_STRING']=="success") {%>
+  success_alert("","");
+<% }%>
+
+function validate_v1v2(field) {
+ if( field.val() < 0 || field.val() > 65535 ) {
+  return _("zTo65535warningMeg");
+ }
+}
+function validate_timer(field) {
+ if( field.val() < 0 || field.val() > 4294967 ) {
+  return _("zTo4294967warningMeg");
+ }
+}
+function validate_sleep(field) {
+ if( field.val() < 300 || field.val() > 4294967 ) {
+  return _("sleepTimerWarningMeg");
+ }
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/login.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>System Utility</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("system_utility");
+var f_uploaded="<%v=get_single('upload.target_filename');%>@@v";
+if(f_uploaded=="N/A")
+	f_uploaded="";
+
+function submitF1() {
+	var wfmess=_("apn file error");//"Error: Wrong APN xml file!";
+	var f = document.form1;
+	if(f.uploadFile1.value.length == 0){ alert(_("system warningMsg02")); return;}
+	var f1=f.uploadFile1.value;
+	var buffer;
+
+	if( ( f1.indexOf(".xml") == -1 )&&( f1.indexOf(".XML") == -1 ) ) { 
+		alert(wfmess);
+		return;
+	}
+	try {
+		f.btImport.disabled=true;
+		f.submit();	
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+function submitF3() {
+	var wfmess=_("system default file error");//"Error: Wrong system default file!";
+	var f = document.form3;
+	if(f.uploadFile3.value.length == 0){ alert(_("system warningMsg02")); return;}//"Please enter a file"
+	var f1=f.uploadFile3.value;
+	var buffer;
+
+	if( ( f1.indexOf(".conf") == -1 )&&( f1.indexOf(".CONF") == -1 ) ) { 
+		alert(wfmess);
+		return;
+	}
+	try {
+		f.btImport.disabled=true;
+		f.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+function submitF4() {
+var f = document.form4;
+	while(f.syslogServer.value.substring(0,1)==" ") {
+		f.syslogServer.value=f.syslogServer.value.substring(1,f.syslogServer.value.length);
+	}
+	f.submit();
+}
+
+function submitF5() {
+var f = document.form5;
+
+	if(f.uploadFile5.value.length == 0){ alert(_("system warningMsg02")); return;}//"Please enter a file"
+	var f1=f.uploadFile5.value;
+	var buffer;
+
+	f.btWebImport.disabled=true;
+	f.submit();
+
+}
+
+$(document).ready(function() {
+	if(document.form2.apndropdown.value=='1')
+		document.form2.apnShow[0].checked=true;
+	else
+		document.form2.apnShow[1].checked=true;
+	document.form1.btImport.value=_("setman import setting import");
+	document.form2.btApply.value=_("apply");
+	document.form3.btImport.value=_("setman import setting import");
+	document.form4.btImport.value=_("apply");
+	document.form5.btWebImport.value=_("setman import setting import");
+	if(f_uploaded!="") {
+		$.get("/cgi-bin/file_action.cgi?I&"+f_uploaded);
+	}
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("system utility"));</script></h3>
+<br/>
+
+<form name="form1" method="POST" action="@@request['SCRIPT_NAME']?form1" encType="multipart/form-data">
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("ex im apn"));</script></th></tr>
+</table>
+<table width="85%">
+<tr> 
+<td colspan="3" align="center" height="40px"><a href="/apnList.xml" style='text-decoration:underline;'><script language="JavaScript">document.write(_("ex apn"));</script></a></td>
+</tr>
+<tr> 
+<td width="15%" align="center" height="40px"><script language="JavaScript">document.write(_("im apn"));</script></td>
+<td width="40%"> <input type=file height="40" size="35" name="uploadFile1"> </td>
+<td width="30%" align="center" ><input type="button" name="btImport" onclick="javascript:submitF1();" value="Import"></input></td>
+</tr>
+</table>
+</form>
+
+<form name="form2" class="content" method="POST" action="@@request['SCRIPT_NAME']?form2">
+<input type="hidden" name="apndropdown" value="@@form['apndropdown']"/>
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("hide show apn"));</script></th></tr>
+</table>
+<table width="85%">
+<tr> 
+	<td width="25%" height="40px"><script language="JavaScript">document.write(_("hide show apn"));</script></td>
+	<td width="30%" align="center"><input type=radio name='apnShow' onclick="document.form2.apndropdown.value='1'">&nbsp;<script language="JavaScript">document.write(_("show"));</script>&nbsp;&nbsp;
+	<input type=radio name='apnShow' onclick="document.form2.apndropdown.value='0'" >&nbsp;<script language="JavaScript">document.write(_("hide"));</script></td>
+	<td width="30%" align="center"><input type="submit" name="btApply" value="Apply"></td>
+</tr>
+</table>
+</form>
+
+<form name="form3" method="POST" action="@@request['SCRIPT_NAME']?form3" encType="multipart/form-data">
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("ec im default"));</script></th></tr>
+</table>
+<table width="85%">
+<tr>
+	<td colspan="3" align="center" height="40px">
+	<b style="color:#FF0000"><script language="JavaScript">document.write(_("util msg1"));</script></b>
+	</td>
+</tr>
+<tr> 
+<td colspan="3" align="center" height="40px"><a href="/default.conf" style='text-decoration:underline;'><script language="JavaScript">document.write(_("export default settings"));</script></a></td>
+</tr>
+<tr> 
+<td width="15%" align="center" height="40px"><script language="JavaScript">document.write(_("import default settings"));</script></td>
+<td width="40%"><input type=file height="40" size="35" name="uploadFile3"></td>
+<td width="30%" align="center" ><input type="button" name="btImport" onclick="javascript:submitF3();" value="Import"></input></td>
+</tr>
+</table>
+</form>
+
+<form name="form4" method="POST" action="@@request['SCRIPT_NAME']?form4" >
+<table width="85%">
+	<tr><th><script language="JavaScript">document.write(_("remote syslog server"));</script></th></tr>
+</table>
+<table width="85%"> 
+<td width="15%" align="center" height="40px"><script language="JavaScript">document.write(_("ip hostname"));</script></td>
+<td width="40%"><input type=input size="35" name="syslogServer"  value="@@form['syslogServer']"> </td>
+<td width="30%" align="center" ><input type="button" name="btImport" onclick="javascript:submitF4();" value="Apply"></input></td>
+</tr>
+</table>
+</form>
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if( request["QUERY_STRING"]=='form1' ) {
+		for (f in files) {
+			var filename = files[f].FILENAME;
+			target = '/opt/cdcs/upload/apnList.xml';
+			rename(files['uploadFile1'].FILENAME, target);
+		}
+	}
+	else if(request["QUERY_STRING"]=='form2') {
+		tempval = form['apndropdown'];
+		set_single( 'webinterface.3gwwan_apndropdown='+tempval );
+	}
+	else if( request["QUERY_STRING"]=='form3' ) {
+		for (f in files) {
+			var filename = files[f].FILENAME;
+			target = '/opt/cdcs/upload/default.conf';
+			rename(files['uploadFile3'].FILENAME, target);
+		}
+	}
+	else if( request["QUERY_STRING"]=='form4' ) {
+		tempval = form['syslogServer'];
+		set_single( 'service.syslog.option.remote='+tempval );
+	}
+	redirect('/system_utility.html');
+}
+else { //GET
+	form['apndropdown'] = get_single( 'webinterface.3gwwan_apndropdown' );
+	form['syslogServer'] = get_single( 'service.syslog.option.remote' );
+}
+%>
+</html>

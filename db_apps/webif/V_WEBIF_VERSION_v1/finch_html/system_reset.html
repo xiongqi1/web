@@ -1,0 +1,70 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>System | Configuration Tools | Reset</title>
+</head>
+<script language="JavaScript" src="stdlibjs.htm"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("admin");
+function doConfirm()
+{
+	if(confirm(_("rebootConfirm") ))/*NOTE - It may take some time to complete this process and restart the system.\nDo you really want to reboot ??*/
+	{
+		document.form.submit();
+	}
+}
+
+</script>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+        retval = set_single( 'service.system.reset=1' ); 
+	} 
+%>
+
+<form name='form' class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<!--<h3>System > Reset</h3>-->
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("reset"));</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+
+<table width="75%"><tr><th>&nbsp;</th></tr></table>
+
+<table border="0" cellspacing="1" cellpadding="5" width="75%">
+<tr align="left"> 
+	<td height="33" colspan="2">&nbsp;</td>
+</tr>
+
+<tr align="center"> 
+<!--    <td colspan="2" ><p style="font-size:12px">To perform the reboot, click on the "Reboot" button below. You will be asked to confirm your decision.<br/>The reset will take about 90 seconds.</p></td>-->
+    <td colspan="2" ><p style="font-size:12px">
+      <script language="JavaScript">document.write(_("rebootRequest"));</script><br/>
+      <script language="JavaScript">document.write(_("rebootTime"));</script></p>
+    </td>
+</tr>
+
+<tr align="left"> 
+    <td colspan="2"> <div align="center"> 
+    <input name="button" type="button" onClick="doConfirm()" value="Reboot">
+    </div></td>
+</tr>
+</table>
+
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<p></p>
+<!--div align="right" style="margin-right:25% "><INPUT TYPE="Button" VALUE="Help" id="bottomButton" onClick="window.open('help.htm#reset')"></div-->
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.form.button.value="   "+_("setman reboot")+"   ";
+</script>
+</body>
+</html>

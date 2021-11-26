@@ -1,0 +1,267 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>TR-069</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<body>
+<script language="JavaScript" src="/util.js"></script>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("TR069");
+function greyOutFields() {
+	var f=document.form;
+	// if tr069 is disabled then grey out the fields
+	f.ACSURL.disabled=true;
+	f.periodicEnable[0].disabled=true;
+	f.periodicEnable[1].disabled=true;
+	f.periodic_interval.disabled=true;
+	f.username.disabled=true;
+	f.password.disabled=true;
+	f.Vpassword.disabled=true;
+}
+
+function ungreyOutFields() {
+	var f=document.form;
+	f.ACSURL.disabled=false;
+	f.periodicEnable[0].disabled=false;
+	f.periodicEnable[1].disabled=false;
+	if(f.periodicEnable[1].checked==true)
+		f.periodic_interval.disabled=true;
+	else
+		f.periodic_interval.disabled=false;
+	f.username.disabled=false;
+	f.password.disabled=false;
+	f.Vpassword.disabled=false;
+}
+
+function checkGreyOut() {
+	var f=document.form;
+	if(f.tr069Enable[0].checked==true)
+		ungreyOutFields();
+	else
+		greyOutFields();
+}
+
+function submitF() {
+	var f=document.form;
+	ungreyOutFields();
+	if (f.tr069_enable.value=='1') {
+		if ( f.ACSURL.value == "" ) {
+			alert(_("Msg118"));//Error: no ACS URL entered.
+			checkGreyOut();
+			return;
+		}
+		if (f.username.value == "") {
+			alert(_("Msg119"));//Error: no ACS Username entered.
+			f.username.select();
+			checkGreyOut();
+			return;
+		}
+		if (f.password.value != f.Vpassword.value) {
+			alert(_("wwan warningMsg2"));//Password do not match!
+			checkGreyOut();
+			f.password.select();
+			return;
+		}
+		if((f.periodic_enable.value=='1') && ( (f.periodic_interval.value < 30) || (f.periodic_interval.value > 2592000) )) {
+			alert(_("Msg120"));//Error: Inform Period must have a value between 30 and 2592000.
+			checkGreyOut();
+			f.periodic_interval.select();
+			return;
+		}
+	}
+	f.submit();
+}
+
+function submit_ConReq() {
+	var f=document.formConReq;
+
+	if (f.ConReq_username.value == "") {
+		alert(_("pleaseEnterUsername"));
+		f.ConReq_username.select();
+		return;
+	}
+	if (f.ConReq_password.value == "") {
+		alert(_("pleaseEnterPassword"));
+		f.ConReq_password.select();
+		return;
+	}
+	if (f.ConReq_password.value != f.ConReq_Vpassword.value) {
+		alert(_("wwan warningMsg2"));//Password do not match!
+		f.ConReq_password.select();
+		return;
+	}
+	f.submit();
+}
+</script>
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	if( request["QUERY_STRING"]=='server') {
+		tempval = form['tr069_enable'];
+		set_single( 'service.tr069.enable='+tempval );
+
+		tempval = form['ACSURL'];
+		set_single( 'tr069.server.url='+tempval );
+
+		tempval = form['username'];
+		set_single( 'tr069.server.username='+tempval );
+
+		tempval = form['password'];
+		set_single( 'tr069.server.password='+tempval );
+
+		tempval = form['periodic_enable'];
+		set_single( 'tr069.server.periodic.enable='+tempval );
+
+		tempval = form['periodic_interval'];
+		set_single( 'tr069.server.periodic.interval='+tempval );
+	}
+	else if ( request["QUERY_STRING"]=='ConReq') {
+		tempval = form['ConReq_username'];
+		set_single( 'tr069.request.username='+tempval );
+
+		tempval = form['ConReq_password'];
+		set_single( 'tr069.request.password='+tempval );
+	}
+}
+
+form['tr069_enable'] = get_single( 'service.tr069.enable' );
+form['ACSURL'] = get_single( 'tr069.server.url' );
+form['username'] = get_single( 'tr069.server.username' );
+temp = get_single( 'tr069.server.password' );
+form['password'] = temp;
+form['Vpassword'] = temp;
+form['periodic_enable'] = get_single( 'tr069.server.periodic.enable' );
+form['periodic_interval'] = get_single( 'tr069.server.periodic.interval' );
+
+form['ConReq_username'] = get_single( 'tr069.request.username' );
+temp = get_single( 'tr069.request.password' );
+form['ConReq_password'] = temp;
+form['ConReq_Vpassword'] = temp;
+%>
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']?server" >
+<!-- <input type="hidden" name="ACSURL" value="@@form['ACSURL']"/> -->
+<input type="hidden" name="tr069_enable" value="@@form['tr069_enable']"/>
+<input type="hidden" name="periodic_enable" value="@@form['periodic_enable']"/>
+<h3><script language="JavaScript">document.write(_("system")+" > TR-069");</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("tr069 configuration"));</script></th></tr>
+</table>
+<table width="75%">
+<tr> 
+	<td width="38%"><script language="JavaScript">document.write(_("enableTR069Service"));</script></td>
+	<td><input type=radio name='tr069Enable' value=1 onClick="javascript:document.form.tr069_enable.value='1';ungreyOutFields()" >&nbsp;<script language="JavaScript">document.write(_("enable"));</script> &nbsp;&nbsp;
+	<input type=radio name='tr069Enable' value=0 onClick="javascript:document.form.tr069_enable.value='0';greyOutFields()" >&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr> 
+	<td><script language="JavaScript">document.write(_("ACS URL"));</script></td>
+	<td><input type="text" name="ACSURL" size="40" value="@@form['ACSURL']" > &nbsp;</td>
+<!--     <td><script language=javascript>htmlGenIpBlocks("ACSURL");</script></td> -->
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("acsUsername"));</script></td>
+	<td><input type="text" name="username" size="16" maxLength="64" value="@@form['username']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("acsPassword"));</script></td>
+	<td> <input type="password" name="password" size="16" maxLength="64" value="@@form['password']"> &nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("verifyACSpassword"));</script></font></td>
+	<td> <input type="password" name="Vpassword" size="16" maxLength="64" value="@@form['Vpassword']"> &nbsp;</td>
+</tr>
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("enableperiodicACSinforms"));</script></td>
+	<td><input type=radio name='periodicEnable' value=1 onClick="javascript:document.form.periodic_enable.value='1';document.form.periodic_interval.disabled=false;" >&nbsp;<script language="JavaScript">document.write(_("enable"));</script>&nbsp;&nbsp;
+	<input type=radio name='periodicEnable' value=0 onClick="javascript:document.form.periodic_enable.value='0';document.form.periodic_interval.disabled=true;" >&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr> 
+<td><script language="JavaScript">document.write(_("informPeriod"));</script></td>
+<td><input type=text name='periodic_interval' size=8 maxLength=10 value="@@form['periodic_interval']" onkeyup=NumfieldEntry(this);>&nbsp;<script language="JavaScript">document.write(_("seconds"));</script></td>
+</tr>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Save" id="saveBtn" onClick="javascript:submitF()" style="width:120px;">
+</div>
+</form>
+
+<form name="formConReq" class="content" method="POST" action="@@request['SCRIPT_NAME']?ConReq" >
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("tr069ConnectionRequest"));</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("connectionRequestUsername"));</script></td>
+	<td><input type="text" name="ConReq_username" size="16" maxLength="64" value="@@form['ConReq_username']">&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("connectionRequestPassword"));</script></td>
+	<td> <input type="password" name="ConReq_password" size="16" maxLength="64" value="@@form['ConReq_password']">&nbsp;</td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("verify password"));</script></td>
+	<td><input type="password" name="ConReq_Vpassword" size="16" maxLength="64" value="@@form['ConReq_Vpassword']">&nbsp;</td>
+</tr>
+</table>
+<div align="center">
+<p></p>
+<input type="button" value="Save" id="submitBtn" onClick="javascript:submit_ConReq()" style="width:120px;">
+</div>
+</form>
+
+<form class="content">
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%">
+	<tr><th><script language="JavaScript">document.write(_("last inform status"));</script></th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="38%"><script language="JavaScript">document.write(_("start at"));</script></td>
+	<td id="InformStartAt"></td>
+</tr>
+<tr>
+	<td><script language="JavaScript">document.write(_("end at"));</script></td>
+	<td id="InformEndAt"></td>
+</tr>
+</table>
+</form>
+
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+$(document).ready(
+function() {
+var f=document.form;
+	if ( (f.periodic_interval.value < 30) || (f.periodic_interval.value > 2592000) )
+		;//f.periodic_interval.value = 600;
+	if(f.tr069_enable.value=='1') 
+		f.tr069Enable[0].checked=true;
+	else
+		f.tr069Enable[1].checked=true;
+	if(f.periodic_enable.value=='1')
+		f.periodicEnable[0].checked=true;
+	else
+		f.periodicEnable[1].checked=true;
+	checkGreyOut();
+	$("#submitBtn").val(_("CSsave"));
+	$("#saveBtn").val(_("CSsave"));
+
+	var startPoll = function() {
+		$.get('/cgi-bin/tr069.cgi', function(d){eval(d);$("#InformStartAt").html(informStartStatus);$("#InformEndAt").html(informEndStatus);} );
+	}
+	setInterval(startPoll, 2000);
+});
+</script>
+</body>
+</html>

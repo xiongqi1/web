@@ -1,0 +1,7 @@
+{
+    "id": "FactoryReset",
+    "title": "Restore factory defaults",
+    "url": "/FactoryReset.html",
+    "path": [ "System", "SystemConfig" ],
+    "position": 100
+}

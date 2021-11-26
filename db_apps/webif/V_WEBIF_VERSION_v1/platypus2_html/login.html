@@ -1,0 +1,133 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%useSession();%>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>Login</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript">
+$(document).ready(function() {
+	document.form.username.focus();
+});
+</script>
+</head>
+<body onload="initTranslation()">
+
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("login");
+function initTranslation() {
+	document.form.submit.value = _("submit");
+	document.form.clear.value = _("clear");
+}
+</script>
+<form name="form"  class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<h3>&nbsp;&nbsp;<script language="JavaScript">document.write(_("login"));</script></h3>
+<div class="line" style="padding-left:20px; margin: 8px 30% 16px 0;"></div>
+<table width="70%">
+	<tr><th><script language="JavaScript">document.write(_("login"));</script></th></tr>
+	<tr><td>&nbsp;</td></tr>
+</table>
+<table id="ID0"  width="70%" cellspacing="0" style="display:none">
+	<tr>
+		<td height="58px" width="12%" ><img align="right" src="/images/error.gif"/></td>
+		<td height="58px"><h4 style="margin-bottom:0px; color:#CC0000"><script language="JavaScript">document.write(_("admin passWarning"));</script></h4></td>
+	</tr>
+</table>
+<table id="ID1" width="70%"  cellspacing=0>
+	<tr>
+		<td width="30%"><script language="JavaScript">document.write(_("user name"));</script>:</td>
+		<td><input type="text" name="username" maxlength="20" style="width:160px" value="@@form['username']"></td>
+	</tr>
+	<tr>
+		<td><script language="JavaScript">document.write(_("password"));</script>:</td>
+		<td><input type="password" name="password" maxlength="20" style="width:160px" value="@@form['password']"></td>
+	</tr>
+</table>
+<table width="70%">
+	<tr>
+		<td>
+		<br/><div align=center><input type="submit" name="submit" value="Submit" style="width:120px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" name="clear" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''" style="width:120px;"></div><br/>
+		</td>
+	</tr>
+	<tr><td>&nbsp;</td></tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	//check username and password
+	user = form['username'];
+	mypassword = form['password'];
+
+	router_user="";
+	router_password="";
+
+	syslog(7,"login.html: entering with POST request");
+
+
+	// new login method - name-password method
+	if( rdb_exists("admin.user.name") ) {
+		syslog(7,"login.html: configurable user name rdb detected");
+
+		router_user=get_single("admin.user.name");
+		router_password=get_single("admin.user.password");
+	}
+	else {
+		syslog(7,"login.html: fixed user name rdb detected");
+
+		if( rdb_exists("admin.user."+user) ) {
+			router_user=user
+			router_password=get_single( 'admin.user.'+user );
+		}
+		else {
+			syslog(7,"login.html: user name not found");
+		}
+	}
+
+	// if user name and password are correct
+	if( (router_user != "") && (user == router_user) && (mypassword==router_password) ) {
+		session["sessionid"] = request["SESSION_ID"];
+		session["user"] = user;
+		/*  checkme = form['checkMe'];
+		if( checkme==true)
+		{
+			retval=set_single( 'login_remember.'+url+'=1');
+		}
+		else
+		{
+			retval=set_single( 'login_remember.'+url+'=0');
+		}*/
+		w=get_single('wizard_status');
+		if( w=="" || w=="N/A" )
+			set_single("wizard_status=0", '-p');
+		redirect('/status.html?setdate');
+	}
+	else {%>
+	<script language='JavaScript'>
+	alert(_("admin passWarning"));
+	document.form.password.select();
+	/*document.getElementById( "ID0" ).style['display']='';
+	document.getElementById( "ID1" ).style['display']='none';
+	setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);*/
+	</script>
+	<%}
+}
+else {
+	if(request['QUERY_STRING']=='logoff') {
+		session["sessionid"] = '';
+		redirect('/login.html');
+	}
+	else if( request["SESSION_ID"]==session["sessionid"] ) {
+		redirect('/status.html?setdate');
+	}
+}
+%>
+</body>
+</html>

@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Modem configuration change template
+#
+# Copyright (C) 2020 Casa Systems Inc.
+#
+
+nof=${0##*/}					# Name of file/script.
+nof=${nof%-*}					# Remove mangled suffix
+source /lib/utils.sh
+source $($(test -n "$1") && dirname "$1" || echo .)/common
+
+SAS_ENABLED="?<service.sas_client.enable>;"
+
+logNotice "started"
+
+PTCRB=$(rdb_get sw.ptcrb)
+CURRENT_MBN=$(rdb_get system.modem.config.use_file)
+SAS_EUD_MBN=$(rdb_get sas.config.eud_mbn_file)
+# for ptcrb use whatever mbn is set, do not change it
+if [ "$PTCRB" = "1" ]; then
+	logNotice "ptcrb mode enabled, not changing modem configuration"
+	if [ "$CURRENT_MBN" != "" ]; then
+		logNotice "custom mbn in use for ptcrb: '$CURRENT_MBN'"
+	fi
+else
+	if [ "$SAS_ENABLED" = "1" -a "$CURRENT_MBN" != "" ]; then
+		# when sas is enabled, clear mbn file path. The modem configuration manager
+		# will automatically select the correct mbn
+		rdb_del system.modem.config.use_file
+		logNotice "custom mbn path cleared, running as CAT B device!"
+		CONFIG_CHANGED="1"
+	elif [ "$SAS_ENABLED" = "0" -a "$CURRENT_MBN" != "$SAS_EUD_MBN" -a "$SAS_EUD_MBN" != "" ]; then
+		# when sas is disabled, use the eud mbn
+		rdb_set -p system.modem.config.use_file "$SAS_EUD_MBN"
+		logNotice "custom mbn set to: '$SAS_EUD_MBN', running as EUD!"
+		CONFIG_CHANGED="1"
+	fi
+
+	if [ "$CONFIG_CHANGED" = "1" ]; then
+		CURRENT_MBN=$(rdb_get system.modem.config.use_file)
+		# restart the modem config manager, it will apply the new config and reboot the device
+		# if there is no change in the config, there will be no reboot.
+		RET=$(/etc/init.d/rc3.d/S580modem_config_mgr restart)
+		logNotice "modem config manager restarted for config:'$CURRENT_MBN', ret=$RET"
+	else
+		logNotice "custom mbn in use: '$CURRENT_MBN'"
+	fi
+fi
+
+logNotice "done."
+

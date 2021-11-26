@@ -1,0 +1,244 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] || session["userlevel"] != '0') { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Load/Save Settings</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/cgi-bin/default_details.cgi"></script>
+</head>
+<body>
+<div id="contentWrapper">
+<% include /menu.html %>
+<script language="javascript" type="text/javascript">
+Butterlate.setTextDomain("SaveLoadSettings");
+var user_agent = '@@headers['USER_AGENT']';
+
+function submitF2() {
+var wfmess=_("system warningMsg01");
+var f = document.form2;
+if(f.uploadFile.value.length == 0){ alert(_("system warningMsg02")); return;}
+var passCheck = 0;
+var f1=f.uploadFile.value;
+var end1=f1.indexOf(".cfg");
+var end2=f1.indexOf(".tar.gz");
+
+	if(end2 > 0)
+		f.fileType.value ="tar.gz";
+	if( end1 >=0 || end2 >= 0)
+		passCheck =1;
+	if(passCheck == 1) {
+		try {
+			f.password.value ="";
+			f.submit();
+		}
+		catch(e) {
+			alert(e.message);
+		}
+	}
+	else {
+		alert(wfmess);
+		return;
+	}
+}
+
+var ipvar = location.href.substring( 0, location.href.indexOf( "SaveLoadSettings.html" )-1 );
+
+function callRestore( filename ) {
+hideItem("form2wait",1);
+document.getElementById( "form2wait2" ).style['display']='none';
+
+var http_request = $.ajax( {
+		url: "/cgi-bin/SaveSettings.cgi?form2&"+filename+"&"+document.form2.password.value,
+		success: function() {
+			eval( http_request.responseText );
+			if( retval == '0' ) {
+				alert(_("system warningMsg03"));
+				if( newip != "" )
+					alert(_("system warningMsg04")+newip );
+				//location.href = "/cgi-bin/rdb.cgi?service.system.reset=1";
+			}
+			else if( retval == "255" ) {
+				alert(_("system warningMsg05")+"\n"+_("log Error")+": "+msg);
+			}
+			else if( retval == "254" ) {
+				if( document.form2.password.value != "" )
+					alert(_("system warningMsg06"));
+				//alert(_("system warningMsg06")+"\n"+_("log Error")+": "+msg);
+				document.getElementById( "form2wait1" ).style['display']='none';
+				document.getElementById( "form2wait2" ).style['display']='';
+				return;
+			}
+			else if( retval == "253" )
+				alert(_("system warningMsg07")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "252" )
+				alert(_("system warningMsg08")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "251" )
+				alert(_("system warningMsg09")+"\n"+_("log Error")+": "+msg);
+			else if( retval == "250" )
+				alert(_("Msg108"));//VPN settings can not be decrypted!
+			else
+				alert(_("system warningMsg10")+"\n"+msg);
+			location.href=ipvar+'/SaveLoadSettings.html';
+		}
+	});
+}
+
+function submitF3() {
+	if (document.form3.pin.value != document.form3.confirmPIN.value) {
+		alert(_("wwan warningMsg2"));
+		return;
+	}
+	if( document.form3.pin.value.toString().length<4 && document.form3.pin.value.toString().length != 0) {
+		alert(_("wlan warningMsg7"));
+		return;
+	}
+	var http_request = $.ajax( {
+		url: "/cgi-bin/SaveSettings.cgi?form3&"+'@@request["SESSION_ID"]'+".cfg&"+document.form3.pin.value,
+		success: function() {
+			hideItem("form3wait",0);
+			eval( http_request.responseText.substring( http_request.responseText.indexOf("filename") ) );
+			alert( _("system warningMsg11") );//Please do not change the file extension!
+			location.href=ipvar+'/'+filename;
+		}
+	});
+}
+
+function doConfirm() {
+var idx;
+	if(default_ip=="") {
+		alert(_("Msg109"));//Error! Missing default configuration file.
+		return;
+	}
+	while( (idx=default_ip.indexOf("%2E"))!=-1)
+		default_ip=default_ip.substring(0,idx)+"."+default_ip.substring(idx+3,default_ip.length);
+
+	if (confirm('All the current settings will be lost!\nDevice IP address will be modified to '+default_ip+',\nPlease use default Root manager User name/Password: root/'+default_root_pass+' \nor Admin manager User name/Password: admin/'+default_admin_pass+'.\nDo you wish to continue? ')) {
+		var http_request = $.ajax( {
+		url: "/cgi-bin/SaveSettings.cgi?formS&-f",
+		success: function() {
+			alert(_("Msg110"));//The default configuration is successfully applied. The router will now reboot
+		}
+		});
+	}
+}
+
+function hideItem( itemID, action ) {
+	if( action==1 ) {
+		document.getElementById( itemID+"0" ).style['display']='none';
+		document.getElementById( itemID+"1" ).style['display']='';
+	}
+	else {
+		document.getElementById( itemID+"1" ).style['display']='none';
+		document.getElementById( itemID+"0" ).style['display']='';
+	}
+}
+
+$(document).ready(function() {
+	$("#saveBtn").val(_("CSsave"));
+	$("#restoreBtn").val(_("Restore"));
+	$("#submitBtn").val(_("submit"));
+	$("#restore2Btn").val(_("Restore"));
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("LoadSave")+" > "+_("settings"));</script></h3>
+
+<form name="form3" >
+<input type="hidden" size="20" name="fileName">
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("saveCurrentSettings"));</script>:</th></tr>
+</table>
+<table id="form3wait0" width="90%">
+<tr>
+	<td width="30%"><script language="JavaScript">document.write(_("password"));</script>&nbsp;&nbsp;<input type=password name='pin' size=24 maxlength=64 value="@@form['pin']">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	<script language="JavaScript">document.write(_("confirmPassword"));</script>&nbsp;&nbsp;<input type=password name='confirmPIN' size=24 maxlength=64 value="@@form['confirmPIN']"></td>
+</tr>
+<tr>
+	<td width="100%"><div align=center><input name="file3" type="button" id="saveBtn" value="Save" onClick="javascript:submitF3();" style="width:120px;">
+	</div></td>
+</tr>
+</table>
+<table id="form3wait1" width="90%" style="display:none">
+	<tr>
+		<td width="100%"><div align=center><img src="images/waiting.gif"/></div></td>
+	</tr>
+</table>
+</form>
+
+<form name="form2" method="POST" action="@@request['SCRIPT_NAME']?form2" encType="multipart/form-data">
+<input type="hidden" name="cmndUpgrade">
+<input type="hidden" name="fileType">
+
+<table width="90%">
+	<tr><th><script language="JavaScript">document.write(_("restoreSavedSettings"));</script>:</th></tr>
+</table>
+
+<table id="form2wait0" width="90%">
+	<tr>
+		<td width="8%"><div align="center"><script language="JavaScript">document.write(_("File"));</script></div></td>
+		<td width="40%"><input type=file height="40" size="35" name="uploadFile"> </td>
+		<td width="52%">
+			<div align="center"><input type="button" id="restoreBtn" onclick="javascript:submitF2();" value="Restore" style="width:120px;"></div>
+		</td>
+	</tr>
+</table>
+<table id="form2wait1" width="90%" style="display:none">
+	<tr>
+		<td width="100%"><div align=center><img src="images/waiting.gif"/></div></td>
+	</tr>
+</table>
+<table id="form2wait2" width="90%" style="display:none">
+	<tr>
+		<td width="100%"><div align="center" style="color:#FF0000"><b><script language="JavaScript">document.write(_("passwd req"));</script></b></div></td>
+	</tr>
+	<tr>
+		<td>
+			<div align="center"><script language="JavaScript">document.write(_("password"));</script>:&nbsp;&nbsp;&nbsp;&nbsp;<input type="text" size=24 maxlength=64 name="password" value="">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<input type="button" id="submitBtn" onClick="callRestore( filename )" value="Submit" style="width:120px;"></div>
+		</td>
+	</tr>
+</table>
+</form>
+
+<form name="formS" >
+<table width="90%">
+	<tr>
+		<th><script language="JavaScript">document.write(_("restorefactoryDefaults"));</script>:</th>
+	</tr>
+</table>
+<table width="90%">
+	<tr>
+		<td width="100%"><div align=center><input name="file4" id="restore2Btn" type='button' value="Restore" onclick="doConfirm()" style="width:120px;"/>
+		</div></td>
+	</tr>
+</table>
+<div class="line" style="padding-left:20px; margin: 8px 10% 16px 0;"></div>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+</script>
+</body>
+<%
+if (request["REQUEST_METHOD"] == "POST") {
+	if(form['fileType'] == "tar.gz")
+		session['filename']= "restore.cfg.tar.gz"
+	else
+		session['filename']= "restore.cfg";
+
+	for (f in files) {
+		var filename = files[f].FILENAME;
+		retval=set_single( 'upload.local_filename=' + filename );
+		target = '/opt/cdcs/upload/' + session["filename"];
+		rename(files['uploadFile'].FILENAME, target);
+	}
+	if( request["QUERY_STRING"]=='form2') {
+	%>
+		<script language=Javascript>hideItem("form2wait",1);var filename='@@session["filename"]';setTimeout("callRestore(filename)", 2100);</script>
+	<%}
+}
+%>
+</html>
+

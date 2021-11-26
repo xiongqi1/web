@@ -1,0 +1,445 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SMS Setup</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<style type="text/css">
+.field-right-desc {
+	display: inline;
+	margin-left: 0px;
+	width: auto;
+	font-weight:normal;
+}
+</style>
+<script language="JavaScript">
+
+var sms_onoff=<%var sms_enabled=get_single("smstools.enable");%>"@@sms_enabled";
+var sim_status="<%_v=get_single('wwan.0.sim.status.status');%>@@_v";
+function smsConfigSet() {
+	clear_alert();
+	if($("[name=Forward]:checked").val()!=0) {
+		if( $("#RedirMobile").val().length<3 && $("#RedirTCP").val().length<3 && $("#RedirUDP").val().length<3) {
+			validate_alert("", _("smsForwardingFieldsErr"));
+			return;
+		}
+		if ( ($("#TCPport").val()!='' && ($("#TCPport").val() == 0 || $("#TCPport").val() > 65535)) ||
+			($("#UDPport").val()!='' && ($("#UDPport").val() == 0 || $("#UDPport").val() > 65535)) ) {
+			validate_alert("", _("warningMsg08"));
+			return;
+		}
+	}
+	else {
+		$("#RedirMobile").val("");
+		$("#RedirTCP").val("");
+		$("#RedirUDP").val("");
+	}
+
+	cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SMS_CONF_SET&";
+	contents_body="RedirMobile="+$("#RedirMobile").val()+"&"+
+		"RedirTCP="+$("#RedirTCP").val()+"&"+
+		"TCPport="+$("#TCPport").val()+"&"+
+		"RedirUDP="+$("#RedirUDP").val()+"&"+
+		"UDPport="+$("#UDPport").val()+"&"+
+		"EncodingScheme="+$("#menuEncodingScheme").val()+"&"+
+		"MoService="+$("#menuMoService").val()+"&"+
+		"RemoteCommand="+$("#menuRemoteCommand").val()+"&"+
+		"RedirEmail=<%_v1=get_single('smstools.conf.redirect_email');%>@@_v1"+"&"+
+		"UseExtSmsClient=<%_v3=get_single('smstools.conf.use_ext_client');%>@@_v3"+"&"+
+		"ExtSmsClientIp1=<%_v4=get_single('smstools.conf.ext_client_ip1');%>@@_v4"+"&"+
+		"ExtSmsClientIp2=<%_v5=get_single('smstools.conf.ext_client_ip2');%>@@_v5"+"&"+
+		"ExtSmsClientPort=<%_v6=get_single('smstools.conf.ext_client_port');%>@@_v6"+"&"+
+		"MsgsPerPage="+$("#msgsperpage").val();
+	$.get(cmd_line+contents_body, function (){window.location.href="/SMS_Setup.html?success"});//smsConfigSetHandler
+}
+
+function SMSConfigGetHandler(v) {
+	eval(v);
+	$("#RedirMobile").val(RedirMobile);
+	$("#RedirTCP").val(RedirTCP);
+	$("#TCPport").val(TCPport);
+	$("#RedirUDP").val(RedirUDP);
+	$("#UDPport").val(UDPport);
+	document.SMS.menuEncodingScheme.value = EncodingScheme;
+	document.SMS.menuMoService.value = MoService;
+	document.SMS.menuRemoteCommand.value = RemoteCommand;
+	document.SMS.msgsperpage.value = MsgsPerPage;
+
+	if(document.SMS.menuEncodingScheme.value=='GSM7') {
+		$("#EncodingScheme-0").attr("checked", "checked");
+	}
+	else {
+		$("#EncodingScheme-1").attr("checked", "checked");
+	}
+
+	if(document.SMS.menuMoService.value=='0') {
+		$("#MoServiceMenu-0").attr("checked", "checked");
+	}
+	else if(document.SMS.menuMoService.value=='1') {
+		$("#MoServiceMenu-1").attr("checked", "checked");
+	}
+	else if(document.SMS.menuMoService.value=='2') {
+		$("#MoServiceMenu-2").attr("checked", "checked");
+	}
+	else if(document.SMS.menuMoService.value=='3') {
+		$("#MoServiceMenu-3").attr("checked", "checked");
+	}
+	else { //default is 3
+		$("#MoServiceMenu-3").attr("checked", "checked");
+	}
+
+	if( RedirMobile.length>3 || RedirTCP.length>3 || RedirUDP.length>3 ) {
+		$("#Forward-0").attr("checked", "checked");
+	}
+	else {
+		$("#Forward-1").attr("checked", "checked");
+		$("#box_2145_pin").css("display", "none");
+	}
+}
+
+function SaveBasicConfigHandler(v) {
+	var Result;
+	eval(v);
+	if (Result == '1') {
+		document.SMS.SmscAddrNo.value=NewSmscAddr;
+	}
+	smsConfigSet();
+}
+
+function SaveBasicConfig() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	clear_alert();
+	$.blockUI({centerY: false, css: {top:"320px"}, message:_("GUI pleaseWait")});
+	if (sms_onoff != document.SMS.menuOnOff.value) {
+		cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SMS_ONOFF&OnOff="+document.SMS.menuOnOff.value;
+		$.get(cmd_line, function() {
+			sms_onoff=document.SMS.menuOnOff.value;
+			if (sms_onoff == '0') {
+				window.location.href="/SMS_Setup.html?success";
+				return;
+			}
+			cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SAVE_SMSC_ADDR&NEW_SMSC_ADDR=";
+			cmd_line+=encodeUrl(document.SMS.SmscAddrNo.value);
+			$.get(cmd_line, SaveBasicConfigHandler);
+		});
+	}
+	else if (sms_onoff != '0') {
+		cmd_line="/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SAVE_SMSC_ADDR&NEW_SMSC_ADDR=";
+		cmd_line+=encodeUrl(document.SMS.SmscAddrNo.value);
+		$.get(cmd_line, SaveBasicConfigHandler);
+	}
+	else{
+		$.unblockUI();
+	}
+}
+
+function SmsOnOff_change(v) {
+	document.SMS.menuOnOff.value=v;
+	if(parseInt(v)) {
+		$("#smsForwarding").css("display", "");
+		$("#box_2144_pin").css("display", "");
+		if($("[name=Forward]:checked").val()==0) {
+			$("#box_2145_pin").css("display", "none");
+		}
+		else {
+			$("#box_2145_pin").css("display", "");
+		}
+	}
+	else {
+		$("#smsForwarding").css("display", "none");
+		$("#box_2144_pin").css("display", "none");
+		$("#box_2145_pin").css("display", "none");
+	}
+}
+
+$(document).ready( function() {
+	if( sim_status!="SIM OK" ) {
+		switch(sim_status) {
+			case "SIM removed":
+			case "SIM not inserted":
+				validate_alert("", _("sim removed warning"));
+			break;
+			case "":
+			case "N/A":
+				validate_alert("", _("sim detecting warning"));
+			break;
+			case "SIM PIN":
+				validate_alert("", _("sim pinlock warning"));
+			break;
+			case "SIM PUK":
+				validate_alert("", _("sim puklock warning"));
+			break;
+			default:
+				validate_alert("", _("sim try warning"));
+			break;
+		}
+		$(".div-all").css("display","none")
+		return;
+	}
+
+	$.get("/cgi-bin/sms.cgi?<%appendCsrfTokenToQueryString();%>CMD=SMS_CONF_GET", SMSConfigGetHandler);
+
+	if (sms_onoff == '0') {
+		document.SMS.menuOnOff.value='0';
+		$("#SmsOnOff-1").attr("checked", "checked");
+	}
+	else {
+		document.SMS.menuOnOff.value='1';
+		$("#SmsOnOff-0").attr("checked", "checked");
+	}
+
+	SmsOnOff_change(sms_onoff);
+
+	var smsc_addr="<%tmpval=get_single('wwan.0.sms.smsc_addr');%>@@tmpval";
+	document.SMS.SmscAddrNo.value=smsc_addr;
+	var ifname="<%tmpval=get_single('wwan.0.if');%>@@tmpval";
+	if (smsc_addr == '' && sim_status != 'SIM OK' && (ifname == 'cns' || ifname == 'atcns')) {
+		document.SMS.SmscAddrNo.value=_("sms warning34");
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="SMS" id="form" class="validate div-all" novalidate="novalidate" method="post" action="@@requst['SCRIPT_NAME']">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("sms gen config"))</script></h2>
+				<input type="hidden" name="menuOnOff" id="menuOnOff"/>
+				<input type="hidden" name="menuEncodingScheme" id="menuEncodingScheme"/>
+				<input type="hidden" name="menuMoService" id="menuMoService"/>
+				<input type="hidden" name="menuRemoteCommand" id="menuRemoteCommand"/>
+				<div class="form-row no-bg-form">
+					<label for="SmsOnOff"><script language=Javascript>document.write(_("sms title"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_2144_pin" data-toggle-disabled="btn_2144_change">
+								<input type="radio" id="SmsOnOff-0" name="SmsOnOff" class="access" onClick="SmsOnOff_change(1)">
+								<label for="SmsOnOff-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="SmsOnOff-1" name="SmsOnOff" class="access" onClick="SmsOnOff_change(0)">
+								<label for="SmsOnOff-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="grey-box" id="box_2144_pin">
+					<div class="form-row">
+						<label for="msgsperpage"><script language=Javascript>document.write(_("messagesPerPage")+" ("+_("10-50")+")")</script></label>
+						<div class="field">
+							<input type="text" name="msgsperpage" id="msgsperpage" maxLength="2" class="validate[required,funcCall[validate_msgsperpage]] required sml msgsperpage" value="@@form['msgsperpage']" onKeyUp="NumfieldEntry(this);"/>
+						</div>
+					</div>
+					#ifdef V_MODULE_VZ20Q
+					<div class="form-row" style="display:none">>
+					#else
+					<div class="form-row">
+					#endif
+						<label for="EncodingScheme"><script language=Javascript>document.write(_("sms encoding scheme menu"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='EncodingScheme' id='EncodingScheme-0' onClick="javascript:document.SMS.menuEncodingScheme.value='GSM7';"/>
+								#ifdef V_CELL_NW_cdma
+								<label for="EncodingScheme-0"><div class="radioText"><script language=Javascript>document.write(_("sms ascii7"))</script></div></label>
+								#else
+								<label for="EncodingScheme-0"><div class="radioText"><script language=Javascript>document.write(_("sms gsm7"))</script></div></label>
+								#endif
+							</div>
+							<div class="radio-box">
+								<input type="radio" class="access" name='EncodingScheme' id='EncodingScheme-1' onClick="javascript:document.SMS.menuEncodingScheme.value='UCS2';"/>
+								<label for="EncodingScheme-1"><div class="radioText"><script language=Javascript>document.write(_("sms ucs2"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					#ifdef V_CELL_NW_cdma
+					<div class="form-row" style="display:none">
+					#else
+					<div class="form-row">
+					#endif
+						<label for="SmscAddrNo"><script language=Javascript>document.write(_("smsc address"))</script></label>
+						<div class="field">
+							<input type="text" name="SmscAddrNo" id="SmscAddrNo" class="validate[required] required med" maxLength="32" onkeyup="urlFilter(this);" value="@@form['SmscAddrNo']" />
+						</div>
+					</div>
+					#if defined(V_CELL_NW_cdma) || defined(V_SMS_QMI_MODE_y) || defined(V_MODULE_VZ20Q)
+						#if 0
+							/* QMI does not support +CGSMS */
+						#endif
+					<div style="display:none">
+					#else
+					<div>
+					#endif
+					<div class="form-row">
+						<label for="MoServiceMenu-0"><script language=Javascript>document.write(_("sms moservice menu"))</script></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='MoServiceMenu' id='MoServiceMenu-0' onClick="javascript:document.SMS.menuMoService.value='0';"/>
+								<label for="MoServiceMenu-0"><div class="radioText"><script language=Javascript>document.write(_("sms moservice ps"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="MoServiceMenu-1"></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='MoServiceMenu' id='MoServiceMenu-1' onClick="javascript:document.SMS.menuMoService.value='1';"/>
+								<label for="MoServiceMenu-1"><div class="radioText"><script language=Javascript>document.write(_("sms moservice cs"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="MoServiceMenu-2"></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='MoServiceMenu' id='MoServiceMenu-2' onClick="javascript:document.SMS.menuMoService.value='2';"/>
+								<label for="MoServiceMenu-2"><div class="radioText"><script language=Javascript>document.write(_("sms moservice ps pref"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="MoServiceMenu-3"></label>
+						<div class="radio-box-group">
+							<div class="radio-box">
+								<input type="radio" class="access" name='MoServiceMenu' id='MoServiceMenu-3' onClick="javascript:document.SMS.menuMoService.value='3';"/>
+								<label for="MoServiceMenu-3"><div class="radioText"><script language=Javascript>document.write(_("sms moservice cs pref"))</script></div></label>
+							</div>
+						</div>
+					</div>
+					</div>
+				</div>
+			</div>
+			</form>
+			<div class="pad div-all">
+				<form class="validate" action="#" novalidate="novalidate" id="smsForwarding">
+					<h2><script language=Javascript>document.write(_("smsForwardingSetup"))</script></h2>
+					<div class="form-row no-bg-form">
+						<label for="field-0"><script language=Javascript>document.write(_("forwarding"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" id="Forward-0" name="Forward" class="access" value=1 onClick="$('#box_2145_pin').css('display', '');">
+									<label for="Forward-0" class="on" ><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" id="Forward-1" name="Forward" class="access" value=0 onClick="$('#box_2145_pin').css('display', 'none');">
+									<label for="Forward-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="grey-box" id="box_2145_pin">
+						<div class="form-row">
+							<label for="RedirMobile"><script language=Javascript>document.write(_("sms redir mobile"))</script></label>
+							<div class="field">
+								<input type="text" name="RedirMobile" id="RedirMobile" class="large" maxLength="32" value="" onkeyup='check_phoneRegex(this)'>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="RedirTCP"><script language=Javascript>document.write(_("tcpServerAddress"))</script></label>
+							<div class="field">
+								<input type="text" name="RedirTCP" id="RedirTCP" class="large" maxLength="256" onkeyup="urlFilter(this);" value="">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="TCPport"><script language=Javascript>document.write(_("tcpPort"))</script></label>
+							<div class="field">
+								<input type="text" name="TCPport" id="TCPport" class="sml validate[funcCall[validate_port]] port" maxLength="5" onkeyup="NumfieldEntry(this)" value="">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="RedirUDP"><script language=Javascript>document.write(_("udpServerAddress"))</script></label>
+							<div class="field">
+								<input type="text" name="RedirUDP" id="RedirUDP" class="large" maxLength="256" onkeyup="urlFilter(this);" value="">
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="UDPport"><script language=Javascript>document.write(_("udpPort"))</script></label>
+							<div class="field">
+								<input type="text" name="UDPport" id="UDPport" class="sml validate[funcCall[validate_port]] port" maxLength="5" onkeyup="NumfieldEntry(this)" value="">
+							</div>
+							<div>
+								<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-65535")+" )")</script></span>
+							</div>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="submit-row">
+				<button type="button" id="SmscAddrChangeBtn" onClick="SaveBasicConfig();"/><script language=Javascript>document.write(_("CSsave"))</script></button>
+				<button class="secondary" id="refreshBtn" type="button" onClick="window.location='SMS_Setup.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Services", "SMS_Setup", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["title"]=_("validatorTitle");
+	VALIDATOR.config.errors["msgsperpage"]=_("sms warning01");
+	$.validator.addMethod("msgsperpage",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 10 || c > 50 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.msgsperpage);
+
+	$.validator.addMethod("port",function(c,a) {
+		if( c.length==0 ) {
+			return true;
+		}
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		return true;
+	},_("Msg126"));//Port number must have a value between 1 and 65535.
+#else
+/********* NTC ValidationEngine **********/
+	function validate_msgsperpage(field) {
+		if( field.val() < 10 || field.val() > 50 || !isAllNum(field.val()) ) {
+			return _("sms warning01");
+		}
+	}
+
+	function validate_port(field, rules, i, options) {
+		if( field.val().length>0 && ( field.val() < 1 || field.val() > 65535 )) {
+			return _("Msg126");
+		}
+	}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('smsSetupSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+#!/bin/sh
+
+log() {
+	logger -t "perform_all_input_mode" "$*"
+}
+
+log_echo() {
+	log "$*"
+	echo "$*"
+}
+
+bail() {
+	log "$*"
+
+	echo "$*" >&2
+	exit 1
+}
+
+print_usage() {
+	cat << EOF
+
+perform_all_input_mode is changing all IOs into input mode
+
+usage>
+	perform_all_input_mode -f
+
+EOF
+}
+
+if [ "$1" != "-f" ]; then
+	print_usage >&2
+	exit 1
+fi
+
+log_echo "* init global configuration"
+
+log_echo "change pull-up voltage to [3.3]"
+io_ctl set_pull_up_voltage "3.3"
+
+io_ctl list | while read io; do
+
+	log_echo "* init IO [$io]"
+
+	log_echo "obtain cap"
+	cap=$(io_ctl get_cap "$io")
+
+	if io_ctl check_pull_up "$io"; then
+		log_echo "turn [off] pull up"
+		io_ctl set_pull_up "$io" 0
+	fi
+
+	if echo "$cap" | grep -q "analogue_input"; then
+		log_echo "change mode to [analogue input]"
+		io_ctl set_mode "$io" "analogue_input"
+	elif echo "$cap" | grep -q "digital_input"; then
+		log_echo "change mode to [digital input]"
+		io_ctl set_mode "$io" "digital_input"
+	fi
+
+done
+
+log_echo "success"

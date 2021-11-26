@@ -1,0 +1,115 @@
+#!/bin/sh -f
+#
+# Connect script for UMTS modules
+#
+# This script is called by connection_mgr after the connection is disconnected as follows:-
+#
+# EUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+PROFILE=$1
+INSTANCE=`echo $2 | awk '{print $1%10+1}'`
+
+WWANID=`echo $2 | awk '{print $1 -$1%10}'`
+
+DEV=`/usr/bin/rdb_get link.profile.$PROFILE.dev`
+TTY=`/usr/bin/rdb_get $DEV.data_if.$INSTANCE`
+V24=`/usr/bin/rdb_get $DEV.V250_if.$INSTANCE`
+
+SCRIPT_DIR=$(dirname "$0")
+
+log() {
+	logger -t EUMTS "$@"
+}
+
+# take v24 if tty does not exist
+if [ -z "$TTY" ]; then
+	TTY="$V24"
+fi
+
+log "launching..."
+
+
+# if shared
+if [ "$V24" == "$TTY" ]; then
+	rdb_set wwan.$WWANID.module.lock_result ""
+	rdb_set wwan.$WWANID.module.lock 0
+
+	t=0
+	while [ $t -lt 30 ]; do
+		log "waiting until simple_at_manager takes the port #$t"
+
+		if [ "`rdb_get wwan.$WWANID.module.lock_result`" == "1" ]; then
+			log "successed"
+			break;
+		fi
+		sleep 1
+
+		t=$(( $t+1 ))
+	done
+fi;
+
+update_pxs_pdp_result() {
+
+	# create chat
+	cat << EOF > "/tmp/EUMTS-chat-$$"
+TIMEOUT 5
+ABORT 'ERROR'
+'' \rAT+CEER
+'OK' AT+CEER=0
+'OK'
+EOF
+	# get chat result
+	log "[pdp result] execute +CEER command on '$TTY'"
+	/usr/sbin/chat -V -f "/tmp/EUMTS-chat-$$" < "$TTY" > "$TTY" 2> "/tmp/EUMTS-chat-$$-result"
+
+	log "[pdp result] result from module"
+	cat "/tmp/EUMTS-chat-$$-result" | log
+	
+	# AT+CEER
+	# +CEER: Requested service option not subscribed
+
+	log "[pdp result] extract result messages"
+	pdp_result=$(sed -n 's/+CEER: \(.*\)/\1/p' "/tmp/EUMTS-chat-$$-result")
+	
+	if [ "$pdp_result" = "No cause information available" ]; then
+		log "[pdp result] no error detected"
+		rdb_set "link.profile.$PROFILE.pdp_result" ""
+	else
+		log "[pdp result] error code - '$pdp_result'"
+		rdb_set "link.profile.$PROFILE.pdp_result" "$pdp_result"
+	fi
+
+	rm -f "/tmp/EUMTS-chat-$$"*
+}
+
+log "setting link.profile.$PROFILE.status down"
+/usr/bin/rdb_set "link.profile.$PROFILE.status" "down"
+
+model=$(rdb_get "wwan.$WWANID.model")
+
+case "$model" in
+	'PHS8-P')
+		# !!WARNING!! workaround for buggy data call termination of Cinterion PHS-8P 
+		# If data connection is terminated by ATH0, Cinterion PHS-8P will not be able to dial (ATD) any more - no way to recover!
+		# According to its AT command manual, data connection always needs to be terminated by LCP TERM
+		log "sending LCP term... (PHS8-P)"
+		cat "${SCRIPT_DIR}/EUMTS-LCPTERM.bin" > "$TTY"
+
+		# update pdp result
+		update_pxs_pdp_result
+		;;
+esac
+
+
+# reset connection up time and 
+if [ -x "/etc/ppp/ip-down.d/00_upd_rdb" ]; then
+	nwif=$(rdb_get "link.profile.$PROFILE.interface")
+	export PPP_IPPARAM="$PROFILE"
+	export PPP_IFACE="$nwif"
+	log "calling ip-down.d/00_upd_rdb"
+	/etc/ppp/ip-down.d/00_upd_rdb
+fi

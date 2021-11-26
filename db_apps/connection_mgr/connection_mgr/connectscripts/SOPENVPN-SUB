@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# openvpn user script 
+
+# description
+#
+# This script is called directly by openvpn as following and 
+#  the main purpose is to handle openvpn paramters to ip-up and ip-down
+#
+
+# parameters
+#
+# SOPENVPN-SUB tap_dev tap_mtu link_mtu ifconfig_local_ip ifconfig_netmask [ init | restart ]
+# ex) SOPENVPN-SUB tun0 1500 1544 10.10.10.6 10.10.10.5 init
+#
+# Yong
+
+log() {
+	logger -t "SOPENVPN-SUB" -- "$@"
+}
+
+log "start"
+env | log
+
+case $script_type in
+	'up')
+		IP_UPDOWN_SCRIPT="/etc/ppp/ip-up"
+		;;
+		
+	'down')
+		IP_UPDOWN_SCRIPT="/etc/ppp/ip-down"
+		;;
+		
+	*)
+		log "unknown script_type - $script_type"
+		exit 1
+		;;
+esac
+
+# collect parameters
+dev="$1"
+tap_mtu="$2"
+link_mtu="$3"
+local_ip="$4"
+
+
+# gateway address in tun mode 
+case $dev in
+	tun*)	remote_ip="$5";;
+	tap*)	remote_ip="$route_gateway_1";;
+esac
+
+#env | log
+
+# launch ip updown script
+log "launching ip up or down script..."
+log "$IP_UPDOWN_SCRIPT \"$dev\" \"ttyNA\" \"38400\" \"$local_ip\" \"$remote_ip\" \"$OPENVPN_USER_PARAM\""
+$IP_UPDOWN_SCRIPT "$dev" "ttyNA" "38400" "$local_ip" "$remote_ip" "$OPENVPN_USER_PARAM"
+
+if [ "$script_type" = "down" ]; then
+	rm -f "/tmp/openvpn-tmp/openvpn-$OPENVPN_PID.conf" "/tmp/openvpn-tmp/openvpn-$OPENVPN_PID.pwd" "/tmp/openvpn-tmp/openvpn-$OPENVPN_PID.sh" "/var/log/openvpn-status.log"
+	kill $OPENVPN_PID 2> /dev/null
+fi
+
+exit 0

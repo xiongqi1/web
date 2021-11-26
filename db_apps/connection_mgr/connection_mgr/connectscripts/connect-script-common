@@ -1,0 +1,53 @@
+#!/bin/sh
+
+# 
+# This script is a head file for all scripts that are called by Connection manager. The main role is to print 
+# clear text log messages of all the connection related script name and depth
+# 
+# 1. maintain "CONNECTION_MGR_SCRIPT" env variable to see calling depth from Connection Manager in the system log
+# 2. print "script name"
+#
+
+log() {
+	logger -t "$CONNECTION_MGR_SCRIPT($CONNECTION_MGR_DEV:$CONNECTION_MGR_PROFILE:$$)" -- "$@"
+}
+
+connect_script_init() {
+	CONNECTION_MGR_SCRIPT=""
+
+	export CONNECTION_MGR_SCRIPT
+}
+
+connect_script_begin() {
+	local script_name=$(basename "$0")
+	local conn_debug_level
+
+	if [ "$script_name" = "SDEV" ]; then
+		if [ "$CONNECTION_MGR_ACTION" = "stop" ];then
+			script_name="E"
+		else
+			script_name="S"
+		fi
+	fi
+
+	if [ -n "$CONNECTION_MGR_SCRIPT" ]; then
+		CONNECTION_MGR_SCRIPT="$CONNECTION_MGR_SCRIPT>"
+	fi
+	CONNECTION_MGR_SCRIPT="$CONNECTION_MGR_SCRIPT$script_name"
+
+	export CONNECTION_MGR_SCRIPT
+
+	log "################## connect-script start [$CONNECTION_MGR_SCRIPT]"
+	log "params : '$*'"
+	log "count  : $#"
+
+	conn_debug_level=$(rdb_get "connection_mgr.debug")
+	test -z "$conn_debug_level" && conn_debug_level=0
+}
+
+
+connect_script_end() {
+	log "### connect-script end [$CONNECTION_MGR_SCRIPT]"
+}
+
+connect_script_begin "$0" "$@"

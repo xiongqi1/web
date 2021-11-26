@@ -1,0 +1,780 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>GEOFENCE</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<%
+if (request['REQUEST_METHOD'] == "POST" ) {
+        tmp = form['geofence_enable'];
+        tmp2 = get_single('sensors.gps.0.geofence.enable');
+        if ((tmp != tmp2) && (tmp == '0' || tmp == '1')) {
+                retval = set_single( 'sensors.gps.0.geofence.enable='+tmp, '-p' );
+        }
+        redirect('/gps_geofence.html?success');
+}
+else { /*GET*/
+        form['geofence_enable'] = get_single( 'sensors.gps.0.geofence.enable' );
+}
+%>
+<script language="JavaScript">
+
+var disp_miles="<%if(rdb_exists('sensors.gps.0.geofence.display_miles')) get_single_direct('sensors.gps.0.geofence.display_miles');%>";
+var disp_decidegree="<%if(rdb_exists('sensors.gps.0.geofence.display_decimaldegree')) get_single_direct('sensors.gps.0.geofence.display_decimaldegree');%>";
+
+var ratio_km_to_mi=0.621371192;
+var valid_digits = 2;
+
+function cvt_km2mi(val) {
+	var dist = parseFloat(val);
+	if (isNaN(dist)==true)
+		return '';
+
+	dist*=ratio_km_to_mi;
+
+	var round_err = dist - parseFloat(dist).toFixed(valid_digits);
+
+	if (round_err < ((1/(ratio_km_to_mi * Math.pow(10,valid_digits))) / 2) && round_err >= (1/Math.pow(10,valid_digits))/2)
+		dist -= 1/Math.pow(10,valid_digits);
+
+	return parseFloat(dist).toFixed(valid_digits);
+}
+
+function cvt_mi2km(val) {
+	var dist = parseFloat(val);
+	if (isNaN(dist)==true) {
+		return '';
+	}
+
+	dist/=ratio_km_to_mi;
+
+	var round_err = dist - parseFloat(dist).toFixed(valid_digits);
+
+	if (round_err > ((ratio_km_to_mi/Math.pow(10,valid_digits)) / 2))
+		dist += 1/Math.pow(10,valid_digits);
+
+	return parseFloat(dist).toFixed(valid_digits);
+}
+
+//convert decimal degree to DMS(Degrees, Minutes, & Seconds)
+//  - coord_type ->  "lati" or "long"
+//  - coord -> coordination for conversion
+//  - elem -> id of div in the setup page.
+//		If elem is not given, the function returns converted coordination with string format.
+//		If elem is given, the children elements of elem are updated.
+function cvt_dd2dms(coord_type, coord, elem) {
+	var dd, abs_dd, degrees, minutes, seconds;
+
+	dd = parseFloat(coord);
+
+	if (isNaN(dd)==false) {
+		abs_dd = Math.abs(dd);
+		degrees = Math.floor(abs_dd);
+		minutes = Math.floor((abs_dd*60)%60);
+		seconds = (abs_dd*3600)%60;
+
+		if (typeof(elem) == "undefined") {
+			if (coord_type == "lati")
+				return (dd > 0 ? "N" : "S") + degrees.toString() + String.fromCharCode(176) + " " + minutes.toString() + "' " + seconds.toFixed(4) + "\"";
+			else
+				return (dd > 0 ? "E" : "W") + degrees.toString() + String.fromCharCode(176) + " " + minutes.toString() + "' " + seconds.toFixed(4) + "\"";
+		}
+		else {
+			$(elem + "-DIR").val(dd>=0? '+' : '-');
+			$(elem + "-D").val(degrees.toString());
+			$(elem + "-M").val(minutes.toString());
+			$(elem + "-S").val(seconds.toFixed(4));
+		}
+	} else {
+		if (typeof(elem) == "undefined") {
+				return '';
+		}
+		else {
+			$(elem + "-DIR").val('+');
+			$(elem + "-D").val('');
+			$(elem + "-M").val('');
+			$(elem + "-S").val('');
+		}
+	}
+}
+
+function cvt_dms2dd(elem) {
+	var dir = $(elem + "-DIR").val();
+	var degree = $(elem + "-D").val();
+	var minute = $(elem + "-M").val();
+	var second = $(elem + "-S").val();
+
+	var abs_dd  = 0;
+	if (typeof(dir) != "undefined" && typeof(degree) != "undefined" && typeof(minute) != "undefined" && typeof(second) != "undefined") {
+		degree = parseFloat(degree);
+		minute = parseFloat(minute);
+		second = parseFloat(second);
+		if (isNaN(degree) == true || isNaN(minute) == true || isNaN(second) == true)
+			return '';
+
+		abs_dd = degree + minute/60 + second/3600;
+	}
+
+	return (dir == "-" ? "-" : "+") + abs_dd.toFixed(6);
+}
+
+function switch_k_m(fromSetup) {
+	if(disp_miles=="1") { //Toggle KM
+		$("#switch-setup-KM").html(_("displayMiles"));
+		$("#switch-list-KM").html(_("displayMiles"));
+		disp_miles="0";
+		$(".Radius-KM").css("display", "");
+		$(".Radius-MI").css("display", "none");
+		if (fromSetup == 1) {
+			$("#cirSetupRadius-KM").val(cvt_mi2km($("#cirSetupRadius-MI").val()));
+		}
+
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>sensors.gps.0.geofence.display_miles=0");
+	} else { //Toggle to MI
+		$("#switch-setup-KM").html(_("displayKilometer"));
+		$("#switch-list-KM").html(_("displayKilometer"));
+		disp_miles="1"
+		$(".Radius-KM").css("display", "none");
+		$(".Radius-MI").css("display", "");
+		if (fromSetup == 1) {
+			$("#cirSetupRadius-MI").val(cvt_km2mi($("#cirSetupRadius-KM").val()));
+		}
+
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>sensors.gps.0.geofence.display_miles=1");
+	}
+}
+
+function switch_dd_dms(fromSetup) {
+	if(disp_decidegree=="1") { //Toggle to DMS
+		$("#switch-setup-dd").html(_("displayDeciDegree"));
+		$("#switch-list-dd").html(_("displayDeciDegree"));
+		disp_decidegree="0";
+		$(".Coord-DD").css("display", "none");
+		$(".Coord-DMS").css("display", "");
+
+		if (fromSetup == "1") {
+			cvt_dd2dms("lati", $("#cirSetupLati-DD").val(), "#cirSetupLati-DMS");
+			cvt_dd2dms("long", $("#cirSetupLong-DD").val(), "#cirSetupLong-DMS");
+		}
+
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>sensors.gps.0.geofence.display_decimaldegree=0");
+	} else { //Toggle to DD
+		$("#switch-setup-dd").html(_("displayDMS"));
+		$("#switch-list-dd").html(_("displayDMS"));
+		disp_decidegree="1";
+		$(".Coord-DD").css("display", "");
+		$(".Coord-DMS").css("display", "none");
+
+		if (fromSetup == "1") {
+			$("#cirSetupLati-DD").val(cvt_dms2dd("#cirSetupLati-DMS"));
+			$("#cirSetupLong-DD").val(cvt_dms2dd("#cirSetupLong-DMS"));
+		}
+
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>sensors.gps.0.geofence.display_decimaldegree=1");
+	}
+}
+
+function init_display()
+{
+	if(disp_miles=="1") { //display MI
+		$("#switch-setup-KM").html(_("displayKilometer"));
+		$("#switch-list-KM").html(_("displayKilometer"));
+		$(".Radius-KM").css("display", "none");
+		$(".Radius-MI").css("display", "");
+	} else { //display KM (default)
+		$("#switch-setup-KM").html(_("displayMiles"));
+		$("#switch-list-KM").html(_("displayMiles"));
+		$(".Radius-KM").css("display", "");
+		$(".Radius-MI").css("display", "none");
+	}
+
+	if(disp_decidegree=="1") { //display DD
+		$("#switch-setup-dd").html(_("displayDMS"));
+		$("#switch-list-dd").html(_("displayDMS"));
+		$(".Coord-DD").css("display", "");
+		$(".Coord-DMS").css("display", "none");
+
+	} else { //display DMS (default)
+		$("#switch-setup-dd").html(_("displayDeciDegree"));
+		$("#switch-list-dd").html(_("displayDeciDegree"));
+		$(".Coord-DD").css("display", "none");
+		$(".Coord-DMS").css("display", "");
+	}
+}
+
+// convert decimal minute to decimal degree.
+function cvt_dm2dd(dir, coord) {
+	var dm, degree_only, dd;
+	dm = parseFloat(coord);
+	if (isNaN(dm)==true)
+		return '';
+
+	degree_only = Math.floor(dm);
+	dd = Math.floor(degree_only / 100) + ((degree_only %100) / 60) + ((dm - degree_only) / 60);
+	return dir + dd.toFixed(6).toString();
+}
+
+function openGoogleMapWindow() {
+	var lat_val='';
+	var lon_val='';
+
+	if(disp_decidegree=="1") {
+		lat_val = $("#cirSetupLati-DD").val();
+		lon_val = $("#cirSetupLong-DD").val();
+	} else { //Toggle to DD
+		lat_val = cvt_dms2dd("#cirSetupLati-DMS");
+		lon_val = cvt_dms2dd("#cirSetupLong-DMS");
+	}
+
+	if (lat_val < -90 || lat_val > 90 || lon_val < -180 || lon_val > 180) {
+		blockUI_alert(_("invalidCoordinate"));
+		return;
+	}
+
+	if( lat_val == '' || lon_val == '' ) {
+		lat_val = cvt_dm2dd((curr_lati_dir=="S"?"-":"+"), curr_lati);
+		lon_val = cvt_dm2dd((curr_long_dir=="W"?"-":"+"), curr_long);
+		if( lat_val == '' || lon_val == '' ) {
+			lat_val = "+0.000000";
+			lon_val = "+0.000000";
+		}
+	}
+
+	address="http://maps.google.com/maps?q="+lat_val+","+lon_val+"+(You+are+here)\&iwloc=A\&hl=en";
+	mapWindow=window.open(address);
+	mapWindow.focus();
+}
+
+//Decimal Degree field entry
+function DDfieldEntry(field) {
+	// "+", "-", "." and digits are allowed for the field
+	field.value=field.value.replace(/[^\+\-\.0-9]+/g, "");
+
+	// " "+" and "-" sign are not allowed from seconds characters.
+	field.value=field.value.substring(0,1).concat(field.value.substring(1).replace(/[^\.0-9]+/g, ""));
+
+	var idx = field.value.indexOf(".");
+	if (idx > 0) // second "." is not allowed.
+		field.value=field.value.substring(0,idx+1).concat(field.value.substring(idx).replace(/[^0-9]+/g, ""));
+	else if (idx == 0) // "." is not allowed to be a leading.
+		field.value=field.value.substring(1);
+}
+
+// Second of DMS
+function DMSecondfieldEntry(field) {
+	// "." and digits are allowed for the field
+	field.value=field.value.replace(/[^\.0-9]+/g, "");
+	var idx = field.value.indexOf(".");
+	if (idx > 0) // second "." is not allowed.
+		field.value=field.value.substring(0,idx+1).concat(field.value.substring(idx).replace(/[^0-9]+/g, ""));
+	else if (idx == 0) // "." is not allowed to be a leading.
+		field.value=field.value.substring(1);
+}
+
+
+function submitF() {
+var f = document.formListSetup;
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	if(!$("#formListSetup").valid()) {
+		return;
+	}
+#else
+	if(!$("#formListSetup").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	$("button").attr("disabled",true);
+	var arg_idx = f.editIdx.value;
+#ifdef V_EVENT_NOTIFICATION
+	var arg_evtnoti = $("#cirSetupEvtNoti").val();
+#endif
+	var arg_name = $("#cirGeofenceName").val();
+	var arg_lati = 0;
+	var arg_long = 0;
+	var arg_radius = 0;
+
+	if (disp_miles == 0)
+		arg_radius = $("#cirSetupRadius-KM").val();
+	else
+		arg_radius = cvt_mi2km($("#cirSetupRadius-MI").val());
+
+	if (disp_decidegree == 0) {
+		arg_lati = cvt_dms2dd("#cirSetupLati-DMS");
+		arg_long = cvt_dms2dd("#cirSetupLong-DMS");
+	}
+	else {
+		arg_lati = $("#cirSetupLati-DD").val();
+		arg_long = $("#cirSetupLong-DD").val();
+	}
+
+	var args = {
+		csrfTokenGet:"@@session[csrfTokenName]"
+		, cmd:"editEntry"
+		, index:arg_idx
+		, name:arg_name
+		, latitude:arg_lati
+		, longitude:arg_long
+		, radius:arg_radius
+#ifdef V_EVENT_NOTIFICATION
+		, evtnoti:arg_evtnoti
+#endif
+	};
+	$.getJSON("./cgi-bin/gps_geofence.cgi",args,
+		function(res,stat,req) {
+			window.location.href="/gps_geofence.html?success"
+		}
+	);
+}
+
+function delEntry( idx ) {
+	var rdbIdx= $("#tdIndex-"+idx).text();
+	$.getJSON("./cgi-bin/gps_geofence.cgi",{csrfTokenGet: "@@session[csrfTokenName]", cmd:"delEntry", index:rdbIdx},
+		function(res,stat,req) {
+			window.location.href="/gps_geofence.html?success"
+		}
+	);
+
+	return;
+}
+
+var curr_idx; //current index of Geofence List in editEntry(), to be used in isUniqueName() for checking the name uniqueness
+
+function editEntry(idx, evtnoti_type) {
+	var f=document.formListSetup;
+
+	curr_idx = idx;
+
+	if (idx == -1) {
+		f.editIdx.value = idx;
+
+		$("#cirGeofenceName").val('Geofence');  // Geofence is the default name
+
+		$("#cirSetupLati-DD").val('');
+		$("#cirSetupLong-DD").val('');
+
+		$("#cirSetupLati-DMS-DIR").val('+');
+		$("#cirSetupLati-DMS-D").val('');
+		$("#cirSetupLati-DMS-M").val('');
+		$("#cirSetupLati-DMS-S").val('');
+
+		$("#cirSetupLong-DMS-DIR").val('+');
+		$("#cirSetupLong-DMS-D").val('');
+		$("#cirSetupLong-DMS-M").val('');
+		$("#cirSetupLong-DMS-S").val('');
+
+		$("#cirSetupRadius-KM").val('');
+		$("#cirSetupRadius-MI").val('');
+#ifdef V_EVENT_NOTIFICATION
+		$("#cirSetupEvtNoti").val('none');
+#endif
+	}
+	else {
+		f.editIdx.value = $("#tdIndex-"+idx).text();
+
+		$("#cirGeofenceName").val($("#tdName-"+idx).text());
+
+		$("#cirSetupLati-DD").val($("#tdLati-DD-"+idx).text());
+		$("#cirSetupLong-DD").val($("#tdLong-DD-"+idx).text());
+		cvt_dd2dms("lati", $("#tdLati-DD-"+idx).text(), "#cirSetupLati-DMS");
+		cvt_dd2dms("long", $("#tdLong-DD-"+idx).text(), "#cirSetupLong-DMS");
+		$("#cirSetupRadius-KM").val($("#tdRadius-KM-"+idx).text());
+		$("#cirSetupRadius-MI").val($("#tdRadius-MI-"+idx).text());
+#ifdef V_EVENT_NOTIFICATION
+		$("#cirSetupEvtNoti").val(evtnoti_type);
+#endif
+	}
+
+	clear_alert();
+	$("#circular_list").css("display", "none");
+	$("#circular_setup").css("display", "");
+}
+
+function cvt_evtnoti_str(notitype) {
+	if (typeof(notitype) == "undefined")
+		return _("notiNone");
+	var ret=''
+	switch (notitype) {
+		case "entry":
+			ret=_("notiEntry");
+			break;
+		case "exit":
+			ret=_("notiExit");
+			break;
+		case "entryexit":
+			ret=_("notiEntryExit");
+			break;
+		default:
+			ret=_("none");
+	}
+	return ret;
+}
+var curr_lati, curr_lati_dir, curr_long, curr_long_dir;
+var curr_geofenceList;
+
+function updateList() {
+	$.getJSON("./cgi-bin/gps_geofence.cgi",{cmd:"getList"}, function(res,stat,req) {
+		var h="";
+		curr_lati = res.curr_lati;
+		curr_lati_dir = res.curr_lati_dir;
+		curr_long = res.curr_long;
+		curr_long_dir = res.curr_long_dir;
+		$.each(res.geofenceList, function(idx, val) {
+			h+="<tr id=trEntry-"+idx+">\
+			    <td id=tdIndex-"+idx+" style=\"display:none\">"+val.rdbIndex+"</td>\
+			    <td id=tdName-"+idx+">"+val.name+"</td>\
+			    <td class=Coord-DD id=tdLati-DD-"+idx+">"+val.lati+"</td>\
+			    <td class=Coord-DD id=tdLong-DD-"+idx+">"+val.long+"</td>\
+			    <td class=Coord-DMS id=tdLati-DMS-"+idx+">"+cvt_dd2dms("lati", val.lati)+"</td>\
+			    <td class=Coord-DMS id=tdLong-DMS-"+idx+">"+cvt_dd2dms("long", val.long)+"</td>\
+			    <td class=Radius-KM id=tdRadius-KM-"+idx+">"+val.radius+"</td>\
+			    <td class=Radius-MI id=tdRadius-MI-"+idx+">"+cvt_km2mi(val.radius)+"</td>\
+			    <td id=tdStatus-"+idx+">"+val.status+"</td>";
+
+			var evtnoti = '';
+#ifdef V_EVENT_NOTIFICATION
+			evtnoti = val.evtnoti;
+			h+="<td id=tdEvtNoti-"+idx+">"+cvt_evtnoti_str(val.evtnoti)+"</td>";
+#endif
+#ifdef V_WEBIF_SPEC_vdf
+			h+="<td class='last'><a class='secondary sml' href='javascript:editEntry("+idx+", \""+evtnoti+"\")'><i class='icon edit'>"+_("edit")+"</i></a></td>";
+#else
+			h+="<td class='last'><a class='secondary sml' style='padding:0;border:0;' href='javascript:editEntry("+idx+", \""+evtnoti+"\")' title='"+_("edit")+"'><i class='icon edit'></i></a></td>";
+#endif
+			h+="<td class='last'><a href='javascript:delEntry("+idx+")' class=\"secondary sml\" style='padding:0;border:0;' title='"+_("delete")+"'><i class='icon close sml'></i></a></td>\
+			    </tr>";
+		});
+		curr_geofenceList = res.geofenceList;
+
+		$("#RulesList").html(h);
+		init_display();
+	});
+}
+
+function isUniqueName(name) {
+	var is_unique = true;
+	
+        $.each(curr_geofenceList, function(idx, val) {
+		if (val.name === name && idx !== curr_idx) {
+			is_unique = false;
+		}
+	});
+
+	return is_unique;
+}
+
+$(document).ready(function() {
+	var gps_enable="<%get_single_direct('sensors.gps.0.enable');%>";
+	if ( gps_enable != '1') {
+		h="<table><tr><th style='text-align:center'>"+_("gpswarning1")+"</th></tr></table>";
+		$("#warning-messages").html(h);
+		$("#circular_list").css("display", "none");
+		$("#circular_setup").css("display", "none");
+		$("#warning-div").css("display", "");
+		return;
+	}
+
+	updateList();
+
+	if ($("#geofence_enable").val() == '1') {
+		$("#geofence_enable_0").attr("checked", "checked");
+		setInterval(updateList, 10000);
+	} else {
+		$("#geofence_enable_1").attr("checked", "checked");
+	}
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="formListSetup" id="formListSetup" class="validate" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+			<%appendCsrfToken();%>
+			<div class="pad" id="circular_setup" style="display:none">
+				<input type="hidden" name="editIdx" value="@@form['editIdx']"/>
+
+				<h2><script language=Javascript>document.write(_("geofence configuration"))</script></h2>
+				<div class="submit-row multi-button">
+					<button type="button" class="secondary sml" onClick="switch_dd_dms(1)" ><div id="switch-setup-dd"></div></button>
+					<button type="button" class="secondary sml" onClick="switch_k_m(1)" ><div id="switch-setup-KM"></div></button>
+				</div>
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="cirGeofenceName"><script language=Javascript>document.write(_("geofenceName"))</script></label>
+						<input type="text" name="cirGeofenceName" id="cirGeofenceName" class="validate[required,funcCall[validate_unique_name]] required large unique_name" maxLength="16" onKeyUp="nameFilter(this);">
+					</div>
+					<div class="form-row Coord-DD">
+						<label for="cirSetupLatitude"><script language=Javascript>document.write(_("latitude"))</script></label>
+						<input type="text" name="cirSetupLati-DD" id="cirSetupLati-DD" class="validate[required,funcCall[validate_dd_lati]] required large dd_lati" maxLength="32" onKeyUp="DDfieldEntry(this);">
+					</div>
+					<div class="form-row Coord-DD">
+						<label for="cirSetupLongtude"><script language=Javascript>document.write(_("longitude"))</script></label>
+						<input type="text" name="cirSetupLong-DD" id="cirSetupLong-DD" class="validate[required,funcCall[validate_dd_long]] required large dd_long" maxLength="32" onKeyUp="DDfieldEntry(this);">
+					</div>
+					<div class="form-row Coord-DMS">
+						<label for="cirSetupLatitude"><script language=Javascript>document.write(_("latitude"))</script></label>
+						<select name="cirSetupLati-DMS-DIR" id="cirSetupLati-DMS-DIR" size="1" class="sml" >
+							<option value="+">N</option>
+							<option value="-">S</option>
+						</select>
+						<input type="text" name="cirSetupLati-DMS-D" id="cirSetupLati-DMS-D" class="validate[required,funcCall[validate_dms_lati_d]] required sml number dms_lati_d" maxLength="2" size="2" onKeyUp="NumfieldEntry(this);"></input><label class='input-connect-dot'>&deg</label>
+						<input type="text" name="cirSetupLati-DMS-M" id="cirSetupLati-DMS-M" class="validate[required,funcCall[validate_dms_ms]] required sml number dms_ms" maxLength="2" size="2" onKeyUp="NumfieldEntry(this);"></input><label class='input-connect-dot'>'</label>
+						<input type="text" name="cirSetupLati-DMS-S" id="cirSetupLati-DMS-S" class="validate[required,funcCall[validate_dms_ms]] required sml number dms_ms" maxLength="7" size="7" onKeyUp="DMSecondfieldEntry(this);"></input><label class='input-connect-dot'>"</label>
+					</div>
+					<div class="form-row Coord-DMS" id="cirSetupLong-DMS">
+						<label for="cirSetupLongtude"><script language=Javascript>document.write(_("longitude"))</script></label>
+						<select name="cirSetupLong-DMS-DIR" id="cirSetupLong-DMS-DIR" size="1" class="sml">
+							<option value="+">E</option>
+							<option value="-">W</option>
+						</select>
+						<input type="text" name="cirSetupLong-DMS-D" id="cirSetupLong-DMS-D" class="validate[required,funcCall[validate_dms_long_d]] required sml number dms_long_d" maxLength="3" size="3" onKeyUp="NumfieldEntry(this);"></input><label class='input-connect-dot'>&deg</label>
+						<input type="text" name="cirSetupLong-DMS-M" id="cirSetupLong-DMS-M" class="validate[required,funcCall[validate_dms_ms]] required sml number dms_ms" maxLength="2" size="2" onKeyUp="NumfieldEntry(this);"></input><label class='input-connect-dot'>'</label>
+						<input type="text" name="cirSetupLong-DMS-S" id="cirSetupLong-DMS-S" class="validate[required,funcCall[validate_dms_ms]] required sml number dms_ms" maxLength="7" size="7" onKeyUp="DMSecondfieldEntry(this);"></input><label class='input-connect-dot'>"</label>
+					</div>
+					<div class="form-row Radius-KM">
+						<label for="cirSetupRadius-KM"><script language=Javascript>document.write(_("radius km"))</script></label>
+						<input type="text" name="cirSetupRadius-KM" id="cirSetupRadius-KM" class="required large number" maxLength="32" onKeyUp="DMSecondfieldEntry(this);">
+					</div>
+					<div class="form-row Radius-MI">
+						<label for="cirSetupRadius-MI"><script language=Javascript>document.write(_("radius mi"))</script></label>
+						<input type="text" name="cirSetupRadius-MI" id="cirSetupRadius-MI" class="required large number" maxLength="32" onKeyUp="DMSecondfieldEntry(this);">
+					</div>
+					<div class="form-row">
+						<fieldset>
+							<label for="cirSetupEvtNoti"><script language=Javascript>document.write(_("notification"))</script></label>
+							<div class="field">
+								<select name="cirSetupEvtNoti" id="cirSetupEvtNoti" size="1" >
+									<option value="none"><script>document.write(_("notiNone"))</script></option>
+									<option value="entry"><script>document.write(_("notiEntry"))</script></option>
+									<option value="exit"><script>document.write(_("notiExit"))</script></option>
+									<option value="entryexit"><script>document.write(_("notiEntryExit"))</script></option>
+								</select>
+							</div>
+						</fieldset>
+					</div>
+					<div class="submit-row" id="gps_appl">
+						<button type="button" id="googlemap" class="secondary" onClick="openGoogleMapWindow()" style="width:auto"><script language=Javascript>document.write(_("googlemap"))</script></button>
+					</div>	<!-- div id="gps_appl" -->
+				</div>
+				<div class="submit-row multi-button">
+					<button type="button" name="submitForm" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="reset" class="secondary" name='BtDel'><script language=Javascript>document.write(_("reset"))</script></button>
+					<button type="button" name='BtCancel' class="secondary" onClick="location.href='gps_geofence.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+			<br/>
+			<div class="pad" id="circular_list">
+			<form name="formCfg" id="formCfg" class="validate" method="POST" action="@@request['SCRIPT_NAME']" nonvalidate="novalidate">
+			<%appendCsrfToken();%>
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("geofence configuration"))</script></h2>
+				<input type="hidden" name="geofence_enable" id="geofence_enable" value="@@form['geofence_enable']"/>
+				<div id="geofence_operation" class="form-row no-bg-form">
+					<label for="field-0"><script language=Javascript>document.write(_("geofence operation"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="geofence_enable_0" name="geofence_enable_radio" class="access" value="1" onClick="javascript:document.formCfg.geofence_enable.value='1';">
+								<label for="geofence_enable_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="geofence_enable_1" name="geofence_enable_radio" class="access" value="0" onClick="javascript:document.formCfg.geofence_enable.value='0';">
+								<label for="geofence_enable_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>	<!-- div id="geofence_operation" -->
+				<div class="submit-row">
+					<button type="submit"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>	<!-- div class="pad" -->
+			</form>
+			<br/>
+			<form class="validate" action="#" novalidate="novalidate">
+				<div class="grid-33">
+					<div class="pad alpha">
+						<h2><script language=Javascript>document.write(_("geofenceList"))</script></h2>
+					</div>
+				</div>
+				<div class="grid-66">
+					<div class="pad omega">
+						<div class="submit-row-condensed">
+							<button type="button" class="secondary sml fr" onClick="editEntry(-1, '')"><i class="icon plus"></i><script language=Javascript>document.write(_("add"))</script></button>
+						</div>
+					</div>
+				</div>
+				<br/>
+				<div class="submit-row multi-button">
+					<button type="button" class="secondary sml" onClick="switch_dd_dms(0)" ><div id="switch-list-dd"></div></button>
+					<button type="button" class="secondary sml" onClick="switch_k_m(0)" ><div id="switch-list-KM"></div></button>
+				</div>
+				<br/>
+				<table class="above-5-column">
+					<colgroup>
+						<col width="200px">
+						<col width="200px">
+						<col width="200px">
+						<col width="150px">
+						<col width="100px">
+					#ifdef V_EVENT_NOTIFICATION
+						<col width="100px">
+					#endif
+						<col width="100px">
+						<col width="50px">
+					</colgroup>
+					<thead id="list-head">
+						<tr>
+							<th class="align10"><script language=Javascript>document.write(_("geofenceName"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("latitude"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("longitude"))</script></th>
+							<th class="align10 Radius-KM"><script language=Javascript>document.write(_("radius km"))</script></th>
+							<th class="align10 Radius-MI"><script language=Javascript>document.write(_("radius mi"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("status"))</script></th>
+						#ifdef V_EVENT_NOTIFICATION
+							<th class="align10"><script language=Javascript>document.write(_("notification"))</script></th>
+						#endif
+							<th>&nbsp;</th>
+							<th >&nbsp;</th>
+						</tr>
+					<thead>
+					<tbody id="RulesList"></tbody>
+				</table>
+			</form>
+			</div>
+			<div class="pad" id="warning-div" style="display:none">
+				<h2><script language=Javascript>document.write(_("geofence configuration"))</script></h2>
+				<table id="warning-messages" class="border-top"></table>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Services", "GEOFENCE", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('submitSuccess'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	VALIDATOR.config.errors["unique_name"]=_("warningforNameUniqueness"); // Name should be unique.
+	$.validator.addMethod("unique_name",function(c,a) {
+		if( isUniqueName(c) ) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	},VALIDATOR.config.errors.unique_name);
+
+	VALIDATOR.config.errors["dd_lati"]=_("warningforDDLati"); // Latitude should be in the ranage between -90 and +90.
+	$.validator.addMethod("dd_lati",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < -90 || c > 90) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.dd_lati);
+
+	VALIDATOR.config.errors["dd_long"]=_("warningforDDLong"); // Longitude should be in the ranage between -180 and +180.
+	$.validator.addMethod("dd_long",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < -180 || c > 180) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.dd_long);
+
+	VALIDATOR.config.errors["dms_lati_d"]=_("warningforDMSLatiDeg"); // Degree of latitude should be less than or equal to 90.
+	$.validator.addMethod("dms_lati_d",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c > 90) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.dms_lati_d);
+
+	VALIDATOR.config.errors["dms_long_d"]=_("warningforDMSLongDeg"); // Degree of longitude should be less than or equal to 180.
+	$.validator.addMethod("dms_long_d",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c > 180) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.dms_long_d);
+
+	VALIDATOR.config.errors["dms_ms"]=_("warningforDMSMinSec"); // Minute and Second should be less than 60.
+	$.validator.addMethod("dms_ms",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c >= 60) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.dms_ms);
+#else
+/********* for NTC ValidationEngine **********/
+function validate_unique_name(field, rules, i, options) {
+	if( !isUniqueName(field.val()) ) {
+		return _("warningforNameUniqueness"); // Name should be unique.
+	}
+}
+function validate_dd_lati(field, rules, i, options) {
+	if( field.val() < -90 || field.val() > 90) {
+		return _("warningforDDLati"); // Latitude should be in the ranage between -90 and +90.
+	}
+}
+function validate_dd_long(field, rules, i, options) {
+	if( field.val() < -180 || field.val() > 180) {
+		return _("warningforDDLong"); // Longitude should be in the ranage between -180 and +180.
+	}
+}
+function validate_dms_lati_d(field, rules, i, options) {
+	if( field.val() > 90) {
+		return _("warningforDMSLatiDeg"); // Degree of latitude should be less than or equal to 90.
+	}
+}
+function validate_dms_long_d(field, rules, i, options) {
+	if( field.val() > 180) {
+		return _("warningforDMSLongDeg"); // Degree of longitude should be less than or equal to 180.
+	}
+}
+function validate_dms_ms(field, rules, i, options) {
+	if( field.val() >= 60) {
+		return _("warningforDMSMinSec"); // Minute and Second should be less than 60.
+	}
+}
+#endif
+</script>
+</body>
+</html>

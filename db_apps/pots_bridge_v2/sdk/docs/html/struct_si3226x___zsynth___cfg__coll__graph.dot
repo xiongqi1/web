@@ -1,0 +1,6 @@
+digraph "Si3226x_Zsynth_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3226x_Zsynth_Cfg\n|+ zsynth_b0\l+ zsynth_b1\l+ zsynth_b2\l+ zsynth_a1\l+ zsynth_a2\l+ ra\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

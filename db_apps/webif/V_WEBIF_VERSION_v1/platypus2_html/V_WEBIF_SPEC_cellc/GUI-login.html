@@ -1,0 +1,110 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Basic Login</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<script language="JavaScript">
+Butterlate.setTextDomain("GUI-login");
+function initTranslation() {
+	$("#username").html(_("GUI username"));
+	$("#passwd").html(_("password"));
+	$("#passWarning").html(_("admin passWarning"));
+	document.getElementById("CSsubmit").value = "  "+_("submit")+"  ";
+	document.getElementById("CSclear").value = "  "+_("clear")+"  ";
+	$("#sToAdv").html(_("GUI sToAdv"));
+}
+
+$(document).ready(function() {
+	$.get('/cgi-bin/setdate.cgi?'+getHostDate());
+	init_moveGUI();
+	setInterval(moveGUI, 100);	
+	document.form.username.focus();
+});
+</script>
+</head>
+<body>
+<div id="banner"><img src="/images/NTC-GUI-banner.png" usemap="#netcomm" border="0px"/>
+<map name="netcomm">
+<area shape="rect" coords="30,20,220,76" href="map-url.htm"  target="_blank"/>
+</map>
+</div>
+
+<form name="form"  class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<div id="basicGUI" style="left:558px; top:120px">
+	<div style="position:absolute; font-size:12px; left:34px; top:544px" ><a class="a1" href="JavaScript:toAdvV('/login.html')" id="sToAdv">Switch to Advanced View</a></div>
+	
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+	<img style="position:absolute; top:0px; left:0px" src="/images/button3.gif" />
+    <div class="Rotate-90" id="tab-status"><a style="text-decoration:none; left:4px;" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>
+    <img style="position:absolute; top:100px; left:0px" src="/images/button1.gif" />
+    <div class="Rotate-90" id="tab-login"><a style="text-decoration:none; color:#d00010;" href="/GUI-login.html"><script language="JavaScript">document.write(_("login"));</script></a></div>
+	
+	<!--div style="position:absolute; font-family: Bryant, Verdana, Arial; font-size:46px; font-weight:600; top:36px; color:#000; left:80px">Router</div>
+	<div style="position:absolute; font-family: Bryant, Verdana, Arial; font-size:32px; font-weight:5; top:45px; color:#000; left:280px">Login</div-->
+	<img style="position:absolute; top:40px; left:85px" src="/images/basic-login.gif" />
+	
+	<img style="position:absolute; top:135px; left:44px" src="/images/strip.png" />
+    <div class="div_text" style="top:195px" id="username">User Name</div>
+    <div class="div_input" style="top:189px" >
+	<input type="text" name="username" maxlength="20" size="20" value="@@form['username']">
+    </div>
+    <div class="div_text" style="top:250px" id="passwd">Password</div>
+    <div class="div_input" style="top:245px" >
+	<input type="password" name="password" maxlength="20" size="20" value="@@form['password']">
+    </div>
+    <div class=div_small_text style="top:310px; font-size:10px;"><script language="JavaScript">document.write(_("login msg"));</script></div>  
+    <div id="ID1" class="div_button" style="top:435px">
+	<input type="submit" id="CSsubmit" value="Submit">
+	<input type="button" id="CSclear" value="&nbsp;Clear&nbsp;" onclick="javascript:document.form.username.value='';document.form.password.value=''">
+    </div>
+    <div id="ID0" style="position:absolute; font-size:12px; top:416px; left:75px; display:none"> 
+    <h4 style="margin-bottom:0px; color:#CC0000; width:300px" id="passWarning">User name or password is incorrect. Please try again!</h4>
+    </div>
+</div>
+<script language="JavaScript">
+initTranslation();
+user_agent = <%val=headers['USER_AGENT'];%>"@@val";
+if(user_agent.indexOf("IE")!=-1)
+	document.form.password.size="22";
+</script>
+</form>  
+</body>
+<%    
+    if (request['REQUEST_METHOD'] == "POST") {      
+        //check username and password
+        user = form['username'];
+        pass = get_single( 'admin.user.'+user );
+		mypassword = form['password'];
+        if( ( pass != 'N/A' ) && ( mypassword == pass) ) //password ok
+        {
+    		session["sessionid"] = request["SESSION_ID"];
+            session["user"] = user;
+            if( user == 'root')
+            	session["userlevel"] = '0';
+            else
+            	session["userlevel"] = '1';
+            redirect('/index.html');
+        }
+        else 
+        {%>
+        	<script language='JavaScript'>
+			document.getElementById( "ID0" ).style['display']='';
+			document.getElementById( "ID1" ).style['display']='none';
+			setTimeout("document.getElementById( 'ID1' ).style['display']='';document.getElementById( 'ID0' ).style['display']='none';document.form.password.select();", 3000);
+			</script>
+        <%}
+	}
+    else {
+        if(request['QUERY_STRING']=='logoff') {
+        	session["sessionid"] = '';
+        }
+        else if( request["SESSION_ID"]==session["sessionid"] ) {
+			redirect('/index.html');
+        }
+    }
+%>
+</html>

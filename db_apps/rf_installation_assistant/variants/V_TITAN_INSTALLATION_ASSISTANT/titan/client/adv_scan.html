@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<script>
+
+    function toggleShowFWIMode(cb) {
+        console.log("Toggle show FWI mode clicked " + cb.checked);
+
+        ajaxPostRequest("/control/toggleShowMode?showFWICells="+cb.checked, "");
+        localStorage.setItem("show_fwi_mode", cb.checked);
+
+        // when Show FWI mode is disabled, show All is also disabled automatically
+        if (cb.checked == false) {
+            ajaxPostRequest("/control/toggleShowMode?showAllCells=false", "");
+            localStorage.setItem("show_all_mode", false);
+        }
+    }
+
+    function toggleShowAllMode(cb) {
+        console.log("Toggle show all mode clicked " + cb.checked);
+
+        ajaxPostRequest("/control/toggleShowMode?showAllCells="+cb.checked, "");
+        localStorage.setItem("show_all_mode", cb.checked);
+
+        // when Show ALL mode is enabled, show FWI should also be enabled automatically
+        if (cb.checked) {
+            ajaxPostRequest("/control/toggleShowMode?showFWICells=true", "");
+            localStorage.setItem("show_fwi_mode", true);
+        }
+    }
+
+    function read_values_local_storage() {
+        for (var i = 0 ; i < 3 ; i++) {
+            g_cid[i] = localStorage.getItem("cid" + (i+1));
+            g_pass[i] = localStorage.getItem("pass" + (i+1));
+        }
+
+        console.log("Show fwi mode "+ localStorage.getItem("show_fwi_mode"))
+        console.log("Show all mode "+ localStorage.getItem("show_all_mode"))
+
+        // restore last status of the page
+        if (localStorage.getItem("show_all_mode") == "true") {
+            ajaxPostRequest("/control/toggleShowMode?showAllCells=true", "");
+            ajaxPostRequest("/control/toggleShowMode?showFWICells=true", "");
+            console.log()
+
+        } else if (localStorage.getItem("show_fwi_mode") == "true") {
+            ajaxPostRequest("/control/toggleShowMode?showFWICells=true", "");
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        read_values_local_storage();
+        console.log("Reading locally stored variables " + g_cid[0] + ' ' + g_cid[1] + ' ' + g_cid[2] +
+        ' ' + g_pass[0] + ' ' + g_pass[1] + ' ' + g_pass[2]);
+    });
+</script>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+
+    <div class="box" id="app-network-scan">
+        <div class="box-header">
+            <h2>Network Scan</h2>
+        </div>
+        <div class="box-content">
+            <div id="scanResult"></div>
+            <div id="toggleShowFWICells" class="radio-box">
+                <input type="checkbox" type="submit" name="showFWICells" id="ShowFWICellButtonId" onclick="toggleShowFWIMode(this)">
+                <label for id="ShowFWICellButtonId">Show All available FWI cells (even those not entered in the previous screen)</label>
+            </div>
+            <div id="toggleShowAllCells" class="radio-box">
+                <input type="checkbox" type="submit" name="showAllCells" id="ShowAllCellButtonId" onclick="toggleShowAllMode(this)">
+                <label for id="ShowAllCellButtonId">Show All cells</label>
+            </div>
+        </div>
+    </div>
+
+    <div id="systemStatusContent"></div>
+    <div class="box" id="app-network-buttons">
+        <div class="box-content">
+            <p>Click 'Back' to go back to network scan page</p>
+            <div class="submit-row">
+                <form action="/scan.html" method="GET">
+                    <button class='med'>Back</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

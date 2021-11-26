@@ -1,0 +1,402 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>VPN</title>
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<script language="JavaScript" src="/cgi-bin/vpn.cgi"></script>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript">
+
+function submitPPTP() {       
+	var f=document.form;
+
+	try {
+	document.form.rdbCmd.value = "";
+	if (f.vpnEnable[0].checked == true) {
+		if( f.profileType.value == "pptp.0" ) {
+			if (f.username.value == "") {
+				alert("Error: No username entered");
+				return;
+			}
+			if (f.pass.value == "") {
+				alert("Error: No password entered");
+				return;
+			}
+			if ( (f.metric.value < 0 ) || (f.metric.value > 65535) )
+			{
+				alert("Error: Metric must have a value between 0 and 65535")
+				f.metric.select();
+				return;
+			}
+		}
+		if (f.vpnserver.value == "" ) {
+			alert("Error: No server IP address entered or not entered correctly");
+			return;
+		}
+		if ( (f.reconnectDelay.value < 30 ) || (f.reconnectDelay.value > 65535) ) {
+			alert("Error: Reconnect Delay must have a value between 30 and 65535")
+			f.reconnectDelay.select();
+			return;
+		}
+		if ( (f.reconnectRetries.value < 0 ) || (f.reconnectRetries.value > 65535) ) {
+			alert("Error: Reconnect Retries must have a value between 0 and 65535")
+			f.reconnectRetries.select();
+			return;
+		}
+	}
+	value = parseInt(f.editindex.value);
+	if( st.length==0 || isNaN(value)==true || value < 0 || value >= st.length ) {
+		i = newprofilenum; //add new
+	}
+	else if( isNaN(st[value].profilenum)==true ) {
+		alert("Error: Profile number incorrectly");
+		return;
+	}
+	else {
+		i=st[value].profilenum;
+	}
+	ungreyOutVPNfields(0);
+	var	header = "&link.profile."+i+".";
+	if( f.profileType.value == "pptp.0" ) {
+		f.rdbCmd.value = "link.profile."+i+".dev="+f.profileType.value+header+"name="+f.newname.value+header+"user="+f.username.value+header+"pass="+f.pass.value+header+"enable="+f.vpnenable.value+header+"defaultroutemetric="+f.metric.value+header+"default.dnstopptp="+f.dnstopptp.value+header+"serveraddress="+f.vpnserver.value+header+"snat="+f.snatEnable.value+header+"reconnect_delay="+f.reconnectDelay.value+header+"reconnect_retries="+f.reconnectRetries.value+header+"authtype="+f.authType.value+header+"verbose_logging="+f.pppDebug.value;
+	}
+	else { //GRE
+		if ( (f.ttl.value < 0 ) || (f.ttl.value > 255) ) {
+			alert("Error: TTL must have a value between 0 and 255")
+			f.ttl.select();
+			return;
+		}
+		f.rdbCmd.value = "link.profile."+i+".dev="+f.profileType.value+header+"name="+f.newname.value+header+"enable="+f.vpnenable.value+header+"serveraddress="+f.vpnserver.value+header+"reconnect_delay="+f.reconnectDelay.value+header+"reconnect_retries="+f.reconnectRetries.value+header+"ttl="+f.ttl.value+header+"verbose_logging="+f.pppDebug.value;
+	}
+	//alert(f.rdbCmd.value);
+	f.submit();
+
+	}
+	catch(e) {
+		alert(e.message);
+	}
+} 
+
+function delentry( index ) {
+	try {
+		i=st[index].profilenum;
+		document.form.rdbCmd.value = "link.profile."+i+".name=&link.profile."+i+".enable=0";
+//alert(document.form.rdbCmd.value);
+		document.form.submit();
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+function greyOutVPNfields() {
+	try {
+		// if PPTP is disabled then grey out the fields
+		document.form.username.disabled = true;
+		document.form.pass.disabled = true;
+		document.form.vpnserver.disabled = true;
+		document.form.pptpDefaultDNSEnable[1].checked = true;
+		document.form.newname.disabled = true;
+		document.form.metric.disabled = true;
+		document.form.authType.disabled = true;
+		document.form.reconnectDelay.disabled = true;
+		document.form.reconnectRetries.disabled = true;
+		document.form.ttl.disabled = true;
+		document.form.pptpDefaultDNSEnable[0].disabled = true;
+		document.form.pptpDefaultDNSEnable[1].disabled = true;
+		document.form.NatEnable[0].disabled = true;
+		document.form.NatEnable[1].disabled = true;
+		document.form.pppDebug[0].disabled = true;
+		document.form.pppDebug[1].disabled = true;
+	}
+	catch(e) {
+		alert(e.message);
+	}
+}
+
+
+function ungreyOutVPNfields(ini) {
+	try {
+		// if PPTP is disabled then grey out the fields
+		document.form.username.disabled = false;
+		document.form.pass.disabled = false;
+		document.form.vpnserver.disabled = false;	
+		document.form.newname.disabled = false;
+		document.form.metric.disabled = false;
+		document.form.authType.disabled = false;
+		document.form.reconnectDelay.disabled = false;
+		document.form.reconnectRetries.disabled = false;
+		document.form.ttl.disabled = false;
+		// also enable the default route
+		if (!ini)
+		{
+			//document.form.pptpDefaultRouteEnable[0].checked = true;
+			document.form.pptpDefaultDNSEnable[0].checked = true;
+		}
+		document.form.pptpDefaultDNSEnable[0].disabled = false;
+		document.form.pptpDefaultDNSEnable[1].disabled = false;
+		document.form.NatEnable[0].disabled = false;
+		document.form.NatEnable[1].disabled = false;
+		document.form.pppDebug[0].disabled = false;
+		document.form.pppDebug[1].disabled = false;
+	}
+	catch(e) {
+	    alert(e.message);
+	}
+}
+
+function showedit( myid, action, idx ) {
+var f=document.form;
+	document.form.editindex.value=idx;
+	document.getElementById( myid+"Div" ).style['display']=action?"":"none";
+	document.getElementById( "listDiv" ).style['display']=action?"none":"";
+	if( action==true ) {
+		if( idx < st.length ) {
+			f.vpnenable.value=st[idx].enable;
+			f.metric.value=st[idx].metric;
+			f.dnstopptp.value=st[idx].dnstopptp;
+			f.newname.value=st[idx].name;
+			f.username.value=st[idx].user;
+			f.pass.value=st[idx].pass;
+			f.vpnserver.value=st[idx].serveraddress;
+			f.reconnectDelay.value = st[idx].reconnect_delay;
+			f.reconnectRetries.value = st[idx].reconnect_retries;
+			f.ttl.value = st[idx].ttl;
+			f.snatEnable.value = st[idx].snat;
+			if( parseInt(st[idx].pppdebug)==1 )
+				f.pppDebug[0].checked=true;
+			else
+				f.pppDebug[1].checked=true;
+			with ( document.forms[0] )
+			{
+				setSelect(profileType, st[idx].type);
+				setSelect(authType, st[idx].authtype);
+			}
+		}
+		else {
+			f.vpnenable.value='1';
+			f.metric.value='30';
+			f.dnstopptp.value='0';
+			f.newname.value='';
+			f.username.value='';
+			f.pass.value='';
+			f.vpnserver.value='';
+			f.vpnserver.value='';
+			f.reconnectDelay.value = "30";
+			f.reconnectRetries.value = "0";
+			f.ttl.value = '255';
+			f.snatEnable.value = '0';
+			f.pppDebug[1].checked=true;
+		/*	with ( document.forms[0] )
+			{
+				setSelect(authType, "pptp");
+			}*/
+		}
+		if(f.vpnenable.value=='1') {
+			ungreyOutVPNfields(0);
+			f.vpnEnable[0].checked=true;
+		}
+		else {
+			greyOutVPNfields();
+			f.vpnEnable[1].checked=true;
+		}
+		if(f.dnstopptp.value=='1')
+			f.pptpDefaultDNSEnable[0].checked=true;
+		else
+			f.pptpDefaultDNSEnable[1].checked=true;
+		if( parseInt(f.snatEnable.value)==1 )
+			f.NatEnable[0].checked=true;
+		else
+			f.NatEnable[1].checked=true;
+	}
+	setType();
+}
+function setType() {
+	if( document.form.profileType.value == "pptp.0" ) {
+		document.getElementById("enableDiv").innerHTML = "Enable PPTP";
+		document.getElementById("serverAddDiv").innerHTML = "PPTP Server Address";
+		document.getElementById( "upmDiv" ).style['display']="";
+		document.getElementById( "greDiv" ).style['display']="none";
+	}
+	else {
+		document.getElementById("enableDiv").innerHTML = "Enable GRE";
+		document.getElementById("serverAddDiv").innerHTML = "GRE Server Address";
+		document.getElementById( "upmDiv" ).style['display']="none";
+		document.getElementById( "greDiv" ).style['display']="";
+	}
+}
+
+</script>
+</head>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	//	i=form['delindex'];
+	//  set_single( 'service.firewall.dnat.'+i+'=' ); //delete last
+	tempval = form['rdbCmd'];
+	if( tempval != "" )
+		set_list( tempval, '-p' );
+}
+%>
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']">
+<input type="hidden" name="editindex" value="@@form['editindex']">
+<input type="hidden" name="snatEnable" value="@@form['snatEnable']"/>
+<h3>VPN</h3>
+<div class="line" style="margin: 8px 10% 16px 0;"></div>
+<div id="listDiv">
+<table width="90%">
+	<tr><th>VPN List</th></tr>
+</table>
+<table width="90%">
+<tr>
+<td width="15%" nowrap bordercolor="#0033cc"><div align="center"><b>Name</b></td>
+<td width="5%" nowrap bordercolor="#0033cc"><div align="center"><b>Type</b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b>Remote Address</b></td>
+<td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b>User Name</b></td>
+<!--td width="20%" nowrap bordercolor="#0033cc"><div align="center"><b>&nbsp;</b></td-->
+<td width="4%" nowrap bordercolor="#0033cc"><div align="center"><b>Enable</b></td>
+<td width="16%" nowrap bordercolor="#0033cc"><div align="center">&nbsp;</td>
+</tr>
+<script language="Javascript">
+function VPNlist() {   
+	if (st.length == 0) {
+		document.write( "<tr><td colspan='6' align='center'>VPN list empty</td></tr>" );
+		return;
+	}
+	//document.form2.stlength.value = st.length;
+	for (var i = 0; i < st.length; i++) {
+		document.write("<tr>");
+		document.write("<td><div align=\"center\">"+st[i].name+"</div></td>");
+		document.write("<td><div align=\"center\">"+st[i].type+"</div></td>");
+		document.write("<td ><div align=\"center\">"+st[i].serveraddress+"</div></td>");
+		document.write("<td><div align=\"center\">"+st[i].user+"</div></td>");
+		document.write("<td><div align=\"center\"><input type=checkbox "+(st[i].enable=='1'?'checked=true':'')+" name='Enable' disabled=true></div></td>");
+		document.write("<td><a href=javascript:showedit('edit',"+true+","+i+") >Edit</a>&nbsp;&nbsp;");
+		document.write("&nbsp;&nbsp;<a href=javascript:delentry("+i+");>Delete</a></td>");
+		document.write("</tr>");
+	}
+}
+VPNlist();
+</script>
+</table>
+<div align="center" style="margin-right:10% ">
+<p></p>
+<input type="button" value="&nbsp;Add&nbsp;" onClick="javascript:showedit( 'edit', true, st.length )">
+</div>
+</div>
+
+<div id="editDiv" style="display:none">
+<table width="90%">
+	<tr><th>VPN Edit</th></tr>
+</table>
+<table width="90%">
+<tr> 
+<td width="38%">Profile Type</td>
+	<td><select name="profileType" size=1 onChange="setType()" >
+		<option value="pptp.0">PPTP</option>
+		<option value="gre.0">GRE</option>
+		</select>
+	</td>
+</tr>
+</table>
+<table width="90%">
+<input type="hidden" name="vpnenable" value="@@form['vpnenable']"/>
+<!--input type="hidden" name="routetopptp" value="@@form['routetopptp']"/-->
+<input type="hidden" name="dnstopptp" value="@@form['dnstopptp']"/>
+<input type="hidden" name="rdbCmd" value="@@form['rdbCmd']"/> 
+<tr> 
+<td width="38%"><div id="enableDiv">Enable VPN</div></td>
+<td><input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='1';ungreyOutVPNfields(0)">&nbsp;Enable &nbsp;&nbsp;
+<input type=radio name='vpnEnable' onClick="javascript:document.form.vpnenable.value='0';greyOutVPNfields()">&nbsp;Disable</td>
+</tr>
+<tr> 
+<!--td>Set Default Route to PPTP</td>
+<td><input type=radio name='pptpDefaultRouteEnable' onClick="javascript:document.form.routetopptp.value='1'">&nbsp;Enable &nbsp;&nbsp;
+<input type=radio name='pptpDefaultRouteEnable' onClick="javascript:document.form.routetopptp.value='0'">&nbsp;Disable</td>
+</tr-->
+<tr> 
+	<td>Profile Name</td>
+	<td><input type="text" name="newname" size=32 maxlength=64 value="@@form['newname']"></td>
+</tr>
+<tr> 
+	<td><div id="serverAddDiv">VPN Server Address</div></td>
+	<td><input type="text" name="vpnserver" size=32 maxlength=64 value="@@form['vpnserver']"></td>
+</tr>
+<tr> 
+</table>
+<table id="upmDiv" width="90%">
+<td width="38%">Username</td>
+<td><input type=text name='username' size=32 maxlength=64 value="@@form['username']"></td>
+</tr>
+<tr> 
+<td>Password</font></td>
+<td><input type=password name='pass' size=32 maxlength=64 value="@@form['pass']"></td>
+</tr>
+<tr> 
+	<td>Authentication Type</td>
+	<td><select name='authType'  size="1" >
+	<option value='any'>Any</option>
+	<option value='ms-chap-v2'>MS-CHAP-V2</option>
+	<option value='ms-chap'>MS-CHAP</option>
+	<option value='chap'>CHAP</option>
+	<option value='eap'>EAP</option>
+	<option value='pap'>PAP</option>
+	</select></td>
+</tr>
+<tr> 
+	<td>Metric</td>
+	<td><input type=text name='metric' size=8 maxLength=5 onkeyup=NumfieldEntry(this); value="@@form['metric']"> &nbsp;(0-65535)</td>
+</tr>
+<tr> 
+<td>Use peer DNS</td>
+<td><input type=radio name='pptpDefaultDNSEnable' onClick="javascript:document.form.dnstopptp.value='1'">&nbsp;Enable &nbsp;&nbsp;
+<input type=radio name='pptpDefaultDNSEnable' onClick="javascript:document.form.dnstopptp.value='0'">&nbsp;Disable</td>
+</tr>
+<tr> 
+	<td width="30%">NAT Masquerading</td>
+	<td><input type=radio name='NatEnable' onClick="javascript:document.form.snatEnable.value='1'">&nbsp;Enable&nbsp;&nbsp;&nbsp;
+		<input type=radio name='NatEnable' onClick="javascript:document.form.snatEnable.value='0'">&nbsp;Disable
+	</td>
+</tr>
+</table>
+<table id="greDiv" width="90%">
+<tr> 
+	<td width="38%">TTL</td>
+	<td><input type=text name='ttl' size=8 maxLength=5 value="@@form['ttl']" onkeyup=NumfieldEntry(this);> &nbsp;( 0-255 )</td>
+</tr>
+</table>
+<table width="90%">
+<tr> 
+	<td width="38%">Verbose logging</td>
+	<td><input type=radio name='pppDebug' value=1 >&nbsp;Enable&nbsp;&nbsp;&nbsp;<input type=radio name='pppDebug' value=0 >&nbsp;Disable</td>
+</tr>
+<tr>
+	<td>Reconnect Delay</td>
+	<td><input type=text name='reconnectDelay' size=8 maxLength=5 value="@@form['reconnectDelay']" onkeyup=NumfieldEntry(this);> &nbsp;( 30-65535 ) secs</td>
+</tr>
+<tr> 
+	<td>Reconnect Retries</td>
+	<td><input type=text name='reconnectRetries' size=8 maxLength=5 value="@@form['reconnectRetries']" onkeyup=NumfieldEntry(this);> &nbsp;( 0-65535, 0=Unlimited )</td>
+</tr>
+</table>
+<div class="line" style="margin: 20px 10% 16px 0;"></div>	
+<div align="center" style="margin-right:10% ">
+<p></p>
+<input type="button" value="Save" onClick="javascript:submitPPTP()">&nbsp;&nbsp;
+<input type="button" value="&nbsp;Exit&nbsp;" onClick="javascript:showedit( 'edit', false, st.length )">
+</div>
+</div>
+</form>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+setCopyRight();
+</script>
+</body>
+</html>

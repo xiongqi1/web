@@ -1,0 +1,51 @@
+#!/bin/sh -f
+#
+# Connect script for UMTS modules
+#
+# This script is called by connection_mgr after the connection is disconnected as follows:-
+#
+# EUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+
+# load v variables
+if [ -e "/etc/variant.sh" ]; then
+	. /etc/variant.sh
+fi
+
+PROFILE=$1
+INSTANCE=$(( $2 + 1 ))
+SCRIPT=$(basename "$0")
+
+
+rdb_get -L "link.profile.$PROFILE." | log
+
+log "setting link.profile.$PROFILE.status down"
+/usr/bin/rdb_set "link.profile.$PROFILE.status" "down"
+
+nwif=$(rdb_get "link.profile.$PROFILE.interface")
+
+if [ "$nwif" ]; then
+	log "$nwif network interface found in 'link.profile.$PROFILE.interface' - tearing down '$nwif'"
+	ifconfig $nwif down 2>&1 | log
+else
+	log "no network interface found in 'link.profile.$PROFILE.interface'"
+fi
+
+# reset connection up time and 
+if [ -x "/etc/ppp/ip-down.d/00_upd_rdb" ]; then
+	nwif=$(rdb_get "link.profile.$PROFILE.interface")
+	export PPP_IPPARAM="$PROFILE"
+	export PPP_IFACE="$nwif"
+	log "calling ip-down.d/00_upd_rdb"
+	/etc/ppp/ip-down.d/00_upd_rdb
+fi
+
+term_pf_daemons.sh "$PROFILE"
+
+log "finished."

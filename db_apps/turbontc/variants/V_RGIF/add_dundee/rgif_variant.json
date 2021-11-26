@@ -1,0 +1,787 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "OWA API",
+        "description": "OWA RESTful API",
+        "version": "1.5.0"
+    },
+    "basePath": "/api/v1",
+    "produces": [
+        "application/json"
+    ],
+    "paths": {
+        "/VoIPClientAddress": {
+            "get": {
+                "summary": "Get the VoIPClient MAC address which is in use with the OWA.  Typically this address should be set by the ‘set /api/v1/VoIPClientAddress’ API.",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/voipMacAddress"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Set the VoIP client (i.e. SIP UA) MAC address which is in use with the OWA.",
+                "tags": [
+                    "VoLTE"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "clientMACAddress",
+                        "description": "VoIP Client's(i.e. SIP UA) MAC address to be used to access OWA’s SIP Gateway.",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/VoiceService/Stats": {
+            "delete": {
+                "summary": "Reset Statistics",
+                "tags": [
+                    "VoLTE"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            },
+            "get": {
+                "summary": "Call Stats",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Call Stats",
+                        "schema": {
+                            "$ref": "#/definitions/VoiceServiceStats"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceService/CallHistory": {
+            "get": {
+                "summary": "Call history",
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "since",
+                        "description": "Time since the history records are collected in ISO-8601 format (e.g.'2015-07-23T04:59:39UTC).  The history records with their \"StartTime\" field value is equal to or older than this will be returned",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Call History",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CallHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "remove all call history",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Call History",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CallHistory"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceService/LineService": {
+            "put": {
+                "summary": "Control the voice line service state",
+                "tags": [
+                    "VoLTE"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "enableService",
+                        "description": "When the OWA starts, the Voice Service state is ‘up’.  When set to false (0), it will bring down the Voice service on OWA.  When set to true (1), it will bring up the Voice service on OWA.  Bringing down/up the service would start re-registering of the IMS service.",
+                        "required": true,
+			"type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            },
+            "get": {
+                "summary": "Get the VoipService line configuration details",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "the VoipService line configuration details",
+                        "schema": {
+                            "$ref": "#/definitions/LineService"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceService/MessageWaiting": {
+            "get": {
+                "summary": "Message waiting indicator",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message Waiting",
+                        "schema": {
+                            "$ref": "#/definitions/MessageWaiting"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceService/IMSStatus": {
+            "get": {
+                "summary": "IMS (PDN) status",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message Waiting",
+                        "schema": {
+                            "$ref": "#/definitions/IMSStatus"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceService/IMSSIPConfiguration": {
+            "get": {
+                "summary": "This is to read the available SIP configuration parameters for IMS User Agent.",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SIP configuration parameters",
+                        "schema": {
+                            "$ref": "#/definitions/IMSSIPConfiguration"
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/VoiceLineSessions": {
+            "get": {
+                "summary": "Table containing the list of active sessions for the voice line.",
+                "description": "",
+                "tags": [
+                    "VoLTE"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/VoiceSession"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "schema": {
+                            "$ref": "#/definitions/Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/RunFieldTest": {
+            "get": {
+                "summary": "Get filed test related result, which could be a SIM file content, PCell, SCell information, next Device Initiated Session event etc.",
+                "description": "",
+                "tags": [
+                    "Device"
+                 ],
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "Run",
+                        "description": "It can be SIMFile, GetLTEStatus, DeviceInitiatedSession or ModuleLog",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Data",
+                        "description": "When \"Run\" = \"SIMFile\", \"Data\" can be ICCID, MSISDN, MBDN, HPPLMN, LOCI, PSLOCI, ACC, AD, FPLMN, AHPLMN, PNN, OPL, OPLMNACT, PLMNSEL or IMPU. When \"Run\" = \"GetLTEStatus\", \"Data\" can be RRCModeStatus, IMSRegistration, ServCellInfo or ActivePDPContextInfo.  When \"Run\" = \"DeviceInitiatedSession\", no \"Data\" is required. When \"Run\" = \"ModuleLog\", no \"Data\" is required.",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                 "responses" : {
+                     "200": {
+                         "description": "Field test result",
+                         "schema": {
+                            "$ref": "#/definitions/FieldTestResult"
+                         }
+                     },
+                     "default": {
+                         "description": "Unexpected error",
+                         "schema": {
+                            "$ref": "#/definitions/Error"
+                         }
+                    }
+                 }
+            },
+            "put": {
+                "summary": "Lock a band or schedule a next Device Initiated Session",
+                "tags": [
+                    "Device"
+                ],
+                "description": "",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "SecurityKey",
+                        "description": "This parameter must be \"OWA\"",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Run",
+                        "description": "LTEBandLock, DeviceInitiatedSession or ModuleLog",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "Data",
+                        "description": "When \"Run\" = \"LTEBandLock\", \"Data\" should be a number like \"30\" or a combine like \"(4+7)\".  When \"Run\" = \"DeviceInitiatedSession\",  \"Data\" should be a date in a format like \"2019-12-01T01:20:34Z\" in UTC timezone.  When \"Run\" = \"ModuleLog\", \"Data\" can be \"enable\" or \"disable\", followed by the last six digits of IMEI, for example: \"enable,123456\"",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "VoiceServiceStats": {
+            "properties": {
+                "PacketsSent": {
+                    "type": "integer",
+                    "description": "Total number of RTP packets sent for this line."
+                },
+                "PacketsReceived": {
+                    "type": "integer",
+                    "description": "Total number of RTP packets received for this line."
+                },
+                "BytesSent": {
+                    "type": "integer",
+                    "description": "Total number of RTP payload bytes sent for this line."
+                },
+                "BytesReceived": {
+                    "type": "integer",
+                    "description": "Total number of RTP payload bytes received for this line."
+                },
+                "PacketsLost": {
+                    "type": "integer",
+                    "description": "Total number of RTP packets that have been lost for this line."
+                },
+                "Overruns": {
+                    "type": "integer",
+                    "description": "Total number of times the receive jitter buffer has overrun for this line."
+                },
+                "Underruns": {
+                    "type": "integer",
+                    "description": "Total number of times the receive jitter buffer has underrun for this line."
+                },
+                "IncomingCallsReceived": {
+                    "type": "integer",
+                    "description": "Total incoming calls received."
+                },
+                "IncomingCallsAnswered": {
+                    "type": "integer",
+                    "description": "Total incoming calls answered by the local user."
+                },
+                "IncomingCallsNotAnswered": {
+                    "type": "integer",
+                    "description": "Total incoming calls not answered by the local user."
+                },
+                "IncomingCallsConnected": {
+                    "type": "integer",
+                    "description": "Total incoming calls that successfully completed call setup signaling."
+                },
+                "IncomingCallsFailed": {
+                    "type": "integer",
+                    "description": "Total incoming calls that failed to successfully complete call setup signaling."
+                },
+                "OutgoingCallsAttempted": {
+                    "type": "integer",
+                    "description": "Total outgoing calls attempted."
+                },
+                "OutgoingCallsAnswered": {
+                    "type": "integer",
+                    "description": "Total outgoing calls answered by the called party."
+                },
+                "OutgoingCallsConnected": {
+                    "type": "integer",
+                    "description": "Total outgoing calls that successfully completed call setup signaling."
+                },
+                "OutgoingCallsFailed": {
+                    "type": "integer",
+                    "description": "Total outgoing calls that failed to successfully complete call setup signaling."
+                },
+                "CallsDropped": {
+                    "type": "integer",
+                    "description": "Total calls that were successfully connected (incoming or outgoing), but dropped unexpectedly while in progress without explicit user termination."
+                },
+                "TotalCallTime": {
+                    "type": "integer",
+                    "description": "Cumulative call duration in seconds."
+                },
+                "ServerDownTime": {
+                    "type": "integer",
+                    "description": "The number of seconds the CPE is unable to maintain a connection to the server. SHOULD not include time in which overall network connectivity is unavailable. Applies only to SIP."
+                },
+                "TimeStampLastReset": {
+                    "type": "string",
+                    "description": "The timestamp of the last accumulative record reset."
+                },
+                "CurrCallRemoteIP": {
+                    "type": "string",
+                    "description": "The far-end host address and IP for the current call."
+                },
+                "LastCallRemoteIP": {
+                    "type": "string",
+                    "description": "The far-end host address and IP for last completed call."
+                }
+            }
+        },
+        "CallHistory": {
+            "properties": {
+                "LastCallNumber": {
+                    "type": "string",
+                    "description": "The dialed string seen in SIP INVITE message"
+                },
+                "OriginatingURI": {
+                    "type": "string",
+                    "description": "SIP Call Caller Address"
+                },
+                "TerminatingURI": {
+                    "type": "string",
+                    "description": "SIP Call Called Address"
+                },
+                "StartTime": {
+                    "type": "string",
+                    "description": "Display the call start time stamp"
+                },
+                "StopTime": {
+                    "type": "string",
+                    "description": "Display the Call end time stamp"
+                },
+                "MaxReceiveInterarrivalJitter": {
+                    "type": "string",
+                    "description": "The max downlink inter-arrival RTP packet jitter"
+                },
+                "AvgReceiveInterarrivalJitter": {
+                    "type": "string",
+                    "description": "The average downlink inter-arrival RTP packet jitter"
+                },
+                "PayloadType": {
+                    "type": "string",
+                    "description": "Media Type (payload type in RTP packet)"
+                },
+                "CodecGSMUMTS": {
+                    "type": "string",
+                    "description": "Media Type (codec info)"
+                },
+                "InboundTotalRTPPackets": {
+                    "type": "string",
+                    "description": "Number of RTP Packets received before de-jitter buffer"
+                },
+                "InboundLostRTPPackets": {
+                    "type": "string",
+                    "description": "Number of downlink RTP Packets lost before de-jitter buffer"
+                },
+                "InboundDejitterDiscardedRTPPackets": {
+                    "type": "string",
+                    "description": "Number of RTP Packets discarded by de-jitter buffer"
+                },
+                "InboundDecoderDiscardedRTPPackets": {
+                    "type": "string",
+                    "description": "Number of RTP Packets discarded by decoder"
+                },
+                "OutboundTotalRTPPackets": {
+                    "type": "string",
+                    "description": "Number of RTP Packets Sent"
+                },
+                "InboundCumulativeAveragePacketSize": {
+                    "type": "string",
+                    "description": "Cumulative moving average of RTP packet size (downlink)"
+                },
+                "OutboundCumulativeAveragePacketSize": {
+                    "type": "string",
+                    "description": "Cumulative moving average of RTP packet size (uplink)"
+                },
+                "OutboundLastRTPTime": {
+                    "type": "string",
+                    "description": "Timestamp of last sent RTP packets"
+                },
+                "OutboundLastRTPToD": {
+                    "type": "string",
+                    "description": "Timestamp of last sent RTP packets"
+                },
+                "InboundLastRTPTime": {
+                    "type": "string",
+                    "description": "Timestamp of last received RTP packets"
+                },
+                "InboundLastRTPToD": {
+                    "type": "string",
+                    "description": "Timestamp of last received RTP packets"
+                },
+                "AvgRTPLatency": {
+                    "type": "string",
+                    "description": "Average time taken by an downlink RTP packet to arrive at receiving SIP agent after being sent"
+                },
+                "EncoderDelay": {
+                    "type": "string",
+                    "description": "Encoder delay"
+                },
+                "DecoderDelay": {
+                    "type": "string",
+                    "description": "Decoder delay"
+                },
+                "CallDirection": {
+                    "type": "string",
+                    "description": "SIP call direction - \"incomming\", \"outgoing\""
+                },
+                "SIPResultCode": {
+                    "type": "string",
+                    "description": "SIP Session End - Result Code"
+                }
+            }
+        },
+        "MessageWaiting": {
+            "properties": {
+                "MessageWaiting": {
+                    "type": "string",
+                    "description": "Add \"Voicemail\" MWI status"
+                }
+            }
+        },
+        "LineService": {
+            "properties": {
+                "ServiceState": {
+                    "type": "integer",
+                    "description": "The current Voip Line service status : 0 : disabled 1: enabled"
+                },
+                "DirectoryNumber": {
+                    "type": "string",
+                    "description": "Customer’s phone number"
+                },
+                "SIPAuthUserName": {
+                    "type": "string",
+                    "description": "SIP user account name"
+                },
+                "SIPAuthPassword": {
+                    "type": "string",
+                    "description": "SIP user account password"
+                },
+                "SIPReInviteExpires": {
+                    "type": "integer",
+                    "description": "SIP re-INVITE expiry timer (in seconds)"
+                },
+                "SIPRegisterExpires": {
+                    "type": "integer",
+                    "description": "SIP Register expiry timer (in seconds)"
+                },
+                "SIPRegisterRetryInterval": {
+                    "type": "integer",
+                    "description": "SIP Register Retry timer (in seconds)"
+                },
+                "SIPRegistersMinExpires": {
+                    "type": "integer",
+                    "description": ""
+                },
+                "SIPRegistrarServer": {
+                    "type": "string",
+                    "description": "SIP Registrar Server address"
+                },
+                "SIPRegistrarServerPort": {
+                    "type": "integer",
+                    "description": "SIP Registrar Server port"
+                },
+                "SIPRegistrarServerTransport": {
+                    "type": "string",
+                    "description": "Transport protocol used by SIP Registrar Server (i.e. UDP, TCP etc)"
+                },
+                "SIPUserAgentDomain": {
+                    "type": "string",
+                    "description": "SIP UAdomain name"
+                },
+                "SIPUserAgentPort": {
+                    "type": "integer",
+                    "description": "SIP UA port"
+                },
+                "SIPUserAgentTransport": {
+                    "type": "string",
+                    "description": "Transport protocol used by SIP UA (i.e. UDP, TCP etc)"
+                },
+                "SIPRFC3262UAC": {
+                    "type": "integer",
+                    "description": "SIP RFC 3262 UAC support "
+                },
+                "SIPRFC3262UAS": {
+                    "type": "integer",
+                    "description": "SIP RFC 3262 UAS support"
+                },
+                "SIPRFC3265Enabled": {
+                    "type": "integer",
+                    "description": "SIP RFC 3265 enabled"
+                },
+                "SIPRFC3311UAC": {
+                    "type": "integer",
+                    "description": "SIP RFC 3311 UAC support"
+                },
+                "SIPDSCP": {
+                    "type": "integer",
+                    "description": "SIP packet’s  IP header DSCP mark value"
+                },
+                "SIPPriorityMark": {
+                    "type": "integer",
+                    "description": "802.1p mark value on the SIP packet’s Ethernet frame (as part of VLAN tag)"
+                },
+                "LineFirstDigitTimer": {
+                    "type": "integer",
+                    "description": "First digit wait timer (in seconds)"
+                },
+                "LineInterDigitTimer": {
+                    "type": "integer",
+                    "description": "Last digit wait timer (in seconds)"
+                },
+                "LineShortInterDigitTimer": {
+                    "type": "integer",
+                    "description": "Short inter digit wait timer (in seconds)"
+                },
+                "LineRTPDSCP": {
+                    "type": "integer",
+                    "description": "RTP packet’s  IP header DSCP mark value"
+                },
+                "LineRTPPriorityMark": {
+                    "type": "integer",
+                    "description": "802.1p mark value on the RTP packet’s Ethernet frame (as part of VLAN tag)"
+                },
+                "LineRTCPEnabled": {
+                    "type": "integer",
+                    "description": "RTCP enabled flag"
+                },
+                "LineRTCPTxInterval": {
+                    "type": "integer",
+                    "description": "RTCP transmit interval (in seconds)"
+                },
+                "LineLocalURI": {
+                    "type": "string",
+                    "description": "URI by which the user agent will identify itself for this line in the format of \"sip:UserName@Domain\""
+                }
+            }
+	    },
+        "IMSStatus": {
+            "properties": {
+                "IMSStatus": {
+                    "type": "string",
+                    "description": "IMS (PDN) Registration Status: \"Registered\",  \"Registering\",  \"Registration Failure\""
+                },
+                "IMSFailureCause": {
+                    "type": "string",
+                    "description": "The Cause of the Registration failure : "
+                },
+                "LastSuccessfulRegistrationTime": {
+                    "type": "string",
+                    "description": "Time stamp for the last IMS Registration failure. "
+                }
+            }
+        },
+        "IMSSIPConfiguration": {
+            "properties": {
+                "SIPAuthUserName": {
+                    "type": "string",
+                    "description": "Username used to authenticate the connection to the IMS server."
+                },
+                "SIPAuthPassword": {
+                    "type": "string",
+                    "description": "Password used to authenticate the connection to the IMS server. When read, this parameter returns an empty string, regardless of the actual value."
+                },
+                "SIPLocalURI": {
+                    "type": "string",
+                    "description": "URI by which the IMS user agent will identify itself for this line (to the IMS server)."
+                }
+            }
+        },
+        "voipMacAddress": {
+            "properties": {
+                "clientMACAddress": {
+                    "type": "string",
+                    "description": "Mac address in the “XX:XX:XX:XX:XX:XX” format"
+                }
+            }
+        },
+        "VoiceSession": {
+            "properties": {
+                "StartTime": {
+                    "type": "string",
+                    "description": "Start timestamp in ISO-8601 format. (e.g. '2015-07-23T04:59:39UTC')"
+                }
+            }
+        },
+        "RRC": {
+            "properties": {
+                "PDCPLatencySent": {
+                    "type": "integer",
+                    "description": "This measures the average uplink latency (in milliseconds) between arrival of a PDCP SDU at UE until the acknowledge for last piece of PDCP SDU is received from the eNB at MAC layer."
+                }
+            }
+        }
+    }
+}

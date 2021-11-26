@@ -1,0 +1,353 @@
+#!/bin/sh
+#
+# diald connection script for DirectIP (or any ethernet type of WWAN connection) and PPP connection
+#
+# SDOD-XXXX scripts are middle men that work between connection_mgr and actual connection scripts. In dial-on-demand mode, connection_mgr 
+# launches a SDOD-XXXX script instead of launching SXXXX connection script and the SDOD-XXXX script launches diald that runs the actual
+# connection script when the WWAN connection is required.
+#
+# connection_mgr uses the proper dod script name by reformatting a connection script name. ( ex. SUMTS ==> SDOD-UMTS, SUSBNET ==> SDOD-USBNET )
+#
+
+#
+# OVERVIEW OF CONNECTION SEQUENCE
+# 
+# * ppp mode
+#
+# SDOD-UMTS ==> SUMTS 0 0 manual_config (to get pppd configuration)
+#           ==> diald.sh (diald) ==> /etc/diald/connect ==> SUMTS 0 0 manual_start (to dial with chat script)
+#                                ==> pppd ==> ip-up scripts
+#
+# * usbnet mode (or any other ethernet type of WWAN connection)
+#
+# SDOD-USBNET ==> diald.sh (diald) ==> /etc/diald/connect ==> SUSBNET 0 0 manual_start (to diald and to connect) ==> ip up scripts
+#
+# A connection script has to support 3 arguments now - [profile], [instance] and [action]. The argument action can be start,stop,
+# manual_start and manual_config. Those actions starting with "manual_" are only for diald to control the connection
+#
+# Yong
+#
+
+script=$(basename "$0")
+
+log() {
+	logger -t "$script" -- "$@"
+}
+
+run() {
+	log "[run] $*"
+
+	RES="/tmp/result-$script-$$.\$\$\$"
+
+	# pipe output to log and redirect result to RES
+	("$@" 2>&1; echo $? > "$RES") | log
+	# get RES and delete
+	run_result=$(cat "$RES")
+	rm -f "$RES"
+
+	return $run_result
+}
+
+
+# give a name to arguments
+prof="$1"
+inst="$2"
+
+# calc instance
+test -z "$inst" && inst="0"
+
+# get connection script 
+connscript_dir=$(dirname "$0")
+connscript_fname=$(echo "$script" | sed 's/^SDOD-//g')
+connscript="${connscript_dir}/S${connscript_fname}"
+
+# get interface dev name
+prof_dev=$(rdb_get "link.profile.$prof.dev")		# ex) [link.profile.1.dev] wwan.0
+netif=$(rdb_get "$prof_dev.netif_udev")			# ex) [wwan.0.netif_udev] wwan0 
+
+# get AT port number
+tty=$(rdb_get "$prof_dev.data_if.$(( $inst + 1 ))")
+v24=$(rdb_get "$prof_dev.V250_if.$(( $inst + 1 ))")
+
+# take v24 if tty does not exist
+test -z "$tty" && tty="$v24"
+
+log << EOF
+prof='$prof'
+inst='$inst'
+connscript='$connscript'
+prof_dev='$prof_dev'
+netif='$netif'
+tty='$tty'
+EOF
+
+device=""
+
+if [ ! -x "$connscript" ]; then
+	log "connection script not accessable - $connscript"
+	return 1
+fi
+
+# get device name
+case "$script" in
+	'SDOD-USBNET')
+		if [ -z "$netif" ]; then
+			log "netif rdb [$prof_dev.netif_udev] is not not available - maybe ppp connection?"
+			return 1
+		fi
+		device="$netif"
+		;;
+
+	'SDOD-UMTS')
+		if [ -z "$tty" ]; then
+			log "data port [$prof_dev.data_if.$inst] is not available - no module?"
+			return 1
+		fi
+		device="$tty"
+
+		pppd_opt=$("$connscript" "$prof" "$inst" manual_config)
+		if [ -z "$pppd_opt" ]; then
+			log "pppd option is not available"
+			return 1
+		fi
+
+
+		;;
+
+	*)
+		log "script name is incorrect ($script) - assume UMTS connection"
+		if [ -z "$tty" ]; then
+			log "data port [$prof_dev.data_if.$inst] is not available - no module?"
+			return 1
+		fi
+		;;
+esac
+
+
+build_diald_conf_ppp() {
+	#/usr/sbin/pppd -defaultroute -detach mtu 1500 mru 1500 netmask 255.255.255.255
+	#pppd /dev/ttyUSB3 nodetach noipdefault crtscts noauth ipparam 1 linkname 1 usepeerdns connect /usr/sbin/chat -v -f /etc/ppp/chatscripts/umts -T atd*99# -U 'AT+CGDCONT=1,"IP","telstra.internet"
+
+	log "pppd option : $pppd_opt"
+
+	# default route
+	if echo "$pppd_opt" | grep -q "^defaultroute\|[[:space:]]defaultroute"; then
+		echo "defaultroute"
+	fi
+
+	# crtsct
+	if echo "$pppd_opt" | grep -q "^crtscts\|[[:space:]]crtscts"; then
+		echo "crtscts"
+	fi
+
+	# remove pppd, port, crtscts and defaultroute as diald has its own options
+	diald_pppd_opt=$(echo "$pppd_opt" | sed 's/pppd[[:space:]]\+[^ ]\+[[:space:]]//g;s/-*nodetach\b\+//g;s/-*crtscts\b//g;s/-*nodetach\b\+//g;s/-*defaultroute\b//g')
+	log "diald pppd option : $diald_pppd_opt"
+
+	cat << EOF
+mode ppp
+
+pppd-options $diald_pppd_opt
+
+speed 115200
+modem
+EOF
+
+}
+
+build_diald_conf() {
+ignore_icmp=$(rdb_get "dialondemand.ignore_icmp");
+ignore_tcp=$(rdb_get "dialondemand.ignore_tcp");
+ignore_udp=$(rdb_get "dialondemand.ignore_udp");
+ignore_ntp=$(rdb_get "dialondemand.ignore_ntp");
+ignore_dns=$(rdb_get "dialondemand.ignore_dns");
+ignore_win7=$(rdb_get "dialondemand.ignore_win7");
+
+ports_en=$(rdb_get "dialondemand.ports_en");
+ports_list=$(rdb_get "dialondemand.ports_list");
+
+	cat << EOF
+
+# flter
+####################################################################
+
+EOF
+
+	if [ "$ports_en" = "1" ]; then
+		if [ -z "$ports_list" ]; then
+			log "port list [dialondemand.ports_list] is blank. no port trigger selected"
+		else
+
+			echo "# port list"
+			for port in $(echo "$ports_list" | sed 's/,/ /g'); do
+				echo "accept udp $(($traffic_online*60)) udp.dest=$port"
+				echo "accept tcp $(($traffic_online*60)) tcp.dest=$port"
+			done
+		fi
+	else
+		if [ "$ignore_ntp" = "1" -o "$ignore_win7" = "1" ]; then
+			echo "# ntp or windows 7"
+			echo "ignore udp udp.dest=udp.ntp"
+		fi
+
+		if [ "$ignore_dns" = "1" ]; then
+			echo "# domain name service"
+			echo "ignore udp udp.dest=53"
+			echo "ignore tcp tcp.dest=53"
+		fi
+
+		if [ "$ignore_icmp" != "1" ]; then
+			echo "# icmp"
+			echo "accept icmp $(($traffic_online*60)) any"
+		fi
+
+		if [ "$ignore_udp" != "1" ]; then
+			echo "# udp"
+			echo "accept udp $(($traffic_online*60)) any"
+		fi
+
+		if [ "$ignore_tcp" != "1" ]; then
+			echo "# tcp"
+			echo "accept tcp $(($traffic_online*60)) any"
+		fi
+
+	fi
+
+	# get dod_debug level
+	dod_debug=$(rdb_get "dialondemand.dod_verbose_logging")
+	if [ "$dod_debug" != "1" ]; then
+		dod_debug=0;
+	fi
+	
+
+	cat << EOF
+# network specific configuration
+####################################################################
+EOF
+
+	case "$script" in
+		'SDOD-USBNET')
+			echo "mode dev"
+			;;
+
+		'SDOD-UMTS')
+			build_diald_conf_ppp
+			;;
+
+		*)
+			build_diald_conf_ppp
+			;;
+	esac
+
+	cat << EOF
+
+
+impulse $(($min_online*60)),0,0
+
+# network
+####################################################################
+dynamic
+local $proxy_localip
+remote $proxy_remoteip
+netmask 255.255.255.255
+metric 0
+demand
+
+
+# diald
+####################################################################
+# buffer packet
+buffer-packets
+buffer_size 65536
+first-packet-timeout $(($min_online*60))
+
+debug $dod_debug
+
+redial-backoff-start 5
+redial-timeout $dial_delay
+connect-timeout 120
+disconnect-timeout 120
+
+# scripts
+####################################################################
+connect "/etc/diald/connect"
+disconnect "/etc/diald/disconnect"
+addroute /etc/diald/addroute
+delroute /etc/diald/delroute
+# initializer
+# deinitializer
+ip-up /etc/diald/ipup
+ip-down /etc/diald/ipdown
+
+# binaries
+####################################################################
+path-ip /sbin/ip
+#path-route
+#path-ifconfig
+#path-pppd
+#path-bootpc
+
+
+EOF
+}
+
+# read configuration
+localip="$(( $prof*2 ))"
+remoteip="$(( $prof*2+1 ))"
+proxy_localip="10.64.64.$localip"
+proxy_remoteip="10.65.65.$remoteip"
+
+traffic_online=$(rdb_get "dialondemand.traffic_online")
+dial_delay=$(rdb_get "dialondemand.dial_delay")
+min_online=$(rdb_get "dialondemand.min_online")
+
+log << EOF
+proxy_localip='$proxy_localip'
+proxy_remoteip='$proxy_remoteip'
+traffic_online='$traffic_online'
+dial_delay='$dial_delay'
+min_online='$min_online'
+EOF
+
+# re-build diald conf
+build_diald_conf > "/tmp/diald.conf"
+
+# put a proxy dns if no dns entry exists
+if ! cat "/etc/resolv.conf" 2> /dev/null | grep -q '^[[:space:]]*nameserver[[:space:]]\+[0-9]\+'; then
+	log "nameserver entry does not exist in '/etc/resolv.conf' - adding a proxy ip address"
+	echo "nameserver $proxy_remoteip # proxy name server (created by $script)" >> "/etc/resolv.conf"
+
+	cat "/etc/resolv.conf" | log
+fi
+
+
+# TODO: we need to power control here. Instead of doing this, we need to use the standard structure of connection scripts
+deactivate_wwan_conn() {
+
+	log "deactivate WWAN connection"
+	run "$connscript" "$prof" "$inst" "stop"
+
+	# manually put the connection status down
+ 	log "clear all wwan status"
+ 	dod_profile=$(rdb_get "dialondemand.profile")
+ 	p="link.profile.$dod_profile"
+ 	
+	run rdb_set "${p}.status" "down"
+	
+	# disconnect 
+	inf=$(rdb_get "link.profile.$dod_profile.interface")
+	if [ -n "$inf" ]; then
+		log "disconnect wwan connection - $inf"
+		run ifconfig "$inf" down
+	fi
+
+	# off dial-on-demand
+	run rdb_set "dialondemand.status" "0"
+}
+
+# make the interface down in case we have the interface already up
+log "DOD start - terminate all wwan connections"
+deactivate_wwan_conn
+
+log "launching diald - diald-run.sh '$device' '$connscript' '$prof' '$inst'"
+exec diald-run.sh "$device" "$connscript" "$prof" "$inst"

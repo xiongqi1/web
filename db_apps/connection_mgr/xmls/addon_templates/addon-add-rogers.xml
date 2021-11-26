@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rt>
+<Include>
+	<Country country="Canada" mcc="302">
+		<Carrier carrier="Rogers" mnc="720">
+			<APN apn="fixed-isp.apn">
+			</APN>
+		</Carrier>
+	</Country>
+</Include>	
+</Rt>

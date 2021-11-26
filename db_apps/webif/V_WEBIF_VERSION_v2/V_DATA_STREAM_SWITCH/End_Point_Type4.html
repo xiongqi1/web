@@ -1,0 +1,174 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>End point type4 (UDP Server)</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language="JavaScript" src="/cgi-bin/end_points.cgi?getList"></script>
+<script language="JavaScript">
+<%
+var epName = base64_encode(request['QUERY_STRING']);
+%>
+var EP_Name="@@epName";
+EP_Name=Base64.decode(EP_Name);
+
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	function setRdb(varRdb, val) {
+		set_single_direct("-p",varRdb, val);
+	}
+	function setDsmRdb(varRdb, val) {
+		setRdb("service.dsm.ep.conf."+varRdb, val);
+	}
+
+	i=validate_number(form['idxEP']);
+	EP_Name=form['nameEP'];
+	// validate input
+	if (string_regex_match(EP_Name, "^[!()*-/0-9;?A-Z_a-z-]+$") == false) {
+		onBadRequest();
+	}
+	var portNumber = string_to_number(form['portnumber']);
+	if (portNumber < 1 || portNumber > 65535) {
+		onBadRequest();
+	}
+	if (form['maxchildren'] != "") {
+		var maxChildren = string_to_number(form['maxchildren']);
+		if (maxChildren < 1 || maxChildren > 20) {
+			onBadRequest();
+		}
+	}
+	setDsmRdb(i+".name", EP_Name);
+	setDsmRdb(i+".type",'4');
+	setDsmRdb(EP_Name+".port_number",form['portnumber']);
+	setDsmRdb(EP_Name+".max_children",form['maxchildren']);
+	set_single_direct("","service.dsm.trigger","1");
+	redirect('/end_points.html?success');
+}
+%>
+
+function submitForm() {
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	blockUI_wait(_("GUI pleaseWait"));
+	for (var i=0; i<endpoints.length;i++) {
+		if(endpoints[i].name==EP_Name) {
+			break;
+		}
+	}
+	$("#idxEP").val(i);
+	$("#nameEP").val(EP_Name);
+	$("#form").submit();
+}
+
+
+
+$(document).ready(function() {
+	$("#portnumber").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.port_number');%>");
+	$("#maxchildren").val("<%get_single_direct('service.dsm.ep.conf.'+request['QUERY_STRING']+'.max_children');%>");
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<form name="form" id="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+			<%appendCsrfToken();%>
+			<input type="hidden" name='idxEP' id='idxEP' value="">
+			<input type="hidden" name='nameEP' id='nameEP' value="">
+			<div class="pad" id="setup">
+				<h2><script language=Javascript>document.write(_("type4")+"  "+_("endPoint")+"   ("+htmlNumberEncode(EP_Name)+")")</script></h2>
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="portnumber"><script language=Javascript>document.write(_("Port number"))</script></label>
+						<div class="field">
+							<input type="text" name="portnumber" id="portnumber" class="large required field1and65535 validate[required, funcCall[validate_field1and65535]]" maxLength="5" onKeyUp='NumfieldEntry(this)' value="">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-65535"))</script></span>
+						</div>
+					</div>
+					<div class="form-row" style="display:none">
+						<label for="maxchildren"><script language=Javascript>document.write(_("Max clients"))</script></label>
+						<div class="field">
+							<input type="text" name="maxchildren" id="maxchildren" class="large required field1and20 validate[required, funcCall[validate_field1and20]]" maxLength="2" onKeyUp='NumfieldEntry(this)' value="">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write(_("1-20"))</script></span>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row" id="submit-div">
+					<button type="button" onClick="submitForm();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='end_points.html'"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+			</form>
+		</div>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+set_menu("Services", "EDP", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("field1and65535",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 65535 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and65535"));
+
+	$.validator.addMethod("field1and20",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 20 ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and20"));
+#else
+function validate_field1and65535(field) {
+	if( field.val() < 1 || field.val() > 65535 ) {
+		return _("field1and65535");
+	}
+}
+function validate_field1and20(field) {
+	if( field.val() < 1 || field.val() > 20 ) {
+		return _("field1and20");
+	}
+}
+#endif
+</script>
+</body>
+</html>

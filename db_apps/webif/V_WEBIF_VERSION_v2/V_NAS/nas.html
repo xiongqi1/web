@@ -1,0 +1,531 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>Storage</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+#if 0
+<!-- server script -->
+#endif
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+
+	/* guest settings */
+	set_single("nas.samba.guest="+form["guest_access"],"-p");
+	set_single("nas.samba.guest_readonly="+form["guest_readonly"],"-p");
+
+	/* authentication settings*/
+	if(form["show_password"]=="on") {
+		set_single("nas.samba.pass="+form["pass_visible"],"-p");
+	}
+	else {
+		/* set_single("nas.samba.user="+form["user"],"-p"); */
+		if(form["pass_valid"]=="1")
+			set_single("nas.samba.pass="+form["pass"],"-p");
+	}
+	set_single("nas.samba.user_readonly="+form["auth_readonly"],"-p");
+
+	/* samba enable or disable */
+
+	set_single("nas.samba.verbose_debug="+form["verbose_debug"],"-p");
+	set_single("nas.samba.enable="+form["samba_en"],"-p");
+	redirect('/nas.html?success');
+}
+%>
+
+#if 0
+<!-- client script -->
+#endif
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+
+var menu_main="System";
+var menu_sub="NAS";
+var menu_title=_("storage device list");
+
+$(function(){
+
+	/* components */
+	var $tbody_storage=$("#tbody_storage");
+
+	var nas=new cgi("./cgi-bin/nas.cgi");
+	var timer;
+
+	function enable_elements(en) {
+		$("div,button,input,label").css("cursor", en?"auto":"wait");
+	}
+
+	function poll_storage_info() {
+		timer=null;
+
+		nas.reset();
+		nas.run("info",function(res){
+
+			s=res.storages;
+
+			/* update storage table */
+			var tbody_storage=new Array();
+			$.each(s,function(i,o){
+				if(o.stat!="inserted")
+					return true;
+
+				if(o.mp=="")
+					return true;
+
+				/* get mount point */
+				var bname;
+				var mp;
+				bname=o.mp.match(/[^\/]*$/g);
+				if(!bname)
+					return true;
+
+				mp=bname[0];
+
+				/* apply location-based description */
+				if(o.desc=="") {
+					if(o.loc.match(/^usb.*/g))
+						o.desc=_("usb");
+					else if(o.loc.match(/^platform.*/g))
+						o.desc=_("builtin");
+				}
+
+				/*
+					* string resource
+
+					_("vfat")
+					_("ntfs")
+				*/
+
+				tbody_storage.push(
+					"<tr>"+
+						"<td>"+(parseInt(o.idx))+"</td>"+
+/*
+						"<td>"+o.stat+"</td>"+
+						"<td>"+o.dev+"</td>"+
+						"<td>"+o.loc+"</td>"+
+*/
+						"<td>"+mp+"</td>"+
+						"<td>"+o.desc+"</td>"+
+
+						"<td>"+_(o.fs)+"</td>"+
+						"<td>"+o.size+"</td>"+
+						"<td>"+o.used+"</td>"+
+						"<td>"+o.avail+"</td>"+
+						"<td>"+o.up+"</td>"+
+
+						"<td>"+
+							"<a class='secondary sml' style='padding:0;border:0;' action='umount' index='"+o.idx+"' title='"+_("safely eject")+"'><i class='icon eject'></i></a>"+
+						"</td>"+
+					"</tr>"
+
+				);
+			});
+
+			function blockUI_alert_thenReload(msg) {
+				function reloadPage() {location.href=ipvar+'/nas.html';}
+				blockUI_alert( msg, reloadPage );
+			}
+
+			$("#storage_warning").toggle(tbody_storage.length==0)
+			$tbody_storage.html(tbody_storage.join(""));
+
+			/* onclick for remove buttons */s
+			$("#tbody_storage a").click(function(){
+				var this_button=this;
+				blockUI_confirm(_("SafelyEjectConfirm"), function(){
+					var storage_idx=parseInt($(this_button).attr("index"));
+					var storage_action="umount";
+
+					enable_elements(false);
+
+					nas.reset();
+					nas.add(storage_idx);
+					nas.run(storage_action,function(res){
+						if(res.cgiresult!=0) {
+							blockUI_alert_thenReload(_("failed to umount"));
+						}
+						else { 
+							window.location="/nas.html";
+						}
+					});
+				});
+
+			});
+
+			enable_elements(true);
+
+			/* reprogram the timer only when it is not set */
+			if(timer==null) {
+				timer=setTimeout(poll_storage_info,5000);
+			}
+		});
+	}
+
+	function load_samba_settings() {
+
+		load_values_to_elements({
+			"input:radio.access[name=samba_en]":"<%get_single_direct('nas.samba.enable');%>"=="1",
+			"input:radio.access[name=verbose_debug]":"<%get_single_direct('nas.samba.verbose_debug');%>"=="1",
+			/* authentication access */
+			"#user":"<%get_single_direct('nas.samba.user');%>",
+			"#pass":"********",
+			"#pass2":"********",
+			"input:radio.access[name=auth_readonly]":"<%get_single_direct('nas.samba.user_readonly');%>"=="1",
+			/* guest access */
+			"input:radio.access[name=guest_access]":"<%get_single_direct('nas.samba.guest');%>"=="1",
+			"input:radio.access[name=guest_readonly]":"<%get_single_direct('nas.samba.guest_readonly');%>"=="1",
+		});
+	}
+
+	/* detect modification of pass and pass2 */
+	$("#pass,#pass2").on("input",function(){
+		$("#pass_valid").val("1");
+	});
+
+	/* submit */
+	$("#form").submit(function(){
+		return true;
+	});
+
+	$("#button_save").click(function(){
+#ifdef V_WEBIF_SPEC_vdf
+		if(!$("#form").valid()) {
+			return;
+		}
+		if( $("#pass").val() != $("#pass2").val() ) {
+			validate_alert ( "", "password not matched");
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			return;
+		}
+#endif
+		$("#form").submit();
+	});
+
+	$("#radio_samba").click(function(){
+		var toggle=$(this).attr("toggle-element");
+		var val=$(this).children().filter("input:radio.access:checked").val();
+
+		$("#"+toggle).toggle(val=="1");
+	});
+
+	$("input:radio.access[name=auth_readonly],input:radio.access[name=guest_access]").click(function(){
+
+		var auth_readonly=$("input:radio.access[name=auth_readonly]:checked").val();
+		var guest_access=$("input:radio.access[name=guest_access]:checked").val();
+
+		if(auth_readonly=="1")
+			load_values_to_elements({"input:radio.access[name=guest_readonly]":true});
+
+		/* show guest read only configuration only when guess access is on and auth is not read-only */
+		$("#div_guest").toggle(auth_readonly=="0" && guest_access=="1");
+	});
+
+	function update_div_password(visible_password) {
+		$("#div_visible_password").toggle(visible_password);
+		$("#div_invisible_password").toggle(!visible_password);
+	}
+
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+	$("#show_password").click(function(){
+
+		var visible_password=$("#show_password").is(":checked");
+
+		/* go to invisible password */
+		if(!visible_password) {
+			update_div_password(false);
+			return;
+		}
+
+		/* get samba password */
+		rdb.reset();
+		rdb.add("nas.samba.pass");
+
+		/* disable elements */
+		enable_elements(false);
+
+		rdb.mget(function(res){
+
+			var pass=res["nas.samba.pass"];
+
+			$("#pass_visible").val(pass);
+			$("#pass2_visible").val(pass);
+
+			update_div_password(true);
+
+			/* enable elements */
+			enable_elements(true);
+		});
+	});
+
+	/* load */
+	function button_load() {
+		enable_elements(false);
+
+		load_samba_settings();
+		$("#radio_samba,input:radio.access[name=auth_readonly]:checked").trigger("click");
+
+		/* update div password */
+		update_div_password(false);
+
+		poll_storage_info();
+	}
+
+	button_load();
+});
+
+function showNoEncryptionWarning() {
+#ifdef V_NON_SECURE_WARNING_y
+	blockUI_alert(_("noEncryptionWarning"));
+#endif
+}
+</script>
+
+#if 0
+<!-- UI  style -->
+#endif
+<style type="text/css">
+	table#table_storage td,table#table_storage th {
+		text-align: left;
+		padding-left: 10px;
+	}
+
+	.p-des-full-width {
+		padding:15px 0 0 20px;
+		width:660px;
+	}
+</style>
+
+#if 0
+<!-- UI  -->
+#endif
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+
+#if 0
+<!--
+	##template## examples
+-->
+#endif
+	<form><!--place holder for validation--></form>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(menu_title)</script></h2>
+				<table id="table_storage">
+					<colgroup>
+						<col width="30px">
+						<col width="80px">
+						<col width="100px">
+						<col width="80px">
+						<col width="80px">
+						<col width="80px">
+						<col width="80px">
+						<col width="80px">
+						<col width="100px">
+					</colgroup>
+					<thead>
+						<tr>
+							<th>#</th>
+							<th><script language=Javascript>document.write(_("mp"))</script></th>
+							<th><script language=Javascript>document.write(_("desc"))</script></th>
+							<th><script language=Javascript>document.write(_("fs"))</script></th>
+							<th><script language=Javascript>document.write(_("size"))</script></th>
+							<th><script language=Javascript>document.write(_("used"))</script></th>
+							<th><script language=Javascript>document.write(_("avail"))</script></th>
+							<th><script language=Javascript>document.write(_("used%"))</script></th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="tbody_storage">
+					</tbody>
+				</table>
+				<th colspan="9">
+					<div align="center" id="storage_warning" style="padding-bottom:20px;display:none"><script language="Javascript">document.write(_("no media found"))</script></div>
+				</th>
+			</div>
+
+			<div class="pad">
+				<form id="form" name="form" class="validate" method="POST" novalidate="novalidate" >
+				<%appendCsrfToken();%>
+					<h2><script language=Javascript>document.write(_("network storage settings"))</script></h2>
+					<div class="grey-box">
+						<div class="form-row">
+							<label><script language="Javascript">document.write(_("samba storage access"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div class="radio-switch" toggle-element="div_samba" id="radio_samba">
+										<input type="radio" class="access" name='samba_en' id='samba_en_0' value="1" onClick="showNoEncryptionWarning()">
+										<label for="samba_en_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" class="access" name='samba_en' id='samba_en_1' value="0">
+										<label for="samba_en_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div id="div_samba">
+							<div class="form-row">
+								<label><script language="Javascript">document.write(_("verbose logging"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch" toggle-element="div_samba">
+											<input type="radio" class="access" name='verbose_debug' id='verbose_debug_0' value="1">
+											<label for="verbose_debug_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" class="access" name='verbose_debug' id='verbose_debug_1' value="0">
+											<label for="verbose_debug_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="p-des-full-width">
+								<b><script language="Javascript">document.write(_("authentication access"))</script></b>
+
+							</div>
+
+							<div id="div_user_access">
+								<div class="form-row">
+									<label for="user"><script language=Javascript>document.write(_("user"))</script></label>
+									<div class="field">
+										<input type="text" class="large" name="user" id="user" style="color:#888" disabled>
+									</div>
+								</div>
+
+								<div id="div_invisible_password" style="display:none">
+									<input type="hidden" name="pass_valid" id="pass_valid" value="0">
+
+									<div class="form-row">
+										<label for="pass"><script language=Javascript>document.write(_("password"))</script></label>
+										<div class="field">
+											<input type="password" class="large validate[required] required" name="pass" id="pass" >
+
+										</div>
+									</div>
+
+									<div class="form-row">
+										<label ><script language=Javascript>document.write(_("verify password"))</script></label>
+										<div class="field">
+											<input type="password" class="large validate[required,equals[pass]] required" id="pass2" >
+										</div>
+
+									</div>
+								</div>
+
+								<div id="div_visible_password" style="display:none">
+									<div class="form-row">
+										<label for="pass"><script language=Javascript>document.write(_("password"))</script></label>
+										<div class="field">
+											<input class="large validate[required]" name="pass_visible" id="pass_visible" >
+
+										</div>
+									</div>
+
+									<div class="form-row">
+										<label ><script language=Javascript>document.write(_("verify password"))</script></label>
+										<div class="field">
+											<input class="large validate[required,equals[pass_visible]]" id="pass2_visible" >
+										</div>
+
+									</div>
+								</div>
+
+								<div class="form-row">
+									<label for="checkbox"><script language="Javascript">document.write(_("show password"))</script></label>
+									<div class="check-box">
+										<input type="checkbox" id="show_password" name="show_password" class="access">
+										<label for='show_password'>&nbsp;</label>
+									</div>
+								</div>
+
+								<div class="form-row">
+									<label><script language="Javascript">document.write(_("readonly"))</script></label>
+									<div class="field">
+										<div class="location-settings">
+											<div class="radio-switch">
+												<input type="radio" class="access" name='auth_readonly' id='auth_readonly_0' value="1">
+												<label for="auth_readonly_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+												<input type="radio" class="access" name='auth_readonly' id='auth_readonly_1' value="0">
+												<label for="auth_readonly_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="p-des-full-width">
+								<b><script language="Javascript">document.write(_("guest access"))</script></b>
+							</div>
+
+							<div class="form-row">
+								<label><script language="Javascript">document.write(_("guest access"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch" id="radio_guess_access">
+											<input type="radio" class="access" name='guest_access' id='guest_access_0' value="1">
+											<label for="guest_access_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" class="access" name='guest_access' id='guest_access_1' value="0">
+											<label for="guest_access_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="form-row" id="div_guest">
+								<label><script language="Javascript">document.write(_("readonly"))</script></label>
+								<div class="field">
+									<div class="location-settings">
+										<div class="radio-switch">
+											<input type="radio" class="access" name='guest_readonly' id='guest_readonly_0' value="1">
+											<label for="guest_readonly_0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+											<input type="radio" class="access" name='guest_readonly' id='guest_readonly_1' value="0">
+											<label for="guest_readonly_1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="pad">
+							<div class="submit-row">
+								<button id="button_save" name="button_save" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+							</div>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("", "");
+<%	}%>
+</script>
+
+</body>
+</html>

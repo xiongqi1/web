@@ -1,0 +1,726 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Profile Name List</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+<script language='javascript'>
+
+var stpf = [];
+var def_profile = 0;
+
+<%
+function setRdb(variable, val) {
+	set_single_direct("",variable,val);
+}
+
+function toInt( str ) {
+	return str-0;
+}
+
+function validateInput() {
+	var numProfiles=string_to_number(form['numProfiles']);
+	for( var i=0; i<numProfiles; i++ ) {
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		// try to convert to validate whether this is a valid number
+		var profileNum = string_to_number(form['profileNum'+i]);
+#endif
+		validateOnOffRadio(form['pppAutoCon'+i]);
+	}
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+#ifndef V_ROUTER_TERMINATED_PPPOE
+#if 0
+	// WARNING: there should be some validation on APNName and ServiceName
+#endif
+	validateOnOffRadio(form['PPPoE']);
+#endif
+	var def_profile=string_to_number(form['def_profile']);
+#ifndef V_WEBIF_SPEC_vdf
+	validateOnOffRadio(form['dataRoam']);
+#endif
+#endif
+}
+
+#if 0
+// WARNING:
+// - When V_MODULE_PRI_BASED_OPERATION='y', rdb_tool.cgi is invoked to write RDB variables.
+// It is not possible to validate input at server-side in that case.
+// - APN, Username, Password, ... can contains special characters while ajax.cgi?getProfiles
+// prints them under "Content-Type: text/html". It is XSS vulnerable.
+// - APN is passed to breakWord so it is a little bit harder to make injected code executed
+// in this page but breakWord is not designed for security purpose and  may not be safe in all cases. 
+#endif
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	validateInput();
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	setRdb( 'service.pppoe.server.0.enable', 0);
+
+	numProfiles=toInt(form['numProfiles']);
+	for( var i=0; i<numProfiles; i++ ) {
+		var profilenum = form['profileNum'+i];
+
+		setRdb("link.profile."+profilenum+".enable",form['pppAutoCon'+i]);
+	}
+#if defined V_CUSTOM_FEATURE_PACK_Santos
+    setRdb('roaming.data.en', 1);
+#else
+	setRdb('roaming.data.en', 0);
+#endif
+	redirect(request['SCRIPT_NAME'] + "?success");
+#else
+#ifdef V_ROUTER_TERMINATED_PPPOE
+/* nothing to do - V_ROUTER_TERMINATED_PPPOE */
+#else
+	setRdb( 'service.pppoe.server.0.apn',form['APNName']);
+	setRdb( 'service.pppoe.server.0.service',form['ServiceName']);
+	pppoeEn=form['PPPoE'];
+	setRdb( 'service.pppoe.server.0.enable',pppoeEn);
+#endif
+
+#ifdef V_DIAL_ON_DEMAND
+	dod_en=toInt(get_single('dialondemand.enable'));
+	dod_pf=toInt(get_single('dialondemand.profile'));
+#endif
+	def_profile=toInt(form['def_profile']);
+	numProfiles=toInt(form['numProfiles']);
+	for( var i=0; i<numProfiles; i++ ) {
+		var pnum=i+1;
+		setRdb("link.profile."+pnum+".enable",form['pppAutoCon'+i]);
+		if ( form['pppAutoCon'+i] == "1" ) {
+#ifdef V_CUSTOM_FEATURE_PACK_Telstra_AU
+			setRdb( "link.profile."+pnum+".ESM_reconnect_delay", "0" );
+#endif
+			setRdb( "link.profile."+pnum+".trigger", "1" );
+		}
+
+		def=0;
+		if ( def_profile == pnum ) def=1;
+		setRdb("link.profile."+pnum+".defaultroute",def );
+#ifdef V_DIAL_ON_DEMAND
+		if (dod_en==1) {
+			if (def==1) {
+				// if default profile number is different from
+				// dialondemand profile number, then sync dialondemand
+				// profile number with this.
+				if (dod_pf!=pnum) {
+					setRdb("dialondemand.profile",pnum);
+				}
+			}
+		}
+#endif
+	}
+
+#ifndef V_WEBIF_SPEC_vdf
+	tempval=form['dataRoam'];
+	setRdb( 'roaming.data.en',tempval);
+	if (tempval=='1')
+		setRdb('roaming.data.blocked','');
+#endif
+
+#ifdef V_ROUTER_TERMINATED_PPPOE
+	redirect("/Profile_Name_List.html?success");
+#else
+	if( pppoeEn=="1" )
+		redirect(request['SCRIPT_NAME'] + "?successPPPoE");
+	else
+		redirect(request['SCRIPT_NAME'] + "?success");
+#endif
+#endif
+}
+#ifdef V_ROUTER_TERMINATED_PPPOE
+/* nothing to do - V_ROUTER_TERMINATED_PPPOE */
+#else
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+else {/*GET for PPPoE*/
+	form['APNName']=base64_encode(get_single( 'service.pppoe.server.0.apn' ));
+	form['ServiceName']=base64_encode(get_single( 'service.pppoe.server.0.service' ));
+}
+#endif
+#endif
+%>
+
+var roam_simcard="<%get_single_direct('manualroam.custom_roam_simcard');%>";
+
+#if defined V_ROUTER_TERMINATED_PPPOE || defined V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+/* do not use pppoe - there is a separate UI for V_ROUTER_TERMINATED_PPPOE */
+var pppoe_en="0";
+#else
+var pppoe_en="<%get_single_direct('service.pppoe.server.0.enable');%>";
+#endif
+var v250_en="<%if(rdb_exists('confv250.enable')) get_single_direct('confv250.enable');%>";
+var padd_en="<%if(rdb_exists('confv250.padd_enable')) get_single_direct('confv250.padd_enable');%>";
+var emulator_en=(v250_en=="1" && padd_en!="1");
+
+#if defined V_CUSTOM_FEATURE_PACK_Telstra_140 || defined V_CUSTOM_FEATURE_PACK_Telstra_145w || defined V_CUSTOM_FEATURE_PACK_Telstra_6200 || defined V_CUSTOM_FEATURE_PACK_Select_Solutions
+<%
+plmn_mcc=get_single('wwan.0.imsi.plmn_mcc');
+plmn_mnc=get_single('wwan.0.imsi.plmn_mnc');
+if (plmn_mcc == '505' && (plmn_mnc == '01' || plmn_mnc == '1')) {
+%>
+var max_enabled_profiles=1;
+<%} else {%>
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+<%}%>
+#else
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+#endif
+if(max_enabled_profiles=="" || max_enabled_profiles=="N/A") {
+	max_enabled_profiles=2;
+}
+
+function checkEnabledProfiles() {
+	var en=0;
+	for( var i=0; i<stpf.length; i++ ) {
+		if(stpf[i].enable == 1) {
+			en++;
+		}
+	}
+	return en;
+}
+
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+function check_default(idx) {
+	if( $("#pppAutoCon"+(idx-1)+"-1").is(":checked") ) {
+		if(checkEnabledProfiles() && emulator_en) {
+			load_value_to_element($("input:radio[name=pppAutoCon"+(def_profile-1)+"]"), false);
+			stpf[def_profile-1].enable=0;
+		}
+		else if(checkEnabledProfiles()>=max_enabled_profiles) {
+			load_value_to_element($("input:radio[name=pppAutoCon"+(def_profile-1)+"]"), false);
+			stpf[def_profile-1].enable=0;
+		}
+		load_value_to_element($("input:radio[name=pppAutoCon"+(idx-1)+"]"), true);
+		stpf[idx-1].enable=1;
+	}
+	def_profile=idx;
+}
+#endif
+
+function check_enable(idx, val) {
+	current_en=checkEnabledProfiles();
+	if( val==1 && stpf[idx].enable!=1 && current_en>0 && emulator_en ) {
+		blockUI_alert(_("enableMultiProfileWarning1"));
+		el="input:radio.access[name=pppAutoCon"+idx+"]";
+		load_value_to_element(el,false);
+	}
+	else if( val==1 && stpf[idx].enable!=1 && current_en>=max_enabled_profiles ) {
+		blockUI_alert(_("maxEnabledProfilesExceeded"));
+		el="input:radio.access[name=pppAutoCon"+idx+"]";
+		load_value_to_element(el,false);
+	}
+	else {
+		clear_alert();
+		stpf[idx].enable=val;
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		if(val==0 && $("input[name=def_profile]:checked").val()==(idx+1)) {
+			for( var i=0; i<stpf.length; i++ ) {
+				if(stpf[i].enable == 1) {
+					document.form.def_profile[i].checked=true;
+					def_profile=i+1;
+					break;
+				}
+			}
+		}
+		else if(current_en==0) {
+			def_profile=idx+1;
+			document.form.def_profile[idx].checked=true;
+		}
+#endif
+	}
+}
+
+function init_profile_list() {
+	var h="";
+#if defined(V_PRODUCT_hth_70)
+	var len=1;
+#else
+	var len=stpf.length;
+#endif
+	for( var i=0; i<len; i++ ) {
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		var profilenum = stpf[i].profilenum;
+
+		h += '<input type="hidden" name="profileNum'+i+'" id="profileNum'+i+'" value="'+profilenum+'">';
+#endif
+		var apn = stpf[i].APNName;
+
+		if(roam_simcard != "1" && stpf[i].autoapn==1) {
+			apn = "<td style='font-style:italic'>"+_("band automatic");
+		}
+		else if (apn=="") {
+			apn = "<td style='font-style:italic'>"+_("blank");
+		}
+		else {
+			apn = "<td>"+breakWord(stpf[i].APNName, 20);
+		}
+
+#ifdef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+		h += "<tr><td class='first'>"+breakWord(stpf[i].name, 10)+"</td><td>";
+#else
+		h += "<tr><td class='first'>"+breakWord(stpf[i].name, 10)+"</td><td class='radio-box'><input type='radio' class='access' name='def_profile' id='def_profile"+i+"' onchange='check_default(this.value)' value="+(i+1);
+		if( def_profile == i+1 ) {
+			h+=" checked";
+		}
+		h+="><label for='def_profile"+i+"'>&nbsp;</label></td><td>";
+#endif
+
+		h+='<div class="location-settings radio-switch"> \
+			<input type="radio" id="pppAutoCon'+i+'-0" name="pppAutoCon'+i+'" class="access" value=1 onclick="check_enable('+i+','+'1)"';
+		if(stpf[i].enable==1) {
+			h+=" checked";
+		}
+		h+='><label for="pppAutoCon'+i+'-0" class="on">'+_("on")+'</label>\
+			<input type="radio" id="pppAutoCon'+i+'-1" name="pppAutoCon'+i+'" class="access" value=0 onclick="check_enable('+i+','+'0)"';
+		if(stpf[i].enable!=1) {
+			h+=" checked";
+		}
+		h+='><label for="pppAutoCon'+i+'-1" class="off">'+_("off")+'</label>\
+		</div>';
+#ifdef V_WEBIF_SPEC_vdf
+		h+="</td>"+apn+"</td><td>"+breakWord(stpf[i].user, 16)+"</td><td class='last'><a class='secondary sml' href='Profile_Settings.html?"+i+"'><i class='icon edit'>"+_("edit")+"</i></a></td></tr>";
+#else
+		h+="</td>"+apn+"</td><td>"+breakWord(stpf[i].user, 16)+"</td><td class='last'><a class='secondary sml' style='padding:0;border:0;' href='Profile_Settings.html?"+i+"' title='"+_("edit")+"'><i class='icon edit'></i></a></td></tr>";
+#endif
+	}
+	$("#TBlist").html(h);
+	$.get("/js/selectivizr.js");
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+#if defined(V_WEBUI_TWEAK_fisher) || defined(V_CUSTOM_FEATURE_PACK_myna)
+	if(0) {
+#else
+	if(pppoe_en=="1") {
+#endif
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA)
+		$("#roamingsettings-div").css("display","none");
+#endif
+		$("#profiles-div").css("display","none");
+	}
+	else {
+		$("#pppoe-div").css("display","none");
+	}
+#endif
+#if !defined(V_ROUTER_TERMINATED_PPPOE) && !defined(V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y)
+	$("#APNName").val(Base64.decode("@@form['APNName']"));
+	$("#ServiceName").val(Base64.decode("@@form['ServiceName']"));
+#endif
+#if 0
+	// Disable profile 2 (ims) and 3 (SOS) enable/disable button when these two
+	// profiles are locked.
+#endif
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+	$("#def_profile1").attr("disabled", true);
+	$("#def_profile2").attr("disabled", true);
+	$("#pppAutoCon1-0").attr("disabled", true);
+	$("#pppAutoCon1-1").attr("disabled", true);
+	$("#pppAutoCon2-0").attr("disabled", true);
+	$("#pppAutoCon2-1").attr("disabled", true);
+#endif
+}
+
+function submitF() {
+	$("#numProfiles").val(stpf.length);
+
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA) && (!defined V_PRODUCT_hth_70) && (!defined V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y)
+	var x = document.getElementsByName("dataRoam");
+	if (x[0].checked == true) {
+	  blockUI_confirm(_("dataRoamAlert"),
+		function() { document.form.submit() },
+		function() {
+			x[0].checked = false;
+			x[1].checked = true;
+			});
+	}
+	else {
+#endif
+#ifdef V_LOCK_IMS_SOS_PROFILE_y
+		$("#def_profile1").attr("disabled", false);
+		$("#def_profile2").attr("disabled", false);
+		$("#pppAutoCon1-0").attr("disabled", false);
+		$("#pppAutoCon1-1").attr("disabled", false);
+		$("#pppAutoCon2-0").attr("disabled", false);
+		$("#pppAutoCon2-1").attr("disabled", false);
+#endif
+		blockUI_wait(_("GUI pleaseWait"));
+		document.form.submit();
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA) && (!defined V_PRODUCT_hth_70) && (!defined V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y)
+	}
+#endif
+}
+
+function doWhenReady() {
+	init_profile_list();
+
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	// load configuration
+	load_values_to_elements(
+		{"input:radio.access[name=PPPoE]":"<%get_single_direct('service.pppoe.server.0.enable');%>"==1}
+	);
+
+#ifndef V_WEBIF_SPEC_vdf
+	load_values_to_elements(
+		{"input:radio.access[name=dataRoam]":"<%get_single_direct('roaming.data.en');%>"==1}
+	);
+#endif
+
+#if !defined(V_WEBUI_TWEAK_fisher) && !defined(V_CUSTOM_FEATURE_PACK_myna)
+	// override click not to enable when any wwan profile is activated
+	$("input:radio.access[name=PPPoE]").click(function(){
+		// bypass if not on
+		if(!$(this).is(":checked[value=1]")) {
+			$("#pppoe-div").css("display","none");
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA)
+			$("#roamingsettings-div").css("display","");
+#endif
+			$("#profiles-div").css("display","");
+			return;
+		}
+
+		if(emulator_en) {
+			load_value_to_element("input:radio.access[name=PPPoE]",false);
+			blockUI_alert(_("enablePPPoEWarning1"));
+			return;
+		}
+		else {
+			// find the activated profile
+			var prof=-1;
+			for( var i=0; i<stpf.length && i<6; i++ ) {
+				if( stpf[i].enable == 1 ) {
+					prof=i;
+					break;
+				}
+			}
+			if(prof>=0) {
+				load_value_to_element("input:radio.access[name=PPPoE]",false);
+				function confirmed_func() {
+					for( var i=0; i<stpf.length && i<6; i++ ) {
+						$("#pppAutoCon"+i+"-1").attr("checked","checked");
+						stpf[i].enable=0;
+					}
+					$("#pppoe-div").css("display","");
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA)
+					$("#roamingsettings-div").css("display","none");
+#endif
+					$("#profiles-div").css("display","none");
+					load_value_to_element("input:radio.access[name=PPPoE]",true);
+				}
+				blockUI_confirm(_("pppoeEnableWarningMsg"), confirmed_func);
+			}
+			else {
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA)
+				$("#roamingsettings-div").css("display","none");
+#endif
+				$("#profiles-div").css("display","none");
+				$("#pppoe-div").css("display","");
+			}
+		}
+	});
+#endif  // V_WEBUI_TWEAK_fisher
+#endif
+#if defined(V_WEBUI_TWEAK_fisher) || defined(V_CUSTOM_FEATURE_PACK_myna)
+    $("#roamingsettings-div").css("display","none");
+    $("#pppoe-div").css("display","none");
+#endif
+}
+
+$(document).ready(function() {
+	function returnStructure(v){
+		eval(v);	// The data provided defines two variables  - stpf,def_profile
+				// This used to create global vars used by the page but here/now they are local
+				// We'll return them so that the calling function can assign them to the globals
+		return [stpf,def_profile];
+	}
+	$.get("/cgi-bin/ajax.cgi?getProfiles",
+		function(v) {
+			var results = returnStructure(v);
+			// Assign the previous local var to the global vars
+			stpf = results[0];
+			def_profile = results[1];
+			doWhenReady();
+		}
+	);
+});
+
+
+#ifdef V_MODULE_PRI_BASED_OPERATION_y
+$(function(){
+
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+	function enable_elements(en) {
+		$("#main_div,button,input").css("cursor", en?"auto":"wait");;
+	}
+
+	pri_carrier="<%get_single_direct('link.profile.wwan.pri');%>".replace(/\(.*\)/,"");
+
+	/* show reset profile only for SPRINT */
+	$("#div_reset_profile,#div_reset_profile2").toggle(pri_carrier=="SPRINT");
+
+	/* allow number only */
+	$('.numbersOnly').keyup(function() {
+		$(this).val( $(this).val().replace(/[^0-9]/g,'') )
+	});
+
+	$("#button_rtn").click(function(){
+		blockUI_confirm(_("omadm deactivate confirm"), function(){
+
+			var msl=$("#input_msl").val();
+
+			/* check msl code */
+			if(msl=="") {
+				blockUI_alert(_("msl code not input"));
+				return;
+			}
+
+			blockUI_wait(_("GUI pleaseWait"));
+
+			rdb.reset();
+			rdb.add("wwan.0.cdma.otasp.stat","");
+			rdb.add("wwan.0.cdma.otasp.spc",msl);
+			rdb.add("wwan.0.cdma.otasp.cmd","rtn");
+
+			rdb.mset(function(res){
+				/* wait until spc done */
+				rdb.wait_for_rdb_result("wwan.0.cdma.otasp.stat",60000,function(res){
+
+					/* redirect to status page if success */
+					var succ=res.match(/^\[done\].*/);
+					if(succ) {
+						setTimeout(function() {
+							location.reload();
+							return;
+						},20000);
+
+						return
+					}
+
+					/* unblock and show fail */
+					$.unblockUI();
+					blockUI_alert(_("omadm factory fail"));
+				});
+			});
+
+		});
+	});
+
+	/* reset profile */
+	$("#button_reset_profile").click(function(){
+
+		blockUI_confirm(_("omadm warning"), function(){
+			var update_type=$("#update_type").val();
+
+			rdb.reset();
+
+			blockUI_wait(_("GUI pleaseWait"));
+			//enable_elements(false);
+
+			/* start factory reset */
+			rdb.add("wwan.0.cdma.otasp.stat","");
+			rdb.add("wwan.0.cdma.otasp.cmd",update_type);
+			rdb.mset(function(res){
+				/* wait until spc done */
+				rdb.wait_for_rdb_result("wwan.0.cdma.otasp.stat",60000,function(res){
+					/* redirect to status page if success */
+					var succ=res.match(/^\[done\].*/);
+					if(succ) {
+						location.reload();
+						return;
+					}
+
+					/* unblock and show fail */
+					$.unblockUI();
+					blockUI_alert_l(_("omadm fail"),function(){
+						location.reload();
+					});
+				});
+			});
+		});
+	});
+});
+#endif
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div id="main_div" class="grid-9 omega">
+		<form name="form" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="numProfiles" id="numProfiles"/>
+		<div class="right-column white-box">
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+			<div class="pad">
+#if defined(V_ROUTER_TERMINATED_PPPOE) || defined(V_PRODUCT_hth_70) || defined V_WEBUI_TWEAK_fisher || defined(V_CUSTOM_FEATURE_PACK_myna)
+				<div class="form-row no-bg-form" style="display:none">
+#else
+				<div class="form-row no-bg-form">
+#endif
+					<h2><script language=Javascript>document.write(_("dataConnection"))</script></h2>
+					<label for="field-1"><script language=Javascript>document.write(_("transparentBridgePPPoE"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="radio-1" name="PPPoE" class="access" value=1>
+								<label for="radio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="radio-2" name="PPPoE" class="access" value=0>
+								<label for="radio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pad" id="pppoe-div">
+				<div class="p-des-full-width" >
+#ifdef V_PRODUCT_vdf_nwl12
+					<p><script language=Javascript>document.write(_("pppoeIntroduction 3gplus"))</script></p>
+#else
+					<p><script language=Javascript>document.write(_("pppoeIntroduction"))</script></p>
+#endif
+				</div>
+				<h2><script language=Javascript>document.write(_("pppoeConfiguration"))</script></h2>
+				<div class="grey-box">
+					<div class="form-row">
+						<label for="APNName"><script language=Javascript>document.write(_("apnName"))</script></label>
+						<div class="field">
+							<input id="APNName" type="text" name="APNName" class="large" maxlength=128>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="ServiceName"><script language=Javascript>document.write(_("serviceName"))</script></label>
+						<div class="field">
+							<input class="large" id="ServiceName" type="text" name="ServiceName" maxlength=128>
+						</div>
+					</div>
+				</div>
+			</div>
+#endif
+			<div class="pad" id="profiles-div">
+				<h2><script language=Javascript>document.write(_("profileNameList"))</script></h2>
+				<table class="name-list">
+					<colgroup>
+						<col width="100px">
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+						<col width="60px">
+#endif
+						<col width="110px">
+						<col width="170px">
+						<col width=auto>
+						<col width="50px">
+					</colgroup>
+					<thead>
+						<tr>
+							<th></th>
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+							<th><script language=Javascript>document.write(_("default"))</script></th>
+#endif
+							<th style="padding-right:8px;"><script language=Javascript>document.write(_("status"))</script></th>
+							<th style="text-align:left;padding-left:10px"><script language=Javascript>document.write(_("apn"))</script></th>
+							<th style="text-align:left;padding-left:10px"><script language=Javascript>document.write(_("user"))</script></th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="TBlist"></tbody>
+				</table>
+			</div>
+
+#ifdef V_MODULE_PRI_BASED_OPERATION_y
+			<div id="div_reset_profile" class="pad" style="display:none">
+				<h2><script language=Javascript>document.write(_("manual oma-dm"))</script></h2>
+
+				<div class="form-row no-bg-form">
+					<label for="field-1"><script language=Javascript>document.write(_("update type"))</script></label>
+
+					<div class="field">
+						<select id="update_type">
+							<option value="omadm-prl"><script language=Javascript>document.write(_("omadm device configuration and prl"))</script></option>
+							<option value="omadm"><script language=Javascript>document.write(_("omadm device configuration"))</script></option>
+							<option value="prl"><script language=Javascript>document.write(_("omadm prl"))</script></option>
+						</select>
+					</div>
+				</div>
+
+				<div class="form-row no-bg-form">
+					<label for="field-1"></label>
+					<div class="location-settings">
+						<button class="secondary" id="button_reset_profile" type="button"><script language=Javascript>document.write(_("oma activate"))</script></button>
+					</div>
+				</div>
+			</div>
+
+			<div id="div_reset_profile2" class="pad" style="display:none">
+				<h2><script language=Javascript>document.write(_("module factory reset"))</script></h2>
+				<div class="form-row no-bg-form">
+					<label for="field-1"><script language=Javascript>document.write(_("msl code"))</script></label>
+
+					<div class="field">
+						<input type=text id="input_msl" class="large numbersOnly" maxLength="6" >
+					</div>
+				</div>
+
+				<div class="form-row no-bg-form">
+					<label for="field-1"></label>
+					<div class="location-settings">
+						<button class="secondary" id="button_rtn" type="button"><script language=Javascript>document.write(_("factory reset"))</script></button>
+					</div>
+				</div>
+
+			</div>
+#endif
+
+#if (!defined V_WEBIF_SPEC_vdf) && (!defined V_CUSTOM_FEATURE_PACK_Verizon_USA) && (!defined V_PRODUCT_hth_70) && (!defined V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y)
+			<div class="pad" id="roamingsettings-div">
+				<div class="form-row no-bg-form">
+					<h2><script language=Javascript>document.write(_("roamingsettings"))</script></h2>
+					<label for="field-1"><script language=Javascript>document.write(_("allowdataroaming"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="dataroamingradio-1" name="dataRoam" class="access" value=1>
+								<label for="dataroamingradio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="dataroamingradio-2" name="dataRoam" class="access" value=0>
+								<label for="dataroamingradio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+#endif
+			<div class="pad">
+				<div class="submit-row">
+					<button type="button" id="button1" onclick="submitF();"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button class="secondary" id="button2" type="button" onClick="window.location='Profile_Name_List.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "Profile_List", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('wwanSubmitSuccess'));
+<%	}
+#ifndef V_SIMULTANEOUS_MULTIPLE_WWAN_VLAN_y
+	else if(request['QUERY_STRING']=="successPPPoE") {%>
+		success_alert("",_('pppoeSubmitSuccess'));
+<%	}
+#endif
+%>
+</script>
+</body>
+</html>

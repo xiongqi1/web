@@ -1,0 +1,523 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] || session["userlevel"] != '0') { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>SSH</title>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div id="contentWrapper">
+<% include /menu.html %>
+
+
+<!-- inline style -->
+<style type="text/css">
+
+	.row_menu {
+		width:100%;
+	}
+	
+	.row_menu_name {
+		width:45%;
+	}
+	
+	.row_buttons {
+		text-align:center;
+		margin-bottom: 10px;
+		margin-top: 10px;		
+	}
+	
+	.row_hostkeys {
+		width:100%;
+	}
+	
+	.file-wrapper {
+		display: inline-block;
+		overflow: hidden;
+		position: relative;
+		border:medium none;
+		
+		text-align:center;
+		padding:0px 0px;
+		
+		left:0px; top:0px;
+	}
+	
+	.file-wrapper input[type=file] {
+		cursor: pointer;
+		font-size: 100px;
+		height: 100%;
+		filter: alpha(opacity=1);
+		-moz-opacity: 0.01;
+		opacity: 0.01;
+		position: absolute;
+		right: 0;
+		top: 0;
+		width:auto;
+	}
+
+	.raw_td {
+		background:#FFFFFF;
+		padding-right:2px;
+		padding-left:2px;
+	}
+</style>
+
+<!-- block ui jqeury -->
+<script language="JavaScript" src="jquery.blockUI.js"></script>
+
+<script language="javascript" type="text/javascript">
+
+Butterlate.setTextDomain("SSH");
+
+function submitForm() {
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+	document.form.periodic_interval.disabled=false;
+	document.form.submit();
+}
+
+/* ssh cgi object */
+var ssh;
+		
+/* jquery main function */
+$(function(){
+	/* create ssh cgi object */
+	var ssh=new cgi("./cgi-bin/ssh.cgi");
+	/* create rdb */
+	var rdb=new rdb_tool();
+
+	/* current client keys */
+	var clientkeys=null;
+
+	/* enable or disable host and client ui */
+	function enable_keys_elements(en) {
+		$("#keysdiv,#keysdiv button,#keysdiv input").css("cursor", en?"auto":"wait");;
+		$("#keysdiv button").attr("disabled",!en);
+	}
+
+	/* read keys and update key ui */
+	function update_ui_keys(){
+		enable_keys_elements(false);
+
+		ssh.reset();
+		ssh.run("info",function(res){
+			var hostkeybody="";
+			var clientkeybody="";
+			// res["cgiresult"]
+
+			/* get host keys */
+			$.each(res["hostkeys"],function(n,v){
+				if(v==null)
+					return true;
+				
+				hostkeybody+="\
+					<tr>\
+						<td>"+n+"</td>\
+						<td>"+(v==""?_("na"):v)+"</td>\
+					</tr>\
+				";
+			});
+
+			/* store clientkeys */
+			clientkeys=res["clientkeys"];
+
+			/* get client keys */
+			$.each(clientkeys,function(i,o){
+				if(o==null) {
+					return true;
+				}
+				clientkeybody+="\
+					<tr>\
+						<td>"+o["user"]+"</td>\
+						<td>"+o["host"]+"</td>\
+						<td>"+o["keytype"]+"</td>\
+						<td class='last'>\
+							<input type='button' value="+_("delete")+" info='"+o["user"]+":"+o["index"]+"' ></button>\
+						</td>\
+					</tr>\
+				";
+			});
+
+			/* update ui */
+			$("#hostkeybody").html(hostkeybody);
+			$("#clientkeybody").html(clientkeybody);
+
+			/* delete client key - click for client deletion buttons*/
+			$("#clientkeybody input:button").click(function(){
+				var clientkey=$(this).attr("info").split(":");
+
+				/* bypass if no value is specified */
+				if(clientkey.length!=2) {
+					return;
+				}
+				var user=clientkey[0];
+				var idx=clientkey[1];
+
+				enable_keys_elements(false);
+				ssh.reset();
+				ssh.add(user);
+				ssh.add(idx);
+				ssh.run("del_clientkey", function(){
+					update_ui_keys();
+				});
+			});
+			enable_keys_elements(true);
+		});
+	}
+
+	/* enable or disable sshcfg */
+	function enable_sshcfg_elements(en) {
+		$("#ssh_config button").attr("disabled",!en);
+		$("#ssh_config,#ssh_config button").css("cursor", en?"auto":"wait");;
+	}
+
+	/* read sshcfg and update sshcfg ui */
+	function update_ui_sshcfg() {
+		rdb.reset();
+		rdb.add("service.ssh.cfg.PasswordAuthentication");
+		rdb.add("service.ssh.cfg.RSAAuthentication");
+		rdb.add("service.ssh.cfg.Protocol");
+
+		/* submit */
+		enable_sshcfg_elements(false);
+		rdb.mget(function(res){
+			/* load ui */
+			load_values_to_elements( {
+				"input:radio.access[name=sshcfg_pass_auth]":res["service.ssh.cfg.PasswordAuthentication"]!="no",
+				"input:radio.access[name=sshcfg_key_auth]":res["service.ssh.cfg.RSAAuthentication"]!="no",
+    				"#sshcfg_proto":res["service.ssh.cfg.Protocol"]||"2",
+			});
+			enable_sshcfg_elements(true);
+		});
+	};
+	
+	/* enable either sshcfg_key_auth or sshcfg_pass_auth when both are disabled */
+	$("input[name=sshcfg_key_auth][value=no]").click(function(){
+		load_value_to_element( "input:radio.access[name=sshcfg_pass_auth]",true );
+	});
+	
+	$("input[name=sshcfg_pass_auth][value=no]").click(function(){
+		load_value_to_element( "input:radio.access[name=sshcfg_key_auth]",true );
+	});
+	
+	/* sshcfg save button */
+	$("#sshcfg_save").click(function(){
+		var val;
+		rdb.reset();
+		/* pass auth. */
+		rdb.add("service.ssh.cfg.PasswordAuthentication",$("input:radio.access[name=sshcfg_pass_auth]:checked").val());
+		/* key auth. */
+		val=$("input:radio.access[name=sshcfg_key_auth]:checked").val();
+		rdb.add("service.ssh.cfg.RSAAuthentication",val);
+		rdb.add("service.ssh.cfg.PubkeyAuthentication",val);
+		/* protocol */
+		rdb.add("service.ssh.cfg.Protocol",$("#sshcfg_proto").val());
+		/* update config */
+		rdb.add("service.ssh.cfg","1");
+
+		/* submit */
+		enable_sshcfg_elements(false);
+		rdb.mset(function(res){
+			enable_sshcfg_elements(true);
+		});
+	});
+
+	/* hostkey - del */
+	$("#del_hostkeys").click(function(){
+		enable_keys_elements(false);
+		ssh.reset();
+		ssh.run("del_hostkeys",function(){
+			update_ui_keys();
+		});
+	});
+
+	/* hostkey - gen */
+	$("#gen_hostkeys").click(function(){
+		enable_keys_elements(false);
+
+		ssh.reset();
+		ssh.run("gen",function(){
+			update_ui_keys();
+		});
+	});
+
+	function prompt_passwords(check_blank_pw,func_ok,func_cancel) {
+		/* input password */
+		$.blockUI( {message: "\
+				<div>\
+				<table>\
+					<tr><td>\
+						"+_("input password")+"\
+					</tr></td>\
+				</table>\
+				<table>\
+					<tr>\
+						<td style='text-align:right'>\
+							"+_("password")+"\
+						</td>\
+						<td>\
+							<input type='password' id='blockui_pass'/>\
+						</td>\
+					<tr>\
+					</tr>\
+						<td style='text-align:right'>\
+							"+_("confirm password")+"\
+						</td>\
+						<td>\
+							<input type='password' id='blockui_pass2'/>\
+						</td>\
+					</tr>\
+				</table>\
+				<button style='display:inline;float:none' id='blockui_yes'>Yes</button>\
+				<button style='display:inline;float:none' id='blockui_no'>No</button>\
+				</div>\
+			</div>"
+		});
+		
+		/* blockui - no */
+		$("#blockui_no").click(function(){
+			$.unblockUI();
+			func_cancel();
+		});
+		
+		/* blockui - yes */
+		$("#blockui_yes").click(function(){
+			
+			/* check passwords */
+			if( $("#blockui_pass").val() != $("#blockui_pass2").val() ) {
+				alert(_("password not matching"));
+				return;
+			}
+			
+			/* check if empty password */
+			if(check_blank_pw && ($("#blockui_pass").val() == "") ) {
+				if(!confirm(_("empty password")));
+					return;
+			}
+			
+			/* unblock ui */
+			$.unblockUI();
+			
+			/* call call-back funcion */
+			func_ok($("#blockui_pass").val());
+		});
+	}
+	
+	/* hostkey - download private/public keys */
+	$("#dn_hostkeys").click(function(){
+		prompt_passwords(true,
+  			function(pw){
+				ssh.reset();
+				ssh.add(pw);
+				ssh.dn("dn_hostkeys", function(){});
+			},
+			function(){}
+		);	
+	});
+
+	/* hostkey - download public keys */
+	$("#dn_pubhostkeys").click(function(){
+		ssh.reset();
+		ssh.dn("dn_pubhostkeys", function(){
+		});
+	});
+
+	/* hostkey - up */
+	$("#up_hostkeys").change(function(e){
+		prompt_passwords(false,
+			function(pw){
+				/* disable elements */
+				enable_keys_elements(false);
+				
+				/* setup ssh cgi */
+				ssh.reset();
+				ssh.setcmd("up_hostkeys");
+				ssh.add(pw);
+				
+				/* submit */
+				ssh.up("#up_hostkeys",function(res){
+					if(res.cgiresult==82) {
+						alert(_("ssh server key password error"));
+					}
+					else if(res.cgiresult!=0) {
+						alert(_("ssh server key upload failure"));
+					}
+					update_ui_keys();
+					
+					/* reset upload form */
+					ssh.reset_up("#up_hostkeys");
+				});
+			},
+			function(){
+				/* reset upload form */
+				ssh.reset_up("#up_hostkeys");
+			}
+		);
+	});
+	
+	/* clientkey - delete all client keys */
+	$("#delall_clientkeys").click(function(){
+		
+		/* bypass if the user does not want */
+		if(!confirm(_("ssh server clear warn"))) {
+			return;
+		}
+		
+		enable_keys_elements(false);
+		ssh.reset();
+		ssh.run("delall_clientkeys", function(){
+			update_ui_keys();
+		});
+	});
+
+	/* clientkey - up */
+	$("#up_clientkeys").change(function(){
+		enable_keys_elements(false);
+		
+		ssh.reset();
+		ssh.setcmd("up_clientkey");
+		ssh.add("root");
+		
+		/* submit */
+		ssh.up("#up_clientkeys",function(res){
+			if(res.cgiresult!=0) {
+				if(res.cgiresult==2) {
+					alert(_("ssh client key upload failure2"));
+				}
+				else {
+					alert(_("ssh client key upload failure"));
+				}
+			}
+			update_ui_keys();
+			
+			/* reset upload form */
+			ssh.reset_up("#up_clientkeys");
+		});
+	});
+	
+	/* initial update */
+	update_ui_sshcfg();
+	update_ui_keys();
+	
+});
+</script>
+
+<h3><script language="JavaScript">document.write(_("system")+" > "+_("SSH"));</script></h3>
+		
+		
+
+<form>
+	<table class="row_menu">
+		<tr><th><script language="JavaScript">document.write(_("ssh server configuration"));</script>:</th></tr>
+	</table>
+	<!-- ssh config -->
+	<table id="ssh_config" class="row_menu">
+		<!-- protocol -->
+		<tr>
+			<td class="row_menu_name"><script language="JavaScript">document.write(_("ssh protocol"));</script></td>
+			<td>
+				<select id="sshcfg_proto">
+					<option value="1"><script>document.write(_("protocol 1"))</script></option>
+					<option value="2"><script>document.write(_("protocol 2"))</script></option>
+					<option value="1,2"><script>document.write(_("protocol 1,2"))</script></option>
+				</select>
+			</td>
+		</tr>
+					
+		<!-- password authentication -->
+		<tr>
+			<td class="row_menu_name"><script language="JavaScript">document.write(_("enable password authentication"));</script></td>
+			<td>
+				<input type="radio" id="sshcfg_pass_auth_0" name="sshcfg_pass_auth" class="access" value="yes">
+				<label for="sshcfg_pass_auth_0" class="on"><script language="JavaScript">document.write(_("on"));</script></label>
+				<input type="radio" id="sshcfg_pass_auth_1" name="sshcfg_pass_auth" class="access" value="no">
+				<label for="sshcfg_pass_auth_1" class="off"><script language="JavaScript">document.write(_("off"));</script></label>
+			</td>
+		</tr>
+		<!-- key authentication -->
+		<tr>
+			<td class="row_menu_name"><script language="JavaScript">document.write(_("enable key authentication"));</script></td>
+			<td>
+				<input type="radio" id="sshcfg_key_auth_0" name="sshcfg_key_auth" class="access" value="yes">
+				<label for="sshcfg_key_auth_0" class="on"><script language="JavaScript">document.write(_("on"));</script></label>
+				<input type="radio" id="sshcfg_key_auth_1" name="sshcfg_key_auth" class="access" value="no">
+				<label for="sshcfg_key_auth_1" class="off"><script language="JavaScript">document.write(_("off"));</script></label>
+			</td>
+		</tr>
+	</table>
+					
+	<div class="row_menu row_buttons">
+		<button type="button" id="sshcfg_save"><script language="JavaScript">document.write(_("CSsave"));</script></button>
+	</div>
+</form>
+					
+		<!-- host key management -->
+		<div id="keysdiv">
+			<form id="hostkeysform">
+				<table class="row_menu">
+					<tr><th><script language="JavaScript">document.write(_("host key management"));</script>:</th></tr>
+				</table>
+				<table class="row_menu row_hostkeys">
+					<tr>
+						<td class="row_menu_name"><script language="JavaScript">document.write(_("key type"));</script></td>
+						<td><script language="JavaScript">document.write(_("date"));</script></td>
+					</tr>
+					<tbody id="hostkeybody"></tbody>
+				</table>
+				<table align="center" style="cellpadding:0;cellspacing:0;width:480px;">
+				<tr>
+					<td class='raw_td'><button type="button" id="del_hostkeys" style="display:none"><script language="JavaScript">document.write(_("clear"));</script></button></td>
+					<td class='raw_td'><button type="button" id="gen_hostkeys" style="width:120px;"><script language="JavaScript">document.write(_("generate keys"));</script></button></td>
+					<td class='raw_td'><button type="button" id="dn_hostkeys" style="width:120px;"><script language="JavaScript">document.write(_("get keys"));</script></button></td>
+					<td class='raw_td'><button type="button" id="dn_pubhostkeys" style="width:120px;"><script language="JavaScript">document.write(_("get public keys"));</script></button></td>
+					<td class='raw_td'><span class="file-wrapper">
+						<input name='upload' type='file' id='up_hostkeys'/>
+						<button type="button" style="width:120px;"><script language="JavaScript">document.write(_("upload keys"));</script></button>
+					</span></td>
+				</tr>
+				</table>
+			</form>
+		
+			<!-- client key management -->
+			<div class="pad" id="clientkeysdiv">
+				<table class="row_menu">
+				<tr><th><script language="JavaScript">document.write(_("client key management"));</script>:</th></tr>
+				</table>
+				<table class="name-list">
+					<tr>
+						<td class="align10"><script language="JavaScript">document.write(_("user"));</script></td>
+						<td class="align10"><script language="JavaScript">document.write(_("host name"));</script></td>
+						<td class="align10"><script language="JavaScript">document.write(_("key type"));</script></td>
+						<td></td>
+					</tr>
+					<tbody id="clientkeybody"></tbody>
+				</table>
+				<div class="row_menu row_buttons">
+					<form>
+						<table align="center" style="cellpadding:0;cellspacing:0;width:240px;">
+						<tr>
+							<!-- <input type="file" height="30" size="35" id="vpnCertiUpFile" name="vpnCertiUpFile"> -->
+							<td class='raw_td'><button type="button" id="delall_clientkeys" style="width:120px;"><script language="JavaScript">document.write(_("clear"));</script></button></td>
+							<td class='raw_td'><span class="file-wrapper">
+								<input name='upload' type='file' id='up_clientkeys'/>
+								<button type="button" style="width:120px;"><script language="JavaScript">document.write(_("upload"));</script></button>
+							</span></td>
+						</tr>
+						</table>
+					</form>
+				</div>
+			</div>
+		</div>
+		
+<div id="footer"></div>
+	<script type="text/javascript">
+		CopyRight();
+	</script>
+</body>
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+    "id": "DhcpSettings",
+    "title": "DHCP",
+    "url": "/dhcp.html",
+    "path": [ "Networking", "LAN" ],
+    "position": 20
+}

@@ -1,0 +1,54 @@
+#!/bin/sh
+
+INSTANCE=$1
+
+WWAN_AUTOAPN=`nvram_get 2860 "wwan_AutoAPN"`
+
+if [ "$WWAN_AUTOAPN" == "1" ]; then
+
+PROFILE_PREFIX="link.profile.$PROFILE"
+
+WWAN_APN=`rdb_get $PROFILE_PREFIX.apn"`
+WWAN_DIALSTR=`rdb_get $PROFILE_PREFIX.dialstr`
+WWAN_USER=`rdb_get $PROFILE_PREFIX.user`
+WWAN_PASS=`rdb_get $PROFILE_PREFIX.pass`
+WWAN_AUTH_TYPE=`rdb_get $PROFILE_PREFIX.auth_type`
+
+else
+
+WWAN_APN=`nvram_get 2860 "wwan_APN"`
+WWAN_DIALSTR=`nvram_get 2860 "wwan_dial"`
+WWAN_USER=`nvram_get 2860 "wwan_user"`
+WWAN_PASS=`nvram_get 2860 "wwan_pass"`
+WWAN_AUTH_TYPE=`nvram_get 2860 wwan_auth`
+
+fi
+
+test -z "$WWAN_AUTH_TYPE" && WWAN_AUTH_TYPE="chap"
+test -z "$WWAN_DIALSTR" && WWAN_DIALSTR="*99#"
+
+WWAN_OPMODE=`nvram_get "wwan_opmode"`
+WWAN_IDLE=`nvram_get "wwan_idle"`
+
+test -z "$WWAN_IDLE" && WWAN_IDLE=180
+
+
+INFO_SERVICE_TYPE=`rdb_get "wwan.$INSTANCE.system_network_status.service_type"`
+INFO_NETWORK_PROVIDER=`rdb_get "wwan.$INSTANCE.system_network_status.network"`
+INFO_SIGNAL_STRENGTH=`rdb_get "wwan.$INSTANCE.radio.information.signal_strength"`
+
+INFO_MODULE_NAME=`rdb_get "wwan.$INSTANCE.model"`
+INFO_FIRMWARE_VERSION=`rdb_get "wwan.$INSTANCE.firmware_version"`
+INFO_DETECT_NAME=`rdb_get "module.name"`
+INFO_ROUTER_VERSION=`cat /etc_ro/version.txt`
+
+INFO_MODULE_MNC=`rdb_get "wwan.$INSTANCE.imsi.plmn_mnc"`
+INFO_MODULE_MCC=`rdb_get "wwan.$INSTANCE.imsi.plmn_mcc"`
+
+FAKE_PASS=`echo "$WWAN_PASS" | sed 's/./\*/g'`
+
+logger PPP "APN name=$WWAN_APN / provider=$INFO_NETWORK_PROVIDER / signal=$INFO_SIGNAL_STRENGTH / service=$INFO_SERVICE_TYPE"
+logger PPP "dial=$WWAN_DIALSTR / user=$WWAN_USER / pass=$FAKE_PASS / auth=$WWAN_AUTH_TYPE"
+logger PPP "rv=$INFO_ROUTER_VERSION"
+logger PPP "dongle=$INFO_MODULE_NAME / ver=$INFO_FIRMWARE_VERSION"
+logger PPP "mcc=$INFO_MODULE_MCC / mnc=$INFO_MODULE_MNC"

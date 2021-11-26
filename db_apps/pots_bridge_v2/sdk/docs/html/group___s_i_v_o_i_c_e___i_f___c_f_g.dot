@@ -1,0 +1,17 @@
+digraph "SiVoice System control interface functions"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  rankdir=LR;
+  Node5 [label="SiVoice Process control",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___p_r_o_c___c_o_n_t_r_o_l.html"];
+  Node1 [label="SiVoice definitions",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e.html"];
+  Node4 [label="SiVoice Timer functions",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___t_i_m_e_r.html"];
+  Node0 [label="SiVoice System control\l interface functions",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node2 [label="SiVoice Memory allocation\l/deallocation",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___m_e_m_o_r_y___i_f.html"];
+  Node3 [label="SiVoice SPI/GCI access\l routines",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$group___s_i_v_o_i_c_e___i_o.html"];
+  Node1->Node0 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node2 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node3 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node4 [shape=plaintext, dir="back", style="solid"];
+  Node0->Node5 [shape=plaintext, dir="back", style="solid"];
+}

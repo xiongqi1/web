@@ -1,0 +1,725 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Event Notification</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+
+// This number is arbitrary. The loops that use this are usually terminated before by lack of RDB or POST data entries
+#define MAX_PIN 99
+
+var pinMode=[];
+#ifdef V_MODCOMMS_y
+var pinLabel=[];
+#endif
+
+#include "event_notif.inc"
+
+<%
+lastPin=MAX_PIN;
+lastPinRdb="sys.sensors.info.lastio";
+if(rdb_exists(lastPinRdb)) {
+	var rval=get_single(lastPinRdb);
+	lastPin=rval-0;
+}
+write( 'var numIoPins='+lastPin+';\n');
+
+function getIoRdb( prefix, i, member ) {
+	var rval='';
+	var rdb=prefix+i+member;
+	if(rdb_exists(rdb))
+		rval=get_single(rdb);
+	return rval;
+}
+
+function getSysIoRdb(i,member) {
+	return getIoRdb('sys.sensors.io.xaux',i,member);
+}
+
+// This function scans through the RDB entries sys.sensors.io.xauxN.* constructing a number of arrays used by the page
+// wr is an optimistion. It is non zero to produce html, zero to just count the number of IO
+function enumerateIo(){
+	for(var i=1;i<=lastPin;i++) {
+		write( 'pinMode['+i+']="'+getSysIoRdb(i,'.mode')+'";\n');
+#ifdef V_MODCOMMS_y
+		write( 'pinLabel['+i+']="'+getSysIoRdb(i,'.label')+'";\n');
+#endif
+	}
+}
+
+
+function setConfig() {
+	var en=form['menuEventNotiEn'];
+	var changeCnt=0;
+	rdbBase="service.eventnoti.conf.";
+	if (en=="1") {
+		if (updateRdb("max_size", form["MaxEventNotiBufSize"])) changeCnt++;
+		if (updateRdb("max_retry", form["MaxEventNotiRetryCount"])) changeCnt++;
+		if (updateRdb("save_to_file", form["menuWriteEventNotiToFile"])) changeCnt++;
+		if (updateRdb("log_file", form["EventNotiLogFile"])) changeCnt++;
+		if (updateRdb("prefix_text", form["EventNotiPrefixText"])) changeCnt++;
+		var idx;
+		var dest_idx;
+		var clients;
+		for (idx=1; idx<=numEventTypes;idx++) {
+			var name = "type."+idx+".";
+			dest_idx = form["destIdx"+idx];
+			if (dest_idx == undefined) {
+				// when elogger detects this is empty destination, it will ignore this event
+				dest_idx = "";
+			}
+			clients = form["clients"+idx];
+			if (clients == undefined) {
+				clients = "";
+			}
+			if (updateRdb(name+"dest_idx", dest_idx)) changeCnt++;
+			if (updateRdb(name+"enabled_clients", clients)) changeCnt++;
+		}
+	}
+	if ((changeCnt>0)||(en!=noti_enabled)) {
+		setRdb("enable",en);
+	}
+}
+
+function setFilter() {
+	var changeCnt=0;
+	var instances = "";
+	var edgesStr = "";
+	var highMs = "";
+	var lowMs = "";
+	var highThresh = "";
+	var lowThresh = "";
+	for (var i=1; i<=lastPin; i++) {
+		var edges = 0;
+		if (form['edgeHigh'+i]!=undefined) edges=edges+2;
+		if (form['edgeLow'+i]!=undefined) edges=edges+1;
+		if (edges>0) {
+			instances = instances + (i + ";");
+			edgesStr = edgesStr + (edges + ";");
+			highMs = highMs +form["msHigh"+i] + ";";
+			lowMs = lowMs +form["msLow"+i] + ";";
+			highThresh = highThresh +form["threshHigh"+i] + ";";
+			lowThresh = lowThresh +form["threshLow"+i] + ";";
+		}
+	}
+	rdbBase="service.eventnoti.conf.";
+	var name = "type."+form['event']+".";
+	if (updateRdb(name+"instances", instances)) changeCnt++;
+	if (updateRdb(name+"debounce.edges", edgesStr)) changeCnt++;
+	if (updateRdb(name+"debounce.highms", highMs)) changeCnt++;
+	if (updateRdb(name+"debounce.lowms", lowMs)) changeCnt++;
+	if (updateRdb(name+"thresh.highthresh", highThresh)) changeCnt++;
+	if (updateRdb(name+"thresh.lowthresh", lowThresh)) changeCnt++;
+	if (changeCnt>0) {
+		setRdb("enable",noti_enabled);
+	}
+}
+
+if (request['REQUEST_METHOD'] == "POST") {
+	if ( form["cmd"]=="EVTNOTI_CONF_SET" ) {
+		setConfig();
+	}
+	else if ( form["cmd"]=="EVTNOTI_FILT_SET" ) {
+		setFilter();
+	}
+	redirect('/event_noti.html?success');
+}
+enumerateIo(); // Determine number of IO and produce html
+
+%>
+
+
+var evtnoti_onoff="@@noti_enabled";
+
+var unsafeSmsString = "\"<>%\\^[]`\+\$\,'#&\n\r";
+
+function isUnsafeSmsMsg(compareChar) {
+	if (unsafeSmsString.indexOf(compareChar) == -1)
+		return false;
+	else
+		return true;
+}
+
+function encodeSpecialChars(val) {
+	var len = val.length;
+	var i = 0;
+	var newStr = "";
+	var original = val;
+	for ( i = 0; i < len; i++ ) {
+		if (isUnsafeSmsMsg(val.substring(i,i+1)) == false)
+			newStr = newStr + val.substring(i,i+1);
+		else
+			newStr = newStr + convert(val.substring(i,i+1));
+	}
+	return newStr;
+}
+
+function EventNotiConfigSet() {
+
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+		if(!$("#form").valid()) {
+			return;
+		}
+#else
+		if(!$("#form").validationEngine("validate")) {
+			validate_alert("","");
+			return;
+		}
+#endif
+
+	var error_msg=checkErrors();
+	if( error_msg!="" ) {
+		validate_alert( "", error_msg );
+		return;
+	}
+	for (var idx=1; idx<=evtnoti_list.length; idx++) {
+		// ignore hidden events
+		if (evtnoti_list[idx-1]=="") {
+			continue;
+		}
+
+		var noti_clients = "";
+		if ($("#sms_checkbox"+idx).is(":checked")==true) {
+			noti_clients += "sms;";
+		}
+		if ($("#email_checkbox"+idx).is(":checked")==true) {
+			noti_clients += "email;";
+		}
+		if ($("#tcp_checkbox"+idx).is(":checked")==true) {
+			noti_clients += "tcp;";
+		}
+		if ($("#udp_checkbox"+idx).is(":checked")==true) {
+			noti_clients += "udp;";
+		}
+		if ($("#cmd_checkbox"+idx).is(":checked")==true) {
+			noti_clients += "cmd;";
+		}
+		$("#clients"+idx).val(noti_clients);
+		$("#destIdx"+idx).val( document.getElementById("dest_"+idx).selectedIndex+1 );
+	}
+	clear_alert();
+	blockUI_wait(_("GUI pleaseWait"));
+	$("#cmd").val("EVTNOTI_CONF_SET" );
+	$("#form").submit();
+}
+
+function checkErrors() {
+var errMsg="";
+
+	for (var i=1; i<EventNotiDestName.length; i++) {
+		var sms_err=false, email_err=false, tcp_err=false, udp_err=false, cmd_err=false;
+		for (var j=1; j<=evtnoti_list.length; j++) {
+			// ignore hidden events
+			if (evtnoti_list[j-1]=="") {
+				continue;
+			}
+
+			if((document.getElementById("dest_"+j).selectedIndex+1)==i) {
+				if ($("#sms_checkbox"+j).is(":checked") && EventNotiDestSmsAddr[i]=="") {
+					sms_err=true;
+				}
+				if ($("#email_checkbox"+j).is(":checked") && EventNotiDestEmailAddr[i]=="") {
+					email_err=true;
+				}
+				if ($("#tcp_checkbox"+j).is(":checked") && (EventNotiDestTcpAddr[i]=="" || EventNotiDestTcpPort[i]=="")) {
+					tcp_err=true;
+				}
+				if ($("#udp_checkbox"+j).is(":checked") && (EventNotiDestUdpAddr[i]=="" || EventNotiDestUdpPort[i]=="")) {
+					udp_err=true;
+				}
+				if ($("#cmd_checkbox"+j).is(":checked") && (EventNotiDestCommand[i]=="")) {
+					cmd_err=true;
+				}
+			}
+		}
+		if(sms_err || email_err || tcp_err || udp_err || cmd_err) {
+			errMsg+=_("eventDestinationErrMsg")+EventNotiDestName[i]+".<br/>";
+		}
+
+	}
+	return errMsg;
+}
+
+function setup_check_all() {
+	var total_email_checked=0, total_tcp_checked=0, total_udp_checked=0, total_sms_checked=0, total_cmd_checked=0, hidden_items=0;
+
+	for (var i=1; i<=evtnoti_list.length; i++) {
+		// ignore hidden events
+		if (evtnoti_list[i-1]=="") {
+			hidden_items++;
+			continue;
+		}
+
+		if ($("#email"+"_checkbox"+i).is(":checked")==true) {
+			total_email_checked++;
+		}
+		if ($("#tcp"+"_checkbox"+i).is(":checked")==true) {
+			total_tcp_checked++;
+		}
+		if ($("#udp"+"_checkbox"+i).is(":checked")==true) {
+			total_udp_checked++;
+		}
+		if ($("#sms"+"_checkbox"+i).is(":checked")==true) {
+			total_sms_checked++;
+		}
+		if ($("#cmd"+"_checkbox"+i).is(":checked")==true) {
+			total_cmd_checked++;
+		}
+	}
+	$("#selectAllEmail").prop('checked', total_email_checked == evtnoti_list.length - hidden_items);
+	$("#selectAllTcp").prop('checked', total_tcp_checked == evtnoti_list.length - hidden_items);
+	$("#selectAllUdp").prop('checked', total_udp_checked == evtnoti_list.length - hidden_items);
+	$("#selectAllSms").prop('checked', total_sms_checked == evtnoti_list.length - hidden_items);
+	$("#selectAllCommand").prop('checked', total_cmd_checked==evtnoti_list.length - hidden_items);
+}
+
+function DestOptionsGet() {
+	for (var i=1; i<=evtnoti_list.length; i++) {
+		// ignore hidden events
+		if (evtnoti_list[i-1]=="") {
+			continue;
+		}
+
+		for (var j=1; j<EventNotiDestName.length; j++) {
+			$("#dest_"+i).append("<option value='"+EventNotiDestName[j]+"'>"+EventNotiDestName[j]+"</option>");
+		}
+		$("#dest_"+i).val(EventNotiDestName[parseInt(EventNotiDestIdx[i])]);
+		$("#dest_"+i).change(function() {
+			idx=this.selectedIndex+1;
+			var email_addr=_("email address")+":"+EventNotiDestEmailAddr[idx];
+			var tcp_addr=_("tcpAddress")+":";
+			tcp_addr+=EventNotiDestTcpAddr[idx]==""?"":EventNotiDestTcpAddr[idx]+":"+EventNotiDestTcpPort[idx]
+			var udp_addr=_("udpAddress")+":";
+			udp_addr+=EventNotiDestUdpAddr[idx]==""?"":EventNotiDestUdpAddr[idx]+":"+EventNotiDestUdpPort[idx]
+			var sms_number=_("smsNumber")+":"+EventNotiDestSmsAddr[idx];
+			var custom_command=_("customCommand")+":"+EventNotiDestCommand[idx];
+			this.title=EventNotiDestName[idx]+"\n"+email_addr+"\n"+tcp_addr+"\n"+udp_addr+"\n"+sms_number+"\n"+custom_command;
+		});
+		$("#dest_"+i).trigger("change");
+	}
+}
+
+function EventNotiConfigGet() {
+	var idx;
+
+	if (EventNotiEn=='1') {
+		$("#menuEventNotiEn").val('1');
+		$("#EventNotiEn-0").attr("checked","checked");
+		$("#box_2145_pin").css("display", "");
+	} else {
+		$("#menuEventNotiEn").val('0');
+		$("#EventNotiEn-1").attr("checked","checked");
+		$("#box_2145_pin").css("display", "none");
+	}
+
+	$("#MaxEventNotiBufSize").val(MaxEventNotiBufSize);
+	$("#MaxEventNotiRetryCount").val(MaxEventNotiRetryCount);
+	$("#menuWriteEventNotiToFile").val(WriteEventNotiToFile);
+	if (WriteEventNotiToFile=='1')
+		$("#WriteEventNotiToFile-0").attr("checked","checked");
+	else if (WriteEventNotiToFile=='0')
+		$("#WriteEventNotiToFile-1").attr("checked","checked");
+	else {
+		$("#menuWriteEventNotiToFile").val('0');
+		$("#WriteEventNotiToFile-1").attr("checked","checked");
+	}
+
+	$("#EventNotiLogFile").val(EventNotiLogFile);
+
+	var decode_msg = unescape(EventNotiPrefixText);
+	decode_msg=decode_msg.replace(/%22/g, "\"");
+	decode_msg=decode_msg.replace(/%0D/g, "\n");
+	$("#EventNotiPrefixText").val(decode_msg);
+	var h="";
+	for (var i=1; i<=evtnoti_list.length; i++) {
+		// ignore hidden items
+		if(evtnoti_list[i-1]=="") {
+			continue;
+		}
+		var email_checked=(EventNotiEnabledClients[i].indexOf('email')!=-1)?"checked":"";
+		var tcp_checked=(EventNotiEnabledClients[i].indexOf('tcp')!=-1)?"checked":"";
+		var udp_checked=(EventNotiEnabledClients[i].indexOf('udp')!=-1)?"checked":"";
+		var sms_checked=(EventNotiEnabledClients[i].indexOf('sms')!=-1)?"checked":"";
+		var cmd_checked=(EventNotiEnabledClients[i].indexOf('cmd')!=-1)?"checked":"";
+		if (i == 5)
+			h+="<tr title='"+evtnoti_desc_list[i-1]+"'>";
+		else
+			h+='<tr title=\"'+evtnoti_desc_list[i-1]+'\">';
+		h+="\
+		<td>"+evtnoti_list[i-1]+"</td>\
+		<td>"+i+"</td>\
+		<input type='hidden' id='destIdx"+i+"' name='destIdx"+i+"'>\
+		<input type='hidden' id='clients"+i+"' name='clients"+i+"'>\
+		<td><div class='check-box'><input type='checkbox' class='access' id='email_checkbox"+i+"' onChange='setup_check_all()'"+email_checked+"><label for='email_checkbox"+i+"'>&nbsp;</label></div></td>\
+		<td><div class='check-box'><input type='checkbox' class='access' id='tcp_checkbox"+i+"' onChange='setup_check_all()'"+tcp_checked+"><label for='tcp_checkbox"+i+"'>&nbsp;</label></div></td>\
+		<td><div class='check-box'><input type='checkbox' class='access' id='udp_checkbox"+i+"' onChange='setup_check_all()'"+udp_checked+"><label for='udp_checkbox"+i+"'>&nbsp;</label></div></td>\
+		<td><div class='check-box'><input type='checkbox' class='access' id='sms_checkbox"+i+"' onChange='setup_check_all()'"+sms_checked+"><label for='sms_checkbox"+i+"'>&nbsp;</label></div></td>\
+		<td><div class='check-box'><input type='checkbox' class='access' id='cmd_checkbox"+i+"' onChange='setup_check_all()'"+cmd_checked+"><label for='cmd_checkbox"+i+"'>&nbsp;</label></div></td>\
+		<td><select id='dest_"+i+"' style='width:100px' title=''></select></td>";
+		if(i>=15 && i<=17) {
+			h+="<td><button type='button' class='secondary sml' onClick='showFilterPrefs("+i+")'>"+_("configure")+"</button>"+"</td></tr>";
+		}
+		else if(i==14) {
+			h+="<td><button type='button' class='secondary sml' onClick='window.location=\"wlstationlist.html\"'>"+_("configure")+"</button>"+"</td></tr>";
+		}
+		else {
+			h+="<td></td></tr>";
+		}
+	}
+	$("#evtnotiList").html(h);
+	setup_check_all();
+}
+
+function SelectAllNoti(client) {
+	var checkval=false;
+	if (client == 'email') checkval=$("#selectAllEmail").is(":checked");
+	else if (client == 'tcp') checkval=$("#selectAllTcp").is(":checked");
+	else if (client == 'udp') checkval=$("#selectAllUdp").is(":checked");
+	else if (client == 'sms') checkval=$("#selectAllSms").is(":checked");
+	else if (client == 'cmd') checkval=$("#selectAllCommand").is(":checked");
+	if (client == 'email' )   {for (var i=1; i<=evtnoti_list.length; i++) {if (evtnoti_list[i-1]!="") $("#email_checkbox"+i).prop("checked", checkval);}}
+	else if (client == 'tcp') {for (var i=1; i<=evtnoti_list.length; i++) {if (evtnoti_list[i-1]!="") $("#tcp_checkbox"+i).prop("checked", checkval);}}
+	else if (client == 'udp') {for (var i=1; i<=evtnoti_list.length; i++) {if (evtnoti_list[i-1]!="") $("#udp_checkbox"+i).prop("checked", checkval);}}
+	else if (client == 'sms') {for (var i=1; i<=evtnoti_list.length; i++) {if (evtnoti_list[i-1]!="") $("#sms_checkbox"+i).prop("checked", checkval);}}
+	else if (client == 'cmd') {for (var i=1; i<=evtnoti_list.length; i++) {if (evtnoti_list[i-1]!="") $("#cmd_checkbox"+i).prop("checked", checkval);}}
+}
+
+function fill_param_fields(map, input, field, def, bit) {
+	var inpsplit = input.split(";");
+	for (var i=1; i<=numIoPins; i++) {
+		var el = $("#" + field + i);
+		var val = map[i];
+		if (val != null) {
+			val = inpsplit[val];
+		}
+		// i.e. if map or inpsplit had no entry, or control disabled
+		if (val == null || el.prop("disabled")) {
+			val = def;
+		}
+		if (bit) {
+			el.prop( "checked", (val & bit)!=0);
+		} else {
+			el.val(val);
+		}
+	}
+}
+
+function showFilterPrefs(event) {
+	// first disable any the column for any pin not of the right type
+	var validIoMode = function(mode){return true;};
+	if (event==15) {
+		validIoMode = function(mode){
+#ifdef V_MODCOMMS_y
+			if ((mode=="digital_input") || (mode=="namurInput") || (mode=="contactClosureInput")) return true;
+#endif
+#if defined(V_IOMGR_kudu)
+			return mode=="digital_input";
+#else
+			return mode=="virtual_digital_input";
+#endif
+		};
+		$('#main-table tr > *:nth-child(7)').hide();
+		$('#main-table tr > *:nth-child(6)').hide();
+	} else if (event==16) {
+		validIoMode = function(mode){
+#ifdef V_MODCOMMS_y
+			if ((mode=="ctInput") || (mode=="tempInput") || (mode=="current_input")) return true;
+#endif
+			return mode=="analogue_input";
+		};
+	} else if (event==17) {
+		validIoMode = function(mode){
+			return mode=="digital_output";
+		};
+		$('#main-table tr > *:nth-child(7)').hide();
+		$('#main-table tr > *:nth-child(6)').hide();
+	}
+	for (var i=1; i<=numIoPins; i++) {
+		$("#filtersettings tbody > *:nth-child("+i+") :input").prop("disabled", !validIoMode(pinMode[i]));
+	}
+	var instances = EventNotiInstances[event].split(";");
+	// reverse mapping so that we can look up the instance number to find it's array position
+	var map = [];
+	for (var i=0; i<instances.length; i++) {
+		map[instances[i]] = i;
+	}
+	// default applies to anything disabled above or with no settings in arrays
+	fill_param_fields(map, EventNotiEdges[event], "edgeHigh", 0, 2);
+	fill_param_fields(map, EventNotiEdges[event], "edgeLow", 0, 1);
+	fill_param_fields(map, EventNotiHighms[event], "msHigh", 500);
+	fill_param_fields(map, EventNotiLowms[event], "msLow", 500);
+	fill_param_fields(map, EventNotiHighthresh[event], "threshHigh", 0);
+	fill_param_fields(map, EventNotiLowthresh[event], "threshLow", 0);
+
+	eventDisplayed = event;
+	$("#filtersubhead").html(_("filter") + ": " + evtnoti_list[event-1]);
+	$("#mainsettings").toggle(false);
+	$("#filtersettings").toggle(true);
+}
+
+function eventNotiFilterClose(save) {
+	if (save) {
+		var error_msg=checkErrors();
+		if( error_msg!="" ) {
+			validate_alert( "", error_msg );
+			return;
+		}
+		$("#event").val(eventDisplayed);
+		$("#cmd").val("EVTNOTI_FILT_SET" );
+		$("#form").submit();
+	}
+	$("#mainsettings").toggle(true);
+	$("#filtersettings").toggle(false);
+}
+
+$(document).ready( function() {
+	blockUI_wait(_("GUI pleaseWait"));
+	EventNotiConfigGet();
+	DestOptionsGet();
+	$.unblockUI();
+	if (EventNotiEn=='1') {
+		error_msg=checkErrors();
+		if( error_msg!="" ) {
+			validate_alert( "", error_msg );
+		}
+	}
+});
+
+function genConfigTable() {
+	var head = "<thead><tr><th>"+_("pin")+"</th><th>"+_("eventnotiHighEdge")+"</th><th>"+_("eventnotiLowEdge")+"</th><th>"+_("eventnotiHighMs")+"</th>"
+			+ "<th>"+_("eventnotiLowMs")+"</th><th>"+_("eventnotiHighThresh")+"</th><th>"+_("eventnotiLowThresh")+"</th></tr></thead>";
+	var body = ""
+	for ( var pin = 1; pin <=numIoPins; pin++ ) {
+		var row = "<tr>"
+#ifdef V_MODCOMMS_y
+		+ "<td>"+ substMice(pinLabel[pin])+"</td>"
+#else
+		+ "<td>"+_("pin")+" "+pin+"</td>"
+#endif
+		+ "<td><input type='checkbox' id='edgeHigh"+pin+"' name='edgeHigh"+pin+"'></td>"
+		+ "<td><input type='checkbox' id='edgeLow"+pin+"' name='edgeLow"+pin+"'></td>"
+		+ "<td><input type='text' id='msHigh"+pin+"' name='msHigh"+pin+"' class='sml validate[required,custom[integer],min[500]]'></td>"
+		+ "<td><input type='text' id='msLow"+pin+"' name='msLow"+pin+"' class='sml validate[required,custom[integer],min[500]]'></td>"
+		+ "<td><input type='text' id='threshHigh"+pin+"' name='threshHigh"+pin+"' class='sml validate[required,custom[number]]'></td>"
+		+ "<td><input type='text' id='threshLow"+pin+"' name='threshLow"+pin+"' class='sml validate[required,custom[number]]'></td>"
+		+ "</tr>"
+		body += row;
+	}
+	return head +"<tbody>"+body+"</tbody>";
+}
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="EVENTNOTI" id="form" class="validate div-all" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<%appendCsrfToken();%>
+		<input type="hidden" name="cmd" id="cmd"/>
+		<input type="hidden" name="event" id="event"/>
+		<div class="right-column white-box">
+			<div id="mainsettings" class="pad">
+				<h2><script language=Javascript>document.write(_("event noti title"))</script></h2>
+				<input type="hidden" name="menuEventNotiEn" id="menuEventNotiEn" value="@@form['menuEventNotiEn']"/>
+				<input type="hidden" name="menuWriteEventNotiToFile" id="menuWriteEventNotiToFile" value="@@form['menuWriteEventNotiToFile']"/>
+				<input type="hidden" name="menuSendToSameDests" id="menuSendToSameDests" value="@@form['menuSendToSameDests']"/>
+
+				<div class="form-row no-bg-form">
+					<label for="EventNotiEn"><script language=Javascript>document.write(_("event noti enable"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch" data-toggle-element="box_2145_pin" data-toggle-disabled="btn_2145_change">
+								<input type="radio" class="access" name='EventNotiEn' id='EventNotiEn-0' onClick="javascript:$('#menuEventNotiEn').val('1');">
+								<label for="EventNotiEn-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" class="access" name='EventNotiEn' id='EventNotiEn-1' onClick="javascript:$('#menuEventNotiEn').val('0');">
+								<label for="EventNotiEn-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="box_2145_pin">
+					<!-- Maximum event notification buffer size -->
+					<div class="form-row">
+						<label for="MaxEventNotiBufSize"><script language=Javascript>document.write(_("event buf max"))</script></label>
+						<div class="field">
+							<input type="text" name="MaxEventNotiBufSize" class="validate[required,funcCall[validate_bufSize]] required bufSize large" id="MaxEventNotiBufSize" maxLength="5" value="@@form['MaxEventNotiBufSize']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("100-10000")+" )")</script></span>
+						</div>
+					</div>
+					<!-- Maximum event notification retry count -->
+					<div class="form-row">
+						<label for="MaxEventNotiRetryCount"><script language=Javascript>document.write(_("event max retry"))</script></label>
+						<div class="field">
+							<input type="text" name="MaxEventNotiRetryCount" class="validate[required,funcCall[validate_retryCount]] required large retryCount" id="MaxEventNotiRetryCount" maxLength="2" value="@@form['MaxEventNotiRetryCount']" onKeyUp="NumfieldEntry(this);">
+						</div>
+						<div>
+							<span class="normal-text">&nbsp;<script language=Javascript>document.write("( "+_("1-20")+" )")</script></span>
+						</div>
+					</div>
+					<!-- Write event notification log to file -->
+					<div class="form-row no-bg-form" style="display:none">
+						<label for="WriteEventNotiToFile"><script language=Javascript>document.write(_("write event to file"))</script></label>
+						<div class="field">
+							<div class="location-settings">
+								<div class="radio-switch">
+									<input type="radio" class="access" name='WriteEventNotiToFile' id='WriteEventNotiToFile-0' onClick="javascript:$('#menuWriteEventNotiToFile').val('1');">
+									<label for="WriteEventNotiToFile-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+									<input type="radio" class="access" name='WriteEventNotiToFile' id='WriteEventNotiToFile-1' onClick="javascript:$('#menuWriteEventNotiToFile').val('0');">
+									<label for="WriteEventNotiToFile-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Event notification log file name -->
+					<div class="form-row no-bg-form">
+						<label for="EventNotiLogFile"><script language=Javascript>document.write(_("event noti logfile"))</script></label>
+						<div class="field">
+							<input type="text" name="EventNotiLogFile" id="EventNotiLogFile" onkeyup="urlFilter(this);" value="@@form['EventNotiLogFile']">
+						</div>
+					</div>
+
+					<!-- Event notification prefix text -->
+					<div class="form-row no-bg-form">
+						<label for="EventNotiPrefixText"><script language=Javascript>document.write(_("unit id"))</script></label>
+						<div class="field">
+							<input type="text" name="EventNotiPrefixText" id="EventNotiPrefixText" onkeyup="urlFilter(this);" value="@@form['EventNotiPrefixText']">
+						</div>
+					</div>
+					<br/>
+					<table class="above-5-column name-list">
+					<colgroup>
+						<col width="200px">
+						<col width="40px">
+						<col width="30px">
+						<col width="30px">
+						<col width="30px">
+						<col width="30px">
+						<col width="60px">
+						<col width="100px">
+						<col width="auto">
+					</colgroup>
+					<thead id="title-head">
+					<tr>
+						<th class="align10"><script language=Javascript>document.write(_("eventDescription"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("eventID"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("email"))</script>
+							<div class='check-box' style="padding-top:8px">
+								<input type="checkbox" class='access' id="selectAllEmail" name="selectAllEmail" value="" onclick='SelectAllNoti("email")' />
+								<label for='selectAllEmail'>&nbsp;</label>
+							</div>
+						</th>
+						<th class="align10"><script language=Javascript>document.write(_("rtcp"))</script>
+							<div class='check-box' style="padding-top:8px">
+							      <input type="checkbox" class='access' id="selectAllTcp" name="selectAllTcp" value="" onclick='SelectAllNoti("tcp")' />
+							      <label for='selectAllTcp'>&nbsp;</label>
+							</div>
+						</th>
+						<th class="align10"><script language=Javascript>document.write(_("UDP"))</script>
+							<div class='check-box' style="padding-top:8px">
+							      <input type="checkbox" class='access' id="selectAllUdp" name="selectAllUdp" value="" onclick='SelectAllNoti("udp")' />
+							      <label for='selectAllUdp'>&nbsp;</label>
+							</div>
+						</th>
+						<th class="align10"><script language=Javascript>document.write(_("sms"))</script>
+							<div class='check-box' style="padding-top:8px">
+							      <input type="checkbox" class='access' id="selectAllSms" name="selectAllSms" value="" onclick='SelectAllNoti("sms")' />
+							      <label for='selectAllSms'>&nbsp;</label>
+							</div>
+						</th>
+						<th class="align10"><script language=Javascript>document.write(_("cmd"))</script>
+							<div class='check-box' style="padding-top:8px">
+								<input type="checkbox" class='access' id="selectAllCommand" name="selectAllCommand" value="" onclick='SelectAllNoti("cmd")' />
+								<label for='selectAllCommand'>&nbsp;</label>
+							</div>
+						</th>
+						<th class="align10"><script language=Javascript>document.write(_("destinationProfile"))</script></th>
+						<th class="align10"><script language=Javascript>document.write(_("filter"))</script></th>
+					</tr>
+					</thead>
+					<tbody id="evtnotiList"></tbody>
+					</table>
+				</div>
+
+				<div class="submit-row">
+					<button type="button" id="wtSave" onClick="EventNotiConfigSet()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="window.location='event_noti.html'"><script language=Javascript>document.write(_("refresh"))</script></button>
+				</div>
+			</div>
+			<div id="filtersettings" class="pad" style="display: none">
+				<h2><script language=Javascript>document.write(_("event noti title"))</script></h2>
+				<h3 id="filtersubhead"></h3>
+				<p><script language=Javascript>document.write(_("eventFilterIoConfig"))</script></p>
+				<table class="name-list grey-box" id="main-table">
+					<script language=Javascript>document.write(genConfigTable())</script>
+				</table>
+				<div class="submit-row">
+					<button type="button" id="wtSave" onClick="eventNotiFilterClose(1)"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					<button type="button" class="secondary" onClick="eventNotiFilterClose(0)"><script language=Javascript>document.write(_("cancel"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Services", "EVENT_NOTI", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('event noti saved'));
+<%	}%>
+#ifdef V_WEBIF_SPEC_vdf
+	$.validator.addMethod("retryCount",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 1 || c > 20 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field1and20"));
+
+	$.validator.addMethod("bufSize",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( c < 100 || c > 10000 || !isAllNum(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},_("field100and10000"));
+#else
+	function validate_retryCount(field, rules, i, options) {
+		if( field.val() < 1 || field.val() > 20 ) {
+			return _("field1and20");
+		}
+	}
+	function validate_bufSize(field, rules, i, options) {
+		if( field.val() < 100 || field.val() > 10000 ) {
+			return _("field100and10000");
+		}
+	}
+#endif
+</script>
+</body>
+</html>

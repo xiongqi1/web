@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CBRS Parameters</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/custom_style.css">
+    <script src="js/keep_alive.js"></script>
+    <style>
+    .data_field_normal_label {
+        font-size: 14px;
+        padding: 2px;
+        display: inline-block;
+    }
+    .credentials_block {
+        border-top: 1px solid #ddd;
+        margin-top: 3px;
+        padding-top: 3px;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 3px;
+        padding-bottom: 3px;
+    }
+    </style>
+    <script src="js/registration_status_handler.js"></script>
+    <script src="js/all.js"></script>
+
+    <script>
+        ajaxPostRequest("/installation_state", "state=normal_operation");
+        g_multiStepReg = false;
+        g_reg_data = null;
+        g_reg_content = null;
+
+        var registrationStatusHandler = new RegistrationStatusHandler();
+
+        var cpiKeyFromQuickCopy = false;
+        var p12AlreadyProvided = false;
+
+        var processingRegisterButton = false;
+
+        // Validate field value is within required range then change field value color
+        // to black or red
+        // fname : field name to validate
+        // min_val : minimum limit
+        // max_val : maximum limit
+        // input_val : a flag to indicate read-only field or input field
+        // unit_str : unit string displayed in read-only field, degree or meter
+        // return : 1 if validation succeeded or 0 if failed
+        function validateAntennaParam(fname, min_val, max_val, input_val, unit_str) {
+            var fval;
+            if (input_val == null) {
+                fval = document.getElementById(fname).value;
+            } else {
+                document.getElementById(fname).innerHTML = input_val;
+                fval = input_val;
+            }
+            if ((fval === 0 || (isNaN(fval) == false && fval != "")) && fval >= min_val && fval <= max_val) {
+                document.getElementById(fname).style["color"] = "black";
+                if (input_val != null && unit_str != null) {
+                    document.getElementById(fname).innerHTML += unit_str;
+                }
+                return 1;
+            }
+            document.getElementById(fname).style["color"] = "red";
+            return 0;
+        }
+
+        // Validate antenna parameters for read-only field and input field
+        // data : antenna parameter data from server to be displayed in read-only field
+        //        Null when called for input field validation
+        function validateAntennaParams(data) {
+            var validity_count = 0;
+            if (data) {
+                validity_count += validateAntennaParam("tool_latitude", -90, 90, data.latitude, '&deg;')
+                validity_count += validateAntennaParam("tool_longitude", -180, 180, data.longitude, '&deg;');
+                validity_count += validateAntennaParam("tool_height", 0, 10000, data.height, '&nbsp;m');
+                validity_count += validateAntennaParam("tool_azimuth", 0, 359, data.azimuth, '&deg;');
+                validity_count += validateAntennaParam("tool_downtilt", -90, 90, data.downtilt, '&deg;');
+                // Enable Copy button only when all Install Tool values are valid
+                document.getElementById("copy_btn").disabled = (validity_count < 5);
+            } else {
+                validity_count += validateAntennaParam("reg_latitude", -90, 90, null, null);
+                validity_count += validateAntennaParam("reg_longitude", -180, 180, null, null);
+                validity_count += validateAntennaParam("reg_height", 0, 10000, null, null);
+                validity_count += validateAntennaParam("reg_azimuth", 0, 359, null, null);
+                validity_count += validateAntennaParam("reg_downtilt", -90, 90, null, null);
+            }
+            return validity_count;
+        }
+
+        // Register button is enabled only when satisfying all of below conditions
+        //  ◦ All Registration Parameters are filled in with valid value
+        //  ◦ The installer has checked off that all installation parameters are correct.
+        //  ◦ The CPI certificate has been input.
+        function checkRegisterButtonCondition() {
+            var validity_count = 0;
+            var ignore_count = 0;
+            if (registrationStatusHandler.isOkForSasRegister()) {
+                validity_count += 1;
+            }
+
+            validity_count += validateAntennaParams(null);
+            var cpi_id = document.getElementById("cpi_id").value
+            // Check UTF-8 octet count
+            if (cpi_id != ""  && !g_multiStepReg && encodeURI(cpi_id).split(/%..|./).length <= 256 + 1) {
+                validity_count += 1;
+                document.getElementById("cpi_id").style["color"] = "black";
+            } else {
+                document.getElementById("cpi_id").style["color"] = "red";
+            }
+            var cpi_name = document.getElementById("cpi_name").value;
+            // Check UTF-8 octet count
+            if (cpi_name != ""  && !g_multiStepReg && encodeURI(cpi_name).split(/%..|./).length <= 256 + 1) {
+                validity_count += 1;
+                document.getElementById("cpi_name").style["color"] = "black";
+            } else {
+                document.getElementById("cpi_name").style["color"] = "red";
+            }
+
+            var keyValidityCount = 0;
+            var checkCpiKey = false;
+            var keyFileEl = document.getElementById("key_file");
+            var passphraseEl = document.getElementById("passphrase");
+            if (p12AlreadyProvided) {
+                // P12 form is enabled, either both file and passcode are blank or both must be filled
+                if (keyFileEl.files.length > 0 || passphraseEl.value) {
+                    checkCpiKey = true;
+                } else {
+                    checkCpiKey = false
+                }
+            } else {
+                if (cpiKeyFromQuickCopy) {
+                    // P12 form is hidden
+                    checkCpiKey = false;
+                } else {
+                    // P12 form is enabled, both file and passcode must be filled
+                    checkCpiKey = true
+                }
+            }
+            if (checkCpiKey && !g_multiStepReg) {
+                keyValidityCount = 1;
+                if (keyFileEl.files.length > 0 && passphraseEl.value && passphraseEl.value.length <= 256) {
+                    validity_count += 1;
+                }
+            }
+
+            var install_certification_time = document.getElementById("install_certification_time").value;
+            // WINNF-TS-0016 specifies format YYYY-MM-DDThh:mm:ssZ
+            // However test data with AT&T SAS server is 2018-08-06T15:51:12.866Z i.e there is ".866" before "Z".
+            // Hence allowing some charaters before "Z" in the pattern
+            if (install_certification_time != "" && !g_multiStepReg
+                    && install_certification_time.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*Z$/)) {
+                validity_count += 1;
+                document.getElementById("install_certification_time").style["color"] = "black";
+            } else {
+                document.getElementById("install_certification_time").style["color"] = "red";
+            }
+
+            if (document.getElementById("data_check").checked) {
+                validity_count += 1;
+            }
+
+            if(g_multiStepReg) {
+                ignore_count = 3;
+            }
+
+            if (validity_count == (10 -ignore_count + keyValidityCount) && !processingRegisterButton) {
+                var modem_tx_off = document.getElementById("modem_tx_status").textContent != "On";;
+                document.getElementById("reg_btn").disabled = modem_tx_off;
+            } else {
+                document.getElementById("reg_btn").disabled = true;
+            }
+        }
+
+        function checkCopyNextButtonCondition(reg_state, auth_count) {
+            document.getElementById("back_btn").disabled = reg_state.startsWith("Registered");
+            document.getElementById("next_btn").disabled = reg_state !== "Registered – Grant Authorized";
+            document.getElementById("move_btn").disabled = !reg_state.startsWith("Registered");
+        }
+
+        var message_history = [];
+        var data_buffer = [];
+        var msg_index = 0;
+        const msg_ids = ["general_error_message",
+                    "general_error_guideline",
+                    "sas_reg_state",
+                    "sas_err_code",
+                    "sas_err_msg",
+                    "scell_id"];
+        const err_msg_ts_id = "err_msg_ts";
+
+        function msgShow() {
+            let record = message_history[msg_index];
+            for (const id of msg_ids) {
+                document.getElementById(id).innerHTML = record[id].html;
+                document.getElementById(id).style.display = record[id].display;
+            }
+            document.getElementById(err_msg_ts_id).innerText = record.ts.toLocaleString();
+            document.getElementById(err_msg_ts_id).style.display = "initial";
+        }
+
+        function msgDiff(msg1, msg2) {
+            for (const id of msg_ids) {
+                if (msg1[id].html != msg2[id].html) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function msgHistoryUnshift() {
+            let record = {};
+            let blank = true;
+
+            record.ts = new Date();
+            for (const id of msg_ids) {
+                let entry = {};
+                entry.html = document.getElementById(id).innerHTML;
+                entry.display = document.getElementById(id).style.display;
+
+                record[id] = entry;
+                if (record[id].html != "") {
+                    blank = false;
+                }
+            }
+
+            if (message_history.length == 0 && !blank) {
+                message_history.unshift(record);
+            }
+            else if (!blank) {
+                let last = message_history[0];
+                if (msgDiff(record, last)) {
+                    message_history.unshift(record);
+                }
+            }
+        }
+
+        function updateNavigate() {
+            if (msg_index < message_history.length-1) {
+                document.getElementById("last_message").classList.remove("inactive");
+            }
+            else {
+                document.getElementById("last_message").classList.add("inactive");
+            }
+
+            if (msg_index > 0) {
+                document.getElementById("next_message").classList.remove("inactive");
+            }
+            else {
+                document.getElementById("next_message").classList.add("inactive");
+            }
+        }
+
+        function onNextMessage() {
+            if (msg_index > 0) {
+                msg_index --;
+                msgShow();
+                updateNavigate();
+            }
+        }
+
+        function onLastMessage() {
+            if (msg_index < message_history.length-1) {
+                msg_index ++;
+                msgShow();
+                updateNavigate();
+            }
+        }
+
+        function getRegistrationStatusAndValidate(data) {
+            if(msg_index != 0) {
+                data_buffer.push(data);
+                return;
+            }
+
+            if (data_buffer.length) {
+                for(const dr of data_buffer) {
+                    registrationStatusHandler.handleData(dr);
+                    msgHistoryUnshift();
+                }
+                data_buffer = [];
+                document.getElementById(err_msg_ts_id).style.display = "none";
+            }
+
+            registrationStatusHandler.handleData(data);
+
+            msgHistoryUnshift();
+            updateNavigate();
+
+            // update Register button availability
+            checkRegisterButtonCondition();
+            // update Next button availability
+            checkCopyNextButtonCondition(data.reg_state, data.auth_count);
+        }
+
+        /*
+         * format a positive integer number to string with 2 digits e.g 1 --> "01"
+         * @param number input positive integer number
+         * @return formatted string
+         */
+        function format2Digits(number) {
+            return number < 10 ? ("0" + number.toString()) : number.toString();
+        }
+
+        /*
+         * display CPI PKCS12 file status
+         * @param text Status text
+         * @param errorInd Display as error
+         */
+        function displayCpiKeyStatus(text, errorInd) {
+            var el = document.getElementById("cpi_key_status")
+            el.textContent = text;
+            if (errorInd) {
+                el.style["color"] = "red";
+            } else {
+                el.style["color"] = "green";
+            }
+        }
+
+        // check if multiple step registration is selected.
+        function getRegMode() {
+            ajaxGetRequest("/reg_method", true, function(data) {
+                if(data && data.reg_method_selected == "multi" ) {
+                    g_multiStepReg = true;
+                    document.getElementById("cpi_section").style.display="none";
+                    document.getElementById("reg_data_section").style.display="block";
+                }
+            });
+        }
+
+        function getCpiParam() {
+            ajaxGetRequest("/user_entry_cpi_param", true, function(data) {
+                //console.log(data);
+                if (data.cpi_id) {
+                    document.getElementById("cpi_id").value = data.cpi_id;
+                }
+                if (data.cpi_name) {
+                    document.getElementById("cpi_name").value = data.cpi_name;
+               }
+
+                cpiKeyFromQuickCopy = data.cpi_key_from_quick_copy;
+                p12AlreadyProvided = data.pkcs12_valid
+                if (p12AlreadyProvided || !cpiKeyFromQuickCopy) {
+                    document.getElementById("credentials_block").setAttribute("style", "display:block");
+                    if (p12AlreadyProvided) {
+                        displayCpiKeyStatus("Valid credentials have already been provided.");
+                    }
+                }
+
+                // set installCertificationTime, which is date and time string in format YYYY-MM-DDThh:mm:ssZ
+                // ignore existing (if any) value
+                // document.getElementById("install_certification_time").value = data.install_certification_time;
+                // get curent date/time as a guide for installer
+                var date = new Date();
+                var install_certification_time = date.getFullYear().toString()
+                    + "-" + format2Digits(date.getMonth() + 1)
+                    + "-" + format2Digits(date.getDate())
+                    + "T" + format2Digits(date.getHours())
+                    + ":" + format2Digits(date.getMinutes())
+                    + ":" + format2Digits(date.getSeconds()) + "Z";
+                document.getElementById("install_certification_time").value = install_certification_time;
+
+            });
+        }
+
+        function copyToolData() {
+            document.getElementById("reg_latitude").value = orientationGpsDataHandler.latitudeData;
+            document.getElementById("reg_longitude").value = orientationGpsDataHandler.longitudeData;
+            document.getElementById("reg_height").value = orientationGpsDataHandler.heightData;
+            document.getElementById("reg_height_type").value = orientationGpsDataHandler.heightDataType;
+            // query most precise orientation data
+            var querying_notification = document.getElementById("querying_data_notification");
+            querying_notification.textContent = "Querying most precise azimuth and downtilt data ...";
+            ajaxGetRequest("/orientation_data", true,
+                function(data) {
+                    document.getElementById("azimuth_data").textContent = data.azimuth;
+                    document.getElementById("reg_azimuth").value = data.azimuth;
+                    document.getElementById("down_tilt_data").textContent = data.down_tilt;
+                    document.getElementById("reg_downtilt").value = data.down_tilt;
+                    querying_notification.textContent = "";
+                },
+                function() {
+                    querying_notification.textContent = "Failed to query most precise azimuth and downtilt data.";
+                }
+            );
+        }
+
+        // Handler to be called when PKCS12 file and passphrase is process successfully
+        function uploadOkHandler() {
+            displayCpiKeyStatus("Credentials format is valid");
+            sasRegister();
+        }
+
+        // Handler to be called when PKCS12 file and passphrase is failed
+        function uploadFailedHandler(responseStatusCode, responseText) {
+            displayCpiKeyStatus(responseText, true);
+            processingRegisterButton = false;
+        }
+
+        // Register button handler
+        function registerButtonHandler() {
+            processingRegisterButton = true;
+            document.getElementById("reg_btn").disabled = true;
+            var cpiP12File = document.getElementById("key_file");
+            var cpiP12Passphrase = document.getElementById("passphrase");
+            if (cpiP12File.files.length > 0 && cpiP12Passphrase.value.length > 0) {
+                var formData = new FormData();
+                formData.append("key_file", cpiP12File.files[0]);
+                formData.append("passphrase", cpiP12Passphrase.value);
+                ajaxFormDataPostRequest("/upload_cpi_pkcs12", formData, uploadOkHandler, uploadFailedHandler);
+            } else {
+                sasRegister();
+            }
+        }
+
+        // Handler to be called when SAS Register request is processed successfully
+        // CBRS Registration process in SAS client is triggered.
+        function sasRegisterPostOkHandler(data) {
+            // wait for a while before enabling Register button
+            setInterval(function(){ processingRegisterButton = false; }, 3000);
+            if(!data) {
+                return;
+            }
+
+            // console.log(data);
+            data = JSON.parse(data);
+
+            var reg_data = "";
+            reg_data += "fccId:" + data.fcc_id + "\n";
+            reg_data += "cbsdCategory:" + data.cat + "\n";
+            reg_data += "callSign:" + data.call_sign + "\n";
+            reg_data += "userId:" +  data.user_id + "\n";
+            reg_data += "radioTechnology:" + data.radio_tech + "\n";
+            reg_data += "cbsdSerialNumber:" + data.serial + "\n";
+            reg_data += "measCapability:" + data.meas_caps + "\n";
+            reg_data += "latitude:" + data.latitude + "\n";
+            reg_data += "longitude:" + data.longitude + "\n";
+            reg_data += "height:" + data.height + "\n";
+            reg_data += "heightType:" + data.height_type + "\n";
+            reg_data += "indoorDeployment:" + data.depolyment + "\n";
+            reg_data += "antennaAzimuth:" + data.azimuth + "\n";
+            reg_data += "antennaDowntilt:" + data.downtilt + "\n";
+            reg_data += "antennaGain:" + data.gain + "\n";
+            reg_data += "antennaBeamwidth:" + data.beam_width + "\n";
+
+            reg_data += "vendor:" + data.vendor + "\n";
+            reg_data += "model:" + data.model + "\n";
+            reg_data += "softwareVersion:" + data.sw_ver + "\n";
+            reg_data += "hardwareVersion:" + data.hw_ver + "\n";
+            reg_data += "firmwareVersion:" + data.fw_ver + "\n";
+
+            document.getElementById("reg_data").value = reg_data;
+
+            if(data.email_addr && !document.getElementById("email_addr").value) {
+                document.getElementById("email_addr").value = data.email_addr;
+            }
+
+            if(data.sms_addr && !document.getElementById("sms_addr").value) {
+                document.getElementById("sms_addr").value = data.sms_addr;
+            }
+
+            g_reg_data = data;
+            g_reg_content = reg_data + "\n";
+
+            document.getElementById("copy_reg_data").disabled = false;
+            document.getElementById("send_email_btn").disabled = false;
+            document.getElementById("send_sms_btn").disabled = false;
+        }
+
+        function send_reg_data(email) {
+
+            var id_addr = "email_addr";
+            var id_save = "save_email";
+            var addr_format = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
+            if(!email) {
+                id_addr = "sms_addr";
+                id_save = "save_sms";
+                addr_format = /^\+?[0-9]{1,20}$/;
+            }
+
+            var address = document.getElementById(id_addr).value;
+            var save = document.getElementById(id_save).checked;
+
+            if(!address.match(addr_format)) {
+                alert("Invalid " + (email?"E-mail":"SMS") + " address");
+                return false;
+            }
+
+            var body = encodeURI(g_reg_content);
+            var href = "";
+            var subject = "CPI data for " + g_reg_data.model + ", IMEI " + g_reg_data.imei + ", IMSI " + g_reg_data.imsi;
+            subject = encodeURI(subject);
+
+            if(email) {
+                href = "mailto:" + address;
+                href += "?subject=" + subject;
+                href += "&body=" + body;
+            }
+            else {
+                href = "sms:" + address;
+                href += "?body=" + subject + encodeURI("\n") + body;
+            }
+
+            // console.log(href);
+            window.location.href = href;
+
+            if(save) {
+               var param = "key=" + (email?"email":"sms");
+               param += "&address=" + address;
+               ajaxPostRequest("/update_address", param);
+            }
+        }
+
+        // Handler to be called when SAS Register request is failed
+        function sasRegisterPostFailedHandler() {
+            alert("Failed to trigger SAS Register process");
+            processingRegisterButton = false;
+        }
+
+        // Send SAS Register request
+        function sasRegister() {
+            var arg_latitude = document.getElementById("reg_latitude").value;
+            var arg_longitude = document.getElementById("reg_longitude").value;
+            var arg_height = document.getElementById("reg_height").value;
+            var arg_height_type = document.getElementById("reg_height_type").value;
+            var arg_azimuth = document.getElementById("reg_azimuth").value;
+            var arg_downtilt = document.getElementById("reg_downtilt").value;
+            var arg_cpi_id = document.getElementById("cpi_id").value;
+            var arg_cpi_name = document.getElementById("cpi_name").value;
+            var arg_install_certification_time = document.getElementById("install_certification_time").value;
+
+            var data = {
+              reg_latitude: arg_latitude,
+              reg_longitude: arg_longitude,
+              reg_height: arg_height,
+              reg_height_type: arg_height_type,
+              reg_azimuth: arg_azimuth,
+              reg_downtilt: arg_downtilt,
+              cpi_id: arg_cpi_id,
+              cpi_name: arg_cpi_name,
+              install_certification_time: arg_install_certification_time
+            };
+            ajaxPostRequestJson("/sas_register", data, sasRegisterPostOkHandler, sasRegisterPostFailedHandler);
+        }
+
+        // Set websocket report filter first
+        setWebsocketReportFilter(BITMASK_ANTENNA_STATUS|BITMASK_REGISTRATION_STATUS);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupPeriodicKeepAlive();
+
+            getCpiParam();
+            getRegMode();
+
+            document.getElementById("copy_btn").disabled = true;
+            document.getElementById("reg_btn").disabled = true;
+            document.getElementById("back_btn").disabled = false;
+            document.getElementById("next_btn").disabled = true;
+            document.getElementById("move_btn").disabled = true;
+            document.getElementById("key_file").onchange = function() {displayCpiKeyStatus("");};
+            document.getElementById("passphrase").onchange = function() {displayCpiKeyStatus("");};
+            document.getElementById("next_message").onclick = onNextMessage;
+            document.getElementById("last_message").onclick = onLastMessage;
+            document.getElementById("copy_reg_data").disabled = true;
+            document.getElementById("send_email_btn").disabled = true;
+            document.getElementById("send_sms_btn").disabled = true;
+        });
+    </script>
+
+</head>
+
+<body>
+<div class="popup-box-dark-mask" id="keepalive-popup-box" style="display:none">
+    <div class="popup-box-container">
+        <fieldset class="popup-box-frame">
+            <div class="popup-box-title" id="popup-title"></div>
+            <div class="popup-box-content">
+                <img id="popup-loading-icon" src="/loading.gif" alt="Loading" class="popup-box-loading-icon"/>
+                <span class="popup-box-message" id="popup-message"></span>
+            <div>
+        </fieldset>
+    </div>
+</div>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="app-data-entry">
+        <div class="box-header">
+            <h2>CBRS Install Parameters</h2>
+        </div>
+        <div class="box-content" style="padding-top:0;">
+            <form name="inst_form" class="content">
+                <div class="data_field_set_line">
+                    <div class="data_field_set_block" style="width:46%;">
+                        <div class="data_field_set_line bottom_delimiter" style="text-align:center;"><b>Install Tool Values</b></div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Latitude</div>
+                            <div class="data_field_text"><span id="latitude_data"></span></div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Longitude</div>
+                            <div class="data_field_text"><span id="longitude_data"></span></div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Height</div>
+                            <div class="data_field_text"><span id="height_data"></span></div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Height type</div>
+                            <div class="data_field_text"><span id="height_type"></span></div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Azimuth</div>
+                            <div class="data_field_text"><span id="azimuth_data" name="tool_azimuth"></span></div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Downtilt</div>
+                            <div class="data_field_text"><span id="down_tilt_data" name="tool_downtilt"></span></div>
+                        </div>
+                    </div>
+                    <div class="data_field_set_block left_delimiter" style="width:45%;">
+                        <div class="data_field_set_line bottom_delimiter" style="text-align:center;"><b>Registration Parameters</b></div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Latitude</div>
+                            <div class="data_field_text fixed_field_height">
+                                <input type="text" size="16" class="no_float" id="reg_latitude" name="reg_latitude" required> &deg;
+                            </div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Longitude</div>
+                            <div class="data_field_text fixed_field_height">
+                                <input type="text" size="16" class="no_float" id="reg_longitude" name="reg_longitude" required> &deg;
+                            </div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Height</div>
+                            <div class="data_field_text fixed_field_height">
+                                <input type="text" size="16" class="no_float" id="reg_height" name="reg_height" required> m
+                            </div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Height type</div>
+                            <div style="display:inline-block;">
+                                <div class="tooltip">
+                                    <select style="width:auto;float:none;" id="reg_height_type" name="reg_height_type">
+                                       <option value="AMSL">AMSL</option>
+                                       <option value="AGL">AGL</option>
+                                    </select>
+                                    <span class="tooltiptext" style="line-height:1.5">Select height measurement type</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Azimuth</div>
+                            <div class="data_field_text fixed_field_height">
+                                <input type="text" size="16" class="no_float" id="reg_azimuth" name="reg_azimuth" required> &deg;
+                            </div>
+                        </div>
+                        <div class="data_field_set_row fixed_field_height">
+                            <div class="data_field_label fixed_field_width">Downtilt</div>
+                            <div class="data_field_text fixed_field_height">
+                                <input type="text" size="16" class="no_float" id="reg_downtilt" name="reg_downtilt" required> &deg;
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="data_field_set_button_line" style="padding: 10px;">
+                    <button class="tinyfont no_float button_auto_width" type="button" id="copy_btn" name="copy_btn" onClick="copyToolData()">&#62; Copy Tool data for Registration &#62;</button>
+                    <div id="querying_data_notification"></div>
+                </div>
+                <div id="cpi_section">
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">CPI ID</div>
+                        <div class="data_field_text">
+                            <input type="text" size="40" class="no_float" id="cpi_id" name="cpi_id" required>
+                        </div>
+                    </div>
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">CPI Name</div>
+                        <div class="data_field_text">
+                            <input type="text" size="40" class="no_float" id="cpi_name" name="cpi_name" required>
+                        </div>
+                    </div>
+                    <div id="credentials_block" class="credentials_block" style="display:none">
+                        <div class="data_field_set_line">
+                            <div class="data_field_label wide_label">Installer Credentials</div>
+                            <div class="data_field_text">
+                                <div class="valid_check"><span id="cpi_key_status"></span></div>
+                            </div>
+                        </div>
+                        <div class="data_field_set_line">
+                            <div class="data_field_normal_label wide_label">Key File</div>
+                            <div class="data_field_text">
+                                <input type="file" size="40" name="key_file" id="key_file" class="no_float" accept=".p12,.pfx,application/x-pkcs12" required>
+                            </div>
+                        </div>
+                        <div class="data_field_set_line">
+                            <div class="data_field_normal_label wide_label">Passcode</div>
+                            <div class="data_field_text">
+                                <input type="password" size="40" name="passphrase" id="passphrase" class="no_float" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">Install Certification Time</div>
+                        <div class="data_field_text">
+                            <input type="text" size="40" class="no_float" id="install_certification_time" name="install_certification_time" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="data_field_set_line" style="display: none">
+                    <div class="data_field_label wide_label">Modem Transmission Status</div>
+                    <div class="data_field_text">
+                        <span class="no_float" id="modem_tx_status">&nbsp;</span>
+                    </div>
+                </div>
+                <div class="data_field_set_line fixed_field_height valign_middle" style="text-align:center;">
+                      <div style="display:inline-block;vertical-align:middle">
+                      <input type="checkbox" id="data_check" name="data_check"></div> Confirm all fields are accurate
+                </div>
+                <div class="data_field_set_button_line">
+                    <div class="tooltip">
+                        <div><button class="med no_float" type="button" id="reg_btn" name="reg_btn" onClick="registerButtonHandler()">Register</button></div>
+                        <span class="tooltiptext">Register with the SAS</span>
+                    </div>
+                    <div style="padding: 5px;">Register only at the final install location.</div>
+                </div>
+
+                <div id="reg_data_section" style="display: none">
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">Registration Data:
+                            <button class="tinyfont no_float" type="button" onclick="document.getElementById('reg_data').click();" id="copy_reg_data">Copy</button>
+                            <br><br><br><br><br><br><br><br><br><br>
+                        </div>
+                        <div class="data_field_text">
+                            <textarea readonly="true" id="reg_data" cols="60" rows="22" class="no_float" onclick="this.focus();this.select();document.execCommand('copy')"></textarea>
+                        </div>
+                    </div>
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">E-mail address:</div>
+                        <div class="data_field_text">
+                            <input type="text" size="32" class="no_float" id="email_addr">
+                            <input type="checkbox" class="no_float" id="save_email" value="save" checked="checked">
+                            <label for="save_email" class="no_float">Save</label>
+                            <button class="tinyfont no_float" type="button" onclick="send_reg_data(true)" id="send_email_btn" >Send</button>
+                        </div>
+                    </div>
+                    <div class="data_field_set_line">
+                        <div class="data_field_label wide_label">SMS address:</div>
+                        <div class="data_field_text">
+                            <input type="text" size="32" class="no_float" id="sms_addr">
+                            <input type="checkbox" class="no_float" id="save_sms" value="save" checked="checked">
+                            <label for="save_sms" class="no_float">Save</label>
+                            <button class="tinyfont no_float" type="button" onclick="send_reg_data(false)" id="send_sms_btn">Send</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data_field_set_line top_delimiter"><b>Status</b>
+                    <div class="err_left_button err_nav_button inactive" id="last_message"></div>
+                    <div class="err_right_button err_nav_button inactive" id="next_message"></div>
+                </div>
+                <div class="data_field_set_line">
+                    <div class="data_field_set_block">
+                        <div class="data_field_text" id="err_msg_ts" style="display:none"></div>
+                        <div class="general_error_message" id="general_error_message" style="display:none"></div>
+                        <div class="general_error_guideline" id="general_error_guideline" style="display:none"></div>
+                        <div class="data_field_set_row">
+                            <div class="data_field_label wide_label" style="vertical-align:top;">CBRS Registration Status</div>
+                            <div class="data_field_text">
+                                <div><div class="data_field_text" id="sas_reg_state"></div></div>
+                                <div><div class="data_field_text" id="sas_err_code" style="display:none"></div></div>
+                                <div><div class="data_field_text" id="sas_err_msg" style="display:none"></div></div>
+                            </div>
+                        </div>
+                        <div class="data_field_set_row">
+                            <div class="data_field_label wide_label">Serving cell</div>
+                            <div class="data_field_text"><span id="scell_id" name="scell_id"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data_field_set_button_line top_delimiter">
+                    <div class="tooltip">
+                        <button class="tinyfont no_float" type="button" onclick="window.location='/scan.html'" id="back_btn" name="back_btn">Back</button>
+                        <span class="tooltiptext">Back to Network Scan</span>
+                    </div>
+                    <div class="tooltip">
+                        <button class="tinyfont no_float" type="button" onclick="window.location='/ttest.html'" id="next_btn" name="next_btn">Next</button>
+                        <span class="tooltiptext">Speed Test screen</span>
+                    </div>
+                    <div class="tooltip">
+                        <button class="tinyfont no_float button_auto_width" onclick="window.location='/move_to_new_location.html'" id="move_btn" name="move_btn">Move To New Location</button>
+                        <span class="tooltiptext">De-register with SAS then re-orient the device</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script src="js/orientation_data_handler.js"></script>
+<script>
+var orientationGpsDataHandler = new OrientationGpsDataHandler();
+</script>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/all.js"></script>
+    <script>
+        document.removeEventListener('DOMContentLoaded', ws_listener, false);
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("document is ready");
+            getTestReport();
+        });
+    </script>
+
+    <script>
+
+    // Create a report file (using client side data only) which mirrors data displayed on the
+    // report page (e.g. similar to buildFinalReport used to build HTML)
+    function createReportFileText(data) {
+
+        var stats_data = data.stats_report.stats; // shorthand
+        var ttest_data = data.ttest_report.test_data; // shorthand
+        var gen_data = data.ttest_report.gen_data;
+
+        var currentDate = new Date();
+
+        var res = "Report saved on: " + currentDate.toString() + "\n\n";
+
+        for (var i = 0; i < stats_data.length; i++) {
+            if (stats_data[i].cell_sector_id) {
+                res += "Cell Sector Id: " + stats_data[i].cell_sector_id  + "\t";
+            } else {
+                res += "PCI: " + stats_data[i].pci  + "\t";
+            }
+            res += "Average RSRP: " + stats_data[i].rsrp_avg  + "\t";
+            res += "Average RSRQ: " + stats_data[i].rsrq_avg  + "\t";
+            res += "Samples: " + stats_data[i].ns  + "\t";
+            res += "Pass/fail: " + stats_data[i].res  + "\n";
+        }
+
+        res += "\nSpeed test:\n";
+
+        if (ttest_data.length == 2) {
+            res += getOverallResult(ttest_data, gen_data.warning, false);
+
+            res += "\nServer used: " + ttest_data[0].server + "\n";
+            res += "Method used: " + ttest_data[0].method + "\n";
+            res += "Time started: " + retrieveTimestamp("testStart") + "\n";
+
+            if (isFinite(ttest_data[0].duration) && isFinite(ttest_data[1].duration)) {
+                res += "Duration: " + Number(Number(ttest_data[0].duration) + Number(ttest_data[1].duration)).toFixed(2) +" seconds\n";
+            }
+
+            res += "Download speed: " + getThroughPutString(ttest_data[0].avg_speed) + "\n";
+            res += "Upload speed: " + getThroughPutString(ttest_data[1].avg_speed) + "\n";
+
+        } else {
+            res += "Unexpected result";
+        }
+
+        res += "Serving Cell: " + gen_data.serving_cell + "\n";
+        res += "IMEI: " + gen_data.imei + "\n";
+        res += "SIM ICCID: " + gen_data.iccid + "\n";
+        res += "SIM MSISDN: " + gen_data.msisdn + "\n";
+        res += "OA s/w version: " + gen_data.sw_ver + "\n";
+        res += "OA h/w version: " + gen_data.hw_ver + "\n";
+        res += "OA AT&T S/N: " + gen_data.sn + "\n";
+        res += "OA MAC: " + gen_data.mac + "\n";
+        res += "OA P/N: " + gen_data.pn + "\n";
+        res += "OA model name: " + gen_data.class + "\n";
+#ifdef V_TITAN_INSTALLATION_ASSISTANT_CONN_nrb200
+        if (gen_data.sw_ver_nrb200) {
+            res += "Alignment tool s/w version: " + gen_data.sw_ver_nrb200 + "\n";
+        } else {
+            res += "Alignment tool s/w version: N/A\n";
+        }
+        if (gen_data.hw_ver_nrb200) {
+            res += "Alignment tool h/w version: " + gen_data.hw_ver_nrb200 + "\n";
+        } else {
+            res += "Alignment tool h/w version: N/A\n";
+        }
+#endif
+        return res;
+    }
+
+    // Process request to save report file
+    function saveReport() {
+
+        var textToWrite = createReportFileText(global_data);
+        var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
+
+        // @TODO - requirement states that file name will also involve the serial number
+        var today = new Date();
+        var date = today.getDate();
+        var month = today.getMonth()+1; //January is 0!
+        var year = today.getFullYear();
+        var hour = today.getHours();
+        var min = today.getMinutes();
+        var sec = today.getSeconds();
+
+        var fileNameToSaveAs = month + "_" + date + "_" + year + "_" + hour + "_" + min + "_" + sec + ".txt";
+
+        var downloadLink = document.createElement("a");
+        downloadLink.download = fileNameToSaveAs;
+
+        downloadLink.innerHTML = "Download File";
+        if (window.webkitURL != null) {
+            // Chrome allows the link to be clicked
+            // without actually adding it to the DOM.
+            downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+        } else {
+            // Firefox requires the link to be added to the DOM
+            // before it can be clicked.
+            downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+            downloadLink.onclick = destroyClickedElement;
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+        }
+        downloadLink.click();
+    }
+
+    function destroyClickedElement(event) {
+        document.body.removeChild(event.target);
+    }
+
+    // called when DOM is loaded before the page is first displayed
+    // Gets all relevant data from the server.
+    function getTestReport() {
+
+        ajaxGetRequest("/report/landing", true, function(data) {
+            var res = buildFinalReport(data);
+            document.getElementById("testReportId").innerHTML = res;
+            // store a copy so we can use the latest shown data for text file generation
+            global_data = data;
+        });
+    }
+    </script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box" id="report-box-id">
+        <div class="box-header">
+            <h2>Report generation</h2>
+        </div>
+        <div class="box-content">
+            <div id="testReportId"></div>
+            <div class="submit-row">
+                <form action="/ttest.html" method="GET">
+                    <button class='med'>Back</button>
+                </form>
+                <div id="SaveReport">
+                    <button class='med' onclick="saveReport()">Save Report</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

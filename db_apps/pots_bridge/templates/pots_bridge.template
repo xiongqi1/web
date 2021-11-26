@@ -1,0 +1,30 @@
+#!/bin/sh
+!<potsbridge_disabled>;
+platform=`cat /etc/platform.txt | sed "s/platform=//"`
+
+# Read the simple_at_manager ready flag.
+# It will be set to "ready" when the manager
+# is ready.
+AT_MANAGER_READY="?<atmgr.status>;"
+SKIN=`rdb_get system.skin`
+BOARD=`rdb_get system.board`
+
+# IMPORTANT : If pots_brige.template reads atmgr.status variable prior to other template that wait
+# this variable, then the waiting template cab be triggered because rdb_manager_t clears triggering flag.
+# So atmgr.status2 should be set here to trigger other template in case.
+if [ "$AT_MANAGER_READY" = "ready" ]; then
+	rdb_set atmgr.status2 ready
+fi
+
+if [ "$platform" = "Platypus" ]; then
+		VOICE_DISABLED=`nvram_get "potsbridge_disabled"`
+else
+		VOICE_DISABLED=`rdb_get "potsbridge_disabled"`
+fi
+
+if [ "$BOARD" = "3g8wv" ] || [ "$BOARD" = "3g38wv" ] || [ "$BOARD" = "3g38wv2" ] || [ "$BOARD" = "3g39wv" ] || [ "$BOARD" = "elaine" ] || [ "$BOARD" = "4g100w" ] || [ "$BOARD" = "3g22wv" ] || [ "$BOARD" = "3g46" ] ; then
+	if [ "$AT_MANAGER_READY" = "ready" ]; then
+		logger "Starting the pots bridge script from template"
+		/sbin/pots_bridge.sh&
+	fi
+fi

@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/GUI-login.html'); exit(403); } 
+_m=get_single('mhs.operationmode'); if(_m!="poweruser") redirect('/index.html');%>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>WAN Basic</title>
+<link href="GUI-ntcStyle.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="/lang/b28n.js"></script>
+<script language="javascript" src="util.js"></script>
+<script language="javascript" src="jquery-1.6.min.js"></script>
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+	set_single('link.profile.0.wan_conntype='+form['wan_conntype'], '-p');
+	set_single('link.profile.0.wan_ipaddr='+form['staticIp'], '-p');
+	set_single('link.profile.0.wan_mask='+form['staticNetmask'],'-p');
+	set_single('link.profile.0.wan_gw='+form['staticGateway'], '-p');
+	set_single('link.profile.0.wan_dns1='+form['staticPriDns'], '-p');
+	set_single('link.profile.0.wan_dns2='+form['staticSecDns'],'-p');
+}
+else {/*GET*/
+	form['wan_conntype']=get_single('link.profile.0.wan_conntype');
+	form['staticIp']=get_single('link.profile.0.wan_ipaddr');
+	form['staticNetmask']=get_single('link.profile.0.wan_mask');
+	form['staticGateway']=get_single('link.profile.0.wan_gw');
+	form['staticPriDns']=get_single('link.profile.0.wan_dns1');
+	form['staticSecDns']=get_single('link.profile.0.wan_dns2');
+}
+%>
+<script language="JavaScript">
+Butterlate.setTextDomain("GUI-wan");
+
+function checkWanPortStatus() {
+var wan_mode=<%v=get_single('link.profile.0.wan_mode');%>"@@v";
+var m=<% _m=get_single('mhs.operationmode'); %>"@@_m";
+	   if (wan_mode !="wan") {
+			if(m=="poweruser")
+				alert(_("lanwan warningMsg2"));
+			else
+				alert(_("lanwan warningMsg1"));
+			window.location=('/login.html');
+			return false;
+	   }
+}
+
+function initTranslation() {
+	$("#wIntroduction").html(_("wan introduction")+" ("+_("wan address mode static")+", DHCP), "+_("Msg2"));
+	$("#CSsave").val("    "+_("CSsave")+"    ");
+}
+
+function connectionTypeSwitch() {
+	document.getElementById( "d_static" ).style['display']='none';
+	document.getElementById("d_static").style.display = "none";
+
+	if (document.form.connectionType.options.selectedIndex == 0)
+		document.getElementById( "d_static" ).style['display']='';
+
+	document.form.wan_conntype.value=document.form.connectionType.value;
+}
+
+function submitF1() {
+var f=document.form;
+	if (f.connectionType.options.selectedIndex == 0) { //STATIC
+		if (!checkIpAddr(f.staticIp, false))
+			return;
+		else if (!checkIpAddr(f.staticNetmask, true))
+			return;
+		else if (f.staticGateway.value != "")
+			if (!checkIpAddr(f.staticGateway, false))
+				return;
+		if (f.staticPriDns.value != "")
+			if (!checkIpAddr(f.staticPriDns, false))
+				return;
+		if (f.staticSecDns.value != "") {
+			if (!checkIpAddr(f.staticSecDns, false))
+				return;
+		}
+	}
+
+	f.submit();
+}
+
+$(document).ready(function() {
+	with ( document.forms[0] ) {
+		if(wan_conntype.value=="N/A")
+			wan_conntype.value="dhcp";
+		connectionType.value=wan_conntype.value;
+		if(staticIp.value=="N/A")
+			staticIp.value="";
+		if(staticNetmask.value=="N/A")
+			staticNetmask.value="";
+		if(staticGateway.value=="N/A")
+			staticGateway.value="";
+		if(staticPriDns.value=="N/A")
+			staticPriDns.value="";
+		if(staticSecDns.value=="N/A")
+			staticSecDns.value="";
+	}
+	initTranslation();
+	connectionTypeSwitch();
+});
+</script>
+
+</head>
+<body onload="checkWanPortStatus();">
+<form name="form" class="content" method='POST' action="@@request['SCRIPT_NAME']"/>
+<input type="hidden" name="wan_conntype" value="@@form['wan_conntype']">
+<% include GUI-extra.html %>
+<div id="basicGUI">
+	<img src="images/Basic-GUI.gif" border="0" usemap="#1"/>
+	<img style="position:absolute; top:0px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-status"><a style="text-decoration:none" href="index.html"><script language="JavaScript">document.write(_("status"));</script></a></div>	
+<%_m=get_single('mhs.operationmode'); if(_m=='poweruser') {%>
+	<img style="position:absolute; top:121px; left:-1px" src="/images/button2.gif" />
+	<div class="Rotate-90" id="tab-wlan"><a href="/GUI-wlan.html"><script language="JavaScript">document.write(_("GUI wireless"));</script></a></div>
+	<img style="position:absolute; top:242px; left:-5px" src="/images/button1.gif" />
+	<div class="Rotate-90" id="tab-wan" style="left:4px;"><a href="/GUI-wan.html">LAN 1 / WAN</a></div>
+<%}%>
+	<div class="div_text" id="wIntroduction" style="top:30px; color:#000"></div>
+	<img style="position:absolute; top:100px; left:44px" src="/images/strip.png"/> 
+	<img style="position:absolute; top:400px; left:44px" src="/images/strip.png"/>
+	
+	<div class="div_text" style="top:130px"><script language="JavaScript">document.write(_("wan connection type"))</script></div>
+	<div class="div_input" style="top:130px" >
+		<select name="connectionType" size="1" onChange="connectionTypeSwitch();">
+			<option value="static"><script language="JavaScript">document.write(_("wan connection type static"))</script></option>
+			<option value="dhcp" id="wConnTypeDhcp"><script language="JavaScript">document.write(_("wan connection type dhcp"))</script></option>
+<!-- 			<option value="PPTP" id="wConnTypePptp"></option> -->
+		</select> 
+    </div>
+	<div id="d_static" style="display:''">
+		<div class="div_text" style="top:180px"><script language="JavaScript">document.write(_("ip address"))</script></div>
+		<div class="div_input" style="top:180px">
+			<input name="staticIp" maxlength=15 value="@@form['staticIp']">
+		</div>
+		<div class="div_text" style="top:220px"><script language="JavaScript">document.write(_("subnet mask"))</script></div>
+		<div class="div_input" style="top:220px">
+			<input name="staticNetmask" maxlength=15 value="@@form['staticNetmask']">
+		</div>
+		<div class="div_text" style="top:260px"><script language="JavaScript">document.write(_("gateway"))</script></div>
+		<div class="div_input" style="top:260px">
+			<input name="staticGateway" maxlength=15 value="@@form['staticGateway']">
+		</div>
+		<div class="div_text" style="top:300px"><script language="JavaScript">document.write(_("inet pri dns"))</script></div>
+		<div class="div_input" style="top:300px;">
+			<input name="staticPriDns" maxlength=15 value="@@form['staticPriDns']">
+		</div>
+		<div class="div_text" style="top:340px"><script language="JavaScript">document.write(_("inet sec dns"))</script></div>
+		<div class="div_input" style="top:340px;">
+			<input name="staticSecDns" maxlength=15 value="@@form['staticSecDns']">
+		</div>
+	</div>
+
+	<div class="div_button" style="top:455px">
+	<input type="button" name="submitForm" onClick='submitF1();' id="CSsave" value="Save">
+	</div>
+</div>
+</form>
+</body>
+</html>

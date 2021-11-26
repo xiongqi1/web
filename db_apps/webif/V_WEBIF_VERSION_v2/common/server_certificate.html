@@ -1,0 +1,405 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Server certificate</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<style>.normal-text{background:#f0f0f0;}</style>
+
+<script language="JavaScript">
+
+function isIncorrect(xStr) {
+	var regEx = /^[a-zA-Z0-9@_\-\. ]+$/;
+	return !xStr.match(regEx);
+}
+
+function progress_err() {
+	document.body.style.cursor = "default";
+	$("#ServerGenCertiBtn").attr("disabled", false);
+	$("#ServerGenDhBtn").attr("disabled", false);
+	$("#output").attr("rows", "1");
+	clearInterval(interval);
+	validate_alert("",errMsg);
+}
+
+var replace_text_list={"This is going to take a long time":_("waitSeveralMinutesMsg"), "Generating DH parameters":_("genDHmag1"), "bit long safe prime":_("genDHmag2"), "generator":_("genDHmag3"), "Done. DH parameters generated successfully.":_("dhDoneMsg"),"Failed":_("failed")};
+var keySize;
+var progress_status="DHinfo";
+var result;
+var req="/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=info_dh";
+var ajaxUpdKey=false;
+var restart=false;
+var errMsg=_("generateHttpsKeyFailed");
+var errCount=0;
+function ajax_progress() {
+	if(ajaxUpdKey && progress_status!="restart" && progress_status!="success") {
+		return;
+	}
+	ajaxUpdKey=true;
+	setTimeout( function() {
+		var jqxhr = $.get(req, function(resp) {
+			ajaxUpdKey=false;
+			eval(resp);
+			switch(progress_status) {
+			case "DHinfo":
+				if ( typeof(result)=="undefined" || result!="ok" ) {
+					progress_err();
+					return;
+				}
+				if(openvpn_dh!=1) {
+					errMsg = _("Msg99");
+					progress_err();
+					return;
+				}
+				else {
+					msg=_("dhGenerated")+"\n"+_("generatingCertificate");
+					req="/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=ca&param=,"
+					+document.getElementById("CertiCountry4").value+","
+					+document.getElementById("CertiState4").value+","
+					+document.getElementById("CertiCity4").value+","
+					+document.getElementById("CertiOrg4").value+","
+					+document.getElementById("CertiEmail4").value;
+					progress_status="ca";
+				}
+				$("#output").val(msg);
+			break;
+			case "ca":
+				if ( typeof(result)=="undefined" || result!="ok" ) {
+					errMsg=_("Msg101");//The router failed to generate the CA key. Please ensure you enter correct certificate information/
+					progress_err();
+					return;
+				}
+				req="/cgi-bin/ajax.cgi";
+				ajaxUpdKey = true; // Disabling update until the following box is answered, for preventing screen flashing.
+				blockUI_confirm(_("webServerRestartConfirm"),
+						function() {
+							progress_status="install";
+							restart = true;
+							ajaxUpdKey = false;
+							req="/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=install";
+						},
+						function() {
+							progress_status="install";
+							restart = false;
+							ajaxUpdKey = false;
+							req="/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=install";
+						}
+						);
+			break;
+			case "install":
+				if(resp.indexOf("can't")==-1) {
+					msg+="\n"+_("certificateSuccessfullyGenerated");
+					$("#output").val(msg);
+					if (restart) {
+						req="/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=restart";
+						$.get(req);
+						msg+="\n"+_("GUI pleaseWait"+"...");
+						$("#output").val(msg);
+						progress_status="restart";
+					} else {
+						progress_status="success";
+					}
+					req="/cgi-bin/ajax.cgi";
+				}
+				else {
+					msg+="\n"+_("wwan operationFailed");
+					$("#output").val(msg);
+					progress_err();
+					return;
+				}
+			break;
+			case "restart":
+				window.location.href="/index.html";
+			break;
+			case "success":
+				ajaxUpdKey=false; // update is not needed any more
+				getCertiInfo(); // Get the certificate details.
+				document.body.style.cursor = 'default';
+				$("#ServerGenCertiBtn").attr("disabled", false);
+				$("#ServerGenDhBtn").attr("disabled", false);
+				clearInterval(interval);
+			break;
+			}
+		})
+		.fail(function() {
+			if (progress_status=='restart')
+				errCount++;
+			if (errCount>=10)
+				window.location.href="/index.html";
+		});
+	});
+}
+
+function serverGenDhClick() {
+	if (document.getElementById("ServerKeySize2048").checked) {
+		keySize = "2048";
+	} else {
+		keySize = "4096";
+	}
+	var req = "/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=init&param="+keySize
+	function confirmed_func() {
+		$("#output-div").css("display", "");
+		$("#output").attr("rows", "6");
+		$("#ServerGenDhBtn").attr("disabled", true);
+		$("#ServerGenCertiBtn").attr("disabled", true);
+		document.body.style.cursor = 'wait';
+		$.get(req, function(x) {
+			if ( typeof(result)=="undefined" || result!="ok" ) {
+				errMsg=_("Msg99");//The router failed to start to generate the DH key.
+				progress_err();
+				return;
+			}
+		});
+		// update the Dh generating progress
+		setTimeout(function _dhupdate(){
+				req = "/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=info_dh";
+				$.get(req, function(x) {
+						eval(x);
+						$.each( replace_text_list, function(t1,t2) {
+								openvpn_output=openvpn_output.replace(t1,t2);
+								});
+						$("#output").val(openvpn_output);
+						if (openvpn_dh==2) {
+							setTimeout(_dhupdate, 2000);
+						} else {
+							document.body.style.cursor = 'default';
+							$("#ServerGenDhBtn").attr("disabled", false);
+							$("#ServerGenCertiBtn").attr("disabled", false);
+							getCertiInfo(); // Update certificate information, should be empty.
+						}
+					});
+				},
+				2000);
+	}
+	var msgH;
+	// Give different warning according to different server key size
+	if (keySize == "4096") {
+		msgH = _("dh hours warning");
+	} else {
+		msgH = _("dh minutes warning");
+	}
+	blockUI_confirm(msgH + " " + _("Msg98"), confirmed_func);
+}
+
+
+function ServerGenCertiBtnClick() {
+	clear_alert();
+#ifdef V_WEBIF_SPEC_vdf
+/*********for vdf validator**********/
+	if(!$("#form").valid()) {
+		return;
+	}
+#else
+	if(!$("#form").validationEngine("validate")) {
+		validate_alert("","");
+		return;
+	}
+#endif
+	function confirmed_func() {
+		$("#output-div").css("display", "");
+		$("#output").attr("rows", "6");
+		$("#ServerGenDhBtn").attr("disabled", true);
+		$("#ServerGenCertiBtn").attr("disabled", true);
+		document.body.style.cursor = 'wait';
+		interval=setInterval(ajax_progress, 2000);
+	}
+	var msg;
+	// Give different message according to different server key size.
+	if (keySize == "4096") {
+		msg = _("gen4096KeyMsg");
+	} else {
+		msg = _("genKeyMsg");
+	}
+	blockUI_confirm(msg, confirmed_func);
+}
+
+function getCertiInfo() {
+	// Get server certificate info
+	$.get("/cgi-bin/vpn_action.cgi?<%appendCsrfTokenToQueryString();%>action=info", function(x) {
+		var server_certificate;
+		eval(x);
+		if (openvpn_dh == 1) {
+			$("#ServerGenCertiBtn").attr("disabled", false);
+			$("#output-div").css("display", "");
+			$("#output").attr("rows", "6");
+			$("#output").val(openvpn_output);
+		} else { // disable certificate generate button if there is no Dh parameter generated.
+			$("#ServerGenCertiBtn").attr("disabled", true);
+		}
+		if (server_certificate == null || server_certificate == "") return;
+		certProps = server_certificate.substring(0, server_certificate.indexOf("/")).split(",");
+		document.getElementById("CertiCountry4").value = certProps[0];
+		document.getElementById("CertiState4").value = certProps[1];
+		document.getElementById("CertiCity4").value = certProps[2];
+		document.getElementById("CertiOrg4").value = certProps[3];
+		document.getElementById("CertiEmail4").value = certProps[5];
+		expDates = server_certificate.substring(server_certificate.indexOf("/")+1, server_certificate.length-1).split(",");
+		document.getElementById("ServerCertiSerial").innerHTML = server_certificate_serial_no;
+		document.getElementById("ServerCertiExpS").innerHTML = expDates[0] == ""? "N/A":expDates[0];
+		document.getElementById("ServerCertiExpE").innerHTML = expDates[1] == ""? "N/A":expDates[1];
+	});
+}
+
+$(document).ready(function() {
+	keySize= <%val=get_single('service.openvpn.keysize');%>"@@val";
+	keySize = keySize.trim();
+	if (keySize == "" || keySize == "N/A") {
+		keySize = "4096"; // Default key size is 4096.
+	}
+	if (keySize == "2048") {
+		document.getElementById("ServerKeySize2048").checked = true;
+	} else {
+		document.getElementById("ServerKeySize4096").checked = true;
+	}
+	// Get certificate info
+	getCertiInfo();
+});
+
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" id="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']">
+		<div class="right-column white-box">
+			<h2><script language=Javascript>document.write(_("generateServerCertificate"))</script></h2>
+			<div class="pad">
+				<div class="form-row" id="ServerKeySizeDiv">
+					<label for="ServerKeySizeBtn"><script>document.write(_("server key size"))</script></label>
+					<div class="radio-box-group">
+						<div class="radio-box">
+							<input id="ServerKeySize2048" class="access" type="radio" name="ServerKeySize">
+							<label for="ServerKeySize2048"><div class="radioText">2048</div></label>
+						</div>
+						<div class="radio-box">
+							<input id="ServerKeySize4096" class="access" type="radio" name="ServerKeySize">
+							<label for="ServerKeySize4096"><div class="radioText">4096</div></label>
+						</div>
+					</div>
+				</div>
+				<div class="form-row" id="serverDhDiv">
+					<label for="ServerGenDhBtn"><script language=Javascript>document.write(_("diffieHellmanParameters"))</script></label>
+					<div class="submit-row" style="padding:0; clear:none">
+					<button type="button" id="ServerGenDhBtn" class="secondary" onClick="serverGenDhClick()" style="margin-left:0;"><script language=Javascript>document.write(_("generate"))</script></button>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='ServerCertiSerial'><script language=Javascript>document.write(_("certificateSerial"))</script></label>
+					<div class="field">
+						<span class="normal-text" id='ServerCertiSerial' name="vpnCertiSerial"></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='ServerCertiExpS'><script language=Javascript>document.write(_("notBefore"))</script></label>
+					<div class="field">
+						<span class="normal-text" id='ServerCertiExpS' name="vpnCertiName3"></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='ServerCertiExpE'><script language=Javascript>document.write(_("notAfter"))</script></label>
+					<div class="field">
+						<span class="normal-text" id='ServerCertiExpE' name="vpnCertiName3"></span>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='CertiCountry4'><script language=Javascript>document.write(_("country"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_CertiCountry]] large required CertiCountry4" id='CertiCountry4' name="CertiCountry4" maxlength=2>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='CertiState4'><script language=Javascript>document.write(_("state"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_checkval]] large required checkval" id='CertiState4' name="CertiState4" maxlength=64>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='CertiCity4'><script language=Javascript>document.write(_("city"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_checkval]] large required checkval" id='CertiCity4' name="CertiCity4" maxlength=64>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='CertiOrg4'><script language=Javascript>document.write(_("organization"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_checkval]] large required checkval" id='CertiOrg4' name="CertiOrg4" maxlength=64>
+					</div>
+				</div>
+				<div class="form-row">
+					<label for='CertiEmail4'><script language=Javascript>document.write(_("email"))</script></label>
+					<div class="field">
+						<input type="text" class="validate[required,funcCall[validate_checkval]] large required checkval" id='CertiEmail4' name="CertiEmail4" maxlength=64>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" class="secondary" id="ServerGenCertiBtn" onClick="ServerGenCertiBtnClick()"><script language=Javascript>document.write(_("generate"))</script></button>
+				</div>
+				<br/>
+				<div class="field-des" id="output-div" style="display:none">
+					<br/>
+					<textarea class="grey-box" id="output" cols="56" rows="1" style="padding:15px 15px; margin-left:-16px; border:0;overflow:auto;" tabindex="1" readonly="readonly"></textarea>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("System", "CERTIFICATE", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+/********* vdf validator**********/
+	VALIDATOR.config.errors["CertiCountry4"]=_("Msg95");
+	$.validator.addMethod("CertiCountry4",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if(c.length<2 || c.length>4 || isIncorrect(c)) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.CertiCountry4);
+
+	VALIDATOR.config.errors["checkval"]=_("Msg96");
+	$.validator.addMethod("checkval",function(c,a) {
+		if(c!==$(a).attr("data-watermark")) {
+			if( isIncorrect(c) ) {
+				return false;
+			}
+		}
+		else if($(a).hasClass("required")) {
+			return false;
+		}
+		return true;
+	},VALIDATOR.config.errors.checkval);
+#else
+/********* NTC ValidationEngine **********/
+	function validate_CertiCountry(field) {
+		if(field.val().length<2 || field.val().length>4 || isIncorrect(field.val())) {
+			return _("Msg95");
+		}
+	}
+	function validate_checkval(field) {
+		if( isIncorrect(field.val()) ) {
+			return _("Msg96");
+		}
+	}
+#endif
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('openvpnSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

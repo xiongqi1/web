@@ -1,0 +1,74 @@
+#!/bin/sh -f
+#
+# Connect script for ETH connections
+#
+# This script is called by connection_mgr as follows:-
+#
+# SUMTS <profile> <instance>
+#
+# Where:
+# <profile> is the configuration profile number to use for this connection
+# <instance> is the number of connections using this device
+#
+
+source "/etc/cdcs/connectscripts/connect-script-common"
+source "/etc/variant.sh"
+
+BIN="$0"
+PROFILE="$1"
+INSTANCE="$(( $2 + 1 ))"
+ACTION="$3"
+
+run() {
+	log "[run] $*"
+	$@ 2>&1 | log
+}
+
+# read profile settings
+log "### read link.profile settings"
+eval $(rdb_get -L "link.profile.$PROFILE" | sed -n "s/^link.profile.$PROFILE.\\([^ ]\+\\) \\(.*\\)/profile_\1='\2';/p")
+
+hwclass="$profile_dev"
+
+# get legacy device name
+dev=$(rdb_get "$hwclass.netif")
+# get dynamic name if legacy device name does not exist
+if [ -z "$dev" ]; then
+	dev=$(rdb_get "sys.hw.class.$hwclass.name")
+	ctrldev=$(rdb_get "sys.hw.class.$hwclass.ctrldevname")
+fi
+
+log << EOF
+hwclass_dev_node='sys.hw.class.$hwclass'
+legacy_dev_node='$hwclass.netif'
+network_if='$dev'
+EOF
+
+if [ -z "$dev" -o -z "$(ifconfig $dev 2>/dev/null)" ]; then
+	log "WAN ETH interface is not ready [dev='$dev']"
+	exit 1
+fi
+
+# This is to replace network interface with control device.
+if [ -n "$ctrldev" ]; then
+	dev="$ctrldev"
+fi
+
+extra_opt=""
+if [ "$V_WIFI_CLIENT" = 'qca_soc_lsdk' ]; then
+	PROFILE_DEV_TYPE=$( echo "$profile_dev" |  sed -n 's/^\([a-zA-Z_]\+\)\.[0-9]\+/\1/p')
+
+	case "$PROFILE_DEV_TYPE" in
+		'wlan_sta')
+			# WIFI client interface for Atheros system is VLAN tagged Virtual interface, it's not physical interface.
+			# So, without -M option, the interface is always regarded as up.
+			extra_opt="-M"
+			;;
+	esac
+fi
+
+
+log "### exec 'ifplugd' $extra_opt -a -n -t3 -i '$dev' -r '/usr/bin/ifplugd.sh'"
+## Warning - Do not put quotation mark around $extra_opt.
+## If extra_opt is empty, exec command processes "$extra_opt" as "" so ifplugd does not work properly.
+exec "ifplugd" $extra_opt -a -n -t3 -i "$dev" -r "/usr/bin/ifplugd.sh"

@@ -1,0 +1,688 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>SIM Security</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<% include utilities.inc %>
+<% indicateRequestValidity(); %>
+
+<%
+#ifdef V_PRODUCT_vdf_nwl22w
+// wait until RDB variable is equal or not equal to a specific value
+// Paramters:
+//	rdb_var:	RDB variable to monitor
+//	value:		Value to compare
+//	opt:		0: Equal; 1: Not equal
+//	timeout:	Timeout in seconds
+// Returns:
+//	1: rdb_var is equal (in case opt == 0) or not equal (opt == 1) to value
+//	0: otherwise or timeout
+function wait_rdb_until(rdb_var, value, opt, timeout) {
+	for (i = 0; i < timeout; i++) {
+		current_value = get_single(rdb_var);
+		// wait until equal
+		if (opt == 0) {
+			if (current_value == value) {
+				return 1;
+			}
+		}
+		else {
+			// wait until not equal
+			if (current_value != value) {
+				return 1;
+			}
+		}
+		esp_sleep(1000);
+	}
+	return 0
+}
+// this is a workaround for a issue in MP7304 module firmware version 05.05.61.00:
+// After inserting a SIM then unlock, the module will reboots! it looks like crashing in module.
+// After the module reboots AND without removing the SIM, the unlocking is fine without rebooting.
+// This should be removed once the issue in module firmware is identified and fixed.
+// Parameter:
+//	pin: PIN to unlock SIM
+function workaround_module_reboot(pin) {
+	if (wait_rdb_until("wwan.0.sim.cmd.status", "[done]", 0, 10) == 1) {
+		// SIM command is successfully. Check whether module reboots
+		if (wait_rdb_until("wwan.0.if", "", 0, 10) == 1) {
+			// Module reboots !!! Wait until it is ready
+			if (wait_rdb_until("wwan.0.if", "", 1, 120) == 1) {
+				// wait until current SIM status, which must be SIM PIN, is read
+				if (wait_rdb_until("wwan.0.sim.status.status", "SIM PIN", 0, 120) == 1) {
+					set_single('wwan.0.sim.cmd.param.pin='+pin);
+					set_single('wwan.0.sim.cmd.status=');
+					set_single('wwan.0.sim.status.result_of_user_operation=');
+					if (form['rememberSIMPIN'] == 1) {
+						set_single('wwan.0.sim.cmd.param.autopin=1');
+					}
+					else {
+						set_single('wwan.0.sim.cmd.param.autopin=0');
+					}
+					set_single('wwan.0.sim.cmd.command=verifypin');
+				}
+			}
+		}
+		// wait for SIM status updated
+		wait_rdb_until("wwan.0.sim.status.status", "SIM OK", 0, 6);
+	}
+}
+#endif
+
+if (request['REQUEST_METHOD'] == "POST") {
+
+	operation_succ=1;
+
+	/* get sim pin */
+	simpin = get_single('wwan.0.sim.pin');
+	/*
+		This is not a security issue but one of Telstra requirement.
+
+		To enable or disable SIM-PIN lock, users are allowed to reuse the previously stored SIM card PIN without re-entering SIM card PIN.
+		Thus, SIM PIN is protected by router's password once the SIM card PIN is stored.
+
+		Based on this requirement, http clients can ask to use router's stored SIM card PIN instead of re-entering as following.
+	*/
+	if(form['pin']=="****") {
+		mypin = simpin;
+	}
+	else {
+		mypin = form['pin'];
+		if (mypin != undefined && mypin != "") {
+			if (string_regex_match(mypin, "^[0-9]{1,8}$") == false) {
+				onBadRequest();
+			}
+		}
+	}
+
+	set_single('wwan.0.sim.cmd.param.pin='+mypin);
+	mystatus = form['SIMStatus'];
+	set_single('wwan.0.sim.cmd.status=');
+	set_single('wwan.0.sim.status.result_of_user_operation=');
+	if (form['rememberSIMPIN'] == 1) {
+		set_single('wwan.0.sim.cmd.param.autopin=1');
+	}
+	else {
+		set_single('wwan.0.sim.cmd.param.autopin=0');
+	}
+	if( mystatus=='SIM locked' ) {
+		set_single('wwan.0.sim.cmd.command=verifypin');
+#ifdef V_PRODUCT_vdf_nwl22w
+		workaround_module_reboot(mypin);
+#else
+		//check last operation
+		esp_sleep(6000);
+		// workaround for those SIM cards that take longer than 15 seconds - BIP 1024 Telstra memory SIM card and some Vodafone SIM cards
+		esp_wait_for_chg('wwan.0.sim.status.status','SIM BUSY',30)
+#endif
+	}
+	else if( mystatus=="PUK" ) {
+		mypuk = form['confirmPUK'];
+		if (mypuk != undefined && mypuk != "") {
+			if (string_regex_match(mypuk, "^[0-9]{1,8}$") == false) {
+				onBadRequest();
+			}
+		}
+		set_single('wwan.0.sim.cmd.param.newpin='+mypin);
+		set_single('wwan.0.sim.cmd.param.puk='+mypuk);
+		set_single('wwan.0.sim.cmd.command=verifypuk');
+#ifdef V_PRODUCT_vdf_nwl22w
+		workaround_module_reboot(mypin);
+#else
+		//check last operation
+		esp_sleep(6000);
+		// workaround for those SIM cards that take longer than 15 seconds - BIP 1024 Telstra memory SIM card and some Vodafone SIM cards
+		esp_wait_for_chg('wwan.0.sim.status.status','SIM BUSY',30)
+#endif
+	}
+	else if( mystatus=="PH-NET PIN" || mystatus=="SIM PH-NET" || mystatus=="SIM MEP locked") {
+		meppin = form['mepCode'];
+		set_single('wwan.0.sim.cmd.param.mep='+meppin);
+		set_single('wwan.0.sim.cmd.command=unlockmep');
+		esp_sleep(5000);
+		redirect('/pinsettings.html?PH-NET');
+		return;
+	}
+	else {
+		mystatus = form['action'];
+		if( mystatus == 'changepin' ) {
+			set_single('wwan.0.sim.cmd.param.pin='+mypin);
+
+			mypin = form['newPIN'];
+			if (mypin != undefined && mypin != "") {
+				if (string_regex_match(mypin, "^[0-9]{1,8}$") == false) {
+					onBadRequest();
+				}
+			}
+			set_single('wwan.0.sim.cmd.param.newpin='+mypin);
+			set_single('wwan.0.sim.cmd.command=changepin');
+		}
+		else if( mystatus == 'disablepin' ) {
+			tempval=get_single('wwan.0.sim.status.pin_enabled');
+			set_single('wwan.0.sim.cmd.command=disablepin');
+		}
+		else if( mystatus == 'enablepin' ) {
+			tempval=get_single('wwan.0.sim.status.pin_enabled');
+			set_single('wwan.0.sim.cmd.command=enablepin');
+		}
+		else {
+			mystatus="";
+		}
+		esp_sleep(6000);
+	}
+
+	/* get result */
+	tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+	if(tempval=="N/A" || tempval=="")
+		tempval = get_single('wwan.0.sim.cmd.status');
+
+	if(tempval != "Operation succeeded" && tempval!="[done]")
+		operation_succ=0;
+
+	if(operation_succ==1) {
+		//check remember pin
+		if (form['rememberSIMPIN'] != undefined && form['rememberSIMPIN'] != "" && form['rememberSIMPIN'] != "0" && form['rememberSIMPIN'] != "1") {
+			onBadRequest();
+		}
+		tempval = form['rememberSIMPIN'];
+	}
+	else {
+		tempval = 0;
+	}
+
+	set_single('wwan.0.sim.autopin='+tempval);
+	if( tempval == '1' ) {
+		set_single('wwan.0.sim.pin='+mypin);
+	}
+	else {
+		set_single('wwan.0.sim.pin=');
+		form['pin'] = "";
+		form['confirmPIN'] = "";
+	}
+	esp_sleep(1000);
+	redirect('/pinsettings.html?'+mystatus)
+}
+else { //GET
+	tempval = get_single('wwan.0.if');
+	if (tempval == 'at' && request['QUERY_STRING'] == "") {
+		set_single('wwan.0.sim.cmd.command=check');
+		esp_sleep(1000);
+	}
+}
+
+tempval = get_single('wwan.0.sim.autopin');
+form['rememberSIMPIN'] = tempval;
+if( tempval == '1' ) {
+	form['pin'] = "****";
+	form['confirmPIN'] = "****";
+}
+else {
+	form['pin'] = "";
+	form['confirmPIN'] = "";
+	form['puk'] = "";
+	form['confirmPUK'] = "";
+}
+__current_autopin=tempval;
+esp_sleep(2000);
+tempval=get_single('wwan.0.sim.status.pin_enabled');
+form['currentPINProtection']=tempval;
+if (tempval=="Disabled") {
+	form['disablePIN']= "disablepin";
+} else {
+	form['disablePIN']= "enablepin";
+}
+form['numRetriesRem']=get_single('wwan.0.sim.status.retries_remaining');
+tempval = get_single('wwan.0.sim.status.result_of_user_operation');
+if(tempval=="N/A" || tempval=="") {
+	tempval = get_single('wwan.0.sim.cmd.status');
+}
+form['lastOpFailed']=tempval;
+form['pukRetries']=get_single('wwan.0.sim.status.retries_puk_remaining');
+form['SIMStatus']=get_single('wwan.0.sim.status.status');
+%>
+
+<script language="JavaScript">
+
+var query_str = Base64.decode(<%_r=base64_encode(request['QUERY_STRING']);%>"@@_r");
+var initPIN;
+var current_autopin="@@__current_autopin";
+function submitF() {
+	clear_alert();
+
+	if( document.form.SIMStatus.value.indexOf("PH-NET")==-1 && document.form.SIMStatus.value.indexOf("MEP")==-1 && document.form.action.value!="changepin" && $("#PINaction").css("display")!="none") {
+		if( document.form.disablePIN.value=="disablepin" && $("#radioPINaction-1").is(":checked") ) {
+			{
+				if (document.form.pin.value.length < 4 || document.form.pin.value.length > 8 ) {
+					validate_alert("", _("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+					return;
+				}
+				else if (document.form.pin.value != document.form.confirmPIN.value) {
+					validate_alert("", _("wan warningMsg12"));//PINs do not match!
+					return;
+				}
+			}
+		}
+	}
+	if( document.form.SIMStatus.value.indexOf("PH-NET")!=-1 || document.form.SIMStatus.value.indexOf("MEP")!=-1 ) {
+		if (document.form.mepCode.value.length<8 || document.form.mepCode.value.length>12) {
+			validate_alert("", _("MEPlength"));//The length of the MEP unlock code must be 8 to 12 digits!
+			return;
+		}
+		if (document.form.mepCode.value != document.form.mepCode2.value) {
+			validate_alert("", _("MEPPins"));//MEP unlock code are not matching each other
+			return;
+		}
+	}
+	else {
+		if($("#currentPINProtection").val()=="Disabled") {
+			if(document.form.action.value=="changepin") {
+				validate_alert("", _("SIMwarningMsg7"));//Please Enable the \"PIN Protection\" first!
+				return;
+			}
+			else if(document.form.SIMStatus.value!="PUK" && document.form.action.value=="disablepin") {
+				validate_alert("", _("SIMwarningMsg12"));//SIM PIN protection is already disabled
+				return;
+			}
+		}
+#if !defined(V_PRODUCT_vdf_nwl22w)
+		else if(document.form.SIMStatus.value!="PUK" && document.form.SIMStatus.value!="SIM PIN" && document.form.SIMStatus.value!="SIM locked" &&
+			   (($("#currentPINProtection").val()=="Enabled" && document.form.action.value=="enablepin") ||
+			    ($("#currentPINProtection").val()=="Disabled" && document.form.action.value=="disablepin")) &&
+			   (current_autopin == document.form.rememberSIMPIN.value)) {
+			validate_alert("", _("SIMwarningMsg13"));//SIM PIN protection is already enabled
+			return;
+		}
+#endif
+		if (document.form.pin.value != document.form.confirmPIN.value) {
+			validate_alert("", $("#SIMStatus").val()=="PUK" ? _("SIMwarningMsg8") : _("wan warningMsg12") );//NewPINs do not match or PINs do not match!
+			return;
+		}
+		if ((document.form.newPIN.value != document.form.confirmNewPIN.value)) {
+			validate_alert("", _("SIMwarningMsg8"));//NewPINs do not match!
+			return;
+		}
+		if ((document.form.SIMStatus.value=="PUK") && (document.form.puk.value != document.form.confirmPUK.value)) {
+			validate_alert("", _("wwan warningMsg13"));//PUK codes do not match!
+			return;
+		}
+		if ((document.form.SIMStatus.value=="PUK") && (document.form.puk.value.length != 8)) {
+			validate_alert("", _("wwan warningMsg19"));
+			return;
+		}
+		if (document.form.pin.value == "") {
+			validate_alert("", "\u202b"+ ( $("#SIMStatus").val()=="PUK" ? _("wwan warningMsg21") : _("wwan warningMsg16")));//you must enter the PIN code to enable or disable PIN verification
+			return;
+		}
+		if (document.form.pin.value.length < 4 || document.form.pin.value.length > 8) {
+			validate_alert("", _("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+			return;
+		}
+		if ((document.form.action.value=="changepin") && (document.form.newPIN.value.length < 4 || document.form.newPIN.value.length > 8 )) {
+			validate_alert("", _("SIMwarningMsg6"));//The length of the PIN must be 4 to 8 digits!
+			return;
+		}
+	}
+	document.form.saveButton.disabled = true;
+	blockUI_wait(_("saveSettings"));
+	document.form.submit();
+}
+
+
+function checkSIMStatus() {
+	$("#SIMStatusText").css("color","RED");
+	<%mepStatus=get_single('meplock.status');%>
+	if( "@@mepStatus"=="locked" ) {
+		document.form.SIMStatus.value="MEP Locked";
+		blockUI_alert(_("mep warningMsg2"));
+		window.location=('mepUnlocking.html');
+		return;
+	}
+
+	if($('#rememberPIN').is(':checked')==true) {
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+	}
+
+	if( (document.form.SIMStatus.value=="SIM PIN")||(document.form.SIMStatus.value.indexOf("SIM locked")!= -1)
+	||(document.form.SIMStatus.value.indexOf("incorrect SIM")!= -1)||(document.form.SIMStatus.value.indexOf("SIM PIN Required")!= -1) ) {
+		document.form.SIMStatus.value = "SIM locked";
+		row_display("PINaction", 0);
+		$("#Bt-ChangePIN").css("display","none");
+	}
+	else if ( document.form.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		document.form.SIMStatus.value="PUK";
+	}
+
+	if(query_str.indexOf("%4d%45%50%4c%6f%63%6b")!=-1) {
+		blockUI_alert(_("SIMwarningMsg10"));
+	}
+
+	switch(document.form.SIMStatus.value) {
+	case "SIM locked":
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		if(query_str.indexOf("locked")!=-1) {
+			validate_alert("", _("SIMwarningMsg1")+" "+document.form.numRetriesRem.value+" "+_("wan attempts")+".");
+			$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("SIMlocked"));
+		}
+		else {
+			$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("SIMlocked")+" - "+_("wan attempts")+" "+document.form.numRetriesRem.value);
+		}
+	break;
+	case "PUK":
+		document.form.numRetriesRem.value = document.form.pukRetries.value;
+		$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("status pukLocked")+" - "+_("wan attempts")+" "+document.form.numRetriesRem.value);
+		row_display("PINaction", 0);
+		$("#Bt-ChangePIN").css("display","none");
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		$('label[for="pin"]').html(_("newPin"));
+		$('label[for="confirmPIN"]').html(_("confirmNewPin"));
+		row_display("puk1", 1);
+		row_display("puk2", 1);
+		if (query_str.indexOf("PUK")!=-1 || query_str.indexOf("locked")!=-1) {
+			if (document.form.numRetriesRem.value == 10) {
+				$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("status pukLocked"));
+				validate_alert("", _("warningMsg17")+" "+$("#numRetriesRem").val()+" "+_("wan attempts")+".");//"Your SIM is PUK locked now. Please enter the PUK code to unlock. You have 10 remaining attempt(s)."
+			}
+			else if (document.form.numRetriesRem.value == 0) {
+				validate_alert("", _("puk warningMsg2"));
+				$("#all-div").css("display","none");
+				$("#SIMStatusText-div").css("display","none");
+ 			}
+			else {
+				$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("status pukLocked"));
+				validate_alert("", _("warningMsg13")+" "+$("#numRetriesRem").val()+" "+_("wan attempts")+".");//"You need to enter the PUK code again since the last code was incorrect. You have 2 remainning attempt(s)."
+			}
+		}
+		else {
+			if (document.form.numRetriesRem.value == 0) {
+				validate_alert("", _("puk warningMsg2"));
+				$("#all-div").css("display","none");
+				$("#SIMStatusText-div").css("display","none");
+			}
+		}
+
+	break;
+	case "PH-NET PIN":
+	case "SIM PH-NET":
+	case "SIM MEP locked":
+		$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("mepLocked"));
+		document.form.pin.disabled = false;
+		document.form.confirmPIN.disabled = false;
+		document.form.pin.value = "";
+		document.form.confirmPIN.value = "";
+		document.form.puk.value = "";
+		document.form.confirmPUK.value = "";
+		document.getElementById( "pin_puk_form" ).style['display']='none';
+		document.getElementById( "meplock_form" ).style['display']='';
+		if (query_str.indexOf("NET")!=-1)
+			validate_alert("", _("MEP unsuccessful"));
+	break;
+	case "SIM OK":
+		$("#SIMStatusText").html(_("simOK")+"<i class='success-sml'></i>");
+		$("#SIMStatusText").css("color","GREEN");
+		if(query_str.length>=3) {//check last operation
+			if (query_str.indexOf("locked")!=-1 || query_str.indexOf("PUK")!=-1 || query_str.indexOf("NET")!=-1)
+				success_alert("", _("wwan warningMsg18"));//Unlock operation successful
+			else if(document.form.lastOpFailed.value=='1' || document.form.lastOpFailed.value.indexOf("failed")!=-1 || document.form.lastOpFailed.value.indexOf("[error]")!=-1)
+				validate_alert("", _("SIMwarningMsg3")+" "+$("#numRetriesRem").val()+" "+_("wan attempts")+".");
+			else
+				success_alert("", _("operation successful"));
+		}
+	break;
+	case "SIM not inserted":
+		if (document.form.numRetriesRem.value != "0") {
+			$("#SIMStatusText-div").css("padding-left","100px");
+			$("#SIMStatusText").html("<i class='warning-sml' style='padding:7px 15px 0 0'></i>"+_("simSecurityWarningMsg"));
+			$("#all-div").css("display","none");
+		}
+		else {
+			validate_alert("", _("puk warningMsg2"));
+			$("#all-div").css("display","none");
+			$("#SIMStatusText-div").css("display","none");
+		}
+	break;
+	case "Negotiating":
+		if (document.form.numRetriesRem.value != "0") {
+			$("#SIMStatusText").html(document.form.SIMStatus.value);
+		}
+		else {
+			validate_alert("", _("puk warningMsg2"));
+			$("#all-div").css("display","none");
+			$("#SIMStatusText-div").css("display","none");
+		}
+	break;
+	default:
+		if (document.form.SIMStatus.value == "") {
+		  blockUI_alert(_("SIMNoInfoWarning"), function(){window.location=('index.html');});
+		}
+		$("#SIMStatusText").html(document.form.SIMStatus.value);
+	break;
+	}
+}
+
+function enablePINFields2() {
+// This is not a bug. "rememberSIMPIN" should be always enabled due to Defect #4990.
+// If you have any question, please talk to Joe Zhou.
+
+	if (document.form.SIMStatus.value.indexOf("Required")!=-1 || document.form.SIMStatus.value.indexOf("PUK")!=-1 ) {
+		document.form.disablePIN.value="enablepin";
+		validate_alert("", _("warningMsg14"));//"You need to unlock the SIM by inputing PIN before disable"
+	}
+	else {
+		enablePINFields();
+	}
+}
+
+function enablePINFields() {
+	document.form.pin.disabled = false;
+	document.form.confirmPIN.disabled = false;
+}
+
+function enablePINFieldsforRemPIN() {
+	document.form.pin.disabled = false;
+	document.form.confirmPIN.disabled = false;
+}
+
+function ChangeAction(action) {
+	document.form.action.value = action;
+	switch( action ) {
+	case "enablepin":
+		row_display("newpin1", 0);
+		row_display("newpin2", 0);
+		enablePINFields();
+	break
+	case "disablepin":
+		row_display("newpin1", 0);
+		row_display("newpin2", 0);
+		enablePINFields2();
+	break
+	case "changepin":
+		row_display("newpin1", 1);
+		row_display("newpin2", 1);
+	break;
+	}
+}
+
+$(document).ready(function() {
+
+	checkSIMStatus();
+
+	if(document.form.rememberSIMPIN.value=="1") {
+		$('#rememberPIN').attr('checked', true);
+		$("#currentRememberPIN").html(_("pin remembered"));
+		$("#RememberPIN-div").css("display", "");
+	}
+	else {
+		$('#rememberPIN').attr('checked', false);
+		$("#RememberPIN-div").css("display", "none");
+	}
+
+	initPIN = document.form.pin.value;
+	document.form.action.value = document.form.disablePIN.value;
+	row_display("newpin1", 0);
+	row_display("newpin2", 0);
+
+	if($("#currentPINProtection").val()=="Disabled") {
+		$("#radioPINaction-1").attr("checked", "checked");
+		$("#Bt-ChangePIN").css("display","none");
+	}
+	else {
+		$("#radioPINaction-0").attr("checked", "checked");
+	}
+
+	$("#CurrentRetriesRem").html(_("numberRetriesRemaining")+":   "+$("#numRetriesRem").val());
+	document.form.saveButton.disabled = false;
+
+	/* set fake sim pin */
+	var pin_prot_conf_avail=$("#PINaction").is(":visible")
+	var autopin="<%get_single_direct('wwan.0.sim.autopin');%>";
+	var pin=(pin_prot_conf_avail && (autopin=="1"))?"****":"";
+	$("#pin").val(pin);
+	$("#confirmPIN").val(pin);
+});
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" class="validate" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate" autocomplete="off">
+		<%appendCsrfToken();%>
+		<div class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("pin settings"))</script></h2>
+				<input type="hidden" name="lastOpFailed" value='@@form["lastOpFailed"]'/>
+				<input type="hidden" name="rememberSIMPIN" id="rememberSIMPIN" value="@@form['rememberSIMPIN']"/>
+				<input type="hidden" name="disablePIN" value="@@form['disablePIN']"/>
+				<input type="hidden" name="action" value="@@form['action']"/>
+				<input type="hidden" name="SIMStatus" id="SIMStatus" value="@@form['SIMStatus']"/>
+				<input type="hidden" name="pukRetries" value="@@form['pukRetries']"/>
+				<input type="hidden" name="currentPINProtection" id="currentPINProtection" value="@@form['currentPINProtection']"/>
+				<input type="hidden" name="numRetriesRem" id="numRetriesRem" value="@@form['numRetriesRem']"/>
+ 				<div class="grey-box">
+					<div class="form-row" style="padding:15px 0;">
+						<div class="field form-pad-left" id="SIMStatusText-div">
+							<span id="SIMStatusText"></span>
+						</div>
+					</div>
+					<div id="all-div">
+						<div class="form-row" id="RememberPIN-div">
+							<div class="field form-pad-left">
+								<span id="currentRememberPIN"></span>
+							</div>
+						</div>
+#ifdef V_MODULE_cinterion
+						<div class="form-row" style="display:none"> as the AT command from Cinterion module at^spic always back the the fixed retries remeaning of 3, hide this section for now
+#else
+						<div class="form-row">
+#endif
+#ifdef V_WEBIF_SPEC_vdf
+							<div style="display:none">
+#else
+							<div class="field form-pad-left">
+#endif
+								<span id="CurrentRetriesRem"></span>
+							</div>
+						</div>
+ 					</div>
+ 					<div class="all-div">
+						<div class="form-row no-bg-form" id="PINaction">
+							<label for="radioPINaction"><script language=Javascript>document.write(_("pinProtection"))</script></label>
+							<div class="field">
+								<div class="location-settings">
+									<div id="pin-protection" class="radio-switch">
+										<input type="radio" id="radioPINaction-0" name="radioPINaction" class="access" onClick="ChangeAction('enablepin')" value="1">
+										<label for="radioPINaction-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+										<input type="radio" id="radioPINaction-1" name="radioPINaction" onClick="ChangeAction('disablepin')" class="access" value="0">
+										<label for="radioPINaction-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="submit-row" id="Bt-ChangePIN">
+							<button type="button" class="secondary" onClick="ChangeAction('changepin')" style="width:auto;"><script language=Javascript>document.write(_("changePIN"))</script></button>
+						</div>
+						<div id="box_2144_pin">
+							<div class="form-row" style="padding-top:20px;">
+								<label for="pin"><script language=Javascript>document.write(_("current pin"))</script></label>
+								<div class="field">
+									<input type="password" name="pin" class="med" id="pin" size=8 maxlength=8 value="" onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="confirmPIN"><script language=Javascript>document.write(_("confirm current pin"))</script></label>
+								<div class="field">
+									<input type="password" name="confirmPIN" class="med" id="confirmPIN" size=8 maxlength=8 value="" onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row" id="newpin1">
+								<label for="newPIN"><script language=Javascript>document.write(_("newPin"))</script></label>
+								<div class="field">
+									<input type="password" name="newPIN" class="med" id="newPIN" size=8 maxlength=8 value="@@form['newPIN']" onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row" id="newpin2">
+								<label for="confirmNewPIN"><script language=Javascript>document.write(_("confirmNewPin"))</script></label>
+								<div class="field">
+									<input type="password" name="confirmNewPIN" class="med" id="confirmNewPIN" size=8 maxlength=8 value="@@form['confirmNewPIN']" onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row" id="puk1" style="display:none;">
+								<label for="puk"><script language=Javascript>document.write(_("puk"))</script></label>
+								<div class="field">
+									<input type="password" name="puk" class="med" size=8 maxlength=8 onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row" id="puk2" style="display:none;">
+								<label for="confirmPUK"><script language=Javascript>document.write(_("wwan confirmPUK"))</script></label>
+								<div class="field">
+									<input type="password" name="confirmPUK" class="med" size=8 maxlength=8 onkeyup="this.value=this.value.replace(/[^\d]/g,'')">
+								</div>
+							</div>
+							<div class="form-row">
+								<label for="checkbox"><script language=Javascript>document.write(_("rememberPin"))</script></label>
+								<div class="check-box-simple">
+									<input type="checkbox" class="access" name="rememberPIN" id="rememberPIN" onClick="$('#rememberSIMPIN').val(this.checked?1:0)"><label for='rememberPIN'>&nbsp;</label>
+								</div>
+							</div>
+						</div>
+					</div>
+ 				</div>
+				<div class="submit-row">
+					<button name="saveButton" type="button" onClick="javascript:submitF()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu("Internet", "SIM_Security", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success-1") {%>
+		success_alert("",_('simSubmitSuccess'));
+<%	}%>
+</script>
+</body>
+</html>

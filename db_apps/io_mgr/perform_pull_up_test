@@ -1,0 +1,237 @@
+#!/bin/sh
+
+log() {
+	logger -t "perform_pull_up_test" "$*"
+}
+
+log_echo() {
+	log "$*"
+	echo "$*"
+}
+
+bail() {
+	log "$*"
+
+	echo "$*" >&2
+	exit 1
+}
+
+print_usage() {
+	cat << EOF
+
+perform_pull_up_test is testing pull-up voltage
+
+usage>
+	perform_pull_up_test <io name>
+
+EOF
+}
+
+# get parameters
+io_name="$1"
+
+# check parameter validation
+if [ -z "$io_name" ]; then
+	print_usage >&2
+	exit 1
+fi
+
+
+check_analogue_input_for_period() {
+	if [ -z "$range_b" ]; then
+		log_echo "no bottom range specified"
+		return 1
+	fi
+
+	if [ -z "$range_t" ]; then
+		log_echo "no top range specified"
+		return 1
+	fi
+
+	if [ -z "$t" ]; then
+		log_echo "no period specified"
+		return 1
+	fi
+
+	sleep 1
+
+	i=0
+	while [ $i -lt $t ]; do
+		i=$((i+1))
+
+		adc=$(io_ctl read_analogue "$io_name")
+		log_echo "check analogue input... (analogue=$adc) #$i/$t"
+		
+		if [ -z "$adc" ]; then
+			log_echo "no adc availabue available"
+			return 1
+		fi
+
+		if [ ${adc%%.*} -lt $range_b ]; then
+			log_echo "too low analogue input"
+			return 1
+		fi
+
+		if [ ${adc%%.*} -gt $range_t ]; then
+			log_echo "too high analogue input"
+			return 1
+		fi
+
+		sleep 1
+	done
+
+	return 0
+}
+
+log_echo "* io cap test"
+
+# check if io name exists
+log_echo "check IO existence"
+if ! io_ctl check "$io_name" > /dev/null; then
+	bail "IO name ($io_name) not found"
+fi
+
+log_echo "check [analogue input] cap"
+if ! io_ctl get_cap "$io_name" | grep -q "analogue_input"; then
+	bail "io does not have analogue input capability"
+fi
+
+log_echo "check [digital output] cap"
+if ! io_ctl get_cap "$io_name" | grep -q "digital_output"; then
+	bail "io does not have digital output capability"
+fi
+
+log_echo "check [pull-up] cap"
+if ! io_ctl check_pull_up "$io_name" 2> /dev/null > /dev/null; then
+	bail "io does not have pull_up_ctl"
+fi
+
+log_echo "* 3v3 pull-up test"
+log_echo "change pull-up voltage to [3v3]"
+io_ctl set_pull_up_voltage "3.3"
+
+log_echo "change io mode to [analogue input]"
+io_ctl set_mode "$io_name" "analogue_input"
+
+log_echo "turn off pull-up [0v]"
+io_ctl set_pull_up "$io_name" "0"
+if ! t=5 range_b=0 range_t=0 check_analogue_input_for_period; then
+	exit 1
+fi
+
+log_echo "turn on pull-up [3v3]"
+io_ctl set_pull_up "$io_name" "1"
+if ! t=5 range_b=2 range_t=3 check_analogue_input_for_period; then
+	exit 1
+fi
+
+log_echo "* 8v2 pull-up test"
+log_echo "change pull up voltage to [8v2]"
+io_ctl set_pull_up_voltage "8.2"
+if ! t=5 range_b=8 range_t=8 check_analogue_input_for_period; then
+	exit 1
+fi
+
+log_echo "* virtual digital input test"
+log_echo "set virtual din threshold to [4v0]"
+io_ctl set_din_threshold "$io_name" "4.0"
+log_echo "change io mode to [virtual_digital_input]"
+io_ctl set_mode "$io_name" virtual_digital_input
+
+log_echo "turn off pull-up [0v]"
+io_ctl set_pull_up "$io_name" "0"
+
+for i in 1 2 3 4 5; do
+	sleep 1
+	din=$(io_ctl read_digital "$io_name")
+	log_echo "check virtual digital input... (virtual din=$din) #$i/5"
+
+	if [ "$din" != "0" ]; then
+		log_echo "incorrect virtual digital input"
+		exit 1;
+	fi
+done
+
+log_echo "turn on pull-up [8v2]"
+io_ctl set_pull_up "$io_name" "1"
+
+for i in 1 2 3 4 5; do
+	sleep 1
+	din=$(io_ctl read_digital "$io_name")
+	log_echo "check virtual digital input... (virtual din=$din) #$i/5"
+
+	if [ "$din" != "1" ]; then
+		log_echo "incorrect virtual digital input"
+		exit 1;
+	fi
+done
+
+
+log_echo "* rdb trigger test for virtual digital input"
+
+log_echo "turn off pull-up [0v]"
+rdb_wait "sys.sensors.io.$io_name.d_in" 10 &
+io_ctl set_pull_up "$io_name" "0"
+
+log_echo "check rdb trigger"
+wait
+if [ $? != 0 ]; then
+	log_echo "rdb trigger failed - timeout"
+	exit 1
+fi
+
+din=$(io_ctl read_digital "$io_name")
+log_echo "check rdb value (virtual din=$din)"
+if [ "$din" != "0" ]; then
+	log_echo "incorrect virtual digital input"
+	exit 1;
+fi
+
+
+log_echo "turn on pull-up [8v2]"
+rdb_wait "sys.sensors.io.$io_name.d_in" 10 &
+io_ctl set_pull_up "$io_name" "1"
+
+log_echo "check rdb trigger"
+wait
+if [ $? != 0 ]; then
+	log_echo "rdb trigger failed - timeout"
+	exit 1
+fi
+
+din=$(io_ctl read_digital "$io_name")
+log_echo "check rdb value (virtual din=$din)"
+if [ "$din" != "1" ]; then
+	log_echo "incorrect virtual digital input"
+	exit 1;
+fi
+
+# digital output test
+log_echo "* digital output test"
+
+log_echo "change pull-up voltage to [3v3]"
+io_ctl set_pull_up_voltage "3.3"
+log_echo "change io mode to [digital output]"
+io_ctl set_mode "$io_name" "digital_output"
+
+log_echo "change digital output to [0]"
+io_ctl write_digital "$io_name" "0"
+if ! t=5 range_b=0 range_t=0 check_analogue_input_for_period; then
+	exit 1
+fi
+
+log_echo "change digital output to [1]"
+io_ctl write_digital "$io_name" "1"
+if ! t=5 range_b=2 range_t=3 check_analogue_input_for_period; then
+	exit 1
+fi
+
+log_echo "* restore io configuration"
+log_echo "change digital output to [0]"
+io_ctl write_digital "$io_name" "0"
+log_echo "change io mode to [analogue input]"
+io_ctl set_mode "$io_name" "analogue_input"
+log_echo "disable [pull-up]"
+io_ctl set_pull_up "$io_name" "0"
+
+log_echo "* success"

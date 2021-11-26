@@ -1,0 +1,146 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<%useSession();%>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Help</title>
+<% include topinc_v2.inc %>
+
+<script language="JavaScript">
+
+var oss_disclaimer_filename;
+
+function isEDGE() {
+	return /Edge\/\d./i.test(navigator.userAgent);
+}
+
+function help_src(url) {
+	if (isEDGE()) {
+		var dl = document.createElement('a');
+		dl.setAttribute('href', url);
+		dl.click();
+	} else {
+	//	window.resizeTo(980,680);
+		window.open(url,"_blank");
+	}
+}
+
+function init_help(responseText) {
+	eval(responseText);
+	if((doclist.length+default_pdf.length)==1) {
+		var helpFile;
+		if(default_pdf.length) {
+			helpFile=default_pdf[0].name;
+		}
+		else {
+			helpFile="/doc/"+doclist[0].name;
+		}
+		$("#single-file").html("<a href='javascript:help_src(\""+helpFile+"\")'>"+_("downloadPDF")+"</a>");
+#ifdef V_WEBIF_SPEC_vdf
+		document.getElementById("link-on-img").href="javascript:help_src(\""+helpFile+"\")";
+#endif
+	}
+	else if((doclist.length+default_pdf.length)>1) {
+		$("#single-file").html(_("choosePDFfile"));
+		h="<tr><th class='align10'>"+_("file name")+"</th><th class='align10'>"+_("date")+"</th><th class='align10'>"+_("size")+"</th><th class='align10'>"+_("action")+"</th></tr>";
+		for(i=0; i< default_pdf.length; i++) {
+			h += "<tr><td><a href='javascript:help_src(\""+default_pdf[i].name+"\")'>"+default_pdf[i].name+"</a></td><td>"+default_pdf[i].date+"</td><td>"+default_pdf[i].size+"</td><td></td></tr>";
+		}
+		for(i=0; i< doclist.length; i++) {
+#ifdef V_WEBIF_SPEC_vdf
+			/***** check duplicate file *****/
+			duplicate=false;
+			for(j=0; j< default_pdf.length; j++) {
+				if(doclist[i].name==default_pdf[j].name) {
+					duplicate=true;
+				}
+			}
+			if(duplicate) {
+				continue;
+			}
+#endif
+			h += "<tr><td><a href='javascript:help_src(\"/doc/"+doclist[i].name+"\")'>"+doclist[i].name+"</a></td><td>"+doclist[i].date+"</td><td>"+doclist[i].size+"</td><td><a href='javascript:deleteFile(\""+doclist[i].name+"\")'>"+_("delete")+"</a></td></tr>";
+		}
+		$("#FileList").html(h);
+	}
+	else {
+		validate_alert(_("errorsTitle"), _("no help file"));
+	}
+	// Open source software disclaimer file
+	// Currently supporting 1 file, so take the first one in the list.
+	if((oss_disclaimer_pdf.length)>=1) {
+		oss_disclaimer_filename = oss_disclaimer_pdf[0].name;
+		$("#oss_disclaimer").css("display","");
+	}
+}
+
+function deleteFile( filename ) {
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	blockUI_alert(_("loginFirst"))
+	window.location.href="/index.html";
+<%}else{%>
+	installFileName=filename;
+	function confirmed_func() {
+		$.get("/cgi-bin/file_action.cgi?<%appendCsrfTokenToQueryString();%>delPDFfile&"+filename, function (responseText) {
+			window.location.href="/help.html?success";
+		});
+	}
+	blockUI_confirm(_("deleteConfirm")+filename+"?", confirmed_func);
+<%}%>
+}
+
+$(document).ready(function() {
+	$.get("/cgi-bin/get_files.cgi?getPDFfilelist", init_help);
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<div class="omega">
+		<form name="form">
+		<div class="right-column white-box">
+			<h2><script language=Javascript>document.write(_("helpMsgUserGuide"))</script></h2>
+			<div class="clearfix">
+				<div class="grid-33 help-download-item">
+#ifdef V_WEBIF_SPEC_vdf
+					<a id="link-on-img"><img src="img/manual_User-Guide.jpg"></a>
+#else
+					<img src="img/manual_User-Guide.jpg" width="220" height="240">
+#endif
+					<h4><script language=Javascript>document.write(_("userGuideDownload"))</script></h4>
+					<p id="single-file" style="padding-left:10px;width:700px;"></p>
+				</div>
+			</div>
+			<table id="FileList" style="width:99%"></table>
+			<div class="pad">
+				<h2 class="with-icon with-icon-int"><script language=Javascript>document.write(_("help info msg"))</script></h2>
+				<p class="help"><script language=Javascript>document.write(_("pleaseRefer"))</script><a onclick='javascript:window.open("http://www.netcommwireless.com", "_blank");' style="cursor:pointer;">www.netcommwireless.com</a>
+			</div>
+			<div class="pad" id="oss_disclaimer" style="display:none;">
+				<h2 class="with-icon with-icon-int"><script language=Javascript>document.write(_("openSourceDisclaimer"))</script></h2>
+				<p class="help"><script language=Javascript>document.write(_("openSourceDisclaimerDownloadMsg1"))</script>&nbsp;<a onclick='javascript:help_src("Open_Source_Software_Disclaimer/" + oss_disclaimer_filename);' style="cursor:pointer;"><script language=Javascript>document.write(_("clickHereToDownload"))</script></a>&nbsp;<script language=Javascript>document.write(_("openSourceDisclaimerDownloadMsg2"))</script>
+			</div>
+		</div>
+		</form>
+	</div>
+</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("Help", "", <%_val = session["user"];%>"@@_val");
+<%	if(request['QUERY_STRING']=="success") {%>
+		success_alert("",_('deleteFileSuccess'));
+<%	}%>
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	$("#logOff").css("display","none");
+<%}%>
+</script>
+</body>
+</html>

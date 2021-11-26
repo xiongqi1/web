@@ -1,0 +1,6 @@
+digraph "vdaa_PCM_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{vdaa_PCM_Cfg\n|+ pcmFormat\l+ pcmHwy\l+ pcm_tri\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<!-- @TODO comments -->
+
+<head>
+    <title>Factory Reset</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <link rel="shortcut icon" href="res/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+    .stage {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .stage_done {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        color: green;
+    }
+    .stage_failed {
+        line-height: 40px;
+        padding: 2px;
+        vertical-align: middle;
+        font-size: 16px;
+        color: red;
+    }
+    </style>
+    <script src="js/all.js"></script>
+    <script>
+    const NO_FACTORY_RESET = 0;
+    const TRIGGERED = 1;
+    const UNREGISTER_CBRS = 2;
+    const EXECUTE_FACTORY_RESET = 3;
+    const FACTORY_RESET_IN_PROGRESS = 4;
+    const REBOOTING = 5;
+    const REBOOTED = 6;
+    const DONE = 7;
+    const FAILED = 8;
+
+    var stageStr = [];
+    stageStr[NO_FACTORY_RESET] = "No factory reset";
+    stageStr[TRIGGERED] = "Starting factory reset";
+    stageStr[UNREGISTER_CBRS] = "Unregistering CBRS";
+    stageStr[EXECUTE_FACTORY_RESET] = "Trigger factory reset in OWA";
+    stageStr[FACTORY_RESET_IN_PROGRESS] = "Executing factory reset in OWA";
+    stageStr[REBOOTING] = "Rebooting OWA";
+    stageStr[REBOOTED] = "OWA is rebooted";
+    stageStr[DONE] = "Factory reset process is complete";
+    stageStr[FAILED] = "Factory reset process failed";
+
+    /*
+     * Process factory reset report
+     * @param report received status
+     * @param openWsIfNeeded true: open websocket if needed
+     */
+    function processStatus(report, openWsIfNeeded) {
+        if (report.stage == NO_FACTORY_RESET || report.stage == DONE || report.stage == FAILED) {
+            document.getElementById("loading_indicator").setAttribute("style", "display:none");
+            document.getElementById("warning_in_progress").setAttribute("style", "display:none");
+        } else {
+            document.getElementById("loading_indicator").setAttribute("style", "");
+            document.getElementById("warning_in_progress").setAttribute("style", "");
+            if (openWsIfNeeded) {
+                setWebsocketReportFilter(BITMASK_FACTORY_RESET_STATUS);
+            }
+        }
+
+        var stageEl = document.getElementById("stage")
+        if (stageEl.textContent != stageStr[report.stage]) {
+            stageEl.textContent = stageStr[report.stage];
+            if (report.stage == DONE) {
+                stageEl.setAttribute("class", "stage_done");
+            } else if (report.stage == FAILED) {
+                stageEl.setAttribute("class", "stage_failed");
+            } else {
+                stageEl.setAttribute("class", "stage");
+            }
+        }
+    }
+
+    /*
+     * Handle factory reset status report from websocket
+     * @param report received status report
+     */
+    function handleFactoryResetStatusWsReport(report) {
+        processStatus(report, false);
+    }
+
+    /*
+     * Handle factory reset status response, which is not from websocket.
+     * @param report received status response
+     */
+    function factoryResetStatus(report) {
+        processStatus(report, true);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        ajaxGetRequest("/owa_factory_reset", true, factoryResetStatus);
+    });
+    </script>
+</head>
+<body>
+<div class="header-wrap" id="main-menu"><!--Top Menu-->
+    <div class="container">
+        <header class='site-header'>
+            <h1 class='grid-4 alpha'></h1><!--So netcomm logo appears even if there is no text here-->
+        </header>
+    </div>
+</div>
+<div id="content" class="site-content">
+<div class="container dashboard">
+    <div class="box">
+        <div class="box-header">
+            <h2>OWA Factory Reset</h2>
+        </div>
+        <div class="box-content">
+            <div class="data_field_set_line">
+              <div class="data_field_set_row fixed_field_height">
+                  <div class="data_field_text fixed_field_height valign_middle" id="loading_indicator"><img src="/loading.gif"></div>
+                  <span class="data_field_text fixed_field_height" id="stage"></span>
+              </div>
+            </div>
+            <div class="data_field_set_line" id="warning_in_progress" style="display:none">
+                <b>Please do not remove the Antenna Alignment tool until the factory reset process is complete.</b>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,6 @@
+This is a daemon to monitor for hardware events and change the appropriate RDB
+variables.
+
+Currently only used on Platypus2, just to handle the reset button.
+
+Ian

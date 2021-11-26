@@ -1,0 +1,444 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+#if 0
+<!-- ##template## title -->
+#endif
+<title>LAN/WAN Switch</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+
+<!-- server script -->
+<%
+if (request['REQUEST_METHOD'] == "POST") {
+}
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+ioTrigEnRdb="service.failover.x.io_trig.en";
+if(rdb_exists(ioTrigEnRdb)) {
+	ioTrigEn=string_to_number(get_single(ioTrigEnRdb));
+}
+#endif
+%>
+
+<!-- client script -->
+<script language="JavaScript">
+
+#if 0
+/* ##template## title - menu */
+#endif
+var menu_main="Internet";
+var menu_sub="LANWAN_Switch";
+var menu_title=_("lanwan configuration");
+
+$(function(){
+	var rdb=new rdb_tool("@@session[csrfTokenName]");
+
+	var eth=new cgi("./cgi-bin/eth.cgi", "@@session[csrfTokenName]");
+
+	var eth_interfaces=new Array();
+
+	var eth_wan=<%temp_val=get_single("service.failover.defaultroutemetric.eth_wan");%>"@@temp_val";
+	var eth_gadget=<%temp_val=get_single("service.failover.defaultroutemetric.eth_gadget");%>"@@temp_val";
+
+	if (eth_wan == "" || eth_wan == "N/A")
+		eth_wan="10";
+
+	if (eth_gadget == "" || eth_gadget == "N/A")
+		eth_gadget="10";
+
+	function get_cfg(pf) {
+		var cfg=[
+			// rdb						default value		control name
+			{rdb:"link.profile."+pf+".conntype",		def:"dhcp",		el:"#conn_type"},
+			{rdb:"link.profile."+pf+".iplocal",		def:"0.0.0.0",		el:"wan_addr"},
+			{rdb:"link.profile."+pf+".mask",		def:"255.255.255.255",	el:"mask"},
+			{rdb:"link.profile."+pf+".gw",			def:"0.0.0.0",		el:"gateway"},
+			{rdb:"link.profile."+pf+".dns1",		def:"0.0.0.0",		el:"dns1"},
+			{rdb:"link.profile."+pf+".dns2",		def:"0.0.0.0",		el:"dns2"},
+			{rdb:"link.profile."+pf+".defaultroutemetric",	def:"10",		el:"#metric"},
+			{rdb:"link.profile."+pf+".snat",		def:"1",		el:"input:radio[name=nat_en]"},
+			{rdb:"link.profile."+pf+".trigger",		def:"1",		el:null},
+		];
+
+		return cfg;
+	}
+
+	function doLanWanSave() {
+		enable_elements(false);
+
+		blockUI_wait(_("GUI pleaseWait"));
+
+		var wan_interfaces=new Array();
+		var prev_lan_interfaces=$.grep(eth_interfaces,function(o){
+			return o.mode!="wan";
+		});
+
+		var fini_save_button_click=function() {
+			update_eth_list();
+			enable_elements(true);
+			$.unblockUI();
+			success_alert("", "");
+		};
+
+		/* build modes */
+		rdb.reset();
+		rdb.set_flag("-p");
+		$("#eth_table select").each(function(e){
+
+			var eth_sel_name_loc=$(this).attr("name").split(".");
+			var eth_sel_name=eth_sel_name_loc[0];
+			var eth_loc=eth_sel_name_loc[1];
+			var eth_name=eth_sel_name.replace("_",".");
+			var eth_mode=$(this).val();
+
+			/* push wan */
+			if(eth_mode=="wan") {
+
+				/* see if the wan interface was LAN interface before */
+				var new_wan_interface=false;
+				$.each(prev_lan_interfaces,function(i,o){
+					new_wan_interface=o.name==eth_name;
+					return !new_wan_interface;
+				});
+
+				/* add the interface to wan interface if it is newly created */
+				if(new_wan_interface)
+					wan_interfaces.push({name:eth_name,mode:eth_mode,loc:eth_loc});
+			}
+
+			rdb.add("network.interface." + eth_name + ".mode",eth_mode);
+		});
+
+		/* rdb set */
+		rdb.mset(function(res){
+
+			eth.reset();
+			eth.run("apply_vlan",function(res){
+
+				var wan_settings_cnt=0;
+
+				/* initiate WAN settings - use DHC if the WAN is newly created */
+				$.each(wan_interfaces,function(i,o){
+
+					var eth2=new cgi("./cgi-bin/eth.cgi", "@@session[csrfTokenName]");
+
+					/* initiate WAN profile */
+					var init_wan_profile=function(wan,profile,loc,existing) {
+
+						var cfg=get_cfg(profile);
+
+						rdb.reset();
+						rdb.set_flag("-p");
+
+						/* use DHCP if not exsiting */
+						if(!existing) {
+							rdb.add("link.profile." + profile + ".conntype","dhcp");
+							if ((loc.indexOf("gadget") == 0) || (loc.indexOf("usb") == 0))
+								rdb.add("link.profile." + profile + ".defaultroutemetric",eth_gadget);
+							else
+								rdb.add("link.profile." + profile + ".defaultroutemetric",eth_wan);
+							rdb.add("link.profile." + profile + ".reconnect_delay","30");
+							rdb.add("link.profile." + profile + ".snat","1");
+							rdb.add("link.profile." + profile + ".defaultroute","1");
+						}
+
+						rdb.add("link.profile." + profile + ".name",wan);
+						rdb.add("link.profile." + profile + ".dev",wan);
+						rdb.add("link.profile." + profile + ".delflag","0");
+						rdb.add("link.profile." + profile + ".enable","1");
+						rdb.add("link.profile." + profile + ".trigger","1");
+
+						rdb.mset(function(res){
+							wan_settings_cnt++;
+
+							/* release UI immediately when the last one is done */
+							if(wan_settings_cnt>=wan_interfaces.length) {
+								fini_save_button_click();
+							}
+
+						});
+
+					};
+
+					eth2.reset();
+					eth2.add(o.name);
+					eth2.run("get_existing_wan_profile",function(res){
+						var profile=res["profile"];
+
+						/* enable if the profile exists */
+						if(profile!="") {
+							init_wan_profile(o.name,profile,o.loc,true);
+						}
+						else {
+							eth2.reset();
+							eth2.add(o.name);
+							eth2.run("get_new_wan_profile",function(res){
+								var profile=res["profile"];
+								init_wan_profile(o.name,profile,o.loc,false);
+							});
+						}
+
+					});
+				});
+
+				/* release UI immediately */
+				if(wan_interfaces.length==0) {
+					fini_save_button_click();
+				}
+
+			});
+		});
+	}
+
+	$("#save_button").click(function(){
+
+		var needToWarn = false;
+		var prev_lan_interfaces=$.grep(eth_interfaces, function(o){ return o.mode!="wan"; } );
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		var ioTrigEn="@@ioTrigEn";
+		var prev_wan_interfaces=$.grep(eth_interfaces, function(o){ return o.mode!="lan"; } );
+		var modeError = false;
+		var lanIfName = "";
+#endif
+
+		$("#eth_table select").each(function(e){
+
+			var eth_sel_name=$(this).attr("name");
+			var eth_name=eth_sel_name.replace("_",".");
+			var eth_mode=$(this).val();
+
+			if(eth_mode=="wan") {
+				$.each(prev_lan_interfaces,function(i,o) // Check the string begins with same device
+					{ if ( eth_name.indexOf(o.name) == 0 ) needToWarn = true; } );
+			}
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+			if(eth_mode=="lan") {
+				$.each(prev_wan_interfaces,function(i,o) // Check the string begins with same device
+					{
+						// error when changing to LAN from WAN while the interface is set to IO pin triggering on WAN failover
+						if ( eth_name.indexOf(o.name) == 0 && ioTrigEn == '1') {
+							modeError = true;
+							lanIfName = o.name;
+						}
+					} );
+			}
+#endif
+		});
+
+#ifdef V_TRIG_IO_PIN_ON_FAILOVER
+		if (modeError) {
+			validate_alert("", lanIfName+_("ioPinModeWarning4-1")+"<a href=wan_summary.html>"+_("ioPinModeWarning4-2")+"</a>"+_("ioPinModeWarning1-3"));
+			return;
+		}
+#endif
+
+		if ( needToWarn ) {
+			blockUI_confirm(_("wanSwitchWarning"), doLanWanSave );
+		} else
+			doLanWanSave();
+
+	});
+
+	function enable_elements(en) {
+		$("#main_div,button").css("cursor", en?"auto":"wait");;
+	}
+
+	function update_eth_list() {
+		/* create wan interfaces */
+		eth_interfaces=new Array();
+
+		$("#eth_table select").each(function(e){
+			var eth_sel_name_loc=$(this).attr("name").split(".");
+			var eth_sel_name=eth_sel_name_loc[0];
+			var eth_loc=eth_sel_name_loc[1];
+			var eth_name=eth_sel_name.replace("_",".");
+			var eth_mode=$(this).val();
+
+			eth_interfaces.push({name:eth_name,mode:eth_mode,loc:eth_loc});
+		});
+	}
+
+	prev_info={};
+	function update_interface_list() {
+
+		eth.reset();
+		eth.run("info",function(res) {
+			if( JSON.stringify(res) != JSON.stringify(prev_info) ) {
+				prev_info=res;
+				enable_elements(false);
+				var eth_table_body="";
+				var switch_mac="";
+
+#if defined(V_IOBOARD_kudu)
+				/* to get mac address from physical device */
+				$.each(res["interfaces"],function(n,o){
+					if(o["hwclass"]=="eth.1") {
+						switch_mac=o["mac"];
+					}
+				});
+#endif
+				var interfaceIndex=0;
+				/* get interface keys */
+				$.each(res["interfaces"],function(n,o){
+					if(o==null)
+						return true;
+
+#ifdef V_WEBIF_SPEC_vdf
+#if 0
+					/* Skip if the interface has been removed. Probably this can apply for all. However to be safe, apply this to VDF products only. */
+#endif
+					if (o["status"] == "removed") {
+						return true;
+					}
+#endif
+					interfaceIndex++;
+					var desc;
+#ifdef V_WEBIF_SPEC_vdf
+					desc=o["desc"].replace("LAN/WAN","WAN/LAN");
+#else
+					desc=o["desc"];
+#endif
+					if(desc=="")
+						desc=_("external");
+
+					var eth_sel_name;
+					eth_sel_name=o["hwclass"].replace(".","_") + "." + o["loc"];
+
+					var disabled="";
+
+#ifdef V_IOBOARD_nguni
+					/* store eth.0 mac address */
+					if(o["hwclass"]=="eth.0")
+						switch_mac=o["mac"];
+					/* use eth.0 mac address if switch mode and disable selection all the time */
+					else if(o["hwclass"]=="eth.1") {
+
+						if(o["status"]!="inserted")
+							o["mac"]=switch_mac;
+
+						disabled="disabled";
+					}
+/* enable this feature for Sep 2014 release to see what happens, might need to disable it again plus on nwl12 models */
+/*
+#elif defined (V_PRODUCT_ntc_30wv) || defined (V_PRODUCT_ntc_40wv) || defined (V_PRODUCT_ntc_6908) || defined (V_PRODUCT_vdf_nwl12)
+					if(o["hwclass"]=="eth.0")
+						return true;
+*/
+#elif defined(V_IOBOARD_kudu)
+					/* use eth.1 mac address if switch mode and disable selection all the time */
+					if(o["hwclass"]=="eth.0") {
+						if(o["status"]!="inserted")
+							o["mac"]=switch_mac;
+					}
+					else if(o["hwclass"]=="eth.1") {
+						disabled="disabled";
+					}
+#else
+					/* nothing to do */
+#endif
+
+					var link;
+
+
+					if(o["link"]=="1")
+						link=_("up")
+					else if(o["link"]=="0")
+						link=_("down")
+					else
+						link=_("na")
+
+					eth_table_body+="\
+							<tr>\
+								<td>" + interfaceIndex + "</td>\
+								<td>" + desc + "</td>\
+								<td>" + (o["hwclass"]==""?_("na"):o["hwclass"]) + "</td>\
+								<td style='text-align:left;'>" + link + "</td>\
+								<td>" + o["mac"] + "</td>\
+								<td>" + o["loc"] + "</td>\
+								<td>\
+									<select name='" + eth_sel_name +"' size='1' " + disabled + ">\
+										<option " + (o["mode"]=="lan"?"selected":"") + " value='lan'>" + _("LAN") + "</option>\
+										<option " + (o["mode"]=="wan"?"selected":"") + " value='wan'>" + _("WAN") + "</option>\
+										<option " + (o["mode"]==""?"selected":"") + " value=''>" + _("disable") + "</option>\
+									</select>\
+								</td>\
+							</tr>\
+					";
+				});
+
+				$("#eth_table_body").html(eth_table_body);
+
+				update_eth_list();
+
+				enable_elements(true);
+			}
+		});
+	}
+
+	update_interface_list();
+	
+	$(document).ready(function() {
+		setInterval(update_interface_list, 3000);
+	});
+
+});
+
+
+</script>
+
+<!-- UI  -->
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+
+#if 0
+<!--
+	##template## examples
+-->
+#endif
+	<form><!--place holder for validation--></form>
+		<div id="main_div" class="right-column white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("ethernet group configuration"))</script></h2>
+				<table id="eth_table">
+					<thead>
+						<th width="05%"><script language=Javascript>document.write(_("mapping no"))</script></th>
+						<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("description"));</script></th>
+						<th width="05%" style="text-align:center;"><script language="JavaScript">document.write(_("name"));</script></th>
+						<th width="10%" style="text-align:left;"><script language="JavaScript">document.write(_("Link status"));</script></th>
+						<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("mac"));</script></th>
+						<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("port"));</script></th>
+						<th width="20%" style="text-align:left;padding-left:10px"><script language="JavaScript">document.write(_("configuration"));</script></th>
+					</thead>
+
+					<tbody id="eth_table_body"></tbody>
+				</table>
+				<div class="submit-row">
+					<button id="save_button" name="save_button" type="button" ><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+        set_menu(menu_main, menu_sub, <%_val = session["user"];%>"@@_val");
+</script>
+
+</body>
+</html>

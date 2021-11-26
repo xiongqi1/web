@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<%if( request["SESSION_ID"]!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Quality Control</title>
+</head>
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script language="JavaScript" src="/stdlibjs.htm"></script>
+<body>
+
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+
+$(document).ready(function() {
+	var projectname = "<%get_single_direct('system.board');%>";
+	document.getElementById("td_projectName").innerHTML = projectname.toUpperCase();
+	var country="<%get_single_direct('localisation.region');%>";
+	var channel="<%get_single_direct('wlan.0.conf.channel');%>";
+	if(channel=="0") {
+		channel="Auto";
+	}
+	$("#country").html(country+" / "+channel);
+});
+
+</script>
+
+<form name="form" class="content" method="POST" action="@@requst['SCRIPT_NAME']" >
+
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<table width="75%" style="padding-top:50px;">
+	<tr><th>Quality Control</th></tr>
+</table>
+<table width="75%">
+<tr>
+	<td width="30%">Project Name</td>
+	<td id="td_projectName"></td>
+</tr>
+<tr>
+	<td>Firmware Version</td>
+	<td><%get_single_direct('sw.version');%></td>
+</tr>
+<tr>
+	<td>Bootloader</td>
+	<td><%get_single_direct('version.bootloader');%></td>
+</tr>
+<tr>
+	<td>Product Serial</td>
+	<td><%get_single_direct('uboot.sn');%></td>
+</tr>
+<tr>
+	<td>WLAN MAC</td>
+	<td><%get_single_direct('wlan.0.mac');%></td>
+</tr>
+<tr>
+	<td>LAN MAC</td>
+	<td><%get_single_direct('wlan.0.mac');%></td>
+</tr>
+<tr>
+	<td>WAN MAC</td>
+	<td><%get_single_direct('link.profile.0.mac');%></td>
+</tr>
+<tr>
+	<td>Module Name</td>
+	<td><%get_single_direct('wwan.0.model');%></td>
+</tr>
+<tr>
+	<td>Module Revision</td>
+	<td><%get_single_direct('wwan.0.firmware_version');%></td>
+</tr>
+<tr>
+	<td>IMEI</td>
+	<td><%get_single_direct('wwan.0.imei');%></td>
+</tr>
+<tr>
+	<td>Wireless Network Name</td>
+	<td><%get_single_direct('wlan.0.ssid');%></td>
+</tr>
+<%
+var auth=get_single('wlan.0.network_auth');
+if(auth=="WPA2PSK" || auth=="WPAPSKWPA2PSK"){
+%>
+<tr>
+	<td>WPA Pre-Shared Key</td>
+	<td><%get_single_direct('wlan.0.wpa_pre_shared_key');%></td>
+</tr>
+<%}%>
+<tr>
+	<td>Country Code / Channel</td>
+	<td id="country"></td>
+</tr>
+</table>
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">CopyRight();</script>
+</body>
+</html>

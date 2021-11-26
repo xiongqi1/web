@@ -1,0 +1,181 @@
+#ifdef PLATFORM_Platypus
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.asp'); exit(403); } %>
+#else
+<%if( request['SESSION_ID']!=session["sessionid"] ) { redirect('/index.html'); exit(403); } %>
+#endif
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Auto Dial</title>
+
+#if (!defined PLATFORM_Platypus)
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+#endif
+</head>
+
+#if (!defined PLATFORM_Avian) && (!defined PLATFORM_Platypus2)
+<script type="text/javascript" src="util.js"></script>
+#endif
+
+<body onload="javascript:initTranslation();">
+
+<div id="contentWrapper">
+#ifdef PLATFORM_Platypus
+<% include /menu-netcomm.asp %>
+#else
+<% include menu.html %>
+#endif
+
+<script language="JavaScript">
+
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2) || (defined PLATFORM_Avian)
+Butterlate.setTextDomain("main");
+#endif
+
+function FieldControlGreyOut(control)
+{
+	try
+	{
+		document.form.autodialNumber.disabled = control;
+	}
+	catch(e)
+	{
+		alert(e.message);
+	}
+}
+
+function support_multi_language()
+{
+#if (defined PLATFORM_Platypus) || (defined PLATFORM_Platypus2) || (defined PLATFORM_Avian)
+	return true;
+#else
+	return false;
+#endif
+}
+
+function multiLangRadio(txt)
+{
+	if(Butterlate.getLang()=="ar")
+		document.write("<font dir=\"rtl\">"+_(txt));
+	else
+		document.write("<font>"+_(txt));
+}
+
+function CustomRadio(xmlmsg, httpmsg)
+{
+	if (support_multi_language())
+		multiLangRadio(xmlmsg);
+	else
+		document.write(httpmsg);
+}
+
+function initTranslation()
+{
+	if (support_multi_language())
+	{
+		document.getElementById("AutodialConfPageTitle").innerHTML = _("services")+" > "+_("auto dial");
+		document.getElementById("AutodialMenuTitle").innerHTML = _("autodial menu title");
+		document.getElementById("AutodialMenuDesc").innerHTML = _("autodial menu desc");
+		document.getElementById("AutodialEnableMenu").innerHTML = _("autodial enable menu");
+		document.getElementById("AutodialNumberMenu").innerHTML = _("autodial number menu");
+	} else {
+		document.getElementById("AutodialConfPageTitle").innerHTML = "Services > Auto Dial";
+		document.getElementById("AutodialMenuTitle").innerHTML = "Auto Dial Configuration";
+		document.getElementById("AutodialMenuDesc").innerHTML = "The router automatically generates short dial tone and commences dialing to predefined destination number when the user lifts a handset.";
+		document.getElementById("AutodialEnableMenu").innerHTML = "Enable Auto Dialling";
+		document.getElementById("AutodialNumberMenu").innerHTML = "Auto Dialling Number";
+	}
+}
+
+</script>
+<%
+#ifdef PLATFORM_Platypus
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		tempval = form['autodialenable'];
+		retval = nvram_set( 'autodial.enable='+tempval );
+		tempval = form['autodialNumber'];
+		retval = nvram_set( 'autodial.dial_string='+tempval );
+	}
+	else /*GET*/
+	{
+		temp = nvram_get( 'autodial.enable' );
+		form['autodialenable'] = temp;
+		temp = nvram_get( 'autodial.dial_string' );
+		form['autodialNumber'] = temp;
+	}
+#else
+	if (request['REQUEST_METHOD'] == "POST")
+	{
+		tempval = form['autodialenable'];
+		retval = set_single( 'autodial.enable='+tempval );
+		tempval = form['autodialNumber'];
+		retval = set_single( 'autodial.dial_string='+tempval );
+	}
+	else /*GET*/
+	{
+		temp = get_single( 'autodial.enable' );
+		form['autodialenable'] = temp;
+		temp = get_single( 'autodial.dial_string' );
+		form['autodialNumber'] = temp;
+	}
+#endif
+%>
+
+<form name="form" class="content" method="POST" action="@@requst['SCRIPT_NAME']" >
+<h3><span id="AutodialConfPageTitle"></span></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="autodialenable" value="@@form['autodialenable']"/>
+
+<table width="75%">
+	<tr><th><span id="AutodialMenuTitle"></span></th></tr>
+</table>
+<table width="75%">
+	<tr><td><span id="AutodialMenuDesc"></span></td></tr>
+
+<table width="75%">
+<tr> 
+	<td width="38%"><span id="AutodialEnableMenu"></span></td>
+	<td><input type=radio name='autodialEnable' value=1 onClick="javascript:document.form.autodialenable.value='1';FieldControlGreyOut(false)" >&nbsp;<script language="JavaScript">CustomRadio("enable", "Enable");</script></font>&nbsp;&nbsp;
+	<input type=radio name='autodialEnable' value=0 onClick="javascript:document.form.autodialenable.value='0';FieldControlGreyOut(true)" >&nbsp;<script language="JavaScript">CustomRadio("disable", "Disable");</script></font></td>
+</tr>
+<tr> 
+	<td><span id="AutodialNumberMenu"></span></td>
+	<td><input type=text name='autodialNumber' size=32 maxlength=32 value="@@form['autodialNumber']"> </td>
+</tr>
+
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="center">
+<p></p>
+<INPUT TYPE="submit" VALUE="Save" onClick="javascript:FieldControlGreyOut(false)" style="width:120px;">
+<!--&nbsp;&nbsp;<INPUT TYPE="button" VALUE="Help" onClick="window.open('help.htm#autodial')"> -->
+</div>
+<script type="text/javascript">   
+if(document.form.autodialenable.value=='1')
+{  
+	FieldControlGreyOut(false);
+	document.form.autodialEnable[0].checked=true;
+}
+else
+{
+	FieldControlGreyOut(true);
+	document.form.autodialEnable[1].checked=true;
+}
+</script> 
+</form>
+</div>
+<div id="footer">User Name:&nbsp;&nbsp;&nbsp;<%write(session["user"]);%>
+<div style="text-align:right" id="copyRight"></div></div>
+<script type="text/javascript">
+#if (defined PLATFORM_Platypus2) || (defined PLATFORM_Avian)
+		CopyRight();
+#else
+		setCopyRight();
+#endif
+</script>
+</body>
+</html>

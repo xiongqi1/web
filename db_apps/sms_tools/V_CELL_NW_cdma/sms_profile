@@ -1,0 +1,36 @@
+#!/bin/sh
+
+if [ "$1" = "get" ]; then
+	DB_DIAL_STR=`rdb_get link.profile.1.dialstr`
+	DB_USER=`rdb_get link.profile.1.user`
+	DB_PASS=`rdb_get link.profile.1.pass`
+	DB_AUTH=`rdb_get link.profile.1.auth_type`
+	DB_IP=`rdb_get link.profile.1.iplocal`
+	DB_STATUS=`rdb_get link.profile.1.status`
+	echo "$DB_DIAL_STR,$DB_USER,$DB_PASS,$DB_AUTH,$DB_IP,$DB_STATUS"
+elif [ "$1" = "set" ]; then
+	DB_DIAL_STR=`echo ${2} |  awk -F "," '{print $1}'`
+	DB_USER=`echo ${2} |  awk -F "," '{print $2}'`
+	DB_PASS=`echo ${2} |  awk -F "," '{print $3}'`
+	DB_AUTH=`echo ${2} |  awk -F "," '{print $4}'`
+	rdb_set link.profile.1.dialstr "${DB_DIAL_STR}"
+	PROFILE_EN=`rdb_get link.profile.1.enable`
+	if [ "$PROFILE_EN" = "1" ]; then
+		rdb_set link.profile.1.enable 0
+		sleep 1
+		rdb_set link.profile.1.enable 1
+	fi
+
+	rdb_set link.profile.1.user "${DB_USER}"
+	rdb_set link.profile.1.pass "${DB_PASS}"
+	if [ "$DB_AUTH" = "chap" ] || [ "$DB_AUTH" = "pap" ]; then
+		rdb_set link.profile.1.auth_type "${DB_AUTH}"
+	else
+		sms_log "wrong auth type : '$DB_AUTH'"
+		echo "FORMAT ERROR"
+		return -1
+	fi
+	echo "Successfully set profile to \"${2}\""
+else
+	return -1
+fi

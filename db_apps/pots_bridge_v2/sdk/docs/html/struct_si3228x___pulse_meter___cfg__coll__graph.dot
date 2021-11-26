@@ -1,0 +1,6 @@
+digraph "Si3228x_PulseMeter_Cfg"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="{Si3228x_PulseMeter_Cfg\n|+ pm_amp_thresh\l+ pm_freq\l+ pm_auto\l+ pm_active\l+ pm_inactive\l|}",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+}

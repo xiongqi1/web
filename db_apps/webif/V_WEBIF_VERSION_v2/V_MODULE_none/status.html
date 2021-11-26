@@ -1,0 +1,176 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<%useSession();%>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+#ifdef V_WEBIF_SPEC_vdf
+<title>Vodafone MachineLink 3G</title>
+#else
+<title>Status</title>
+#endif
+<% include topinc_v2.inc %>
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<style>
+td {
+	border:0;
+}
+</style>
+<script language='javascript'>
+var imageidx = 6;
+var pppStatus = new Array();
+var type = new Array()
+var iplocal = new Array();
+var ipremote = new Array();
+var prvSimStatus = "0";
+var pincounter = 0;
+var ajaxerror = 0;
+var show_duration = new Array();
+var simStatus = "";
+var currentSession="";
+var usageHistory="";
+var max_enabled_profiles="<%get_single_direct('wwan.0.max_sub_if');%>";
+var lan_ip=<%_v=get_single("link.profile.0.address");%>"@@_v";
+var lan_mask=<%_v=get_single("link.profile.0.netmask");%>"@@_v";
+var hw_ver=<%_v=get_single("uboot.hw_ver");%>"@@_v";
+if(hw_ver=="")
+	hw_ver="1.0";
+var user=<%_u=session["user"];%>"@@_u";
+
+function ajaxUpdate(response) {
+	ajaxerror = 0;
+	eval(response);
+
+	$("#uptime").html(toUpTime( uptime ));
+
+
+	if(br0mac!="N/A") {
+		$("#ethmac").html(br0mac);
+	}
+	else {
+		$("#ethmac").html(eth0mac);
+	}
+
+	if( dcvoltage != "N/A" && dcvoltage !=0 ) {
+		$("#dcvoltage").html(dcvoltage+"V");
+	}
+	else {
+		$("#dcvoltage").html(_("na"));
+	}
+
+	$("#powersource").html(powersource);
+
+
+/* ================= Ports Status ================= */
+	$("#port1_text").html(portStatus);
+	if(portStatus.indexOf("Up")!= -1) {
+		$("#port1_text").html(_("status up")+portStatus.substr(3, portStatus.indexOf("Mbps")+11)+"<i class='success-sml'/>");
+	}
+	else {
+		$("#port1_text").html(_("status down")+"<i class='warning-sml'></i>");
+	}
+}
+
+
+
+$(document).ready(function() {
+	$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+	var startPoll = function() {
+		if( ++ajaxerror<=18) //3 mins
+			$.get('/cgi-bin/ajax.cgi', ajaxUpdate );
+		else
+			location.reload();
+	}
+	setInterval(startPoll, 10000);
+        set_menu("Status", "", <%_val = session["user"];%>"@@_val");
+
+	if(serialnum=="" || serialnum=="N/A") {
+		$("#serialnum-div").css("display","none");
+	}
+<%if( request["SESSION_ID"]!=session["sessionid"] ) {%>
+	$("#logOff").css("display","none");
+<%}%>
+});
+</script>
+<script language='JavaScript' type="text/javascript" src='/cgi-bin/ajax.cgi'></script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container dashboard">
+		<div class="grid-9 alpha">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("sysInfo"))</script></h2>
+				</div>
+				<div class="row">
+					<div id="system-information" class="box-content">
+						<div class="each-box alpha">
+							<h3><script language=Javascript>document.write(_("status system up time"))</script></h3>
+							<div class="a-center">
+								<span class="time" id="uptime"></span>
+							</div>
+						</div>
+						<div class="each-box">
+							<h3><script language=Javascript>document.write(_("routerVersion"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("boardVersion"))</script></dt>
+								<dd><script language=Javascript>document.write(hw_ver);</script></dd>
+							</dl>
+							<dl>
+								<div id="serialnum-div">
+								<dt><script language=Javascript>document.write(_("routerSerialNumber"))</script></dt>
+								<dd><script language=Javascript>document.write(serialnum);</script></dd>
+								</div>
+							</dl>
+							<dl>
+								<dt><script language=Javascript>document.write(_("firmware"))</script></dt>
+								<dd><script language=Javascript>document.write(version);</script></dd>
+							</dl>
+						</div>
+						<div class="each-box omega">
+							<h3><script language=Javascript>document.write(_("powerStatus"))</script></h3>
+							<dl>
+								<dt><script language=Javascript>document.write(_("powerSource"))</script></dt>
+								<dd id="powersource">&nbsp;</dd>
+							</dl>
+							<dl id="dcvoltage_div">
+								<dt><script language=Javascript>document.write(_("dcInputVoltage"))</script></dt>
+								<dd id="dcvoltage">&nbsp;</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="grid-3 omega">
+			<div class="box">
+				<div class="box-header">
+					<h2><script language=Javascript>document.write(_("lan"))</script></h2>
+				</div>
+				<div class="box-content" style="padding-top:0;">
+					<dl>
+						<dt><script language=Javascript>document.write(_("IP"))</script></dt>
+						<dd><script language=Javascript>document.write(lan_ip+" / "+lan_mask);</script></dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("macAddress"))</script></dt>
+						<dd id="ethmac">&nbsp;</dd>
+					</dl>
+					<dl>
+						<dt><script language=Javascript>document.write(_("ethernet port status"))</script></dt>
+						<dd style="padding-top:8px;"><span id="port1_text">&nbsp;</span></dd>
+					</dl>
+
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+</body>
+</html>
+

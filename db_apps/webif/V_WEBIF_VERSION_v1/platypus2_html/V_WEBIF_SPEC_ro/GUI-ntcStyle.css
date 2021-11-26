@@ -1,0 +1,367 @@
+body {
+	font-size:12px;
+	font-family: Arial;
+	background-color:#FFFFFF
+}
+a {
+	color:#000000;
+}
+
+.a1 {
+	color:#D00001;
+}
+
+.a2 {
+	font-size:18px;
+	text-decoration:none;
+}
+
+.a3 {
+	color:#D00001;
+	font-size:10px;
+	font-weight:bold;
+}
+
+.strip {
+	position:absolute;
+}
+
+.t1 {
+	position:absolute;
+	color:#D00001;
+	font-weight:bold;
+	top:13px;
+	left:27px;
+	width:370px;
+	font-size: 12px;
+	padding-right:10px;
+}
+
+#apn_pass {
+	position:absolute;
+	top:42px;
+	left:430px;
+}
+.t2 {
+	position:absolute;
+	top:15px;
+	left:20px;
+	font-weight:bold;
+	color:#D00001;
+	width:214px;
+}
+
+#basicGUI {
+	position:absolute;
+	left:66px;
+	top:175px;
+}
+
+#GUI-offset {
+	position:absolute;
+	top:38px;
+}
+
+#GUI-battery {
+	left:132px;
+	top:59px;
+	position:absolute;
+}
+#GUI-CSQ {
+	left:158px;
+	top:235px;
+	position:absolute;
+}
+#GUI-confirmKey {
+	left:40px;
+	top:154px;
+	position:absolute;
+}
+#langTab {
+	position:absolute;
+	font-size:12px;
+	left:360px;
+	top:-30px;
+	display:none;
+}
+
+.div_input {
+	background-color:transparent;
+	color:#D00001;
+	left:191px;
+	position:absolute;
+	width: 200px;
+}
+.div_input2 {
+	color:#D00001;
+	background-color:transparent;
+	left:45px;
+	position:absolute;
+	width: 200px;
+}
+.div_text {
+	position:absolute;
+	color:#D00001;
+	font-weight:bold;
+	left:30px;
+	font-size: 12px;
+	width: 200px;
+}
+.div_small_text {
+	color:#D00001;
+	font-weight:bold;
+	left: 30px;
+	position:absolute;
+	width:370px;
+	font-size: 10px;
+}
+.div_button{
+	left:160px;
+	position:absolute;
+	top:470px;
+}
+.div_button input {
+	background:#ffffff;
+	/*color:#d00001;*/
+}
+.finchAjax {
+	color:#D00001;
+	font-weight:bold;
+	border-style:none;
+	font-size: 12px;
+	background-color:transparent;
+}
+.div_step{
+	font-size:18px;
+	font-weight:lighter;
+	color:#d00001;
+	position:absolute;
+	left:45px;
+	top:45px;
+}
+.div_introduction {
+	color:#d00001;
+	position:absolute;
+	width:345px;
+	font-size: 12px;
+	left: 45px;
+	top: 75px;
+	height: 100px;
+}
+.div_text_n12 {
+	position:absolute;
+	color:#d00001;
+	font-weight:bold;
+	font-size: 12px;
+	left: 45px;
+}
+.warning {
+	position:absolute;
+	left:1px;
+	top:-77px;
+	width:382px;
+	height: 53px;
+	border-top:3px solid #dddddd;
+	border-bottom:3px solid #dddddd;
+	border-left:3px solid #dddddd;
+	border-right:3px solid #dddddd;
+	background-color: #f0f0f0;
+}
+.warningText {
+	position:absolute;
+	left:25px;
+	top:17px;
+	color:#d00001;
+	font-weight:bold;
+}
+
+.box {
+	position:absolute;
+	top:210px;
+	width:380px;
+	height:200px;
+}
+
+.Rotate-90
+{
+	position:absolute;
+	color:#FFFFFF;
+	font-size:14px;
+	font-weight:bold;
+}
+#tab-status {
+	left:60px;
+	top:10px;
+}
+#tab-status2 {
+	left:60px;
+	top:8px;
+}
+#tab-status2 a{
+	color:#FFFFFF;
+}
+#tab-login {
+	left:200px;
+	top:10px; 
+}
+#tab-login2 {
+	left:200px;
+	top:8px; 
+}
+#tab-login2 a{
+	color:#FFFFFF;
+}
+#tab-wlan {
+	left:200px;
+	top:10px;
+}
+#tab-wlan2 {
+	left:200px;
+	top:8px;
+}
+#tab-wlan2 a{
+	color:#FFFFFF;
+}
+#tab-3gwwan {
+	left:350px;
+	top:10px;
+}
+#tab-3gwwan2 {
+	left:350px;
+	top:8px;
+}
+#tab-3gwwan2 a{
+	color:#FFFFFF;
+}
+
+#chooseAPN {
+	color:#222222;
+	background-color:#FFFFFF;
+	text-decoration:underline;
+	/*color:#0000FF;*/
+}
+#firstTimeSetup {
+	 position:absolute;
+	 left:60px;
+	 top:8px;
+	 font-weight:normal;
+}
+#firstTimeSetup a{ color:#ffffff;}
+
+#waitingBox {
+	background-color:#aaaaaa;
+	width:470px;
+	height:74px;
+	left:0px;
+	top:-75px;
+}
+
+/* ================================================================
+This copyright notice must be kept untouched in the stylesheet at
+all times.
+
+The original version of this stylesheet and the associated (x)html
+is available at http://www.stunicholls.com/menu/pro_drop_2.html
+Copyright (c) 2005-2007 Stu Nicholls. All rights reserved.
+This stylesheet and the associated (x)html may be modified in any 
+way to fit your requirements.
+=================================================================== */
+
+/*=================================================================== */
+#nav2
+{
+	padding:0;
+	margin:0;
+	list-style:none;
+	height:32px;
+	position:relative;
+	z-index:50;
+	font-family:arial, verdana, sans-serif;
+	font-size:11px;
+	width:200px;
+	background-color:transparent;
+}
+
+#nav2 li.top
+{
+	display:block;
+	float:left;
+	height:22px;
+	background-color:#000;
+}
+
+#nav2 li:hover {position:relative; z-index:200;}
+
+#nav2 li:hover ul.sub
+{
+	left:1px; /*position-x*/
+	top:20px; /*position-y*/
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #aaaaaa;*/
+	white-space:nowrap;
+	width:132px;/*Country*/
+	height:auto;
+	z-index:300;
+	background-color: #cccccc;
+}
+#nav2 li:hover ul.sub li
+{display:block; height:20px; position:relative; float:left; width:80px; font-weight:normal;}
+
+
+/*#nav2 li:hover ul.sub li a,*/
+#nav2 li:hover ul.sub li span
+{
+	display:block;
+	height:18px;
+	width:130px;/*Country & Carrier*/
+	line-height:18px;
+	text-indent:5px;
+	color:#000;
+	text-decoration:none;
+	border:1px solid #FFFFFF;
+}
+
+/*#nav2 li:hover ul.sub li a:hover,*/ 
+#nav2 li:hover ul.sub li span:hover
+{
+	/*color:#005799;*/
+	border-color:#ffffff;
+	background-color: #aaaaaa;
+}
+
+#nav2 li:hover li:hover ul
+{
+	left:88px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /* Carrier */
+	z-index:400;
+	height:auto;
+}
+
+#nav2 li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover ul,
+#nav2 li:hover li:hover li:hover li:hover li:hover ul
+{
+	left:120px;
+	top:0px;
+	background: #dddddd;
+	padding:2px 2px 2px 2px;
+	/*border:1px solid #ffffff;*/
+	white-space:nowrap;
+	width:132px; /*APN*/
+	z-index:400;
+	height:auto;
+}
+
+#nav2 ul, 
+#nav2 li:hover ul ul,
+#nav2 li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover ul ul,
+#nav2 li:hover li:hover li:hover li:hover ul ul
+{position:absolute; left:-9999px; top:-9999px; list-style:none;}
+
+

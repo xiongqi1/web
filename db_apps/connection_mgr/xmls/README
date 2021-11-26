@@ -1,0 +1,8 @@
+
+The addon_templates directory has various xml addon files.
+
+addon.xml                       : all platforms
+addon-Platform.xml              : all variants in the specific platform
+addon-Platform-Variant.xml      : all skins in the specific platform and variant
+addon-Platform-Variant-Skin.xml : only to the specific platform, variant and skins
+

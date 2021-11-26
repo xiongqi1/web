@@ -1,0 +1,166 @@
+<%if( request['SESSION_ID']!=session["sessionid"] ) redirect('/index.html');%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="-1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>NTP</title>
+</head>
+
+<link href="/BovineStyle.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="/cgi-bin/timezoneList.cgi"></script>
+
+<body>
+<div id="contentWrapper">
+<% include menu.html %>
+<script language="JavaScript">
+Butterlate.setTextDomain("main");
+
+function greyOutNTPFields()
+{
+    try
+    {
+		document.form.ntpServerAddress.disabled = true;	
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+function ungreyOutNTPFields()
+{
+    try
+    {
+        document.form.ntpServerAddress.disabled = false;
+	}
+	catch(e)
+	{
+	    alert(e.message);
+	}
+}
+
+
+function checkNTPConf()
+{
+	try
+	{
+		if (document.form.ntpEnable[1].checked == true)
+		{
+			greyOutNTPFields();
+		}
+		else if (document.form.ntpEnable[0].checked == true)
+		{
+			ungreyOutNTPFields();
+		}
+	}
+	catch (e)
+	{
+		alert(e.message);
+	}
+}
+</script>
+
+<%
+    if (request['REQUEST_METHOD'] == "POST")
+	{
+        tempval = form['ntpenable'];
+        retval = set_single( 'service.ntp.enable='+tempval );
+        tempval = form['ntpServerAddress'];
+        retval = set_single( 'service.ntp.server_address='+tempval );
+        tempval = form['TZ'];
+        retval = set_single( 'service.ntp.timezone='+tempval );
+        tempval = form['offset'];
+        retval = set_single( 'service.ntp.offset='+tempval ); 
+	} 
+	else /*GET*/
+	{
+        temp = get_single( 'service.ntp.enable' ); 
+        form['ntpenable'] = temp;
+        temp = get_single( 'service.ntp.server_address' ); 
+        form['ntpServerAddress'] = temp;
+        temp = get_single( 'service.ntp.timezone' ); 
+        form['TZ'] = temp;
+        temp = get_single( 'service.ntp.offset' ); 
+        form['offset'] = temp;
+	}
+%>
+
+
+
+<form name="form" class="content" method="POST" action="@@request['SCRIPT_NAME']" >
+<!--<h3>Services > NTP</h3>-->
+<h3><script language="JavaScript">document.write(_("services")+" > NTP");</script></h3>
+<div class="line" style="margin: 8px 25% 16px 0;"></div>
+<input type="hidden" name="ntpenable" value="@@form['ntpenable']"/>
+
+<table width="85%">
+    <tr><th><script language="JavaScript">document.write(_("NTP config title"));</script></th></tr>
+</table>
+
+<table width="85%">
+<tr> 
+    <td width="38%"><script language="JavaScript">document.write(_("enableNTP"));</script></td>
+    <td><input type=radio name='ntpEnable' value=1 onClick="javascript:document.form.ntpenable.value='1';ungreyOutNTPFields()" >&nbsp;<script language="JavaScript">document.write(_("enable"));</script> &nbsp;&nbsp;
+    <input type=radio name='ntpEnable' value=0 onClick="javascript:document.form.ntpenable.value='0';greyOutNTPFields()" >&nbsp;<script language="JavaScript">document.write(_("disable"));</script></td>
+</tr>
+<tr> 
+    <td><script language="JavaScript">document.write(_("ntpServerAddress"));</script></td>
+    <td><input type=text name='ntpServerAddress' size=32 maxlength=64 value="@@form['ntpServerAddress']" />&nbsp;&nbsp;(<script language="JavaScript">document.write(_("ip acceptable"));</script>)</td>
+</tr>
+<tr height="33px" style="display:none">
+	<td>Time Zone</td>
+	<td><input type="hidden" name="TZ" value="@@form['TZ']"/>
+	<input type="hidden" name="offset" value="@@form['offset']"/></td>
+</tr>
+<div style="position:absolute; top:274px; left:332px; display:none">
+<select name="timezone" size="1"  style="width:260px;" onclick="setTimezoneValue(this.value);"></select>  
+</div>
+
+</table>
+<div class="line" style="margin: 20px 25% 16px 0;"></div>	
+<div align="right" style="margin-right:15% ">
+<p></p>
+<input TYPE="submit" id="bottomButton" VALUE="Save" onClick="javascript:ungreyOutNTPFields()">&nbsp;&nbsp;
+<!--INPUT TYPE="Button" VALUE="Help" onClick="window.open('help.htm#ntp')"-->
+</div>
+<script type="text/javascript">
+function setTimezoneValue(myvalue)
+{
+var pos=myvalue.indexOf(":");
+	if(pos!=-1)
+	{
+		document.form.TZ.value=myvalue.substring(0,pos);
+		document.form.offset.value=myvalue.substring(pos+1);
+	}
+}
+
+for (i=0; i<st.length; i++)
+{
+	document.form.timezone.options[i] = new Option(st[i].TZ, st[i].TZ+":"+st[i].offset);
+	if(document.form.TZ.value==st[i].TZ)
+		document.form.timezone.options[i].selected=true;
+}
+
+if(document.form.ntpenable.value=='1')
+{  
+	ungreyOutNTPFields();
+	document.form.ntpEnable[0].checked=true;
+}
+else
+{
+	greyOutNTPFields();
+	document.form.ntpEnable[1].checked=true;
+}
+document.form.ntpServerAddress.focus();
+</script> 
+</form>
+</div>
+<div id="footer"></div>
+<script type="text/javascript">
+CopyRight();
+document.getElementById("bottomButton").value="   "+_("CSsave")+"   ";
+</script>
+</body>
+</html>

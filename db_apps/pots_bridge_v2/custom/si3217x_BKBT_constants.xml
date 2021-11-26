@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<PROJECT Generator="ProSLIC_API_Config_Tool" ToolVersion="4.2.1" XML_VERSION="15">
+    <PROSLIC_GENERAL_PARAMETERS>
+        <Si3217x part_num="2" dcdcBomOpt="0" pwr_range="0" batt_type="0" vbatr_requested="136.000000" vbath_requested="60.000000" ac_sense_opt="0" irq1="0" irq2="0" irq3="3" irq4="0" pwr_thresh="2000.000000" thermal_tau="1500.000000" low_power_ckbx="1" gpio="0" gpioCfg1="0" gpioCfg2="0" gpioCfg3="0" coarse_sensor_ckbx="0" daaEnabled="0" vdc_range_opt="0" gate_drive="0" zcal_en_opt="1" enable_preset_enum="0" num_presets="0" />
+    </PROSLIC_GENERAL_PARAMETERS>
+    <VDAA_GENERAL_PARAMETERS>
+        <Si3217x inte="0" intp="0" rcald="0" hssm="0" foh="1" lvfd="0" cvs="0" cvp="1" gce="0" iire="0" full="0" full2="0" filt="1" rg1="0" pwmm="0" pwme="0" spim="0" />
+    </VDAA_GENERAL_PARAMETERS>
+    <DEFAULTS />
+    <Ringing>
+        <DEFAULT_RINGING ring_type="2" ring_waveshape="0" crest_factor="1.414000" amp="45.000000" offset="0.000000" freq="20.000000" r_ring="100.000000" ta_en="n" ti_en="n" time_on="2.000000" time_off="4.000000" cadstate="n" l_loop="500.000000" r_wire="0.043600" max_ren="5.000000" r_cpe_max="600.000000" r_prot="30.000000" loop_units="0" />
+    </Ringing>
+    <DC_Feed>
+        <DEFAULT_DCFEED v_vlim="48.000000" v_rfeed="43.000000" v_ilim="34.000000" i_rfeed="15.000000" i_ilim="20.000000" vov_bat="5.000000" vov_gnd="4.000000" vcm_oh="27.000000" lcronhk="10.000000" lcroffhk="12.000000" lcrdbi="5.000000" longhith="8.000000" longloth="7.000000" longdbi="5.000000" lcrmask="150.000000" lcrmask_polrev="80.000000" lcrmask_state="200.000000" lcrmask_linecap="200.000000" i_vlim="0.000000" />
+    </DC_Feed>
+    <Tone>
+        <TONEGEN_FCC_DIAL amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="0" ta_2="0" ti_1="0" ti_2="0" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_DIAL_STUTTER amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_REORDER amp_1="-18.000000" amp_2="-18.000000" freq_1="480.000000" freq_2="620.000000" ta_1="250" ta_2="250" ti_1="250" ti_2="250" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_ROH amp_1="3.000000" amp_2="3.000000" freq_1="2450.000000" freq_2="2600.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_SAS amp_1="-18.000000" amp_2="-18.000000" freq_1="440.000000" freq_2="0.000000" ta_1="300" ta_2="0" ti_1="0" ti_2="0" routing_1="2" routing_2="0" zero_1="1" zero_2="0" />
+        <TONEGEN_FCC_CAS amp_1="-18.000000" amp_2="-18.000000" freq_1="2130.000000" freq_2="2750.000000" ta_1="80" ta_2="80" ti_1="0" ti_2="0" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CONFIRMATION_0 amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CONFIRMATION_1 amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CONFIRMATION_2 amp_1="-18.000000" amp_2="-18.000000" freq_1="350.000000" freq_2="440.000000" ta_1="100" ta_2="100" ti_1="100" ti_2="100" routing_1="2" routing_2="2" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CALLWAITING_0 amp_1="-18.000000" amp_2="-18.000000" freq_1="440.000000" freq_2="0.000000" ta_1="300" ta_2="0" ti_1="8000" ti_2="0" routing_1="2" routing_2="0" zero_1="1" zero_2="1" />
+        <TONEGEN_FCC_CALLWAITING_1 amp_1="-18.000000" amp_2="-18.000000" freq_1="440.000000" freq_2="0.000000" ta_1="0" ta_2="0" ti_1="2000" ti_2="0" routing_1="2" routing_2="0" zero_1="1" zero_2="1" />
+    </Tone>
+    <Impedance>
+        <DEFAULT_IMPEDANCE file="cwdb.db" is_db="y" txgain_db="0" rxgain_db="0" hi_res="0" zref="" rprot="" rfuse="" emi_cap="" is_wideband="99" />
+    </Impedance>
+    <FSK>
+        <DEFAULT_FSK amp="0.220000" mark_freq="1200.000000" space_freq="2200.000000" baud="1200.000000" depth="0.000000" startStopBits="n" />
+    </FSK>
+    <PCM>
+        <DEFAULT_PCM format="0.000000" alaw="0.000000" tristate="n" en="n" tx_edge="n" tx_both="n" tx_hwy="n" rx_hwy="n" widebandEn="n" />
+    </PCM>
+    <Pulse_Metering>
+        <DEFAULT_PULSE_METERING freq="0" amp="1.000000" cal="0" ramp="0" power="0" auto="0" active_time="2000" inactive_time="2000" />
+    </Pulse_Metering>
+    <Vdaa_Country>
+        <DEFAULT_VDAA_COUNTRY custom_enabled="0" country_select="69" />
+    </Vdaa_Country>
+    <Vdaa_Audio_Gain>
+        <DEFAULT_VDAA_AUDIO_GAIN mute="0" xga2="0" xga3="0" cpEn="0" coarseGainSelect="0" fineGainSelect="0" aoutGainSelect="64" />
+    </Vdaa_Audio_Gain>
+    <Vdaa_Ring_Validation>
+        <DEFAULT_VDAA_RINGVAL fMin="16" fMax="65" tOn="2000" tOff="4000" rdly="2" rpol="0" rngv="0" rdi="0" rt1_2="0" rfwe="0" />
+    </Vdaa_Ring_Validation>
+    <Vdaa_PCM>
+        <DEFAULT_VDAA_PCM pcmf="0" phcf="0" pcmtri="0" />
+    </Vdaa_PCM>
+    <Vdaa_Hybrid>
+        <DEFAULT_VDAA_HYBRID acim="0" r1_line="600" r2_line="0" c_line="0" custom_sel="0" eian="0" length="500" gauge_sel="1" units_sel="0" />
+    </Vdaa_Hybrid>
+</PROJECT>

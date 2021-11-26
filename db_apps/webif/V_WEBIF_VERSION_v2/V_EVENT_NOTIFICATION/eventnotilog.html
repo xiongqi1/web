@@ -1,0 +1,81 @@
+<%
+if ((request['REQUEST_METHOD'] == "GET") && (form['CMD'] == 'CLEARLOG')) {
+	if( request["SESSION_ID"]==session["sessionid"] )  {
+		exec_cmd('elogger 0 "clearlog"');
+	}
+	exit(200);
+}
+%>
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Event Notification Logging</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+
+<script language="JavaScript">
+function checkEventnotiLogFile()
+{
+	if ($("#noti_history").val() != "" )
+		downloadEventnoti();
+	else
+		alert(_("log file not exist"));
+}
+
+function downloadEventnoti()
+{
+	location.href = '/cgi-bin/logfile.cgi?action=downloadEvtLog';
+}
+
+function clearEventnotiLog()
+{
+	$.get('@@request['SCRIPT_NAME']?CMD=CLEARLOG', function(response) { updateEventnoti(); });
+}
+
+function updateEventnoti()
+{
+	$.get('/cgi-bin/logfile.cgi?action=getEvtLog', function(response) { $("#noti_history").val(response); });
+}
+
+$(document).ready( function() {updateEventnoti();} );
+
+</script>
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+	<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+	<div class="grid-9 omega">
+		<form name="form" method="POST" action="@@request['SCRIPT_NAME']" novalidate="novalidate">
+		<div class="right-column hide_eventnoti white-box">
+			<div class="pad">
+				<h2><script language=Javascript>document.write(_("event noti log"))</script></h2>
+				<div class="submit-row" style="padding:0 0 40px 0;">
+					<button type="button" name="get_log_btn" class="secondary" onClick="checkEventnotiLogFile()"><script language=Javascript>document.write(_("download"))</script></button>
+					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<button type="button" name="clear_log_btn" class="secondary" onClick="clearEventnotiLog()"><script language=Javascript>document.write(_("clear"))</script></button>
+					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<button type="button" name="update_log_btn" class="secondary" onClick="updateEventnoti()"><script language=Javascript>document.write(_("update"))</script></button>
+				</div>
+				<h2><script language=Javascript>document.write(_("event noti history"))</script></h2>
+				<div id="event_noti_history" style="padding-right:20px;">
+					<textarea name='noti_history' id='noti_history' style="width:700px;height:600px;" readonly='readonly' ></textarea>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+
+<script language='javascript'>
+	set_menu("System", "EVENTNOTILOG", <%_val = session["user"];%>"@@_val");
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+-- Custom Lua CGI code for test
+-- Copyright (C) 2020 Casa Systems Inc.

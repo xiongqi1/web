@@ -1,0 +1,1422 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Operator settings</title>
+<% include topinc_v2.inc %>
+#include "redirectOnSessionTimeout.inc"
+<script language="JavaScript" src="/cgi-bin/ajax.cgi?getProfiles"></script>
+<%
+
+/* Phone module PRI name */
+var priid_carrier=get_single("wwan.0.priid_carrier");
+
+module_type=get_single("wwan.0.module_type");
+if (request['REQUEST_METHOD'] == "POST") { // preBand could be number or string so we have to compare both
+	set_single( 'manualroam.2g3gpreference='+form['preference'] );
+	tempval = form['paramBand'];
+	retval=set_single( 'wwan.0.currentband.cmd.status=' );
+	retval=set_single( 'wwan.0.currentband.cmd.param.band='+tempval );
+	#ifdef ENABLE_NETWORK_RAT_SEL
+	set_single( 'wwan.0.currentband.cmd.param.rat='+form['selratlist'] );
+	#endif
+	retval=set_single( 'wwan.0.currentband.backup_config='+tempval );
+	retval=set_single( 'wwan.0.currentband.cmd.command=set' );
+
+	// we do not automatically change PLMN as the Quanta module has module-based linkage between PLMN and band selection.
+	// otherwise, the last band selection will be changed by the following PLMN change
+	if(module_type!="quanta") {
+		// change plmn
+		if( form['resetPLMN'] == "1" ) {
+			set_single( 'wwan.0.PLMN_select=0,0,0' );
+			set_single( 'wwan.0.PLMN_command_state=5' );
+		}
+	}
+	tempval='';
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+	if (tempval=='') { esp_sleep(1000); tempval=get_single( 'wwan.0.currentband.cmd.status' ); }
+
+#if !defined(V_MODULE_EC21)
+    /* Do not clear this for the Quectel EC21 based products; we need this to restore band */
+    /* settings from a configuration file. */
+	if (tempval=='[done]') { set_single( 'wwan.0.currentband.backup_config='); }
+#endif
+
+	form['status'] = tempval;
+	set_single( 'wwan.0.currentband.cmd.command=get' );
+	esp_sleep(3000);
+}
+_paramBand = get_single( 'wwan.0.currentband.cmd.param.band' );
+if(_paramBand=="") {
+	set_single( 'wwan.0.currentband.cmd.command=get' );
+	if (_paramBand=='') { esp_sleep(1000); _paramBand=get_single( 'wwan.0.currentband.current_selband' );}
+	if (_paramBand=='') { esp_sleep(1000); _paramBand=get_single( 'wwan.0.currentband.current_selband' );}
+	if (_paramBand=='') { esp_sleep(1000); _paramBand=get_single( 'wwan.0.currentband.current_selband' );}
+	if (_paramBand=='') { esp_sleep(1000); _paramBand=get_single( 'wwan.0.currentband.current_selband' );}
+	if (_paramBand=='') { esp_sleep(1000); _paramBand=get_single( 'wwan.0.currentband.current_selband' );}
+}
+form['prevBand'] = _paramBand;
+form['prevBand2'] = _paramBand;
+form['preference'] = get_single( 'manualroam.2g3gpreference' );
+%>
+
+<script language="JavaScript" type="text/javascript">
+var system_network_plmn_list="<%get_single_direct('wwan.0.PLMN_list');%>";
+var frequency="<%get_single_direct('wwan.0.system_network_status.current_band');%>";
+var atcns_if="<%get_single_direct('wwan.0.if');%>";
+var cmd_status="<%get_single_direct('wwan.0.PLMN.cmd.status');%>";
+if(cmd_status!="[done]")
+	system_network_plmn_list="";
+var PLMN_select = <%val=get_single('wwan.0.PLMN_select');%>"@@val";
+//var wwan_0_system_network_plmn_selectionMode = <%val=get_single('wwan.0.system_network_plmn_selectionMode');%>"@@val";
+var wwan_0_PLMN_selectionMode = "<%get_single_direct('wwan.0.PLMN_selectionMode');%>";
+var system_network_status_network = "<%get_single_direct('wwan.0.system_network_status.network');%>";
+var wwan_0_sim_status_status = "<%get_single_direct('wwan.0.sim.status.status');%>";
+var restoreCmd="";
+var pf_enabled=0;
+var pppoe_en="<%get_single_direct('service.pppoe.server.0.enable');%>";
+#ifdef V_GPS
+var gps_en="<%get_single_direct('sensors.gps.0.enable');%>";
+#endif
+var conn_type="<%if(rdb_exists('wwan.0.conn_type')) get_single_direct('wwan.0.conn_type'); %>";
+#ifdef V_WEBIF_SPEC_vdf
+var manualroam_setting_msg="<%get_single_direct('manualroam.setting.msg');%>";
+#endif
+
+function hideObjectById(id) {
+	if (document.getElementById) {
+		obj = document.getElementById(id);
+		obj.style.display = "none";
+	}
+}
+
+function showObjectById(id) {
+	if (document.getElementById) {
+		obj = document.getElementById(id);
+		obj.style.display = "inline";
+	}
+}
+
+function UrlDecode(str) {
+	var output = "";
+	for (var i = 0; i < str.length; i+=3) {
+		var val = parseInt("0x" + str.substring(i + 1, i + 3));
+		output += String.fromCharCode(val);
+	}
+	return output;
+}
+
+/****************************************************/
+var secs=0;
+var timerID = null;
+var timerRunning = false;
+var timeout = 2;
+var delay = 3000;
+var rdbCmd = "";
+var provideAction = "";
+var currentBandSel ="";
+var reg_err_counter=0;
+var reg_secc_counter=0;
+
+function InitializeTimer() {
+	// Set the length of the timer, in seconds
+	secs = 0;//timeout
+	StopTheClock();
+	StartTheTimer();
+}
+
+function StopTheClock() {
+	if(timerRunning)
+		clearTimeout(timerID);
+	timerRunning = false;
+}
+
+function StartTheTimer() {
+	if( rdbCmd ) {
+		if (secs==0) {
+			StopTheClock();
+			$.get(rdbCmd, alertContents);
+			rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN.cmd.status&wwan.0.PLMN_selectionMode&wwan.0.system_network_status.network&wwan.0.sim.status.status&wwan.0.currentband.current_selband&wwan.0.system_network_status.service_type&wwan.0.system_network_status.reg_stat";
+			#ifdef V_WEBIF_SPEC_vdf
+			rdbCmd+="&manualroam.setting.msg";
+			#endif
+			secs = timeout;
+			StartTheTimer();
+		}
+		else {
+			self.status = secs;
+			secs = secs - 1;
+			timerRunning = true;
+			timerID = self.setTimeout("StartTheTimer()", delay);
+		}
+	}
+}
+function restoreConnections(success_action) {
+	if(restoreCmd!="") {
+		$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+restoreCmd, function(){
+			setTimeout(success_action, 3000);
+		});
+	}
+	else {
+		setTimeout(success_action, 3000);
+	}
+}
+
+var delayCounter=0;
+#ifdef V_WEBIF_SPEC_vdf
+var delayTime=10;
+#else
+var delayTime=5;
+#endif
+function delayForConnectionDown(callback_func) {
+	setTimeout(function() {
+		if(++delayCounter>delayTime) {
+			callback_func();
+			return;
+		}
+		delayForConnectionDown(callback_func);
+	},1000);
+}
+
+function disableConnections(callback_func) {
+	$.blockUI({message:_("deactivateConnection")});
+	$("#restoreCmd").val(restoreCmd);
+	rdbCmd="";
+	if(pppoe_en=="1") {
+		rdbCmd="service.pppoe.server.0.enable=0&";
+	}
+#ifdef V_GPS
+	if(gps_en=="1") {
+		rdbCmd+="sensors.gps.0.enable=0&";
+	}
+#endif
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+rdbCmd;
+	for( i=1; i<=stpf.length; i++ ) {
+		if(i>1) {
+			rdbCmd+="&";
+		}
+		rdbCmd+="link.profile."+i+".enable=0";
+	}
+	$("#nameText").html("");
+	delayCounter=0;
+	$.get(rdbCmd, function(){delayForConnectionDown(callback_func)});
+}
+
+var registrationStr=[_("unregisteredNoSearch"), _("registeredHome"), _("unregisteredSearching"), _("registrationDenied"), _("unknown"), _("registeredRoaming"), _("registeredSMShome"), _("registeredSMSroaming"), _("emergency"), _("na")];
+
+#ifdef V_WEBIF_SPEC_vdf
+var prev_manualroam_setting_msg = ""
+#endif
+
+function alertContents(responseText) {
+	var wwan_0_PLMN_cmd_status="";
+	var wwan_0_system_network_status_reg_stat="";
+	eval(responseText);
+	if(wwan_0_PLMN_cmd_status==""
+	#ifdef V_WEBIF_SPEC_vdf
+	   && manualroam_setting_msg == ""
+	#endif
+	)
+		return;
+	if(provideAction == "netScan") {
+		if(wwan_0_PLMN_cmd_status=="[done]") {
+			StopTheClock();
+			restoreConnections(function(){location.href="/setband.html";});
+		}
+		else if(wwan_0_PLMN_cmd_status.indexOf("error")!= -1 ) {
+			rdbCmd = "";
+			StopTheClock();
+			if(restoreCmd!="") {
+				$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+restoreCmd);
+			}
+			blockUI_alert( _("band warningMsg4") );//Network scan unsuccessful, please try again.
+			//restoreConnections(function(){location.href="/setband.html";});
+		}
+		else {
+			;
+		}
+	}
+	else if(provideAction == "changeMode") {
+		if((wwan_0_PLMN_cmd_status=="[DONE]") || (wwan_0_PLMN_cmd_status=="[done]")) {
+			switch (wwan_0_system_network_status_reg_stat) {
+				case "0":
+				case "3":
+					if( ++reg_err_counter>10 || reg_secc_counter>1) {
+						validate_alert("", registrationStr[parseInt(wwan_0_system_network_status_reg_stat)]);
+						StopTheClock();
+						function my_func() {
+							document.form.scanNetwork.disabled=false;
+							document.form.saveBand.disabled=false;
+							document.form.saveMode.disabled=false;
+							document.form.btnCancel.disabled=false;
+						}
+						restoreConnections(my_func);
+						return;
+					}
+				break;
+				case "":
+				break;
+				default:
+					if( ++reg_secc_counter>5 || reg_err_counter>1 ) {
+						StopTheClock();
+						restoreConnections(function(){location.href="/setband.html";});
+						return;
+					}
+				break;
+			}
+		}
+		else if(wwan_0_PLMN_cmd_status=="error" ) {
+			rdbCmd = "";
+			StopTheClock();
+			blockUI_alert(_("band warningMsg5"));//"Error! Please try again"
+			restoreConnections(function(){location.href="/setband.html";});
+			//location.href="/setband.html";
+		}
+		#ifdef V_WEBIF_SPEC_vdf
+		else {
+
+			if((typeof(manualroam_setting_msg) != "undefined") && manualroam_setting_msg != prev_manualroam_setting_msg) {
+				prev_manualroam_setting_msg = manualroam_setting_msg;
+				blockUI_wait(manualroam_setting_msg);
+			}
+		}
+		#endif
+	}
+
+	if((typeof(wwan_0_system_network_status_network) != "undefined")) {
+		if (wwan_0_system_network_status_network.charAt(0) == "%")
+			provider=UrlDecode(wwan_0_system_network_status_network);
+		else
+			provider=wwan_0_system_network_status_network;
+		//provider=provider.replace("3Telstra", "Telstra");
+		if(provider=="Limited Service")
+			provider=_("limited service");
+		else if(provider=="N/A")
+			provider=_("na");
+		else if(provider!="") {
+			switch(wwan_0_system_network_status_service_type) {
+				case "GSM":"GUI pleaseWait"
+				case "UMTS":
+					provider+=" / "+ wwan_0_system_network_status_service_type;
+				break;
+				case "E-UMTS":
+					provider+=" / LTE";
+				break;
+			}
+		}
+		$("#nameText").html(provider);
+	}
+}
+
+function set_plmn_preference(plmn_preference) {
+	// manualroam.2g3gpreference:
+	// Each digit refer to type of network: 4 -> 4G, 2 -> 3G, 1 -> 2G
+	// Least digit has more priority on searching order.
+	// So if "manualroam.2g3gpreference" is set to 214, searchs 4G, 2G and 3G in order.
+	// And if "manualroam.2g3gpreference" is set to 24, searchs 4G and 3G in order, 2G is not included.
+	if(plmn_preference===undefined) {
+		plmn_preference="1";
+	}
+	if (plmn_preference == 0) // 2G
+		plmn_preference=21; // 2G -> 3G
+	else if(plmn_preference == 2) // 4G
+		plmn_preference=124; // 4G -> 3G -> 2G
+	else // 3G
+		plmn_preference=12; // 3G -> 2G
+	return plmn_preference;
+}
+
+function apply_func_step2() {
+	blockUI_wait(_("saveSettings"));
+	if( radioscount==1 ) {
+		i=0;
+	}
+	else {
+		for( i=0; i<list_name.length; i++)
+			if( document.form.rdlist[i].checked==true ) break;
+	}
+
+	if (i>=list_name.length) i=0;
+
+	if(document.form.PLMN_Selection_Mode[1].checked) {
+		if (atcns_if == 'cns') {
+			if((parseInt(list_type[i])>0)&&(parseInt(list_type[i])<4))
+				cmd = "2,"+list_mcc[i]+","+list_mnc[i];//2g
+			else
+				cmd = "1,"+list_mcc[i]+","+list_mnc[i];//3g
+		}
+		else {
+			cmd = list_type[i]+","+list_mcc[i]+","+list_mnc[i];
+		}
+	}
+	else {
+		cmd = "0";
+		if (restoreCmd != "")
+			restoreCmd += "&";
+		restoreCmd += "wwan.0.PLMN_list=";
+	}
+
+	plmn_preference=set_plmn_preference($("input:radio.access[name=plmn_preference]:checked").val());
+
+	costeffective=$("input:radio.access[name=costeffective]:checked").val();
+	if(costeffective===undefined) {
+		costeffective="0";
+	}
+	reg_err_counter=0;
+	reg_secc_counter=0;
+#ifndef V_WEBIF_SPEC_vdf
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN_select="+cmd+"&manualroam.2g3gpreference="+plmn_preference+"&manualroam.costeffectivemode="+costeffective+"&wwan.0.PLMN_command_state=5&wwan.0.system_network_status.reg_stat=";
+	delay = 1000;
+#else
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN.cmd.status&wwan.0.PLMN_selectionMode&wwan.0.system_network_status.network&wwan.0.sim.status.status&wwan.0.currentband.current_selband&wwan.0.system_network_status.service_type&wwan.0.system_network_status.reg_stat";
+	$.ajax({
+		type: 'POST',
+		url: 'cgi-bin/operator_setting.cgi?<%appendCsrfTokenToQueryString();%>cmd=setOperSettings&PLMN_select='+cmd+'&plmnpreference='+plmn_preference+'&costeffectivemode='+costeffective,
+		dataType: 'json'
+	});
+#endif
+	InitializeTimer();
+	document.form.scanNetwork.disabled=true;
+	document.form.saveBand.disabled=true;
+	document.form.saveMode.disabled=true;
+	document.form.btnCancel.disabled=true;
+}
+
+#ifdef V_WEBIF_SPEC_vdf
+function apply_func_step1() {
+	restoreCmd="";
+	if( pppoe_en=="1" ) {
+		restoreCmd="service.pppoe.server.0.enable=1";
+	}
+#ifdef V_GPS
+	if( gps_en=="1" ) {
+		if(restoreCmd!="") {
+			restoreCmd+="&";
+		}
+		restoreCmd+="sensors.gps.0.enable=1";
+	}
+#endif
+	$.get("/cgi-bin/ajax.cgi?getProfiles",function(v){
+		eval(v)
+		for( i=0; i<stpf.length; i++ ) {
+			if(stpf[i].enable == 1) {
+				if(restoreCmd!="") {
+					restoreCmd+="&";
+				}
+				restoreCmd+="link.profile."+(i+1)+".enable=1";
+				pf_enabled++;
+			}
+		}
+
+#ifdef V_GPS
+		if( pppoe_en=="1" || pf_enabled || gps_en=="1") {
+#else
+		if( pppoe_en=="1" || pf_enabled ) {
+#endif
+			disableConnections(apply_func_step2);
+			return;
+		}
+		apply_func_step2();
+	});
+}
+#endif
+
+function changeMode() {
+	clear_alert();
+	//$(".submit-row").css("display", "none");
+	provideAction = "changeMode";
+	apply_func_step2();
+}
+
+function pre_netScan() {
+	clear_alert();
+	if( typeof(wwan_0_sim_status_status) == "undefined") {
+		blockUI_alert("SIM not detected");
+		return;
+	}
+#ifndef V_WEBIF_SPEC_vdf
+	restoreCmd="";
+	if( pppoe_en=="1" ) {
+		restoreCmd="service.pppoe.server.0.enable=1";
+	}
+#ifdef V_GPS
+	if( gps_en=="1" ) {
+		if(restoreCmd!="") {
+			restoreCmd+="&";
+		}
+		restoreCmd+="sensors.gps.0.enable=1";
+	}
+#endif
+	$.get("/cgi-bin/ajax.cgi?getProfiles",function(v){
+		eval(v)
+		for( i=0; i<stpf.length; i++ ) {
+			if(stpf[i].enable == 1) {
+				if(restoreCmd!="") {
+					restoreCmd+="&";
+				}
+				restoreCmd+="link.profile."+(i+1)+".enable=1";
+				pf_enabled++;
+			}
+		}
+#ifdef V_GPS
+		if( pppoe_en=="1" || pf_enabled || gps_en=="1") {
+#else
+		if( pppoe_en=="1" || pf_enabled ) {
+#endif
+			function netScan_func() {
+				disableConnections(netScan);
+			}
+			blockUI_confirm_l(_("band Msg3"), netScan_func);
+		}
+		else {
+			netScan();
+		}
+	});
+#else
+	blockUI_confirm_l(_("band Msg3"), netScan_cgi);
+#endif
+}
+
+function netScan() {
+	provideAction = "netScan";
+	blockUI_wait(_("scanningWait"));
+	rdbCmd =  "/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN.cmd.status=&wwan.0.PLMN_command_state=1";
+	delay = 1000;
+	InitializeTimer();
+	$("#nameText").html("");
+}
+
+function netScan_cgi() {
+	provideAction = "netScan";
+	blockUI_wait(_("scanningWait"));
+	$.ajax({
+		type: 'POST',
+		url: 'cgi-bin/operator_setting.cgi?<%appendCsrfTokenToQueryString();%>cmd=getOperList',
+		dataType: 'json'
+	});
+}
+
+function submitF() {
+	clear_alert();
+	f=document.form;
+	f.saveBand.disabled=true;
+	if(f.paramBand.value=="") {
+		f.paramBand.value="All bands";
+	}
+
+	plmn_preference=set_plmn_preference($("input:radio.access[name=plmn_preference]:checked").val());
+	f.preference.value=plmn_preference;
+	StopTheClock();
+	f.submit();
+}
+
+#ifdef V_WEBIF_SPEC_vdf
+function submitRoaming() {
+	clear_alert();
+	f=document.form;
+	if(f.menuRoamingEn.value=="1") {
+		rdbCmd = "/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>roaming.data.en=1&roaming.data.blocked==";
+	} else {
+		rdbCmd = "/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>roaming.data.en=0";
+	}
+	blockUI_wait(_("GUI pleaseWait"));
+	$.get(rdbCmd, function(){window.location.href="/setband.html?successRoaming";});
+}
+#endif
+
+function initTableBand() {
+var module_band_list = <%_v1=get_single('wwan.0.module_band_list');%>"@@_v1";
+var module_band_list2 = <%_v2=get_single('wwan.0.currentband.current_band');%>"@@_v2";
+#if !defined(V_FIXED_BAND_none) // fixed band variants
+	document.getElementById("BandSetDiv").style['display'] = 'none';
+	document.getElementById("BandNotAvailDiv").style['display'] = '';
+#else
+	// hide band-selection page if band list is not available for dongles
+	if( (module_band_list.length>0) || (module_band_list2!="N/A") ){
+		document.getElementById("BandSetDiv").style['display'] = '';
+		document.getElementById("BandNotAvailDiv").style['display'] = 'none';
+	}
+	else {
+		document.getElementById("BandSetDiv").style['display'] = 'none';
+		document.getElementById("BandNotAvailDiv").style['display'] = '';
+	}
+#endif
+	/* build selrat select list */
+
+	#ifdef ENABLE_NETWORK_RAT_SEL
+	var selrat_cur="<%get_single_direct('wwan.0.currentband.current_selrat');%>";
+	var selrat_list="<%get_single_direct('wwan.0.module_rat_list');%>";
+	var selrat_html=new Array();
+
+	/* get slerat names */
+	var selrat_names=new Array();;
+	$.each(selrat_list.split("&"),function(i,o){
+		var selrat_items;
+
+		/* remove first column */
+		selrat_items=$.grep(o.split(","),function(o2,i2){
+			return i2>0;
+		});
+		selrat_names.push(selrat_items.join(""));
+	});
+
+	/* filter out redundent names */
+	var unique_selrat_names=new Array();
+	$.each(selrat_names,function(i,v){
+		if ($.inArray(v,unique_selrat_names)<0)
+			unique_selrat_names.push(v);
+	});
+
+	/* build option html */
+	$.each(unique_selrat_names,function(i,v){
+		selrat_html.push("<option value='"+v+"'>"+v+"</option>");
+	});
+
+	$("#selratlist").html(selrat_html.join(""));
+	$("#selratlist").val(selrat_cur);
+
+	$("#selratlist").change(function(){
+		selrat_chg=true;
+	});
+	#endif
+<%	_paramBand=base64_encode(_paramBand);%>
+	p_param_band=Base64.decode("@@_paramBand");
+
+	if(module_band_list=="" || module_band_list=="N/A") {
+		var bands_list = new Array();
+		bands_list = module_band_list2.split(";");
+		if(bands_list.length==0)
+			return;
+		for(i=0; i<bands_list.length; i++) {
+			if((bands_list[i]==p_param_band) ) {
+				//document.getElementById("currentBand").innerHTML=bands_list[i];
+				document.form.bandList.options[i]=new Option(bands_list[i], bands_list[i], false, true);
+			}
+			else {
+				document.form.bandList.options[i]=new Option(bands_list[i], bands_list[i], false, false);
+			}
+		}
+	}
+	else {
+		var all_str = new Array();
+		all_str = module_band_list.split("&");
+		if( all_str.length <= 0) {
+			return;
+		}
+		for(i=0; i<all_str.length; i++) {
+			var band_array = new Array();
+			band_array = all_str[i].split(",");
+			if(band_array.length != 2) break;
+			while(band_array[1].substring(0,1)==" ") {
+				band_array[1]=band_array[1].substring(1,band_array[1].length);
+			}
+			if((band_array[0]==p_param_band)||(band_array[1]==p_param_band)||(band_array[1]=="All bands" && p_param_band=="Autoband")) {
+				currentBandSel=band_array[1];
+				document.form.prevBand.value=band_array[0];
+				document.form.bandList.options[i]=new Option(band_array[1], band_array[0], false, true);
+				document.form.prevBand2.value=band_array[1];
+			}
+			else {
+				document.form.bandList.options[i]=new Option(band_array[1], band_array[0], false, false);
+			}
+		}
+	}
+}
+
+var bandList_value;
+
+function bandChange() {
+	document.form.paramBand.value = document.form.bandList.options[document.form.bandList.selectedIndex].value;
+	band_text=$("#bandList option[value='"+document.form.paramBand.value+"']").text();
+	set_plmn_preference_radio(band_text);
+}
+
+var selrat_chg=false;
+
+function bandChangeprompt() {
+	#ifdef ENABLE_NETWORK_RAT_SEL
+	if(bandList_value==document.form.bandList.value && !selrat_chg) {
+		return;
+	}
+	#else
+	if(bandList_value==document.form.bandList.value) {
+		return;
+	}
+	#endif
+
+	document.form.resetPLMN.value="0";
+	// change the select mode to automatic first
+	if( wwan_0_PLMN_selectionMode == "Manual" ) {
+		function confirmed_func() {
+			document.form.resetPLMN.value="1";
+			blockUI_wait(_("saveSettings"));
+			$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN_selectionMode=", function() { submitF(); });
+		}
+		blockUI_confirm_l(_("band warningMsg9"), confirmed_func);
+		return;
+	}
+#ifdef V_WEBIF_SPEC_vdf
+	else if( wwan_0_PLMN_selectionMode == "Automatic" ) {
+		roaming_sim="<%if(rdb_exists('manualroam.custom_roam_simcard')) get_single_direct('manualroam.custom_roam_simcard'); %>"=="1";
+
+		if(roaming_sim)
+			document.form.resetPLMN.value="1";
+        }
+#endif
+
+	blockUI_wait(_("saveSettings"));
+	submitF();
+}
+
+/******************************************/
+var radioscount = 0;
+var list = new Array();
+var ischecked = 0;
+var list_name = new Array();
+var list_mcc = new Array();
+var list_mnc = new Array();
+var list_status = new Array();
+var list_type = new Array();
+var list_decodestr = new Array();
+
+function hasSubStr(str, substr) {
+	return str.search(substr) >= 0;
+}
+
+function set_provider_list() {
+var ii = 0;
+var h="";
+	initTableBand();
+	if( typeof(system_network_plmn_list) != "undefined") {
+
+		//system_network_plmn_list='AT\\&T,310,410,1,1&,310,410,4,7&310 2,310,26,1,1&T-Mobile USA,310,260,1,7&T-Mobile USA,310,260,4,7';
+
+		// split by a single ampersand
+		var cooked = system_network_plmn_list.replace(/\\&/g,"^impossible^");
+		list = cooked.split("&");
+		$.each(list,function(i,v){
+			list[i]=v.replace(/\^impossible\^/g,'&');
+		});
+
+		for( var i=0; i<list.length; i++) {
+			ray = list[i].split(",");
+			if(ray.length == 5 ) {
+				list_name[ii]=ray[0];
+				//list_name[ii]=ray[0].replace("3Telstra", "Telstra");
+				list_name[ii]=list_name[ii].replace("Telstra Mobile", "Telstra");
+				list_mcc[ii]=ray[1];
+				list_mnc[ii]=ray[2];
+				list_status[ii]=parseInt(ray[3]);
+				list_type[ii]=ray[4];
+				ii++;
+			}
+		}
+
+		/*
+			PHS-8P blank operator name workaround - PHS8-P occationally returns blank names
+		*/
+		var i;
+		$.each(list_name,function(i,v){
+
+			/* bypass if not a blank operator */
+			if(v!="")
+				return;
+
+			for(var j=0;j<list_name.length;j++) {
+				/* bypass if a blank operator */
+				if(list_name[j]=="")
+					continue;
+
+				/* use the operator name if mcc and mnc are matching */
+				if(list_mcc[i]==list_mcc[j] && list_mnc[i]==list_mnc[j])
+					list_name[i]=list_name[j];
+			}
+		});
+
+		for( var i=0; i<list_name.length; i++) {
+			mytype=parseInt(list_type[i]);
+			if($("#bandList option:selected").text()!="All bands") {
+			//Work around for Cinterion module -- only display mateched band
+				switch(mytype)
+				{
+					case 0:
+						//"Unknown"
+					break;
+					case 1:
+
+					case 2:
+						if( $("#bandList option:selected").text().indexOf("GSM")==-1 ) {
+							continue;
+						}
+						break;
+					case 3:
+					case 4:
+					case 5:
+					case 6:
+					case 7:
+						if( $("#bandList option:selected").text().indexOf("WCDMA")==-1 ) {
+							continue;
+						}
+						break;
+					case 8:
+					case 9:
+					case 11:
+						if( $("#bandList option:selected").text().indexOf("LTE")==-1 ) {
+							continue;
+						}
+						break;
+					default:
+						//"Reserved"
+					break;
+				}
+			}
+
+			/* priid based restriction - disable forbidden network for Telstra PRI */
+			var forbidden_greyout=false;
+			var priid_carrier="@@priid_carrier";
+			var misi="<%get_single_direct('wwan.0.imsi.msin');%>";
+			if(priid_carrier=="TELSTRA" || misi.substring(0,5)=="50501") {
+				/* forbidden if (cns and 2 bit) or (non-cns and 1,2bit is 2) */
+				forbidden_greyout=((atcns_if=='cns') && ((list_status[i]&2)!=0)) || ((atcns_if!='cns')&&((list_status[i]&3)==2));
+			}
+
+			h+="<tr " +(forbidden_greyout?"style='color:darkgrey'":"")+"><td class='radio-box'>";
+			if ( (list_status[i] &3)!=3) {
+				radioscount++;
+				h+="<input type='radio' class='access' name='rdlist' id='rdlist"+i+"'";
+				if( (atcns_if == 'cns' && ( list_status[i] &1 ) && !ischecked) || //Registered
+					(atcns_if != 'cns' && ( list_status[i] &4 ) && !ischecked)) { //Current
+					ischecked++;
+					h+=" checked='checked'";
+				}
+
+				if(forbidden_greyout)
+					h+=" stat='forbidden' disabled";
+
+				h+="><label for='rdlist"+i+"' style='margin-left:10px;'>&nbsp;</label>";
+			}
+			else {
+				h+="&nbsp;&nbsp;";
+			}
+			h+="</td><td>"+list_name[i]+"</td>";
+			h+="<td>"+list_mcc[i]+"</td>";
+			h+="<td>"+list_mnc[i]+"</td>";
+
+			decodestr = "";
+
+			if (atcns_if == 'cns') {
+				if (list_status[i] &1)
+					decodestr += (decodestr=="")?"Registered ":"/ Registered ";
+				if( list_status[i] &4 )
+					decodestr += (decodestr=="")?"Home ":"/ Home ";
+				if (list_status[i] &2)
+					decodestr += (decodestr=="")?"Forbidden ":"/ Forbidden ";
+
+				decodestr += (decodestr=="")?"Available":"";
+			}
+			else {
+				if ((list_status[i]&3) ==1)
+					decodestr += (decodestr=="")?"Available ":"/ Available ";
+				if (list_status[i] &4)
+					decodestr += (decodestr=="")?"Current ":"/ Current ";
+				if ((list_status[i]&3) ==2)
+					decodestr += (decodestr=="")?"Forbidden ":"/ Forbidden ";
+				decodestr += (decodestr=="")?"Unknown":"";
+			}
+			h+="<td>"+decodestr+"</td>";
+
+			pos = -1;
+			decodestr = "";
+			mystring=list_type[i];
+			do {
+				mystring=mystring.substring(pos+1);
+				mytype=parseInt(mystring);
+
+				if (atcns_if == 'cns') {
+					switch(mytype)
+					{
+						case 0:
+							decodestr += (decodestr.indexOf("Unknown")==-1 && pos==-1)?"Unknown ":"/ Unknown";
+						break;
+						case 1:
+							decodestr += (decodestr.indexOf("GSM")==-1 && pos==-1)?"GSM ":"/ GSM ";
+						break;
+						case 2:
+							decodestr += (decodestr.indexOf("DCS")==-1 && pos==-1)?"DCS ":"/ DCS ";
+						break;
+						case 3:
+							decodestr += (decodestr.indexOf("GSM DCS")==-1 && pos==-1)?"GSM DCS ":"/ GSM DCS ";
+						break;
+						case 4:
+							decodestr += (decodestr.indexOf("PCS")==-1 && pos==-1)?"PCS ":"/ PCS ";
+						break;
+						case 5:
+							decodestr += (decodestr.indexOf("GSM PCS")==-1 && pos==-1)?"GSM PCS ":"/ GSM PCS ";
+						break;
+						case 6:
+							decodestr += (decodestr.indexOf("ICO")==-1 && pos==-1)?"ICO ":"/ ICO ";
+						break;
+						case 7:
+							decodestr += (decodestr.indexOf("UMTS")==-1 && pos==-1)?"UMTS ":"/ UMTS ";
+						break;
+						default:
+							decodestr += (decodestr.indexOf("Reserved")==-1 && pos==-1)?"Reserved ":"/ Reserved ";
+						break;
+					}
+				}
+				else {
+					#if 0 //comment
+						// AcT is converted via simple_at_manager
+						//  - _convATOpListToCNSOpList()	: AT+COPS --> WEBUI
+						//  - convert_network_type()		: WEBUI --> AT+COPS
+						//	* AcT
+						// AT+COPS	WEBUI
+						// 0		1	//GSM (2G)
+						// 1		2	//GSM Compact (2G)
+						// 2		7	//UMTS (3G)
+						// 3		3	//GSM/EGPRS (2G)
+						// 4		4	//UMTS/HSDPA (3G)
+						// 5		5	//UMTS/HSUPA (3G)
+						// 6		6	//HSDPA+HSUPA (3G)
+						// 7		9	//E-UTRAN
+						// 8		10	//EC-GSM-IoT (A/Gb mode)
+						// 9		11	//E-UTRAN (NB-S1 mode)
+					#endif //comment
+					var networkTypeStr = ["Unknown", "GSM (2G)", "GSM (2G)", "GSM/EGPRS (2G)", "UMTS/HSDPA (3G)", "UMTS/HSUPA (3G)", "HSDPA+HSUPA (3G)" , "UMTS (3G)", "DC-HSPA+", "LTE (4G)","EC-GSM-IoT (A/Gb mode)", "E-UTRAN (NB-S1 mode)" ];
+
+					if (decodestr == "")
+						decodestr = networkTypeStr[mytype];
+					else if (!hasSubStr(decodestr,new RegExp(networkTypeStr[mytype],"i")))
+						decodestr += " / " + networkTypeStr[mytype];
+				}
+			} while( (pos = mystring.indexOf("/"))!= -1 );
+			list_decodestr[i]=decodestr;
+			h+="<td>"+decodestr+"</td></tr>";
+		}
+
+		if(h.length) {
+			document.write(h);
+			$("#list-table").css("display","");
+		}
+
+		if (atcns_if == 'cns') {
+			for( var i=0; i<list_name.length; i++) {
+				if(list_name[i].indexOf(system_network_status_network)==0 ) {
+					if( ( (PLMN_select.substring(0,1)=="2")&&(frequency.indexOf("GSM")!=-1)) || ((PLMN_select.substring(0,1)=="1")&&(frequency.indexOf("GSM")==-1)) ) {//XOR based on last opration
+						document.form.rdlist[i].checked=true;
+						break;
+					}
+				}
+			}
+		}
+
+		if(wwan_0_PLMN_selectionMode == "Automatic" || wwan_0_PLMN_selectionMode == "Manual") {
+			if(wwan_0_PLMN_selectionMode=="Automatic"){
+				//$("#ModeText").html(_("band automatic"));
+				document.form.PLMN_Selection_Mode[0].checked=true;
+			}
+			else{
+				//$("#ModeText").html(_("manual"));
+				document.form.PLMN_Selection_Mode[1].checked=true;
+			}
+		}
+		else if(PLMN_select.length>0 && PLMN_select != "N/A") {
+			if(PLMN_select.substring(0,1)=="0"){
+				//$("#ModeText").html(_("band automatic"));
+				document.form.PLMN_Selection_Mode[0].checked=true;
+			}
+			else {
+				//$("#ModeText").html(_("manual"));
+				document.form.PLMN_Selection_Mode[1].checked=true;
+			}
+		}
+	}
+
+	if(system_network_status_network=="Limited Service")
+		system_network_status_network=_("limited service")
+	else if(system_network_status_network=="N/A")
+		system_network_status_network=_("na");
+	var provider=system_network_status_network;
+	if (provider.charAt(0) == "%") {
+		provider=UrlDecode(provider).replace("&","&#38");
+	}
+	$("#nameText").html(provider.replace("Telstra Mobile", "Telstra"));
+	provideAction = "";
+	rdbCmd="/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>wwan.0.PLMN.cmd.status="; //!!!only load the list once
+	InitializeTimer();
+}
+
+function plmnModeOnChange() {
+	if(document.form.PLMN_Selection_Mode[0].checked==true) {
+		document.form.saveMode.disabled=false;
+		document.form.scanNetwork.disabled=true;
+		greyOutRadio(true,0);
+	}
+	else {
+		if(list.length<=1) {
+			document.form.saveMode.disabled=true;
+		}
+		else {
+			document.form.saveMode.disabled=false;
+			greyOutRadio(false,0);
+		}
+		document.form.scanNetwork.disabled=false;
+	}
+}
+
+function greyOutRadio( action, value ) {
+	if( radioscount==1 ) {
+		document.form.rdlist.disabled=action;
+	}
+	else {
+		for(i = 0; i<radioscount; i++) {
+
+			/* do not change forbidden status elements */
+			if($(document.form.rdlist[i]).attr("stat")=="forbidden")
+				continue;
+
+			if(action==false) {
+				/* TT#5956 :Manual roaming list of operators provents users from choosing forbidden network
+				if ((list_status[i]&3) ==2) { //Forbidden
+					document.form.rdlist[i].disabled=true;
+				}
+				else*/ {
+					if(value==1) {
+						if(list_decodestr[i].indexOf("UMTS")!= -1 || list_decodestr[i].indexOf("HSPA")!= -1) {
+							document.form.rdlist[i].disabled=false;
+							document.form.rdlist[i].checked=true;
+						}
+						else
+							document.form.rdlist[i].disabled=true;
+					}
+					else if(value==2 ) {
+						if(list_decodestr[i].indexOf("GSM")!= -1) {
+							document.form.rdlist[i].disabled=false;
+							document.form.rdlist[i].checked=true;
+						}
+						else
+							document.form.rdlist[i].disabled=true;
+					}
+					else {
+						document.form.rdlist[i].disabled=action;
+					}
+				}
+			}
+			else {
+				document.form.rdlist[i].disabled=action;
+			}
+		}
+	}
+}
+
+function set_plmn_preference_radio() {
+	$("#plmn_preference_0").attr("disabled", false);
+	$("#plmn_preference_1").attr("disabled", false);
+	if (conn_type == 'lte') {
+		$("#plmn_preference_2").attr("disabled", false);
+	}
+	if(band_text.indexOf("LTE")!=-1 || band_text.indexOf("4G")!=-1) {
+		$("#plmn_preference_2").prop('checked', true);
+		//check 4g/3g
+		if(band_text.indexOf("WCDMA")==-1 && band_text.indexOf("3G")==-1 && band_text.indexOf("UMTS")== -1 && band_text.indexOf("HSPA")== -1) {
+			$("#plmn_preference_1").attr("disabled", true);
+		}
+		//check 3g/2g
+		if(band_text.indexOf("GSM")==-1 && band_text.indexOf("2G")==-1) {
+			$("#plmn_preference_0").attr("disabled", true);
+		}
+	}
+	else if(band_text.indexOf("WCDMA")!=-1 || band_text.indexOf("3G")!=-1 || band_text.indexOf("UMTS")!= -1 || band_text.indexOf("HSPA")!= -1) {
+		$("#plmn_preference_1").prop('checked', true);
+		//check 3g/2g
+		if(band_text.indexOf("GSM")==-1 && band_text.indexOf("2G")==-1) {
+			$("#plmn_preference_0").attr("disabled", true);
+		}
+		if (conn_type == 'lte') {
+			$("#plmn_preference_2").attr("disabled", true);
+		}
+	}
+	else if(band_text.indexOf("GSM")!=-1 || band_text.indexOf("2G")!=-1) {
+		$("#plmn_preference_0").prop('checked', true);
+		$("#plmn_preference_1").attr("disabled", true);
+		if (conn_type == 'lte') {
+			$("#plmn_preference_2").attr("disabled", true);
+		}
+	}
+	else {
+		if (conn_type == 'lte') {
+			$("#plmn_preference_2").prop('checked', true);
+		}
+		else {
+			$("#plmn_preference_1").prop('checked', true);
+		}
+	}
+}
+
+$(document).ready( function() {
+#ifdef V_WEBIF_SPEC_vdf
+	load_values_to_elements(
+		{"input:radio.access[name=dataRoam]":"<%get_single_direct('roaming.data.en');%>"==1}
+	);
+
+	roamen=$("#dataroamingradio-1").is(":checked")?"1":"0";
+	if (roamen == "1")
+		document.form.menuRoamingEn.value="1"
+	else
+		document.form.menuRoamingEn.value="0"
+#endif
+
+#ifdef V_BAND_SETTINGS_WEBUI_none
+	$("#bandList").css("display","none");
+	$("#currBand").html("<%get_single_direct('wwan.0.currentband.config');%>");
+#endif
+
+	if( wwan_0_sim_status_status!="SIM OK" ) {
+		switch(wwan_0_sim_status_status) {
+			case "SIM removed":
+			case "SIM not inserted":
+				validate_alert("", _("sim removed warning"));
+			break;
+			case "":
+			case "N/A":
+				validate_alert("", _("sim detecting warning"));
+			break;
+			case "SIM PIN":
+				validate_alert("", _("sim pinlock warning"));
+			break;
+			case "SIM PUK":
+				validate_alert("", _("sim puklock warning"));
+			break;
+			default:
+				validate_alert("", _("sim try warning"));
+			break;
+		}
+		$("#band-div").css("display","none")
+		return;
+	}
+
+	if(document.form.status.value=="[done]") {
+		if($("#restoreCmd").val()!="") {
+			$.get("/cgi-bin/rdb.cgi?<%appendCsrfTokenToQueryString();%>"+$("#restoreCmd").val(), function(){
+				$.get("/cgi-bin/ajax.cgi?getProfiles", function(responseText){eval(responseText);});
+			});
+		}
+		success_alert("",_("bandSubmitSuccess"));
+	}
+	plmnModeOnChange();
+	if(list_name.length > 0) {
+		document.getElementById("btn1").style['display'] = 'none';
+		document.getElementById("btn2").style['display'] = '';
+		document.form.PLMN_Selection_Mode[1].checked=true;
+		greyOutRadio(false,0);
+	}
+
+	if (conn_type != 'lte')
+		$("#plmn_preference_lte").hide();
+
+	bandList_value=$("#bandList").val();
+
+	// load configuration
+	//p_param_band=$("#p_param_band").html();
+
+	var band_text=document.form.prevBand2.value
+	if(band_text.indexOf("GSM")!=-1) {
+		$("#plmn_preference_0").attr("checked","checked");
+		$("#plmn_preference_1").attr("disabled", true);
+		$("#plmn_preference_2").attr("disabled", true);
+	}
+	else if(band_text.indexOf("WCDMA")!=-1){
+		$("#plmn_preference_0").attr("disabled", true);
+		$("#plmn_preference_1").attr("checked","checked");
+		$("#plmn_preference_2").attr("disabled", true);
+	}
+	else if(band_text.indexOf("LTE")!=-1){
+		$("#plmn_preference_0").attr("disabled", true);
+		$("#plmn_preference_1").attr("disabled", true);
+		$("#plmn_preference_2").attr("checked","checked");
+	}
+	else {
+<%
+		var plmn_preference_value='';
+		if(rdb_exists('manualroam.2g3gpreference')) {
+			plmn_preference_value=get_single('manualroam.2g3gpreference', '', '--base64');
+		}
+%>
+		var plmn_preference_value=Base64.decode("@@plmn_preference_value");
+
+		// manualroam.2g3gpreference:
+		// each digit refer to type of network: 4 -> 4G, 2 -> 3G, 1 -> 2G
+		// Least digit has more priority on searching order.
+		// So if "manualroam.2g3gpreference" is set to 214, searchs 4G, 2G and 3G in order.
+		// And if "manualroam.2g3gpreference" is set to 24, searchs 4G and 3G in order, 2G is not included.
+		if (plmn_preference_value != '124' && plmn_preference_value != '12' && plmn_preference_value != '21')
+			plmn_preference_value = '124';
+
+		if (conn_type != 'lte' && plmn_preference_value == '124')
+			plmn_preference_value = '12';
+
+		// plmn_preference_value: 4G - 124, 3G - 12, 2G - 21
+		if (plmn_preference_value == '124')
+			plmn_preference_value='2'; // 4G
+		else if (plmn_preference_value == '21')
+			plmn_preference_value=0; // 2G
+		else
+			plmn_preference_value=1; // 3G
+
+		$('#plmn_preference_'+ plmn_preference_value).attr("checked","checked");
+	}
+
+	// toggle network reference based on "operator mode"
+	$("input:radio.access[name=PLMN_Selection_Mode]").change(function(){
+		roaming_sim="<%if(rdb_exists('manualroam.custom_roam_simcard')) get_single_direct('manualroam.custom_roam_simcard'); %>"=="1";
+
+		if($(this).is(":checked")) {
+			if(roaming_sim && ($(this).val()==0)) {
+				$(".show_plmn_preference").css("display","");
+				$("input:radio.access[name=costeffective]").change();
+			}
+			else {
+				$(".show_plmn_preference").css("display","none");
+			}
+		}
+	});
+
+	// trigger change event
+	$("input:radio.access[name=PLMN_Selection_Mode]").trigger("change");
+
+	load_values_to_elements({
+			"input:radio.access[name=costeffective]":"<%if(rdb_exists('manualroam.costeffectivemode')) get_single_direct('manualroam.costeffectivemode'); %>",
+		}
+	);
+
+	$("input:radio.access[name=costeffective]").change(function(){
+		roaming_sim="<%if(rdb_exists('manualroam.custom_roam_simcard')) get_single_direct('manualroam.custom_roam_simcard'); %>"=="1";
+
+		if(!roaming_sim)
+			$("#plmn_preference_div").hide();
+		else if($(this).is(":checked") && $(this).val()==1) {
+			$("#plmn_preference_div").hide();
+		}
+		else if($(this).is(":checked") && $(this).val()==0) {
+			if(document.form.PLMN_Selection_Mode[0].checked == true)
+				$("#plmn_preference_div").show();
+			else
+				$("#plmn_preference_div").hide();
+		}
+	});
+
+	// trigger change event
+	$("input:radio.access[name=costeffective]").trigger("change");
+
+});
+</script>
+
+<div class="header-wrap" id="main-menu"><!--Top Menu--></div>
+<div id="content" class="site-content">
+	<div class="container">
+		<aside class="grid-3 alpha sidemenu" id="side-menu"><!--Side Menu--></aside>
+		<div class="grid-9 omega">
+	<form name="form" class="validate" novalidate="novalidate" method="POST" action="@@request['SCRIPT_NAME']">
+	<%appendCsrfToken();%>
+	<div class="right-column white-box">
+		<div class="pad">
+			<h2><script language=Javascript>document.write(_("band settings"))</script></h2>
+			<input type="hidden" name="status" value="@@form['status']"/>
+			<input type="hidden" name="prevBand" value="@@form['prevBand']"/>
+			<input type="hidden" name="prevBand2" value="@@form['prevBand2']"/>
+			<input type="hidden" name="paramBand" value="@@form['paramBand']"/>
+			<input type="hidden" name="restoreCmd" id="restoreCmd" value="@@form['restoreCmd']"/>
+			<input type="hidden" name="resetPLMN" value="0"/>
+			<input type="hidden" name="preference" value="@@form['preference']"/>
+
+			<div id="band-div">
+
+				<div id="BandSetDiv" style="display:none">
+					<!--div class="form-row">
+						<label for="currentBand"><script language=Javascript>document.write(_("currentBand"))</script></label>
+						<span class="normal-text" id="currentBand"></span>
+					</div-->
+
+					#ifdef ENABLE_NETWORK_RAT_SEL
+					<div class="form-row">
+						<fieldset>
+							<label><script language=Javascript>document.write(_("change radio access technology"))</script></label>
+							<div class="field">
+								<select id="selratlist" name="selratlist" size="1"></select>
+							</div>
+						</fieldset>
+					</div>
+					#endif
+
+					<div class="form-row">
+						<fieldset>
+#ifndef V_BAND_SETTINGS_WEBUI_none
+							<label for="bandList"><script language=Javascript>document.write(_("changeBand"))</script></label>
+#else
+							<div class="field">
+								<label for="currBand"><script language=Javascript>document.write(_("currentBand"))</script></label>
+								<span class="normal-text" id="currBand"></span>
+							</div>
+#endif
+							<div class="field">
+								<select id="bandList" name="bandList" size="1" onChange="javascript:bandChange()"></select>
+							</div>
+						</fieldset>
+					</div>
+#ifndef V_BAND_SETTINGS_WEBUI_none
+					<div class="submit-row">
+						<button type="button" value="Apply" name='saveBand' id='btnApplyFormBand' onClick="bandChangeprompt()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+					</div>
+#endif
+				</div>
+
+				<div id="BandNotAvailDiv" style="display:none">
+					<td width="100%" id="bandNotAvailableTxt"><script language=Javascript>document.write(_("bandSettingNotAvailable"))</script></td>
+				</div>
+
+#ifdef V_CUSTOM_FEATURE_PACK_Verizon_USA
+				<div id="OperatorSettingDiv" style="display:none">
+#endif
+				<br/><h2 id="operatorSettings"><script language=Javascript>document.write(_("band operatorSettings"))</script>
+<!-- 				&nbsp;&nbsp;<i class='progress-sml' id="scanwait" style="padding-bottom:2px; display:none"></i> -->
+				</h2>
+				<div class="form-row">
+					<label for="PLMN_Selection_Mode"><script language=Javascript>document.write(_("band selectOperatorMode"))</script></label>
+					<div class="radio-box-group">
+						<div class="radio-box">
+							<input type="radio" class="access" name="PLMN_Selection_Mode" id="PLMN_Selection_Mode-0" value=0  onclick="plmnModeOnChange();$('#table-div').css('display', 'none');" checked="checked">
+							<label for="PLMN_Selection_Mode-0"><div class="radioText"><script language=Javascript>document.write(_("band automatic"))</script></div></label>
+						</div>
+						<div class="radio-box">
+							<input type="radio" class="access" name="PLMN_Selection_Mode" id="PLMN_Selection_Mode-1" value=1 onClick="plmnModeOnChange();$('#table-div').css('display', '');">
+							<label for="PLMN_Selection_Mode-1"><div class="radioText"><script language=Javascript>document.write(_("manual"))</script></div></label>
+						</div>
+					</div>
+				</div>
+				<div class="form-row show_plmn_preference">
+					<label><script language=Javascript>document.write(_("cost effective mode"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="costeffective-0" name="costeffective" class="access" value=1>
+								<label for="costeffective-0" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="costeffective-1" name="costeffective" class="access" value=0>
+								<label for="costeffective-1" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-row show_plmn_preference" id="plmn_preference_div">
+					<label><script language=Javascript>document.write(_("plmn reference"))</script></label>
+					<div class="radio-box-group">
+						<div class="radio-box" id="plmn_preference_lte">
+							<input type="radio" class="access" name="plmn_preference" id="plmn_preference_2" value=2>
+							<label for="plmn_preference_2"><script language=Javascript>document.write(_("plmn reference 4g"))</script></label>
+						</div>
+						<div class="radio-box">
+							<input type="radio" class="access" name="plmn_preference" id="plmn_preference_1" value=1>
+							<label for="plmn_preference_1"><script language=Javascript>document.write(_("plmn reference 3g"))</script></label>
+						</div>
+						<div class="radio-box">
+							<input type="radio" class="access" name="plmn_preference" id="plmn_preference_0" value=0>
+							<label for="plmn_preference_0"><script language=Javascript>document.write(_("plmn reference 2g"))</script></label>
+						</div>
+					</div>
+				</div>
+
+				<div class="form-row">
+					<label for="nameText"><script language=Javascript>document.write(_("band currentRegistration"))</script></label>
+					<span class="normal-text" id="nameText"></span>
+				</div>
+				<div id="table-div">
+				<table class="form-row" id="list-table" style="display:none">
+					<colgroup>
+						<col width="50px">
+						<col width="240px">
+						<col width="100px">
+						<col width="100px">
+						<col width="180px">
+						<col width="180px">
+					</colgroup>
+					<thead>
+						<tr>
+							<th>&nbsp;</th>
+							<th class="align10"><script language=Javascript>document.write(_("operatorNameList"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("band mcc"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("band mnc"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("band operatorStatus"))</script></th>
+							<th class="align10"><script language=Javascript>document.write(_("network type"))</script></th>
+						</tr>
+					</thead>
+					<tbody id="provider_list"><script language="JavaScript">set_provider_list();</script></tbody>
+				</table>
+				</div>
+				<div class="submit-row">
+					<div id="btn1">
+						<button type="button" class="secondary" name='scanNetwork' id='btnScan' onClick="pre_netScan()"><script language=Javascript>document.write(_("band scan"))</script></button>
+					</div>
+					<button type="button" name='saveMode' id='saveMode' onClick="changeMode()"><script language=Javascript>document.write(_("apply"))</script></button>
+					<div id="btn2" style="display:none">
+						<button type="button" class="secondary" name="btnCancel" id="btnCancel" onClick="location.reload();"><script language=Javascript>document.write(_("cancel"))</script></button>
+						&nbsp;&nbsp;
+					</div>
+				</div>
+#ifdef V_CUSTOM_FEATURE_PACK_Verizon_USA
+				</div> <!-- id="OperatorSettingDiv" -->
+#endif
+			</div>
+
+#ifdef V_WEBIF_SPEC_vdf
+			<div id="roamingsettings-div">
+				<input type="hidden" name="menuRoamingEn" id="menuRoamingEn" value="@@form['menuRoamingEn']"/>
+				<div class="form-row">
+					<h2><script language=Javascript>document.write(_("roamingsettings"))</script></h2>
+					<label for="field-1"><script language=Javascript>document.write(_("allowdataroaming"))</script></label>
+					<div class="field">
+						<div class="location-settings">
+							<div class="radio-switch">
+								<input type="radio" id="dataroamingradio-1" name="dataRoam" class="access" value=1 onClick="javascript:document.form.menuRoamingEn.value='1';">
+								<label for="dataroamingradio-1" class="on"><script language=Javascript>document.write(_("on"))</script></label>
+								<input type="radio" id="dataroamingradio-2" name="dataRoam" class="access" value=0 onClick="javascript:document.form.menuRoamingEn.value='0';">
+								<label for="dataroamingradio-2" class="off"><script language=Javascript>document.write(_("off"))</script></label>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="submit-row">
+					<button type="button" value="Apply" name='saveRoaming' id='btnApplyFormRoaming' onClick="submitRoaming()"><script language=Javascript>document.write(_("CSsave"))</script></button>
+				</div>
+			</div>
+#endif
+
+		</div>
+	</div>
+	</form>
+</div>
+	</div>
+</div>
+<footer class="footer">
+	<div class="container">
+		<p class="copy-right"><script language=Javascript>document.write(_("powered by netComm"))</script></p>
+	</div>
+</footer>
+<script language='javascript'>
+    set_menu("Internet", "BAND", <%_val = session["user"];%>"@@_val");
+#ifdef V_WEBIF_SPEC_vdf
+<%	if(request['QUERY_STRING']=="successRoaming") {%>
+		success_alert("",_('roaming setting saved'));
+<%	}%>
+#endif
+</script>
+
+</body>
+</html>
